@@ -1,3 +1,5 @@
+import { clubMemberNoun } from "@/modules/organizations/club-kind";
+
 /**
  * Club rosters (#356). Pure rules: club years, ages, and labels. Birth dates
  * travel as `YYYY-MM-DD` calendar dates, never as instants, so a time zone can
@@ -417,14 +419,19 @@ export function parseRosterBirthDateInput(
  * nothing for staff and adults, whose rows then fall back to their type label
  * as before. A role someone typed is never replaced.
  */
-export function defaultRosterRole(attendeeType: string | null | undefined) {
-  return attendeeType === "YOUTH" ? "Pathfinder" : "";
+export function defaultRosterRole(attendeeType: string | null | undefined, clubKind?: string | null) {
+  return attendeeType === "YOUTH" ? clubMemberNoun(clubKind) : "";
+}
+
+/** Whether a stored role is the youth default of either club kind, so a kind change never leaves a typed role mistaken for one (#1517). */
+export function isDefaultYouthRole(role: string | null | undefined) {
+  return role === clubMemberNoun("PATHFINDER") || role === clubMemberNoun("ADVENTURER");
 }
 
 /** A typed role, or the default for the type when it was left blank (#424). */
-export function rosterRoleOrDefault(role: string | null | undefined, attendeeType: string | null | undefined) {
+export function rosterRoleOrDefault(role: string | null | undefined, attendeeType: string | null | undefined, clubKind?: string | null) {
   const typed = (role ?? "").trim();
-  return typed || defaultRosterRole(attendeeType);
+  return typed || defaultRosterRole(attendeeType, clubKind);
 }
 
 export type RosterYearSummary = {

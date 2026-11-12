@@ -232,6 +232,7 @@ async function main() {
     const club = await prisma.organization.findUniqueOrThrow({ where: { id: approved.organizationId } });
     assert(club.type === "CLUB" && club.parentOrganizationId === churchA.id && club.name === `${stamp} Trailblazers` && club.isActive, "the club is an active CLUB under the sponsoring church");
     assert(club.sourceOrgType === "Pathfinder Club", "a Pathfinder application makes a Pathfinder club");
+    assert(club.clubKind === "PATHFINDER", "a Pathfinder application makes a Pathfinder-kind club");
     const invites = await prisma.clubInvite.findMany({ where: { organizationId: club.id } });
     assert(invites.length === 1 && invites[0]!.role === "DIRECTOR" && invites[0]!.email === directorEmail && invites[0]!.status === "SENT", "one director invite was sent to the director");
     const inviteEmailSent = sent.find((message) => message.to.includes(directorEmail));

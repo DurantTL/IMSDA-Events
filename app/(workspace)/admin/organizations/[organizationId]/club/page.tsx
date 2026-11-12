@@ -6,9 +6,11 @@ import { Eye } from "lucide-react";
 import { ActAsButton } from "@/components/act-as-button";
 import { ClubImportYearMove } from "@/components/club-import-year-move";
 import { ClubGuardiansPanel } from "@/components/club-guardians-panel";
+import { ClubKindControl } from "@/components/club-kind-control";
 import { ClubOverview } from "@/components/club-overview";
 import { HubCardGroup } from "@/components/admin-hub";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
+import { clubKindLabel } from "@/modules/organizations/club-kind";
 import { canAdministerClubOrganization } from "@/modules/organizations/access";
 import { clubPageHref, clubRelatedCards, directoryReturnHref } from "@/modules/club-reports/club-page-links";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -48,7 +50,7 @@ export default async function StaffOpenClubPage({
   const view = staffClubYearView(query?.year);
   const club = await getPrisma().organization.findUnique({
     where: { id: organizationId },
-    select: { type: true, name: true, isActive: true, parentOrganization: { select: { name: true } } },
+    select: { type: true, name: true, isActive: true, clubKind: true, parentOrganization: { select: { name: true } } },
   });
   if (!club || club.type !== "CLUB") notFound();
   const imports = await listClubImports(organizationId);
@@ -86,9 +88,11 @@ export default async function StaffOpenClubPage({
           <h2 className="club-name-heading" title={club.name} translate="no">{club.name}</h2>
           <dl className={styles.facts}>
             <div><dt>Sponsoring church</dt><dd translate={club.parentOrganization ? "no" : undefined}>{club.parentOrganization?.name ?? "No church listed"}</dd></div>
+            <div><dt>Club kind</dt><dd>{clubKindLabel(club.clubKind)}</dd></div>
             <div><dt>Status</dt><dd>{club.isActive ? "Active" : "Inactive"}</dd></div>
             <div><dt>Club year</dt><dd>{view.clubYear}</dd></div>
           </dl>
+          {user.globalRole === "SYSTEM_ADMIN" && <ClubKindControl clubKind={club.clubKind} organizationId={organizationId} />}
           <p>This is what the club&apos;s director sees. Nothing can be changed here; showing birth dates is recorded.</p>
         </div>
       </div>

@@ -71,6 +71,7 @@ import {
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
 import styles from "@/components/club-roster-sections.module.css";
 import tableStyles from "@/components/club-roster-table.module.css";
+import { clubMemberNounPlural } from "@/modules/organizations/club-kind";
 
 type RosterResponse = {
   members?: RosterMemberRecord[];
@@ -192,7 +193,10 @@ function ClubRosterWorkspaceInner({
   guardiansOnly = false,
   sectionsStartClosed = false,
   schoolDetails = false,
+  clubKind,
 }: {
+  /** Pathfinder or Adventurer: the member wording (#1517). Pathfinder when omitted. */
+  clubKind?: string | null;
   /**
    * School type and church membership (#1668): true only where the caller loaded them, which is the club's own roster
    * (director, deputy, registrar) and the system administrator's Open club page. Area Coordinators and event managers
@@ -520,7 +524,7 @@ function ClubRosterWorkspaceInner({
   const sortMenuColumns = columns.filter((column): column is RosterSortColumn => (ROSTER_SORT_COLUMNS as readonly string[]).includes(column));
   const sections = [
     { key: "STAFF", title: "Staff", empty: filtersActive ? "No one in Staff matches." : "No staff on the roster yet.", people: sortPeople(visible.filter((member) => rosterSectionOf(member.attendeeType) === "STAFF")) },
-    { key: "MEMBERS", title: "Members", empty: filtersActive ? "No one in Members matches." : "No Pathfinders on the roster yet.", people: sortPeople(visible.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS")) },
+    { key: "MEMBERS", title: "Members", empty: filtersActive ? "No one in Members matches." : `No ${clubMemberNounPlural(clubKind)} on the roster yet.`, people: sortPeople(visible.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS")) },
   ] as const;
   /**
    * Staff and Members open and close on their own (#1305). Order of precedence: a search or filter that matches people
@@ -1429,8 +1433,8 @@ function ClubRosterWorkspaceInner({
           </label>
           <label>
             Role (optional)
-            {/* Left blank, youth save as "Pathfinder"; staff and adults stay blank (#424). */}
-            <input defaultValue={editing?.role ?? ""} maxLength={60} name="role" placeholder={defaultRosterRole(formType)} />
+            {/* Left blank, youth save as "Pathfinder" or "Adventurer" by club kind; staff and adults stay blank (#424). */}
+            <input defaultValue={editing?.role ?? ""} maxLength={60} name="role" placeholder={defaultRosterRole(formType, clubKind)} />
           </label>
           <label>
             Gender

@@ -18,6 +18,7 @@ import {
 import type { DirectorGrantRecord } from "@/modules/organizations/director-grants-repository";
 import styles from "@/components/club-directors-workspace.module.css";
 import { EmptyState } from "@/components/empty-state";
+import { clubMemberNoun } from "@/modules/organizations/club-kind";
 
 type GrantResponse = {
   grants?: DirectorGrantRecord[];
@@ -65,7 +66,7 @@ export function ClubDirectorsWorkspace({
   canOpenPeople = false,
   linkCurrentOnly = false,
 }: {
-  club: { id: string; name: string; isActive: boolean };
+  club: { id: string; name: string; isActive: boolean; clubKind?: string | null };
   initialGrants: DirectorGrantRecord[];
   /** Whether the viewer may open People & access (#1277): each person then links to their page. The server decides again. */
   canOpenPeople?: boolean;
@@ -228,7 +229,7 @@ export function ClubDirectorsWorkspace({
           </div>
           <label>
             Reason
-            <input maxLength={500} minLength={3} name="reason" placeholder="e.g. 2026–27 Pathfinder director per church board" required />
+            <input maxLength={500} minLength={3} name="reason" placeholder={`e.g. 2026–27 ${clubMemberNoun(club.clubKind)} director per church board`} required />
           </label>
           <p className="field-help">
             The person needs a verified account first. If they don&apos;t have one,

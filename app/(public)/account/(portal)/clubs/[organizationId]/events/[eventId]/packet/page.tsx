@@ -1,3 +1,4 @@
+import { getClubKind } from "@/modules/organizations/club-profile-repository";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
@@ -45,7 +46,7 @@ export default async function DirectorClubPacketPage({
         </div>
         <PrintReportButton label="Print packet" />
       </div>
-      <ClubPacketSheet packet={packet} qrSrc={`/api/attendee/clubs/${encodeURIComponent(organizationId)}/events/${encodeURIComponent(eventId)}/club-pass/qr${teamKey ? `?team=${encodeURIComponent(teamKey)}` : ""}`} />
+      <ClubPacketSheet clubKind={await getClubKind(organizationId)} packet={packet} qrSrc={`/api/attendee/clubs/${encodeURIComponent(organizationId)}/events/${encodeURIComponent(eventId)}/club-pass/qr${teamKey ? `?team=${encodeURIComponent(teamKey)}` : ""}`} />
     </section>
   );
 }

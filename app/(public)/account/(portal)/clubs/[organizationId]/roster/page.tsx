@@ -111,6 +111,7 @@ export default async function ClubRosterPage({
         key={clubYear}
         classHistoryBase={`/account/clubs/${organizationId}/class-tracking`}
         canSeeBirthDates={access.capabilities.seeBirthDates && !readOnly}
+        clubKind={access.club.clubKind}
         clubYear={clubYear}
         complianceFilter={complianceFilterFrom(complianceParam)}
         // The club Home "Review roster" task links to `?filter=details-needed` and counts with `rosterRowMissingFields` (through `rosterDetailsNeeded`),

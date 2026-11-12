@@ -1,0 +1,20 @@
+/* System administrators' club kind control on the Open club page (#1517). */
+.control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+}
+
+.label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.label select {
+  min-height: 44px;
+}

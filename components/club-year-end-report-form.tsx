@@ -17,6 +17,7 @@ import type { YearEndReportRecord } from "@/modules/club-reports/year-end-reposi
 import { savedMessage } from "@/components/form-message";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import styles from "@/components/club-year-end-report-form.module.css";
+import { clubMemberNoun } from "@/modules/organizations/club-kind";
 
 type Contact = {
   contactName: string;
@@ -85,7 +86,10 @@ export function ClubYearEndReportForm({
   prefillMeta,
   readOnly,
   readOnlyNote,
+  clubKind,
 }: {
+  /** Pathfinder or Adventurer: the year wording (#1517). Pathfinder when omitted. */
+  clubKind?: string | null;
   endpoint: string;
   reportYear: string;
   spanLabel: string;
@@ -191,7 +195,7 @@ export function ClubYearEndReportForm({
   return (
     <form className="page-stack club-report-form" noValidate onSubmit={save}>
       <div className="public-manage-card">
-        <p className="public-registration-eyebrow">{`Pathfinder year ${reportYear} · ${spanLabel}`}</p>
+        <p className="public-registration-eyebrow">{`${clubMemberNoun(clubKind)} year ${reportYear} · ${spanLabel}`}</p>
         <h2>Year-End Report</h2>
         <p className="field-help">
           Due {dueLabel}. Please report as accurately as possible; your information aids the North America Division.
@@ -211,7 +215,7 @@ export function ClubYearEndReportForm({
         </div>
       )}
       <div className="inline-notice" role="note">
-        Counts include roster members who were active at any point during the Pathfinder year, and TLTs (youth marked TLT on the roster).
+        Counts include roster members who were active at any point during the {clubMemberNoun(clubKind)} year, and TLTs (youth marked TLT on the roster).
         Youth are grouped by age on the roster, using the age on file.
       </div>
       {prefillMeta && (

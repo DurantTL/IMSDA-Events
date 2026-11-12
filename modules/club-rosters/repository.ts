@@ -5,7 +5,7 @@ import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { lockClubOrders } from "@/modules/club-orders/repository";
 import { openBirthDate, sealBirthDate } from "@/modules/club-rosters/birth-dates";
-import { ageOn, birthDateProblem, calendarDateOf, clubYearFor, defaultRosterRole, guardianEditableYears, rosterIsTltFor } from "@/modules/club-rosters/domain";
+import { ageOn, birthDateProblem, calendarDateOf, clubYearFor, defaultRosterRole, guardianEditableYears, isDefaultYouthRole, rosterIsTltFor } from "@/modules/club-rosters/domain";
 import { guardianSetEmailProblem, guardianSetPhoneProblem } from "@/modules/club-rosters/guardians-domain";
 import { deleteGuardiansForMember, replaceGuardians } from "@/modules/club-rosters/guardians-repository";
 import type { RosterMemberInput, RosterMemberUpdate } from "@/modules/club-rosters/schemas";
@@ -263,13 +263,17 @@ export async function addRosterMemberInTransaction(
     data: { firstName: input.firstName, lastName: input.lastName },
     select: { id: true },
   });
+  // The schema fills a blank youth role with the Pathfinder default; an Adventurer club's reads "Adventurer" (#1517).
+  const clubKind = input.attendeeType === "YOUTH" && input.role === defaultRosterRole("YOUTH")
+    ? (await tx.organization.findUnique({ where: { id: organizationId }, select: { clubKind: true } }))?.clubKind
+    : undefined;
   const member = await tx.clubRosterMember.create({
     data: {
       organizationId,
       clubYear,
       personId: person.id,
       attendeeType: input.attendeeType,
-      role: input.role,
+      role: clubKind ? defaultRosterRole("YOUTH", clubKind) : input.role,
       classLevel: input.classLevel,
       // The TLT flag (#1851) is a youth member's own.
       isTlt: rosterIsTltFor(input.attendeeType, input.isTlt),
@@ -350,16 +354,18 @@ export async function updateRosterMember(
     // A blank role defaults by the type the person ends up with (#424): youth
     // become "Pathfinder", staff and adults stay blank. A typed role is kept.
     const finalType = input.attendeeType ?? member.attendeeType;
+    const clubKind = input.role !== undefined || input.attendeeType !== undefined
+      ? (await tx.organization.findUnique({ where: { id: organizationId }, select: { clubKind: true } }))?.clubKind
+      : undefined;
     let role = input.role === undefined
       ? undefined
-      : input.role.trim() || defaultRosterRole(finalType);
+      : input.role.trim() || defaultRosterRole(finalType, clubKind);
     // Changing type carries the old type's default role along ("Pathfinder"
     // for a youth moved to staff). Re-default it, but never a typed role.
     const typeChanged = input.attendeeType !== undefined && input.attendeeType !== member.attendeeType;
-    const oldDefault = defaultRosterRole(member.attendeeType);
     const effectiveRole = role ?? member.role ?? "";
-    if (typeChanged && oldDefault && effectiveRole === oldDefault) {
-      role = defaultRosterRole(finalType);
+    if (typeChanged && member.attendeeType === "YOUTH" && isDefaultYouthRole(effectiveRole)) {
+      role = defaultRosterRole(finalType, clubKind);
     }
     const firstName = input.firstName ?? member.person?.firstName ?? "";
     const lastName = input.lastName ?? member.person?.lastName ?? "";

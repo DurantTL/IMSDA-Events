@@ -86,9 +86,9 @@ describe("selectAccountBannerAnnouncements", () => {
 });
 
 describe("listAccountBannerAnnouncements", () => {
-  const directorClub = { organizationId: "club-dir", name: "A", role: "DIRECTOR" as const, sponsoringChurch: null };
-  const deputyClub = { organizationId: "club-dep", name: "B", role: "DEPUTY" as const, sponsoringChurch: null };
-  const registrarClub = { organizationId: "club-reg", name: "C", role: "REGISTRAR" as const, sponsoringChurch: null };
+  const directorClub = { organizationId: "club-dir", name: "A", role: "DIRECTOR" as const, sponsoringChurch: null, clubKind: "PATHFINDER" as const };
+  const deputyClub = { organizationId: "club-dep", name: "B", role: "DEPUTY" as const, sponsoringChurch: null, clubKind: "PATHFINDER" as const };
+  const registrarClub = { organizationId: "club-reg", name: "C", role: "REGISTRAR" as const, sponsoringChurch: null, clubKind: "PATHFINDER" as const };
 
   // What the database hands back for one announcement row.
   function row(id: string, link: { own?: boolean; club?: string | null }, overrides: Record<string, unknown> = {}) {

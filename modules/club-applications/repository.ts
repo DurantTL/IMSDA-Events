@@ -669,6 +669,7 @@ export async function decideNewClubApplication(
         parentOrganizationId: churchId,
         isActive: true,
         sourceOrgType: newClubSourceOrgType[application.clubType],
+        clubKind: application.clubType,
       },
       select: { id: true },
     });

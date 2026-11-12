@@ -2,6 +2,7 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { LONG_TRANSACTION, lockEvent } from "@/modules/attendance-reconciliation/repository";
 import { clubYearFor } from "@/modules/club-rosters/domain";
@@ -301,10 +302,12 @@ export type ChurchBillRecord = {
 const STAFF_LIST_LIMIT = 300;
 
 /** Conference club orders for youth department staff: newest first, with who is billed, and each church's bill on the billing events. */
-export async function loadConferenceOrdersForStaff(): Promise<{ orders: StaffConferenceOrderRecord[]; bills: ChurchBillRecord[]; items: ConferenceItem[] }> {
+/** `clubKind` limits the orders to Pathfinder or Adventurer clubs (#1517); omitted shows all. Church bills are not filtered. */
+export async function loadConferenceOrdersForStaff(clubKind?: ClubKindValue | null): Promise<{ orders: StaffConferenceOrderRecord[]; bills: ChurchBillRecord[]; items: ConferenceItem[] }> {
   const prisma = getPrisma();
   const [rows, invoices, items] = await Promise.all([
     prisma.conferenceClubOrder.findMany({
+      ...(clubKind ? { where: { club: { clubKind } } } : {}),
       orderBy: [{ submittedAt: "desc" }, { id: "desc" }],
       take: STAFF_LIST_LIMIT,
       select: { ...orderSelect, organizationId: true, churchId: true, eventId: true, club: { select: { name: true } }, church: { select: { name: true } } },

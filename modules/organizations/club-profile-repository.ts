@@ -4,6 +4,7 @@ import { z } from "zod";
 import { emailToStore, phoneToStore } from "@/lib/field-validation";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { clubKindLabel, type ClubKindValue } from "@/modules/organizations/club-kind";
 import type { ClubProfileInput } from "@/modules/organizations/club-profile-schemas";
 import { SPONSOR_ORGANIZATION_TYPES, canSponsorClub, normalizeOrganizationName } from "@/modules/organizations/domain";
 import { OrganizationOperationError } from "@/modules/organizations/repository";
@@ -151,4 +152,30 @@ export async function updateClubProfile(organizationId: string, submitted: ClubP
     }, tx);
   });
   return getClubProfile(organizationId);
+}
+
+/** Staff set a club's kind (#1517). CLUB organizations only. Audited with just the old and new kind. */
+export async function setClubKind(organizationId: string, clubKind: ClubKindValue, actorUserId: string) {
+  return getPrisma().$transaction(async (tx) => {
+    const club = await tx.organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true, clubKind: true } });
+    if (!club) throw new OrganizationOperationError("ORGANIZATION_NOT_FOUND", "That organization could not be found.");
+    if (club.type !== "CLUB") throw new OrganizationOperationError("CLUB_REQUIRED", "Only a club has a kind.");
+    if (club.clubKind === clubKind) return { clubKind, changed: false };
+    await tx.organization.update({ where: { id: organizationId }, data: { clubKind } });
+    await writeAuditLog({
+      actorUserId,
+      action: "CLUB_KIND_CHANGED",
+      entityType: "Organization",
+      entityId: organizationId,
+      summary: `Changed ${club.name} from ${clubKindLabel(club.clubKind)} to ${clubKindLabel(clubKind)}.`,
+      metadata: { from: club.clubKind, to: clubKind },
+    }, tx);
+    return { clubKind, changed: true };
+  });
+}
+
+/** A club's kind for wording (#1517); Pathfinder when the club isn't found. */
+export async function getClubKind(organizationId: string): Promise<ClubKindValue> {
+  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { clubKind: true } });
+  return club?.clubKind ?? "PATHFINDER";
 }
