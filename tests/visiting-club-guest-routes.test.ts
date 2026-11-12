@@ -59,7 +59,13 @@ describe("every club-event route and page applies it", () => {
   });
 
   it("calls rejectGuestClubOtherEvent in every route under the club's event address", () => {
-    const missing = walk(routeRoot, "route.ts").filter((file) => !read(file).includes("rejectGuestClubOtherEvent("));
+    // One guest check per access check, so every handler in a file asks, not just one of them.
+    const count = (source: string, needle: string) => source.split(needle).length - 1;
+    const missing = walk(routeRoot, "route.ts").filter((file) => {
+      const source = read(file);
+      const guarded = count(source, "rejectGuestClubOtherEvent(");
+      return guarded === 0 || guarded < count(source, "requireRosterAccess(");
+    });
     expect(missing).toEqual([]);
   });
 
