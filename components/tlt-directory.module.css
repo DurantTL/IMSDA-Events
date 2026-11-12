@@ -31,6 +31,7 @@
 .entryRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .entryRow input { flex: 1 1 10rem; min-height: 44px; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--field-border); border-radius: var(--radius-element); background: var(--card); font: inherit; }
 .entryNote { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--muted); }
+.suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 0; padding: 0; list-style: none; }
 .plain { margin: 0; padding: 0; list-style: none; }
 @media print {
   .noPrint { display: none !important; }

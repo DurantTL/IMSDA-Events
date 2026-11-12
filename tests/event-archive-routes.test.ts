@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/env", () => ({
   getServerEnv: () => ({ APP_BASE_URL: "https://events.example.test" }),
   isServerEnvironmentError: () => false,

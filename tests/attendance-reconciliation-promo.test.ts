@@ -225,3 +225,44 @@ describe("what a version and its fingerprint hold", () => {
     expect(fingerprintInput(build("corr-1"))).toBe(fingerprintInput(build("corr-2")));
   });
 });
+
+describe("a promo code restricted to attendee types (#102)", () => {
+  const restrictedPercent = (codes: string[]): PromoSource => ({ ...percent, code: "TEENS10", attendeeTypeCodes: codes });
+  // Two teens (one no-show) and two adults, $50 each; the estimate discounted only the two teens: 10% of $100 = $10.
+  const people = [
+    person(true, 5000, { attendeeTypeCode: "TEEN" }),
+    person(false, 5000, { attendeeTypeCode: "TEEN" }),
+    person(true, 5000, { attendeeTypeCode: "ADULT" }),
+    person(true, 5000, { attendeeTypeCode: null }),
+  ];
+  const build = (promo: PromoSource | null, recordedCents: number) => {
+    return {
+      registrationId: "r1", confirmationCode: "C-1", status: "CONFIRMED" as const, label: "Synthetic Club", clubId: "c", locationId: null, locationName: null,
+      estimatedCents: 20000 - recordedCents, people, registrationCharges: [], credits: [],
+      promo: promo && { ...promo, recordedCents }, review: null, registrationAdjustmentCents: 0, hasPriceLines: true,
+    } satisfies RegistrationSource;
+  };
+
+  it("discounts only the attended people of a listed type", () => {
+    const result = reconcileRegistration(build(restrictedPercent(["TEEN"]), 1000));
+    // Attended: one teen ($50), one adult, one untyped = $150; the code takes 10% of the teen's $50 only.
+    expect(result.components.promoCents).toBe(-500);
+    expect(result.billableCents).toBe(14500);
+  });
+
+  it("never exceeds the discount that was recorded", () => {
+    const result = reconcileRegistration(build({ ...restrictedPercent(["TEEN"]), value: 10_000 }, 300));
+    expect(result.components.promoCents).toBe(-300);
+  });
+
+  it("gives no discount when nobody attended of a listed type, or the type was removed", () => {
+    expect(reconcileRegistration(build(restrictedPercent(["CHILD"]), 1000)).components.promoCents).toBeCloseTo(0);
+    expect(reconcileRegistration(build(restrictedPercent(["OLDTYPE"]), 1000)).billableCents).toBe(15000);
+  });
+
+  it("an empty or missing restriction takes the percentage over every attended person, exactly as before", () => {
+    const everyone = reconcileRegistration(build(percent, 2000));
+    expect(everyone.components.promoCents).toBe(-1500);
+    expect(reconcileRegistration(build(restrictedPercent([]), 2000))).toEqual({ ...everyone, promo: { code: "TEENS10", appliedCents: -1500 } });
+  });
+});

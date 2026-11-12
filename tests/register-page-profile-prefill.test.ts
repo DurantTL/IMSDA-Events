@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/attendee-accounts/passkey-offer-eligibility", () => ({ passkeyOfferForPage: vi.fn().mockResolvedValue(false) }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: vi.fn() }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/modules/forms/public-repository", () => ({ getPublicRegistrationExperience: mocks.getPublicRegistrationExperience }));

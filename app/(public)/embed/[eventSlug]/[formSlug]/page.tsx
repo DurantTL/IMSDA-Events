@@ -3,6 +3,7 @@ import { securityCheckConfigForPage } from "@/modules/security/security-check-co
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BrandLink } from "@/components/brand-link";
+import { passkeyOfferForPage } from "@/modules/attendee-accounts/passkey-offer-eligibility";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { PublicRegistrationForm } from "@/components/public-registration-form";
 import { getPublicRegistrationExperience } from "@/modules/forms/public-repository";
@@ -67,6 +68,7 @@ export default async function EmbeddedRegistrationPage({
         lodging={experience.lodging}
         embedded
         disableDrafts={Boolean(account)}
+        passkeyOffer={await passkeyOfferForPage()}
         securityCheck={await securityCheckConfigForPage()}
       />
     </div>

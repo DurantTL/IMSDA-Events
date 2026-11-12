@@ -4,8 +4,9 @@ import { useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { DestinationSearch } from "@/components/destination-search";
+import { areaPageDestinations, areaRecordSearch, type AreaSearchPage } from "@/components/area-search-model";
 import { clubPageDestinations, clubRecordSearch, type ClubSearchPage } from "@/components/club-search-model";
-import type { SearchDestination } from "@/components/destination-search-model";
+import type { RecordSearchSpec, SearchDestination } from "@/components/destination-search-model";
 import styles from "@/components/club-portal-search.module.css";
 
 /**
@@ -15,14 +16,27 @@ import styles from "@/components/club-portal-search.module.css";
  * (Tab past it, a click elsewhere, another control opening, or Escape handing focus back to the button).
  */
 export function ClubPortalSearch({ pages }: { pages: readonly ClubSearchPage[] }) {
+  return <BannerSearch pages={pages} records={clubRecordSearch} toDestinations={clubPageDestinations} inputId="club-portal-search-input" />;
+}
+
+/** The Area Coordinator banner's search (#1854): the same panel over the coordinator's tabs and the clubs its Clubs page lists. */
+export function AreaCoordinatorSearch({ pages }: { pages: readonly AreaSearchPage[] }) {
+  return <BannerSearch pages={pages} records={areaRecordSearch} toDestinations={areaPageDestinations} inputId="area-search-input" />;
+}
+
+function BannerSearch<R extends { query: string }>({ pages, records, toDestinations, inputId }: {
+  pages: readonly { href: string; label: string }[];
+  records: RecordSearchSpec<R>;
+  toDestinations: (pages: readonly { href: string; label: string }[]) => SearchDestination[];
+  inputId: string;
+}) {
   const pathname = usePathname();
-  const destinations: SearchDestination[] = useMemo(() => clubPageDestinations(pages), [pages]);
+  const destinations: SearchDestination[] = useMemo(() => toDestinations(pages), [pages, toDestinations]);
   // The panel is open only on the page it was opened on, so a route change closes it without an effect.
   const [openPath, setOpenPath] = useState<string | null>(null);
   const open = openPath === pathname;
   const setOpen = (next: boolean) => setOpenPath(next ? pathname : null);
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const inputId = "club-portal-search-input";
   const wrapId = `${inputId}-wrap`;
 
   // Escape with nothing left to undo (no typed words, no open list) closes the panel and hands focus back to the button.
@@ -74,7 +88,7 @@ export function ClubPortalSearch({ pages }: { pages: readonly ClubSearchPage[] }
         type="button"
         ref={toggleRef}
         className={`icon-button ${styles.toggle}`}
-        aria-label="Search this club's pages, your clubs and members"
+        aria-label={records.label}
         aria-expanded={open}
         aria-controls={wrapId}
         // Pressing the button while the field has focus must not blur the field first (that would close, then reopen).
@@ -85,7 +99,7 @@ export function ClubPortalSearch({ pages }: { pages: readonly ClubSearchPage[] }
       </button>
       </span>
       <div className={styles.search} id={wrapId} data-open={open ? "true" : "false"} onBlurCapture={onBlurCapture} onMouseDown={onMouseDown} onKeyDownCapture={onKeyDownCapture}>
-        <DestinationSearch destinations={destinations} inputId={inputId} onNavigated={() => setOpen(false)} records={clubRecordSearch} />
+        <DestinationSearch destinations={destinations} inputId={inputId} onNavigated={() => setOpen(false)} records={records} />
       </div>
     </>
   );

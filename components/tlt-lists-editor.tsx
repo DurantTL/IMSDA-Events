@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary, type ErrorSummaryItem } from "@/components/form-error-summary";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
@@ -42,6 +43,8 @@ function Entry({ list, entry, onProblem, onClear }: {
   const [fieldError, setFieldError] = useState("");
   const [saved, setSaved] = useState("");
   const [failed, setFailed] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState("");
   const inputId = `tlt-${list}-${entry.id}-name`;
   const errorId = `${inputId}-error`;
   useUnsavedChangesGuard(name !== entry.name);
@@ -55,9 +58,13 @@ function Entry({ list, entry, onProblem, onClear }: {
     try {
       await send(body);
       setSaved(savedMessage());
+      setConfirming(false);
       router.refresh();
     } catch (caught) {
-      if (caught instanceof SendError && (caught.code === "NAME_TAKEN" || caught.code === "INVALID_TLT_REQUEST")) {
+      if (confirming && kind === "retire") {
+        // The confirm dialog is open: show the failure there, where the person is looking.
+        setConfirmError(notSavedMessage(errorText(caught)));
+      } else if (caught instanceof SendError && (caught.code === "NAME_TAKEN" || caught.code === "INVALID_TLT_REQUEST")) {
         setFieldError(caught.message);
         onProblem({ targetId: inputId, message: summaryMessage(`Name of ${entry.name}`, caught.message) });
       } else {
@@ -74,7 +81,7 @@ function Entry({ list, entry, onProblem, onClear }: {
         <label className="sr-only" htmlFor={inputId}>Name of {entry.name}</label>
         <input {...fieldErrorProps(errorId, fieldError)} id={inputId} maxLength={60} onChange={(event) => { setName(event.target.value); setFieldError(""); }} value={name} />
         <SubmitButton className="secondary-button" disabled={busy === "retire" || name.trim() === entry.name} label="Rename" submitting={busy === "rename"} submittingLabel="Saving…" />
-        <button aria-busy={retire.ariaBusy || undefined} className="secondary-button" disabled={retire.disabled} onClick={() => void run("retire", { action: entry.retired ? "restore" : "retire", list, id: entry.id })} type="button">
+        <button aria-busy={retire.ariaBusy || undefined} className="secondary-button" disabled={retire.disabled} onClick={() => { if (entry.retired) void run("retire", { action: "restore", list, id: entry.id }); else { setConfirmError(""); setConfirming(true); } }} type="button">
           {retire.label}
         </button>
       </form>
@@ -84,6 +91,22 @@ function Entry({ list, entry, onProblem, onClear }: {
         {entry.inUse === 0 ? "Not used yet." : `Used by ${entry.inUse} ${entry.inUse === 1 ? "TLT" : "TLTs"}; kept either way.`}
       </p>
       <FormMessage message={failed || saved} tone={failed ? "error" : "success"} />
+      <ConfirmDialog
+        busy={busy === "retire"}
+        busyLabel="Retiring…"
+        confirmLabel="Retire"
+        destructive
+        error={confirmError}
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => void run("retire", { action: "retire", list, id: entry.id })}
+        open={confirming}
+        title={`Retire ${entry.name}?`}
+      >
+        <p>
+          {list === "position" ? "This position type" : "This tag"} will no longer be offered for new choices.
+          {entry.inUse > 0 ? ` ${entry.inUse} ${entry.inUse === 1 ? "TLT keeps" : "TLTs keep"} it.` : ""} Nothing is deleted, and you can restore it later.
+        </p>
+      </ConfirmDialog>
     </li>
   );
 }

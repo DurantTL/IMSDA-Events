@@ -58,3 +58,17 @@ export function csvDownloadResponse(body: string, fileName: string, init: { stat
     },
   });
 }
+
+/** The zip download response (#175): application/zip as an attachment under `fileName`, private and not cached. */
+export function zipDownloadResponse(body: Uint8Array, fileName: string): Response {
+  const safeName = fileName.replace(/[^A-Za-z0-9._-]/g, "-");
+  return new Response(body as BodyInit, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/zip",
+      "Content-Disposition": `attachment; filename="${safeName}"`,
+      "Cache-Control": "private, no-store, max-age=0",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
