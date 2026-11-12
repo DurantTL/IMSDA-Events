@@ -61,6 +61,7 @@ export async function authenticateWithPassword(
       globalRole: true,
       memberships: { where: { status: "ACTIVE" }, select: { role: true } },
       clubsAdministratorGrant: { select: { revokedAt: true } },
+      youthAdministratorGrant: { select: { revokedAt: true } },
       mfaEnrollment: { select: { status: true } },
       passkeys: { where: { revokedAt: null }, select: { id: true }, take: 1 },
       credential: {
@@ -91,6 +92,7 @@ type SignInFacts = {
   globalRole: GlobalRole | null;
   memberships: ReadonlyArray<{ role: string }>;
   clubsAdministratorGrant: { revokedAt: Date | null } | null;
+  youthAdministratorGrant: { revokedAt: Date | null } | null;
   mfaEnrollment: { status: "PENDING" | "ACTIVE" } | null;
   passkeys: ReadonlyArray<{ id: string }>;
 };
@@ -144,6 +146,7 @@ async function readSignInFacts(userId: string): Promise<SignInFacts | null> {
       globalRole: true,
       memberships: { where: { status: "ACTIVE" }, select: { role: true } },
       clubsAdministratorGrant: { select: { revokedAt: true } },
+      youthAdministratorGrant: { select: { revokedAt: true } },
       mfaEnrollment: { select: { status: true } },
       passkeys: { where: { revokedAt: null }, select: { id: true }, take: 1 },
     },
@@ -253,6 +256,7 @@ export async function checkStaffPasswordNoCount(email: string, password: string)
       globalRole: true,
       memberships: { where: { status: "ACTIVE" }, select: { role: true } },
       clubsAdministratorGrant: { select: { revokedAt: true } },
+      youthAdministratorGrant: { select: { revokedAt: true } },
       mfaEnrollment: { select: { status: true } },
       passkeys: { where: { revokedAt: null }, select: { id: true }, take: 1 },
       credential: {

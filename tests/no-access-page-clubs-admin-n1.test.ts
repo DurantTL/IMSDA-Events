@@ -9,7 +9,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ headers: vi.fn(), cookies: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`redirect:${to}`); } }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.session }));
-vi.mock("@/modules/access/admin-roles", () => ({ isActiveClubsAdministrator: mocks.clubsAdmin }));
+vi.mock("@/modules/access/admin-roles", () => ({ isActiveClubsAdministrator: mocks.clubsAdmin, isActiveYouthAdministrator: async () => false }));
 vi.mock("@/modules/events/repository", () => ({ listEventsForUser: mocks.events }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: vi.fn() }));
 vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: vi.fn() }));

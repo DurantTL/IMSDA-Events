@@ -98,6 +98,22 @@ export function PersonAccess({
                   {person.systemAdministrator ? <span className={styles.note}>A system administrator already has every club area.</span> : null}
                 </>}
           </Fact>
+          {full ? (
+            <Fact label={systemRoleText.YOUTH_ADMIN.name}>
+              {!hasStaff ? <span className={styles.muted}>Needs a staff login</span>
+                : !person.systemAdministrator ? (
+                  <>
+                    <RoleToggle kind="youth-administrator" name={name} on={person.youthAdministrator} userId={person.staffId!} />
+                    <span className={styles.note}>The conference youth director: the Area Coordinator view plus the Youth directory.</span>
+                  </>
+                ) : (
+                  <>
+                    <OnOff on={person.youthAdministrator} />
+                    <span className={styles.note}>A system administrator can already open the Youth directory.</span>
+                  </>
+                )}
+            </Fact>
+          ) : null}
           <Fact label={systemRoleText.SITE_CONTENT_EDITOR.name}>
             {!hasStaff ? <span className={styles.muted}>Needs a staff login</span>
               : full && !person.systemAdministrator ? (

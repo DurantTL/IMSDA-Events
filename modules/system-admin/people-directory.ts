@@ -220,6 +220,8 @@ export type PersonDetail = {
   accountId: string | null;
   systemAdministrator: boolean;
   clubsAdministrator: boolean;
+  /** Youth Admin (#1685). Only ever true for a system administrator's view ("full" scope); a Clubs Administrator is never sent it. */
+  youthAdministrator: boolean;
   siteContentEditor: boolean;
   areaCoordinator: boolean;
   /** The TLT director setting on the Area Coordinator role (#1686); on only while the role is current. */
@@ -306,6 +308,7 @@ export async function getPersonDetail(
         accountStatus: true,
         credential: { select: { disabledAt: true } },
         clubsAdministratorGrant: { select: { revokedAt: true } },
+        youthAdministratorGrant: { select: { revokedAt: true } },
         siteContentEditorGrant: { select: { revokedAt: true } },
         mfaEnrollment: { select: { status: true } },
         sessions: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
@@ -345,6 +348,7 @@ export async function getPersonDetail(
     accountId: account ? accountId : null,
     systemAdministrator: user?.globalRole === "SYSTEM_ADMIN",
     clubsAdministrator: Boolean(user?.clubsAdministratorGrant && !user.clubsAdministratorGrant.revokedAt),
+    youthAdministrator: full && Boolean(user?.youthAdministratorGrant && !user.youthAdministratorGrant.revokedAt),
     siteContentEditor: Boolean(user?.siteContentEditorGrant && !user.siteContentEditorGrant.revokedAt),
     areaCoordinator: Boolean(account?.areaCoordinatorGrant && isGrantCurrent(account.areaCoordinatorGrant, now)),
     tltDirector: Boolean(account?.areaCoordinatorGrant && account.areaCoordinatorGrant.tltDirector && isGrantCurrent(account.areaCoordinatorGrant, now)),

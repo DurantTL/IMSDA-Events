@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { actAsActorRoleFields } from "@/modules/audit/act-as-actor-role";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   CLUB_REPORT_PREVIEW_ROW_LIMIT,
@@ -36,7 +37,7 @@ import {
 export type ClubReportActor =
   | { kind: "staff"; userId: string }
   | { kind: "coordinator"; accountId: string }
-  | { kind: "act-as"; userId: string; actAsId: string; viaClubsAdministrator?: true };
+  | { kind: "act-as"; userId: string; actAsId: string; viaClubsAdministrator?: true; viaYouthAdministrator?: true };
 
 export type ClubReportMode = "preview" | "csv" | "print";
 
@@ -49,14 +50,14 @@ export class ClubReportError extends Error {
   }
 }
 
-function auditActor(actor: ClubReportActor) {
+export function auditActor(actor: ClubReportActor) {
   return {
     ...(actor.kind === "coordinator" ? {} : { actorUserId: actor.userId }),
     metadata: {
       viewer: actor.kind === "staff" ? "STAFF" : "AREA_COORDINATOR",
       ...(actor.kind === "coordinator" ? { actorAttendeeAccountId: actor.accountId } : {}),
       ...(actor.kind === "act-as" ? { actAsId: actor.actAsId } : {}),
-      ...(actor.kind === "act-as" && actor.viaClubsAdministrator ? { actorRole: "CLUBS_ADMINISTRATOR" } : {}),
+      ...(actor.kind === "act-as" ? actAsActorRoleFields(actor) : {}),
     } satisfies Record<string, Prisma.InputJsonValue>,
   };
 }

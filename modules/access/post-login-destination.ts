@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { GlobalRole } from "@prisma/client";
-import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
+import { isActiveClubsAdministrator, isActiveYouthAdministrator } from "@/modules/access/admin-roles";
 import { NO_EVENTS_PATH, resolveLoginDestination } from "@/modules/access/login-routing";
 import { withoutArchivedEvents } from "@/modules/events/archive";
 import { readLastUsedEventId } from "@/modules/events/last-used-event";
@@ -33,6 +33,7 @@ export async function resolvePostLoginDestination(
     lastEventId,
     returnTo: options.returnTo,
     isClubsAdmin: !isSystemAdmin && events.length === 0 ? await isActiveClubsAdministrator(user.id) : false,
+    isYouthAdmin: !isSystemAdmin && events.length === 0 ? await isActiveYouthAdministrator(user.id) : false,
   });
   // Same as /select-event: someone whose only events are archived goes to that list, not "no access".
   return destination === NO_EVENTS_PATH && allEvents.length > 0 ? "/archived-events" : destination;

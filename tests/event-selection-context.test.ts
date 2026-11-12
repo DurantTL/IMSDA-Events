@@ -28,7 +28,7 @@ class RedirectSignal extends Error {
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
-vi.mock("@/modules/access/admin-roles", () => ({ isActiveClubsAdministrator: mocks.isClubsAdmin }));
+vi.mock("@/modules/access/admin-roles", () => ({ isActiveClubsAdministrator: mocks.isClubsAdmin, isActiveYouthAdministrator: async () => false }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/events/repository", () => ({
   listEventsForUser: mocks.listEventsForUser,

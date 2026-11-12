@@ -66,8 +66,9 @@ describe("Area Coordinator act-as in Clubs administration (#1556)", () => {
     const ac = readFileSync("app/api/admin/act-as/area-coordinator/route.ts", "utf8");
     const dir = readFileSync("app/api/admin/organizations/[organizationId]/act-as-director/route.ts", "utf8");
     expect(ac).toContain("AREA_COORDINATOR_PORTAL_HREF");
-    expect(ac).toContain("requireClubsAdministration");
-    expect(ac).toContain("actAsActor(actor)");
+    // #1685: the guard also admits an active Youth Admin, for this Area Coordinator act-as only.
+    expect(ac).toContain("requireAreaCoordinatorActAs()");
+    expect(ac).toContain("actAsAreaCoordinator(staff, sessionId)");
     expect(ac).not.toContain("requireSystemAdministrator");
     expect(dir).toContain("clubDirectorPortalHref(organizationId)");
   });

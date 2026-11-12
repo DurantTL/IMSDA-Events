@@ -15,6 +15,7 @@ import {
   type ClubReportActor,
 } from "@/modules/reporting/club-report-export";
 import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { actAsRoleMarks } from "@/modules/audit/act-as-actor-role";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 import { eventFileScope } from "@/modules/reporting/export-scope";
@@ -105,6 +106,6 @@ export async function resolveCoordinatorReportActor(): Promise<ClubReportActor |
   const account = await currentAreaCoordinator();
   if (account) return { kind: "coordinator", accountId: account.id };
   const acting = await currentStaffActingContext();
-  if (acting?.role === "AREA_COORDINATOR") return { kind: "act-as", userId: acting.userId, actAsId: acting.actAsId, ...(acting.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) };
+  if (acting?.role === "AREA_COORDINATOR") return { kind: "act-as", userId: acting.userId, actAsId: acting.actAsId, ...actAsRoleMarks(acting) };
   return null;
 }
