@@ -695,6 +695,10 @@ enum MessageTemplateKey {
   EVENT_DEBRIEF_INVITE
   /// The one reminder (#1679), sent three days after the invitation and only to people who have not answered. Not an event template.
   EVENT_DEBRIEF_REMINDER
+  /// The automatic Monthly Record reminder (#1895): sent on the 11th to a club's director and deputy when the previous month's record is not submitted. No event.
+  MONTHLY_RECORD_REMINDER
+  /// The counts-only summary of those reminders to Area Coordinators (#1895). Numbers only. No event.
+  MONTHLY_RECORD_REMINDER_SUMMARY
 }
 
 enum MessageTemplateStatus {
@@ -884,6 +888,7 @@ model User {
 
   staffHomeLayout           StaffHomeLayout?
   memberships               EventMembership[]
+  eventStaffingAssignments  EventStaffingAssignment[]
   clubsAdministratorGrant   ClubsAdministratorGrant?
   youthAdministratorGrant   YouthAdministratorGrant?
   siteContentEditorGrant    SiteContentEditorGrant?
@@ -1244,6 +1249,7 @@ model AttendeeAccount {
   /// Clubs this account directs. Explicit staff grants only — never inferred.
   clubDirectorGrants                ClubDirectorGrant[]
   areaCoordinatorGrant              AreaCoordinatorGrant?
+  eventStaffingAssignments          EventStaffingAssignment[]        @relation("EventStaffingAssignmentAccount")
   coordinatedLocations              EventLocation[]                  @relation("EventLocationCoordinator")
   grantedClubRoles                  ClubDirectorGrant[]              @relation("ClubDirectorGrantGrantedByAccount")
   acceptedClubInvites               ClubInvite[]                     @relation("ClubInviteAcceptedAccount")
@@ -1921,6 +1927,8 @@ model Event {
   debrief                             EventDebrief?                    @relation("EventDebrief")
   debriefsCarriedHere                 EventDebrief[]                   @relation("EventDebriefCarriedFrom")
   budgetCostLines                     EventBudgetCostLine[]            @relation("EventBudgetCostLines")
+  staffingActivities                  EventStaffingActivity[]          @relation("EventStaffingActivities")
+  staffingAssignments                 EventStaffingAssignment[]        @relation("EventStaffingAssignments")
   formTestSubmissions                 FormTestSubmission[]
   publicFormSubmissions               PublicRegistrationSubmission[]
   capacityReservations                RegistrationCapacityReservation[]
@@ -2097,6 +2105,65 @@ model EventBudgetCostLine {
   event Event @relation("EventBudgetCostLines", fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId, createdAt])
+}
+
+/// What an assignment on an event's staffing sheet is for (#1678). TLT is part of the table from the start so a later change can
+/// assign TLTs (by help-area tag) without reshaping it; the first slice only writes LEAD, HELPER and LIFEGUARD.
+enum EventStaffingRole {
+  LEAD
+  HELPER
+  LIFEGUARD
+  TLT
+}
+
+/// One activity on an event's optional staffing sheet (#1678): a name, optional text, and how many TLTs, lifeguards and other
+/// helpers it needs. Plain table names so volunteers and shifts (#65, #201, #203) can extend the boundary. Kept when the Event
+/// staffing module is switched off.
+model EventStaffingActivity {
+  id               String   @id @default(cuid())
+  eventId          String
+  name             String
+  description      String   @default("")
+  location         String   @default("")
+  timeText         String   @default("")
+  tltsNeeded       Int      @default(0)
+  lifeguardsNeeded Int      @default(0)
+  helpersNeeded    Int      @default(0)
+  position         Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  event       Event                     @relation("EventStaffingActivities", fields: [eventId], references: [id], onDelete: Cascade)
+  assignments EventStaffingAssignment[]
+
+  @@index([eventId, position])
+}
+
+/// One person in one role on one activity (#1678): a registered person (`personId`), an event staff user (`userId`), or an
+/// Area Coordinator's attendee account (`attendeeAccountId`, LEAD only), exactly one of the three (database check). At most one LEAD per activity and one row per person per activity (unique indexes).
+model EventStaffingAssignment {
+  id         String            @id @default(cuid())
+  eventId    String
+  activityId String
+  role       EventStaffingRole
+  personId   String?
+  userId     String?
+  attendeeAccountId String?
+  createdAt  DateTime          @default(now())
+
+  event    Event                 @relation("EventStaffingAssignments", fields: [eventId], references: [id], onDelete: Cascade)
+  activity EventStaffingActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  person   Person?               @relation(fields: [personId], references: [id], onDelete: Cascade)
+  user     User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attendeeAccount AttendeeAccount? @relation("EventStaffingAssignmentAccount", fields: [attendeeAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, personId])
+  @@unique([activityId, userId])
+  @@unique([activityId, attendeeAccountId])
+  @@index([eventId, personId])
+  @@index([eventId, userId])
+  @@index([eventId, attendeeAccountId])
+  @@index([activityId, role])
 }
 
 enum ModuleRequestStatus {
@@ -2602,6 +2669,7 @@ model Person {
   lodgingRoommateAsked       EventLodgingRoommateRequest[] @relation("LodgingRoommateTargetPerson")
   lodgingRulesAsA            EventLodgingRule[] @relation("LodgingRulePersonA")
   lodgingRulesAsB            EventLodgingRule[] @relation("LodgingRulePersonB")
+  eventStaffingAssignments   EventStaffingAssignment[]
 
   @@index([lastName, firstName])
 }
@@ -2780,6 +2848,7 @@ model UserPersonLink {
  * relationship.
  */
 model Organization {
+  monthlyRecordReminders MonthlyRecordReminderLog[]
   clubEventTeachers ClubEventTeacher[]
   activityScores    ActivityScore[]
   attendancePointsOverrides AttendancePointsOverride[]
@@ -7267,6 +7336,34 @@ model BackgroundCheckReminder {
   @@index([batchId])
 }
 
+/// One automatic Monthly Record reminder (#1895): one row per club per report month, claimed in the same transaction
+/// that queues its emails. The unique key is what makes the reminder go once however often the sweep runs. Holds a
+/// count of recipients and no address or name (the outbox has those).
+model MonthlyRecordReminderLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  /// The month the record is for, "YYYY-MM" (the month before the one the reminder went out in).
+  reportMonth    String
+  clubYear       String
+  recipients     Int
+  sentAt         DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, reportMonth])
+  @@index([reportMonth])
+  @@index([sentAt])
+}
+
+/// Whether the automatic Monthly Record reminder is on for one club year (#1895). No row means on. A Clubs
+/// Administrator turns it off and back on; each change is audited.
+model MonthlyRecordReminderSetting {
+  clubYear        String   @id
+  enabled         Boolean  @default(true)
+  updatedByUserId String?
+  updatedAt       DateTime @updatedAt
+}
+
 /// One reminder for one deadline at one reminder point, 14 or 2 days before it is
 /// due (#910). Prepared automatically; emailed only after staff approve it. The
 /// unique key means a deadline, reminder point and due date are never prepared
@@ -11539,6 +11636,9 @@ model ScoredActivity {
   /// BANDS mode: `[{ "label": "Blue", "thresholdHundredths": 9000 }, ...]`, best band first.
   ribbonBands    Json               @default("[]")
   sortOrder      Int                @default(0)
+  /// Set on the two inspection events the optional Inspections tool makes (#1896): "campsite" or "uniform". Null for every
+  /// other scored event. One of each per event, so switching the tool on again never duplicates them.
+  inspectionKind String?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
@@ -11546,6 +11646,7 @@ model ScoredActivity {
   scores ActivityScore[]
 
   @@unique([eventId, normalizedName])
+  @@unique([eventId, inspectionKind])
   @@index([eventId, sortOrder])
 }
 

@@ -1,0 +1,15 @@
+/* Tap targets of the Monthly Records grid on the review list (#1588): 44px at every width, not only on touch screens.
+   The element selectors keep these ahead of the global .intro-actions button size and the global grid link rule. */
+a.target,
+label.target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+a.cellLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+}

@@ -2,6 +2,7 @@ import "server-only";
 
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { ensureInspectionEventsIfOn } from "@/modules/event-inspections/setup";
 import { SCHEDULED_EMAIL_MIN_LEAD_MS } from "@/modules/communications/scheduled-email-domain";
 import { parseInformationFormDefinition } from "@/modules/information-forms/definition";
 import { scopedActorAudit, type ScopedToggleActor } from "@/modules/event-modules/scoped-toggle";
@@ -263,6 +264,8 @@ export async function reprojectDebriefBatches(tx: Tx, eventId: string): Promise<
  * way switching it on later would. Nothing to do when the Debrief was not chosen.
  */
 export async function afterCreationModules(tx: Tx, input: { eventId: string; moduleKeys: readonly string[]; actorUserId: string }) {
+  // Inspections (#1896) makes its two scored events when the new event is created with it on.
+  if (input.moduleKeys.includes("inspection-scoring")) await ensureInspectionEventsIfOn(tx, input.eventId, input.actorUserId);
   if (!input.moduleKeys.includes(DEBRIEF_MODULE_KEY)) return;
   await onDebriefEnabled(tx, { eventId: input.eventId, actor: { kind: "staff", userId: input.actorUserId } });
 }
