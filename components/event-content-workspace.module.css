@@ -90,3 +90,16 @@
 .saveBar :global(.primary-button) {
   min-height: 44px;
 }
+
+/* The page header above already spaces the page; the shared stack's own top padding would double it. */
+.workspace:global(.page-stack) {
+  padding-top: 0;
+}
+
+/* The file list's delete button is 44px at every width (the shared icon button is 39px). */
+.deleteFile:global(.icon-button) {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}

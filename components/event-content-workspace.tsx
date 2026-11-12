@@ -524,7 +524,7 @@ export function EventContentWorkspace({
   }
 
   return (
-    <section className="page-stack">
+    <section className={`page-stack ${styles.workspace}`}>
       {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void save()} />}
       {editBackup.restored && (
         <div className="form-notice draft-restored-notice" role="status">
@@ -576,7 +576,7 @@ export function EventContentWorkspace({
                 </small>
                 <button
                   aria-label={`Delete ${asset.displayName}`}
-                  className="icon-button danger"
+                  className={`icon-button danger ${styles.deleteFile}`}
                   onClick={() => { setDeleteError(""); setPendingDelete(asset); }}
                   type="button"
                 >
@@ -768,45 +768,45 @@ export function EventContentWorkspace({
 
         <section className={styles.addGroup} aria-labelledby="event-content-add-title">
           <h2 id="event-content-add-title">Add a section</h2>
-        <div className={styles.addButtons}>
-          <button className="secondary-button" type="button" onClick={() => addSection("RICH_TEXT")}>
-            <FileText size={15} aria-hidden="true" /> Add a text section
-          </button>
-          <button className="secondary-button" type="button" onClick={() => addSection("RESOURCE_LINKS")}>
-            <Link2 size={15} aria-hidden="true" /> Add resource links
-          </button>
-          <button className="secondary-button" type="button" onClick={() => addSection("NOTICE")}>
-            <Info size={15} aria-hidden="true" /> Add a notice card
-          </button>
-          <button className="secondary-button" type="button" onClick={() => addSection("STEPS")}>
-            <ListOrdered size={15} aria-hidden="true" /> Add a steps card
-          </button>
-          <button className="secondary-button" type="button" onClick={() => addSection("CHECKLIST")}>
-            <SquareCheck size={15} aria-hidden="true" /> Add a checklist card
-          </button>
-        </div>
+          <div className={styles.addButtons}>
+            <button className="secondary-button" type="button" onClick={() => addSection("RICH_TEXT")}>
+              <FileText size={15} aria-hidden="true" /> Add a text section
+            </button>
+            <button className="secondary-button" type="button" onClick={() => addSection("RESOURCE_LINKS")}>
+              <Link2 size={15} aria-hidden="true" /> Add resource links
+            </button>
+            <button className="secondary-button" type="button" onClick={() => addSection("NOTICE")}>
+              <Info size={15} aria-hidden="true" /> Add a notice card
+            </button>
+            <button className="secondary-button" type="button" onClick={() => addSection("STEPS")}>
+              <ListOrdered size={15} aria-hidden="true" /> Add a steps card
+            </button>
+            <button className="secondary-button" type="button" onClick={() => addSection("CHECKLIST")}>
+              <SquareCheck size={15} aria-hidden="true" /> Add a checklist card
+            </button>
+          </div>
 
-        <div className="event-block-picker">
-          <label>
-            Add a block
-            <select value={blockToAdd} onChange={(event) => setBlockToAdd(event.target.value as typeof blockToAdd)}>
-              {newBlockKinds.map((kind) => (
-                <option
-                  value={kind}
-                  key={kind}
-                  disabled={(kind === "HERO" && hasHero) || (kind === "CUSTOM_HTML" && !isSystemAdmin)}
-                >
-                  {blockKindLabels[kind]}
-                  {kind === "HERO" && hasHero ? " (already on the page)" : ""}
-                  {kind === "CUSTOM_HTML" && !isSystemAdmin ? " (system administrators only)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className="secondary-button" type="button" onClick={() => addSection(blockToAdd)}>
-            <Plus size={15} aria-hidden="true" /> Add block
-          </button>
-        </div>
+          <div className="event-block-picker">
+            <label>
+              Add a block
+              <select value={blockToAdd} onChange={(event) => setBlockToAdd(event.target.value as typeof blockToAdd)}>
+                {newBlockKinds.map((kind) => (
+                  <option
+                    value={kind}
+                    key={kind}
+                    disabled={(kind === "HERO" && hasHero) || (kind === "CUSTOM_HTML" && !isSystemAdmin)}
+                  >
+                    {blockKindLabels[kind]}
+                    {kind === "HERO" && hasHero ? " (already on the page)" : ""}
+                    {kind === "CUSTOM_HTML" && !isSystemAdmin ? " (system administrators only)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="secondary-button" type="button" onClick={() => addSection(blockToAdd)}>
+              <Plus size={15} aria-hidden="true" /> Add block
+            </button>
+          </div>
         </section>
 
         <div className={`event-savebar${dirty ? " is-pinned" : ""} ${styles.saveBar}`} role="region" aria-label="Save event page">

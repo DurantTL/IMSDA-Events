@@ -82,4 +82,12 @@ describe("Public content layout (#1586)", () => {
     expect(page).toContain("secondary={<EventContentStarterButton />}");
     expect(markup).not.toContain("Add event guide starter");
   });
+
+  it("sizes the file delete button to 44px and drops the stack's doubled top padding", () => {
+    const css = read("components/event-content-workspace.module.css");
+    expect(css).toMatch(/\.deleteFile:global\(\.icon-button\)\s*\{[^}]*width: 44px;[^}]*height: 44px;/);
+    expect(css).toMatch(/\.workspace:global\(\.page-stack\)\s*\{\s*padding-top: 0;/);
+    expect(workspace).toContain("styles.deleteFile");
+    expect(workspace).toContain("styles.workspace");
+  });
 });
