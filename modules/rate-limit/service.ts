@@ -1047,6 +1047,27 @@ export async function checkClubTransferRequestRateLimit(
 }
 
 /**
+ * A club leader adding or removing a staff training record (#1697): per client, per signed-in leader (an attendee
+ * account, or a staff user acting as director), and per club. Generous: this is data entry, and the limits only stop
+ * scripted hammering.
+ */
+export async function checkClubStaffTrainingRateLimit(
+  request: Request,
+  actorKey: string,
+  organizationId: string,
+) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const actor = hashRateLimitIdentifier("club-staff-training-actor", actorKey, configuration);
+  const club = hashRateLimitIdentifier("club-staff-training-club", organizationId, configuration);
+  return evaluate([
+    { policy: "club-staff-training.write.client", limit: 120, windowSeconds: oneHour, identifierHashes: [client] },
+    { policy: "club-staff-training.write.actor", limit: 120, windowSeconds: oneHour, identifierHashes: [actor] },
+    { policy: "club-staff-training.write.club", limit: 400, windowSeconds: oneDay, identifierHashes: [club] },
+  ], configuration);
+}
+
+/**
  * Per-operation budgets for a club form's private link (#610), per 15
  * minutes. The token is a 256-bit secret, so these exist to stop scripted
  * guessing and hammering, not to slow a parent filling in a form: `read` is

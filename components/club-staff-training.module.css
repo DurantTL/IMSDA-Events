@@ -1,0 +1,18 @@
+/* Staff training records (#1697): one card per adult, so it reads at 390px. */
+.people { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); }
+.person { display: grid; gap: 8px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); align-content: start; }
+.name { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); font-weight: 700; overflow-wrap: anywhere; }
+.type { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.records { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.record { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--line); }
+.recordText { display: grid; gap: 2px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.recordTitle { font-weight: 600; color: var(--imsda-navy); }
+.recordMeta { color: var(--muted); }
+.none { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.add summary { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--imsda-purple); font-weight: 600; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.form { display: grid; gap: 10px; padding-top: 6px; }
+.field { display: grid; gap: 4px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; color: var(--imsda-navy); }
+.field label { font-weight: 600; }
+.field input, .field select { min-height: 44px; width: 100%; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--field-border); border-radius: var(--radius-element); background: var(--card); font: inherit; font-weight: 400; color: inherit; }
+.field small { font-weight: 400; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.removeButton { min-height: 44px; }

@@ -27,6 +27,7 @@ vi.mock("@/modules/club-rosters/repository", () => ({ listRoster: mocks.listRost
 vi.mock("@/modules/club-transfers/repository", () => ({ isGuestClub: async () => false, listTransferClubOptions: mocks.listTransferClubOptions }));
 vi.mock("@/modules/club-rosters/guardians-access", () => ({ rosterGuardiansForAccess: async () => ({}) }));
 vi.mock("@/modules/club-features/roster-health", () => ({ rosterHealthAvailable: async () => false }));
+vi.mock("@/modules/staff-training/repository", () => ({ staffTrainingAvailable: async () => false }));
 vi.mock("@/modules/club-rosters/carry-forward", () => ({ getCarryForwardOffer: async () => ({ state: "NOTHING_TO_CARRY" }) }));
 
 import ClubRosterPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/roster/page";
