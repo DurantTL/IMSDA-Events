@@ -58,6 +58,7 @@ const unsortedTables: Record<string, string> = {
   "app/(workspace)/more/program-assignments/[runId]/page.tsx": "print sheet: frozen assignment run",
   "components/asset-return-panel.tsx": "short fixed list: one person's items on a return form",
   "components/club-form-submission-view.tsx": "print sheet: passenger roll call",
+  "components/analytics-charts.tsx": "set order: a chart's data table in the chart's order (days or weeks in date order, steps in funnel order, events ranked as drawn)",
   "components/club-report-charts.tsx": "set order: months in year order and a chart's data table in the chart's order",
   "components/club-supply-catalog-workspace.tsx": "set order: import preview in file order",
   "components/information-form-responses-view.tsx": "set order: response log, newest first, paged by cursor",
