@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { clubDirectoryClubHref, clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
+import { UNAVAILABLE_STATUS } from "@/modules/system-admin/admin-hubs-model";
+import type { ClubCardCounts } from "@/modules/club-reports/club-card-status-domain";
+import { clubRecordsCounts, completedHonorsCount } from "@/modules/club-reports/club-card-status-domain";
 import { clubPageHref, clubPageReturnHref, clubRelatedCards, directoryReturnHref } from "@/modules/club-reports/club-page-links";
 
 const read = (path: string) => readFileSync(path, "utf8");
@@ -74,12 +77,60 @@ describe("the This club cards (#1587)", () => {
     const from = encodeURIComponent(clubPageHref("club-1", "2025-26", directory));
     expect(cards[0]!.href).toBe(`/admin/organizations/club-1/directors?from=${from}`);
     expect(cards[1]!.href).toBe(`/admin/organizations/club-1/profile?from=${from}`);
-    expect(cards[2]!.href).toBe("/admin/organizations/club-1/club/honors?year=2025-26");
+    expect(cards[2]!.href).toBe(`/admin/organizations/club-1/club/honors?year=2025-26&from=${from}`);
     // The records view honours a club-page `from` (#1588) and shows "Back to <club>".
     expect(cards[3]!.href.startsWith(`${clubSummaryHref({ clubYear: "2025-26", view: "records", query: "Synthetic Pathfinders" })}&from=`)).toBe(true);
     expect(cards[3]!.href.endsWith("#monthly-records")).toBe(true);
     expect(new URL(cards[3]!.href, "https://x.test").searchParams.get("from")!.startsWith("/admin/organizations/club-1/club?year=2025-26")).toBe(true);
-    expect(cards.every((card) => card.status === null)).toBe(true);
+    expect(cards.every((card) => card.status === null)).toBe(true); // no counts handed in: no status shown
+  });
+
+  it("keeps the directory return on the Honors link: a valid from is kept, a foreign or external one is dropped", () => {
+    const honors = clubRelatedCards({ ...base, viewer: all })[2]!;
+    const from = new URL(honors.href, "https://x.test").searchParams.get("from");
+    expect(clubPageReturnHref(from, "club-1")).toBe(clubPageHref("club-1", "2025-26", directory));
+    expect(clubPageReturnHref(`/admin/organizations/club-1/club?year=2025-26&from=${encodeURIComponent("https://evil.example/x")}`, "club-1")).toBe("/admin/organizations/club-1/club?year=2025-26");
+    expect(clubPageReturnHref("https://evil.example/admin/organizations/club-1/club?year=2025-26", "club-1")).toBeNull();
+    expect(clubPageReturnHref("/admin/organizations/club-2/club?year=2025-26", "club-1")).toBeNull();
+    const without = clubRelatedCards({ ...base, directoryHref: null, viewer: all })[2]!;
+    expect(clubPageReturnHref(new URL(without.href, "https://x.test").searchParams.get("from"), "club-1")).toBe("/admin/organizations/club-1/club?year=2025-26");
+  });
+
+  const statuses = (counts: ClubCardCounts, extra: object = {}) =>
+    Object.fromEntries(clubRelatedCards({ ...base, clubActive: true, clubHasChurch: true, counts, ...extra, viewer: all }).map((card) => [card.title, card.status]));
+
+  it("words each status: zero, one and many", () => {
+    expect(statuses({ admins: 0 })["Club admins"]).toEqual({ tone: "warn", text: "No admins" });
+    expect(statuses({ admins: 1 })["Club admins"]).toEqual({ tone: "ok", text: "1 admin" });
+    expect(statuses({ admins: 3 })["Club admins"]).toEqual({ tone: "ok", text: "3 admins" });
+    expect(statuses({ honors: 0 })["Honors"]).toEqual({ tone: "draft", text: "None this year" });
+    expect(statuses({ honors: 1 })["Honors"]).toEqual({ tone: "ok", text: "1 honor" });
+    expect(statuses({ honors: 7 })["Honors"]).toEqual({ tone: "ok", text: "7 honors" });
+    expect(statuses({ records: { missing: 2, submitted: 5 } })["Monthly Records"]).toEqual({ tone: "warn", text: "2 missing" });
+    expect(statuses({ records: { missing: 0, submitted: 4 } })["Monthly Records"]).toEqual({ tone: "ok", text: "4 submitted" });
+    expect(statuses({ records: { missing: 0, submitted: 0 } })["Monthly Records"]).toEqual({ tone: "draft", text: "None due yet" });
+  });
+
+  it("words the profile status from the club's own fields", () => {
+    expect(statuses({})["Club profile"]).toEqual({ tone: "ok", text: "Church listed" });
+    expect(statuses({}, { clubHasChurch: false })["Club profile"]).toEqual({ tone: "warn", text: "No church listed" });
+    expect(statuses({}, { clubActive: false, clubHasChurch: false })["Club profile"]).toEqual({ tone: "draft", text: "Inactive" });
+  });
+
+  it("says Unavailable for a failed read and shows nothing for one that was not made", () => {
+    const failed = statuses({ admins: null, honors: null, records: null });
+    expect(failed["Club admins"]).toEqual(UNAVAILABLE_STATUS);
+    expect(failed["Honors"]).toEqual(UNAVAILABLE_STATUS);
+    expect(failed["Monthly Records"]).toEqual(UNAVAILABLE_STATUS);
+    expect(statuses({})["Club admins"]).toBeNull();
+  });
+
+  it("gives no status or card for a viewer without the gate", () => {
+    const counts = { admins: 2, honors: 2, records: { missing: 1, submitted: 1 } };
+    const records = clubRelatedCards({ ...base, counts, viewer: { canAdministerClub: false, clubsAdministration: true } });
+    expect(records.map((card) => [card.title, card.status?.text])).toEqual([["Monthly Records", "1 missing"]]);
+    const club = clubRelatedCards({ ...base, counts, viewer: { canAdministerClub: true, clubsAdministration: false } });
+    expect(club.map((card) => card.title)).toEqual(["Club admins", "Club profile", "Honors"]);
   });
 
   it("leaves out Monthly Records for an inactive club, whose records the view does not list", () => {
@@ -124,6 +175,12 @@ describe("selected club page source (#1587)", () => {
     expect(page).not.toMatch(/healthRecord|insurance/i);
   });
 
+  it("has the Honors page return through the validated club-page from", () => {
+    const honors = read("app/(workspace)/admin/organizations/[organizationId]/club/honors/page.tsx");
+    expect(honors).toContain("clubPageReturnHref(");
+    expect(honors).toContain("?? clubPageHref(organizationId, clubYear)");
+  });
+
   it("keeps notFound and no-access for removed or inaccessible clubs", () => {
     expect(page).toContain('redirect("/no-access")');
     expect(page).toContain('club.type !== "CLUB"');
@@ -135,5 +192,28 @@ describe("selected club page source (#1587)", () => {
     expect(read("components/club-directory.tsx")).toContain("clubDirectoryClubHref(club.id, clubYear, returnTo)");
     expect(read("components/club-directory.module.css")).toContain("min-height: 44px");
     expect(read("app/(workspace)/admin/organizations/[organizationId]/club/club-page.module.css")).not.toContain(":hover");
+  });
+});
+
+describe("card counts (#1587)", () => {
+  it("counts months past due with no submitted report, as the Monthly Records grid does", () => {
+    const now = new Date("2026-11-12T15:00:00Z"); // September's report was due Oct 10, October's is due Nov 10
+    expect(clubRecordsCounts({ clubYear: "2026-27", submittedMonths: [], joinedOn: null, now })).toEqual({ submitted: 0, missing: 2 });
+    expect(clubRecordsCounts({ clubYear: "2026-27", submittedMonths: ["2026-09"], joinedOn: null, now })).toEqual({ submitted: 1, missing: 1 });
+    expect(clubRecordsCounts({ clubYear: "2026-27", submittedMonths: ["2026-09", "2026-10"], joinedOn: null, now })).toEqual({ submitted: 2, missing: 0 });
+    // a club that joined in November owes nothing for September or October
+    expect(clubRecordsCounts({ clubYear: "2026-27", submittedMonths: [], joinedOn: "2026-11-01", now })).toEqual({ submitted: 0, missing: 0 });
+    // a month not yet due is not missing
+    expect(clubRecordsCounts({ clubYear: "2026-27", submittedMonths: [], joinedOn: null, now: new Date("2026-09-20T15:00:00Z") })).toEqual({ submitted: 0, missing: 0 });
+  });
+
+  it("counts the latest non-voided entry per member and honor, completed only", () => {
+    const entry = (personId: string, honorId: string, status: string, voided = false) => ({ personId, honorId, status, voided });
+    expect(completedHonorsCount([])).toBe(0);
+    expect(completedHonorsCount([entry("p1", "h1", "COMPLETED")])).toBe(1);
+    expect(completedHonorsCount([entry("p1", "h1", "COMPLETED", true), entry("p1", "h1", "COMPLETED")])).toBe(1);
+    expect(completedHonorsCount([entry("p1", "h1", "COMPLETED", true)])).toBe(0);
+    expect(completedHonorsCount([entry("p1", "h1", "IN_PROGRESS"), entry("p1", "h1", "COMPLETED")])).toBe(0); // the later entry wins
+    expect(completedHonorsCount([entry("p1", "h1", "COMPLETED"), entry("p2", "h1", "COMPLETED"), entry("p1", "h2", "COMPLETED")])).toBe(3);
   });
 });
