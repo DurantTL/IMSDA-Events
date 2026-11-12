@@ -53,20 +53,20 @@ export function StaffApprovalsFinance({ eventId, rows, totals }: { eventId: stri
         <div className="report-table-wrap">
           {sorted.noteText && <SortOrderNote>{sorted.noteText}</SortOrderNote>}
           <ListPager label="Staff approvals pages" noun="approvals" nounOne="approval" onPage={setPage} part="count" slice={slice} />
-          <table className="report-table table-cards">
+          <table role="table" className="report-table table-cards">
             <caption className="sr-only">Approved staff, pastor and volunteer registrations with their conference-paid meals</caption>
-            <thead>
-              <tr>
-                {sorted.header("worker")}
-                {sorted.header("group")}
-                {sorted.header("approvedBy")}
-                {sorted.header("approvedOn")}
-                {sorted.header("meals")}
+            <thead role="rowgroup">
+              <tr role="row">
+                {sorted.header("worker", "Worker")}
+                {sorted.header("group", "Group")}
+                {sorted.header("approvedBy", "Approved by")}
+                {sorted.header("approvedOn", "Approved on")}
+                {sorted.header("meals", "Conference-paid meals")}
               </tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup">
               {slice.items.map((row) => (
-                <tr key={row.id}>
+                <tr key={row.id} role="row">
                   <th scope="row" translate="no" {...cardCell("Worker")}>{row.worker || row.confirmationCode}</th>
                   <td {...cardCell("Group")}>{GROUP_LABEL[row.group]}</td>
                   <td translate="no" {...cardCell("Approved by")}>{row.approvedBy ?? "Not recorded"}</td>
