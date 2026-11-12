@@ -42,16 +42,16 @@ function pageRoutes(): string[] {
 }
 
 function routeExists(path: string, routes: readonly string[]): boolean {
-  const parts = path.split("/").filter(Boolean);
+  const parts = path.split("#")[0]!.split("?")[0]!.split("/").filter(Boolean);
   return routes.some((route) => {
     const routeParts = route.split("/").filter(Boolean);
     return routeParts.length === parts.length && routeParts.every((part, index) => /^\[.+\]$/.test(part) || part === parts[index]);
   });
 }
 
-const eventStaff = (permissions: EventPermission[]): HelpViewer => ({ isSystemAdmin: false, selectedEventId: "evt_synthetic", permissions });
-const admin: HelpViewer = { isSystemAdmin: true, selectedEventId: "evt_synthetic", permissions: [...eventPermissions] };
-const noEvent: HelpViewer = { isSystemAdmin: false, selectedEventId: "", permissions: [] };
+const eventStaff = (permissions: EventPermission[]): HelpViewer => ({ isSystemAdmin: false, isClubsAdministrator: false, selectedEventId: "evt_synthetic", permissions });
+const admin: HelpViewer = { isSystemAdmin: true, isClubsAdministrator: true, selectedEventId: "evt_synthetic", permissions: [...eventPermissions] };
+const noEvent: HelpViewer = { isSystemAdmin: false, isClubsAdministrator: false, selectedEventId: "", permissions: [] };
 const ids = (viewer: HelpViewer) => visibleGuides(viewer).map((guide) => guide.id);
 
 describe("guide registry", () => {
@@ -67,12 +67,24 @@ describe("guide registry", () => {
       "import-with-preview",
       "resolve-email-problem",
       "understand-system-readiness",
-      "review-new-club-application",
       "inspect-system-health",
       // Event setup guides (#1435).
       "finish-event-setup",
       "prepare-check-in-and-badges",
       "schedule-event-emails",
+      // Clubs Administrator guides (#1882): the written ones (review-new-club-application moved here), then the walkthroughs.
+      "clubs-find-a-club",
+      "clubs-leaders-and-invites",
+      "clubs-give-a-club-role",
+      "review-new-club-application",
+      "clubs-member-transfers",
+      "clubs-import-clubs",
+      "clubs-monthly-records",
+      "clubs-year-end-review",
+      "clubs-sterling-follow-up",
+      "clubs-download-reports",
+      "walkthrough-clubs-find-club",
+      "walkthrough-clubs-leaders",
     ]);
     expect(new Set(all).size).toBe(all.length);
     for (const id of all) expect(id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
@@ -200,7 +212,8 @@ describe("links to working pages", () => {
     expect(links.map((link) => link.href)).toEqual([
       "/staff?event=evt_synthetic",
       "/admin/people?event=evt_synthetic",
-      "/admin/clubs/leaders?event=evt_synthetic",
+      // A Clubs page needs no event, so its link carries none.
+      "/admin/clubs/leaders",
     ]);
   });
 
