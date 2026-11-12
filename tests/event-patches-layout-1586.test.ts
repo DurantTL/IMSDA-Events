@@ -62,4 +62,15 @@ describe("Event patches layout (#1586)", () => {
     const linked = render({ initial: { linked: [item], choices: [item], isClubEvent: true } });
     expect(linked).toContain("Unlink");
   });
+
+  it("points to the catalog when it has nothing to link, and keeps the usual copy when items exist", () => {
+    const none = { linked: [], choices: [], isClubEvent: true };
+    expect(render()).toContain("Choose an item above and link it to this event.");
+    const admin = render({ initial: none, canOpenCatalog: true });
+    expect(admin).toContain("No patches or pins are in the catalog to link.");
+    expect(admin).toContain('href="/admin/club-supplies"');
+    const other = render({ initial: none });
+    expect(other).toContain("Ask a system administrator or the Clubs Administrator to add patches and pins to the Club supply catalog.");
+    expect(other).not.toContain("Choose an item above");
+  });
 });

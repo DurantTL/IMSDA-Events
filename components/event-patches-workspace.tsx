@@ -50,13 +50,13 @@ export function EventPatchesWorkspace({ eventId, canOpenCatalog = false, initial
   const available = data.choices.filter((item) => !linkedIds.has(item.itemId));
   const sections = [...new Set(available.map((item) => item.section))];
 
+  const catalogLink = canOpenCatalog ? <Link href="/admin/club-supplies">Club supply catalog</Link> : "Club supply catalog";
+
   return (
-    <section className="page-stack">
+    <section className={`page-stack ${styles.patchesWorkspace}`}>
       {confirmDialog}
       <p className={styles.ownershipNote}>
-        Patches and pins come from the{" "}
-        {canOpenCatalog ? <Link href="/admin/club-supplies">Club supply catalog</Link> : "Club supply catalog"}.
-        Club directors are suggested a linked item for every member who attended, and confirm before anything is ordered.
+        Items come from the {catalogLink}. Directors are suggested a linked item for each attendee and confirm before anything is ordered.
       </p>
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
@@ -96,7 +96,13 @@ export function EventPatchesWorkspace({ eventId, canOpenCatalog = false, initial
       <section className="panel">
         <div className="section-heading"><div><p className="eyebrow">Linked</p><h2>Patches and pins for this event ({data.linked.length})</h2></div></div>
         {data.linked.length === 0 ? (
-          <EmptyState announce={false} headingLevel={3} title="No patch or pin linked yet">Choose an item above and link it to this event.</EmptyState>
+          <EmptyState announce={false} headingLevel={3} title="No patch or pin linked yet">
+            {available.length > 0
+              ? "Choose an item above and link it to this event."
+              : canOpenCatalog
+                ? <>No patches or pins are in the catalog to link. Add them in the {catalogLink}.</>
+                : "Ask a system administrator or the Clubs Administrator to add patches and pins to the Club supply catalog."}
+          </EmptyState>
         ) : (
           <ul className={styles.itemList}>
             {data.linked.map((item) => (

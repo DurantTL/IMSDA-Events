@@ -32,6 +32,7 @@
 .rowError { flex-basis: 100%; color: var(--coral); font-size: max(var(--type-floor, 0px), .62rem); }
 
 /* Event patches page (#1586): ownership note, and a phone layout where the select, button and Unlink stack full width. */
+.patchesWorkspace:global(.page-stack) { padding-top: 0; }
 .ownershipNote { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
 .ownershipNote a { color: var(--imsda-purple); font-weight: 700; }
 .unlinkButton { min-height: 44px; min-width: 44px; }
