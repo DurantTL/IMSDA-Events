@@ -1,4 +1,4 @@
-/* Church club summary (#1711): staff read-only, and it prints on one landscape letter page. */
+/* Church club summary (#1711): staff read-only, and it prints on one letter page. */
 .sheet { display: grid; gap: 12px; }
 .printOnly { display: none; }
 .clubs { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
@@ -29,13 +29,11 @@
   .months { grid-template-columns: repeat(12, minmax(0, 1fr)); }
 }
 
-/* A named page, so only this sheet prints landscape (an unnamed @page would apply to every page once loaded). */
-@page churchClubs { size: letter landscape; margin: 0.4in; }
-
+/* No @page rule: an unnamed one would apply to every page once loaded, and naming the page on this nested sheet forces a blank first sheet. The default portrait page fits five clubs. */
 @media print {
   .noPrint { display: none !important; }
   /* Print sizes are set once here, in points, so the sheet fits one page. */
-  .sheet { --print-title: 9pt; --print-text: 7.5pt; page: churchClubs; gap: 3pt; }
+  .sheet { --print-title: 9pt; --print-text: 7.5pt; gap: 3pt; }
   .printOnly { display: block; margin: 0; font-size: var(--print-title); font-weight: 700; }
   .clubs { gap: 3pt; }
   .club { gap: 2pt; padding: 3pt 5pt; border-radius: 0; border-color: var(--muted); }
