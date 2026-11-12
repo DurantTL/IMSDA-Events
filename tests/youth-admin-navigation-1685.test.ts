@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSearchDestinations, searchDestinations, type DestinationSearchContext } from "@/components/destination-search-model";
-import { areaTabs, railItems, staffPlaceFor, visibleAreas, type StaffAreaViewer } from "@/components/staff-areas";
+import { areaTabs, railItems, showsClubYearSelector, staffPlaceFor, visibleAreas, type StaffAreaViewer } from "@/components/staff-areas";
 import { buildStaffNavigation } from "@/components/staff-navigation-model";
 
 /** #1685: a Youth Admin finds the Youth directory in the Clubs area and in Find a page; nobody else gains an entry. Showing a link grants nothing: the page checks the role. */
@@ -52,5 +52,14 @@ describe("Find a page", () => {
     const system = buildSearchDestinations({ ...search, isSystemAdmin: true, youthDirectory: true }).filter((d) => d.label === "Youth directory");
     expect(system).toHaveLength(1);
     expect(system[0]!.scope).toBe("System");
+  });
+});
+
+describe("the club year picker", () => {
+  it("shows on the Clubs pages that read ?year=, never on the Youth directory, which always shows the current club year", () => {
+    expect(showsClubYearSelector(staffPlaceFor("/admin/clubs/summary"))).toBe(true);
+    expect(showsClubYearSelector(staffPlaceFor("/admin/clubs"))).toBe(true);
+    expect(showsClubYearSelector(staffPlaceFor("/admin/youth"))).toBe(false);
+    expect(showsClubYearSelector(staffPlaceFor("/admin"))).toBe(false);
   });
 });

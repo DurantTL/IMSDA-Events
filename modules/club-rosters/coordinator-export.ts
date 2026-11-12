@@ -1,3 +1,4 @@
+import { actAsActorRoleFields } from "@/modules/audit/act-as-actor-role";
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
@@ -23,7 +24,7 @@ import { toCsv } from "@/modules/reporting/csv";
  */
 
 /** Who is exporting: an attendee account, or a staff member acting as a coordinator. */
-export type CoordinatorExportActor = { accountId: string } | { userId: string; actAsId: string };
+export type CoordinatorExportActor = { accountId: string } | { userId: string; actAsId: string; viaClubsAdministrator?: true; viaYouthAdministrator?: true };
 
 const sterlingLabels = {
   CLEAR: "Clear",
@@ -81,7 +82,7 @@ export async function runCoordinatorRosterExport(
     ...(clubs.length === 1 && input.clubs !== "all" ? { entityId: clubs[0]!.id } : {}),
     summary: input.preview ? "Previewed an Area Coordinator roster export." : "Exported club rosters to CSV as an Area Coordinator.",
     metadata: {
-      ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : { actAsId: actor.actAsId }),
+      ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : { actAsId: actor.actAsId, ...actAsActorRoleFields(actor) }),
       clubYear: input.clubYear,
       clubs: input.clubs === "all" ? "all" : clubs.map((club) => club.id),
       clubCount: clubs.length,

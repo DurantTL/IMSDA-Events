@@ -193,14 +193,13 @@ export default async function YouthDirectoryPage({ searchParams }: { searchParam
                       <td {...cardCell("Total")}>{row.total}</td>
                     </tr>
                   ))}
-                </tbody>
-                <tfoot role="rowgroup">
-                  <tr role="row">
+                  {/* The totals are the last body row, not a table footer: the shared card layout styles body rows only, so a footer row would lose its labels on a phone. */}
+                  <tr role="row" className={styles.totalRow}>
                     <th role="rowheader" scope="row">All grades</th>
                     {gradeCounts.columns.map((column) => <td key={column.key} {...cardCell(column.label)}>{column.total}</td>)}
                     <td {...cardCell("Total")}>{gradeCounts.total}</td>
                   </tr>
-                </tfoot>
+                </tbody>
               </table>
             </div>
             <div className={styles.countGrid}>

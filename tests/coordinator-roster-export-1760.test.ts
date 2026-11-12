@@ -326,6 +326,23 @@ describe("same-origin POST only (#1760 review)", () => {
   });
 });
 
+describe("the audit label while acting (#1685)", () => {
+  it.each([
+    ["a Youth Admin", { viaYouthAdministrator: true }, "YOUTH_ADMINISTRATOR"],
+    ["a Clubs Administrator", { viaClubsAdministrator: true }, "CLUBS_ADMINISTRATOR"],
+  ])("labels an export made by %s", async (_label, marks, role) => {
+    mocks.currentStaffActingContext.mockResolvedValue({ role: "AREA_COORDINATOR", userId: "staff-2", actAsId: "actas-2", ...marks });
+    expect((await call("columns=club&clubs=all")).status).toBe(200);
+    expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({ metadata: { actAsId: "actas-2", actorRole: role } });
+  });
+
+  it("writes no role for a system administrator", async () => {
+    mocks.currentStaffActingContext.mockResolvedValue({ role: "AREA_COORDINATOR", userId: "staff-2", actAsId: "actas-2" });
+    await call("columns=club&clubs=all");
+    expect(mocks.writeAuditLog.mock.calls[0]![0].metadata).not.toHaveProperty("actorRole");
+  });
+});
+
 describe("act-as through a Clubs Administrator (#1760 review)", () => {
   it("is allowed and audited with the act-as id", async () => {
     mocks.currentStaffActingContext.mockResolvedValue({ role: "AREA_COORDINATOR", userId: "staff-2", actAsId: "actas-2", viaClubsAdministrator: true });

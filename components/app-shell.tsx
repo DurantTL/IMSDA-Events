@@ -30,7 +30,7 @@ import { StaffKeyboardWatch } from "@/components/staff-keyboard-watch";
 import { buildStaffNavigation } from "@/components/staff-navigation-model";
 import { pageOwnsHeader } from "@/components/page-header-routes";
 import { showsWorkContextChip } from "@/components/work-context-model";
-import { staffAreaMeta } from "@/components/staff-areas";
+import { showsClubYearSelector, staffAreaMeta } from "@/components/staff-areas";
 import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
 import { staffWorkspaceOptions } from "@/modules/access/workspace-contexts";
 import { adminRoleLanding, type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
@@ -355,7 +355,7 @@ export function AppShell({
             menuLabel={place.inEvent ? "Event menu" : staffAreaMeta[place.area].menuLabel}
             title={place.inEvent ? "Event menu" : staffAreaMeta[place.area].menuLabel}
             tabs={rowTabs}
-            trailing={place.area === "clubs" && !place.inEvent ? <ClubsYearSelector /> : openPicker}
+            trailing={showsClubYearSelector(place) ? <ClubsYearSelector /> : place.area === "clubs" && !place.inEvent ? null : openPicker}
           />
           {currentTab?.views && currentTab.views.length > 1 && <StaffViewStrip label={`${currentTab.label} views`} views={currentTab.views} />}
           {!pageDrawsOwnHeader && (

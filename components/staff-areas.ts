@@ -289,6 +289,11 @@ export function isEventScopedPath(pathname: string): boolean {
   return eventPagePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+/** The club year picker belongs to the Clubs pages that read `?year=`; the Youth directory always shows the current club year (#1685), so it has none. */
+export function showsClubYearSelector(place: Pick<StaffPlace, "area" | "tab" | "inEvent">): boolean {
+  return place.area === "clubs" && !place.inEvent && place.tab !== "youth-directory";
+}
+
 export type StaffPlace = { area: StaffArea; tab: string | null; view: string | null; inEvent: boolean };
 
 function under(pathname: string, path: string) {

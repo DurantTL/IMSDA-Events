@@ -209,7 +209,7 @@ export async function resendStaffInvite(userId: string, actorUserId: string) {
 
 /**
  * Cancels a pending staff invite: unused activation links are spent, the sign-in is switched off, and a system
- * administrator or Clubs Administrator role given with the invite is removed. Event assignments are kept.
+ * administrator, Clubs Administrator or Youth Admin role given with the invite is removed. Event assignments are kept.
  * "Allow sign-in" on the person's page undoes the sign-in part, not the roles.
  */
 export async function cancelStaffInvite(userId: string, actorUserId: string, now = new Date()) {

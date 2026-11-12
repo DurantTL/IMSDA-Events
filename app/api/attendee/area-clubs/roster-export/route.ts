@@ -1,3 +1,4 @@
+import { actAsRoleMarks } from "@/modules/audit/act-as-actor-role";
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { resolveAreaCoordinatorViewer } from "@/modules/club-forms/access";
@@ -29,7 +30,7 @@ async function postHandler(request: Request) {
     const clubYear = resolveAreaClubYear(params.year);
     const result = await runCoordinatorRosterExport(
       { columns: params.columns, clubs: params.clubs, clubYear, preview: params.preview },
-      viewer.actor.kind === "ATTENDEE" ? { accountId: viewer.actor.accountId } : { userId: viewer.actor.userId, actAsId: viewer.actor.actAsId },
+      viewer.actor.kind === "ATTENDEE" ? { accountId: viewer.actor.accountId } : { userId: viewer.actor.userId, actAsId: viewer.actor.actAsId, ...actAsRoleMarks(viewer.actor) },
     );
     if ("csv" in result) {
       return csvDownloadResponse(result.csv, exportFileName({ scope: clubYear, kind: "club-rosters" }));

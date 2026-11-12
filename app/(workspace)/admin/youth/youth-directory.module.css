@@ -9,6 +9,10 @@
   padding: 20px;
 }
 
+.panel > * {
+  min-width: 0;
+}
+
 .panel h2 {
   margin: 0;
   color: var(--imsda-navy);
@@ -30,6 +34,7 @@
 }
 
 .toolbar {
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: end;
@@ -45,9 +50,17 @@
   font-weight: 700;
 }
 
+/* A long club name in a dropdown never widens the page, at any width: the label and the select take the room they are given. */
+.toolbar label {
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1 1 12rem;
+  max-width: 22rem;
+}
+
 .toolbar select {
+  width: 100%;
   min-height: var(--touch-target);
-  max-width: min(100%, 22rem);
+  max-width: 100%;
 }
 
 .toolbar button,
@@ -83,6 +96,11 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap: 18px;
+}
+
+.totalRow th,
+.totalRow td {
+  font-weight: 700;
 }
 
 .bars {
@@ -158,14 +176,8 @@
     flex: 1 1 100%;
   }
 
-  /* A long club name in a dropdown never widens the page: the label and the select take the width of the screen. */
   .toolbar label {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .toolbar select {
-    width: 100%;
-    max-width: 100%;
+    max-width: none;
   }
 
   .bar {

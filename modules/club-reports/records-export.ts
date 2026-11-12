@@ -1,3 +1,4 @@
+import { actAsActorRoleFields } from "@/modules/audit/act-as-actor-role";
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
@@ -22,7 +23,7 @@ import { RosterExportError } from "@/modules/club-rosters/export-repository";
  * year, clubs, months, layout, column keys and row count, never a figure. A preview is not audited.
  */
 
-export type RecordsExportActor = { accountId: string } | { userId: string; actAsId: string };
+export type RecordsExportActor = { accountId: string } | { userId: string; actAsId: string; viaClubsAdministrator?: true; viaYouthAdministrator?: true };
 
 const needsRecordDetail = (columns: readonly RecordsExportColumnKey[]) =>
   columns.some((key) => key === "onTimePoints" || key.startsWith("item:"));
@@ -82,7 +83,7 @@ export async function runRecordsExport(
     ...(input.clubs !== "all" && chosen.length === 1 ? { entityId: chosen[0]!.id } : {}),
     summary: "Exported Monthly Records to CSV as an Area Coordinator.",
     metadata: {
-      ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : { actAsId: actor.actAsId }),
+      ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : { actAsId: actor.actAsId, ...actAsActorRoleFields(actor) }),
       clubYear: input.clubYear,
       clubs: input.clubs === "all" ? "all" : chosen.map((club) => club.id),
       clubCount: chosen.length,
