@@ -83,7 +83,8 @@ button.sheetTrigger { display: none; }
   @supports (height: 1dvh) { div.sheetCard { max-height: min(88dvh, calc(100dvh - 24px)); } }
   .sheetCard .sheetHead { display: flex; }
   .sheetCard .sheetSort { display: grid; grid-template-columns: minmax(0, 1fr); }
-  .sheetCard .sheetDone { display: inline-flex; justify-content: center; min-height: 44px; width: 100%; }
+  /* Done stays in reach at the bottom of the sheet while its controls scroll (#1894). */
+  .sheetCard .sheetDone { position: sticky; bottom: 0; display: inline-flex; justify-content: center; min-height: 44px; width: 100%; }
   .sheetCard .rosterSearchPanel { margin: 0; padding: 0; border: 0; background: none; }
   .sheetCard .rosterResultLine { display: none; }
   .sheetCard :global(.club-roster-toolbar) { margin: 0; }
