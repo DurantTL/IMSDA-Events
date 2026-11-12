@@ -1,15 +1,15 @@
 {
   "walkthrough-coordinator-clubs": {
     "capturedFor": "2026-11-12",
-    "sourceHash": "d4029a1d0af9129290488227b8afa6e04de8982d364b7ef12bbb8d5a3aa8756f"
+    "sourceHash": "7c1eeda722fe8b96aa60ddd4dc8cd5c8d830461f494d32174e1d3513920a2f6a"
   },
   "walkthrough-coordinator-follow-up": {
     "capturedFor": "2026-11-12",
-    "sourceHash": "f31738366d1b56e1c248fe19c302858a0bc80863484a8d924ffbe212fb245512"
+    "sourceHash": "8b4e7ff86792bc3818c169362625401d6628d46405afb7aefade6b75d9546c75"
   },
   "walkthrough-coordinator-no-director": {
     "capturedFor": "2026-11-12",
-    "sourceHash": "ff029d97766ada53c6c23e19d605587eda01891bd14db06b1ce96f678b74ae3e"
+    "sourceHash": "faf2b00f0e98b8059c1c3bcf0098fed37caf31f84c61276727a74884a111a530"
   },
   "walkthrough-coordinator-points": {
     "capturedFor": "2026-11-12",
@@ -33,7 +33,7 @@
   },
   "walkthrough-director-get-help": {
     "capturedFor": "2026-11-12",
-    "sourceHash": "9a7c6ed804acd5445b85cb6687b1aeef4fbbd8e0f61c3d50620201f6f7dd895e"
+    "sourceHash": "60d39e95b0a3babca05deddd801007591281dccb3251c45dca7a13928c44eb83"
   },
   "walkthrough-director-leaders": {
     "capturedFor": "2026-11-12",
