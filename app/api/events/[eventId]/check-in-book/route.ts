@@ -16,10 +16,11 @@ async function getHandler(
 ) {
   try {
     const { eventId } = await context.params;
-    await requireClubReportsAccess(await getCurrentSession(), eventId, findActiveMembership);
+    const access = await requireClubReportsAccess(await getCurrentSession(), eventId, findActiveMembership);
     const params = new URL(request.url).searchParams;
     const data = await getCheckInBookData(eventId, {
       statuses: parseCheckInBookStatuses(params.getAll("status")),
+      registeredClubsOnly: access.registeredClubsOnly,
       extraFieldKey: params.get("extra"),
       // ?location= narrows the book to one location; without it every location is combined (#413).
       location: locationParam(request),

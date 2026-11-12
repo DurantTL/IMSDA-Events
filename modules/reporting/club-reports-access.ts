@@ -7,7 +7,7 @@ import {
   type MembershipLookup,
   type Session,
 } from "@/modules/access/authorization";
-import { resolveClubOversight } from "@/modules/club-rosters/event-oversight";
+import { isClubRegisteredForEvent, resolveClubOversight } from "@/modules/club-rosters/event-oversight";
 import { resolveEventContext } from "@/modules/events/selection";
 import { getPrisma } from "@/lib/prisma";
 
@@ -20,11 +20,30 @@ import { getPrisma } from "@/lib/prisma";
  */
 export async function resolveClubReportsAccess(requestedEventId?: string) {
   const context = await resolveEventContext(requestedEventId);
+  const registeredClubsOnly = limitedToRegisteredClubs(context.user, context.membership);
   if (context.permissions.includes("VIEW_REPORTS")) {
-    return { ...context, allowed: true as const, readOnly: false as const };
+    return { ...context, allowed: true as const, readOnly: false as const, registeredClubsOnly };
   }
   const oversight = await resolveClubOversight(context.event.id);
-  return { ...context, allowed: oversight.allowed, readOnly: true as const };
+  return { ...context, allowed: oversight.allowed, readOnly: true as const, registeredClubsOnly };
+}
+
+/**
+ * An event administrator's role is for this event only, so their club exports cover the clubs registered for it
+ * (submitted or confirmed). System administrators, Clubs Administrators (who hold the role through their grant, #1643) and
+ * staff who hold report access through another role are not narrowed.
+ */
+export function limitedToRegisteredClubs(
+  user: { globalRole?: string | null },
+  membership: { role: string; viaClubsAdministrator?: true } | null | undefined,
+) {
+  return user.globalRole !== "SYSTEM_ADMIN" && membership?.role === "EVENT_ADMIN" && !membership.viaClubsAdministrator;
+}
+
+/** Whether one club's data may be opened or exported by this viewer: always, unless narrowed to registered clubs. */
+export async function canOpenClubForReports(access: { registeredClubsOnly: boolean }, eventId: string, organizationId: string) {
+  if (!access.registeredClubsOnly) return true;
+  return isClubRegisteredForEvent(eventId, organizationId);
 }
 
 export function canViewClubReports(permissions: readonly string[]) {
@@ -46,12 +65,13 @@ export async function requireClubReportsAccess(
 ) {
   const access = await requireEventMembership(session, eventId, lookup);
   const permissions = effectivePermissions(access.user, access.membership);
-  if (permissions.includes("VIEW_REPORTS")) return { ...access, permissions };
+  const registeredClubsOnly = limitedToRegisteredClubs(access.user, access.membership);
+  if (permissions.includes("VIEW_REPORTS")) return { ...access, permissions, registeredClubsOnly };
 
   const isEventAdmin = access.user.globalRole === "SYSTEM_ADMIN" || access.membership?.role === "EVENT_ADMIN";
   if (isEventAdmin) {
     const event = await getPrisma().event.findUnique({ where: { id: eventId }, select: { audience: true } });
-    if (event?.audience === "CLUB") return { ...access, permissions };
+    if (event?.audience === "CLUB") return { ...access, permissions, registeredClubsOnly };
   }
   throw new AccessDeniedError(
     "Report access, or Pathfinder event-manager oversight of this club event, is required.",

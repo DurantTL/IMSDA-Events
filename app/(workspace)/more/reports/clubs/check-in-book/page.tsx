@@ -24,7 +24,7 @@ export default async function CheckInBookPage({
   searchParams: Promise<{ event?: string; status?: string | string[]; extra?: string; location?: string }>;
 }) {
   const { event: requested, status, extra, location } = await searchParams;
-  const { event, allowed } = await resolveClubReportsAccess(requested);
+  const { event, allowed, registeredClubsOnly } = await resolveClubReportsAccess(requested);
   if (!allowed) {
     return (
       <AccessRestricted
@@ -35,7 +35,7 @@ export default async function CheckInBookPage({
     );
   }
   const statuses = parseCheckInBookStatuses(status);
-  const data = await getCheckInBookData(event.id, { statuses, extraFieldKey: extra, location });
+  const data = await getCheckInBookData(event.id, { statuses, extraFieldKey: extra, location, registeredClubsOnly });
   if (!data) return <NotAvailableForEvent reason="This event could not be loaded." />;
 
   const eventQuery = `event=${encodeURIComponent(event.id)}`;

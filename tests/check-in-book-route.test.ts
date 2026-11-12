@@ -52,13 +52,14 @@ describe("GET /api/events/[eventId]/check-in-book", () => {
       statuses: ["CONFIRMED", "WAITLISTED"],
       extraFieldKey: "skill_induction",
       location: null,
+      registeredClubsOnly: false,
     });
   });
 
   it("defaults to submitted and confirmed registrations", async () => {
     mocks.findActiveMembership.mockResolvedValue(membership("EVENT_ADMIN"));
     await GET(request(), context);
-    expect(mocks.getCheckInBookData).toHaveBeenCalledWith("event-1", { statuses: ["SUBMITTED", "CONFIRMED"], extraFieldKey: null, location: null });
+    expect(mocks.getCheckInBookData).toHaveBeenCalledWith("event-1", { statuses: ["SUBMITTED", "CONFIRMED"], extraFieldKey: null, location: null, registeredClubsOnly: true });
   });
 
   it("passes ?location= through to narrow the book (#413)", async () => {

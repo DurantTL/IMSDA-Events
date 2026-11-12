@@ -6,7 +6,7 @@ import { AccessRestricted } from "@/components/access-restricted";
 import { ClubPacketSheet } from "@/components/club-packet-sheet";
 import { PrintReportButton } from "@/components/print-report-button";
 import { getClubPacketData } from "@/modules/reporting/club-packet-repository";
-import { resolveClubReportsAccess } from "@/modules/reporting/club-reports-access";
+import { canOpenClubForReports, resolveClubReportsAccess } from "@/modules/reporting/club-reports-access";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
@@ -26,7 +26,7 @@ export default async function StaffClubPacketPage({
   const { event: requested, team: rawTeam } = await searchParams;
   const teamKey = singleSearchParam(rawTeam);
   if (teamKey === null) notFound();
-  const { event, allowed } = await resolveClubReportsAccess(requested);
+  const { event, allowed, registeredClubsOnly } = await resolveClubReportsAccess(requested);
   if (!allowed) {
     return (
       <AccessRestricted
@@ -36,6 +36,7 @@ export default async function StaffClubPacketPage({
       />
     );
   }
+  if (!(await canOpenClubForReports({ registeredClubsOnly }, event.id, organizationId))) notFound();
   const packet = await getClubPacketData(event.id, organizationId, teamKey);
   if (!packet) {
     // A team this club never registered (or another club's) is not found.

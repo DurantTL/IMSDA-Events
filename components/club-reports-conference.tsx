@@ -91,7 +91,7 @@ export function ClubReportsConference({
         )}
       </div>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
-      <p className="field-help">{`${clubs.length} ${registeredOnly ? "registered" : "active"} clubs · ${missingTotal} missing reports so far.`}</p>
+      <p className="field-help">{`${clubs.length} ${registeredOnly ? "registered" : "active"} ${clubs.length === 1 ? "club" : "clubs"} · ${missingTotal} missing reports so far.`}</p>
       {clubs.length === 0 ? (
         <div className="panel"><p className="report-empty">{(registeredOnly ? `No registered clubs for ${clubYear}. Try another club year.` : `No active clubs for ${clubYear}. Try another club year.`)}</p></div>
       ) : (
