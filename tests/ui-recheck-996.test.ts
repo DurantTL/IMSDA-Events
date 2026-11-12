@@ -13,9 +13,9 @@ const rule = (selector: string) => css.match(new RegExp(`(?:^|\\n)${selector.rep
 describe("registration cards (bug 1)", () => {
   it("keep a name column that is never starved by the badges", () => {
     // #1574: one full-width card per row; the chips row sits under the name column, so the badges never starve it.
-    const module = read("components/people-list.module.css");
-    expect(module).toMatch(/\.card \{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/);
-    expect(module).toMatch(/\.chips \{[^}]*grid-column: 1;/);
+    const listCss = read("components/people-list.module.css");
+    expect(listCss).toMatch(/\.card \{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/);
+    expect(listCss).toMatch(/\.chips \{[^}]*grid-column: 1;/);
     expect(rule(".record-card-shell")).toMatch(/container-type:\s*inline-size/);
     expect(read("components/people-workspace.tsx")).toContain("className={listStyles.chips}");
   });
