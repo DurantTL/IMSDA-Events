@@ -1,5 +1,6 @@
 import { withRequestContext } from "@/lib/request-context";
 import { clubFormApiError } from "@/modules/club-forms/api-errors";
+import { isTltFormTemplateKey } from "@/modules/club-forms/domain";
 import { buildClubFormsCsv } from "@/modules/club-forms/csv";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 import { currentTltFormsViewer } from "@/modules/tlt-directory/access";
@@ -13,6 +14,8 @@ async function getHandler(request: Request) {
   if (!viewer) return Response.json({ message: "Not found." }, { status: 404, headers: { "Cache-Control": "private, no-store" } });
   try {
     const params = new URL(request.url).searchParams;
+    // Any form but her three is simply not there for her.
+    if (!isTltFormTemplateKey(params.get("form"))) return Response.json({ message: "Not found." }, { status: 404, headers: { "Cache-Control": "private, no-store" } });
     const { csv, filename } = await buildClubFormsCsv(viewer, { templateKey: params.get("form") ?? "", organizationId: params.get("club") ?? undefined });
     return csvDownloadResponse(csv, exportFileName({ scope: "club-forms", kind: filename.replace(/\.csv$/, "") }));
   } catch (error) {

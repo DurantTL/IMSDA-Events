@@ -449,8 +449,8 @@ export function viewerCanSeeSchoolDetails(viewer: ClubFormsViewer, organizationI
   }
   // Never for a "Not listed" submission (no club, #1229), which is conference staff's alone.
   if (viewer.kind === "AREA_COORDINATOR") return organizationId !== null;
-  // The TLT director reads the TLT forms whole (#1686), whichever club they came from.
-  if (viewer.kind === "TLT_DIRECTOR") return true;
+  // The TLT director has Event Admin level here: school type and church membership are not hers (#1686).
+  if (viewer.kind === "TLT_DIRECTOR") return false;
   return viewer.systemAdmin || viewer.clubsAdministrator;
 }
 

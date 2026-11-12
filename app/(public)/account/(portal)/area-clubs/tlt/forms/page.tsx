@@ -28,7 +28,7 @@ export default async function TltFormsInboxPage({ searchParams }: { searchParams
   return (
     <section className="public-manage-card page-stack">
       <CoordinatorSectionHeading eyebrow="TLT director" title="TLT forms">
-        <p>Every submitted TLT Application, TLT Program Recommendation and TLT of the Year nomination, from all clubs, newest first. Opening one shows every answer, health and conduct included, and each opening is recorded.</p>
+        <p>Every submitted TLT Application, TLT Program Recommendation and TLT of the Year nomination, from all clubs, newest first. Every answer is shown, and each opening is recorded.</p>
       </CoordinatorSectionHeading>
       <p><Link className="secondary-button" href="/account/area-clubs/tlt">Back to the TLT directory</Link></p>
       <TltFormsInbox clubs={inbox.clubs} filters={filters} forms={inbox.forms} slice={slice} />

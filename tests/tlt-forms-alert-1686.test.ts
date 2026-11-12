@@ -89,6 +89,15 @@ describe("the TLT director's alert", () => {
     expect(rows.find((row) => row.recipientEmail === "staff@example.test")!.subjectSnapshot).toMatch(/^Club form submitted/);
   });
 
+  it("makes the staff feed item only when the form's own list got an email, not for the director alone", async () => {
+    setup("club_tlt_application", [], ["director@example.test"]);
+    await queueClubFormSubmittedEmails(client as never, input, true);
+    expect(client.adminAlertFeedItem.createMany).not.toHaveBeenCalled();
+    setup("club_tlt_application", ["staff@example.test"], ["director@example.test"]);
+    await queueClubFormSubmittedEmails(client as never, input, true);
+    expect(client.adminAlertFeedItem.createMany).toHaveBeenCalledTimes(1);
+  });
+
   it("never sends it twice for one submission", async () => {
     setup("club_tlt_application", [], ["director@example.test"]);
     mocks.outboxFindMany.mockResolvedValue([{ idempotencyKey: "club-form-submitted:sub-1:director@example.test" }]);

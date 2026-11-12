@@ -178,6 +178,7 @@ export async function queueClubFormSubmittedEmails(client: Client, input: ClubFo
   });
   const done = new Set(already.map((row) => row.idempotencyKey));
   const ids: string[] = [];
+  let staffCount = 0;
   for (const email of everyone) {
     if (done.has(keyFor(email))) continue;
     const message = directorSet.has(email) && tltContent ? tltContent : content;
@@ -201,10 +202,11 @@ export async function queueClubFormSubmittedEmails(client: Client, input: ClubFo
       select: { id: true },
     });
     ids.push(created.id);
+    if (!directorSet.has(email)) staffCount += 1;
   }
   // The feed item (#1033) beside the emails, in the same transaction: one per submission however many addresses. The
   // form's own name is a label staff chose; no answer and no submitter name.
-  if (ids.length > 0) {
+  if (staffCount > 0) {
     await recordAlertFeedItem(client, {
       notificationKey: "CLUB_FORM_SUBMITTED",
       occurrenceKey: `club-form-submitted:${input.submissionId}`,

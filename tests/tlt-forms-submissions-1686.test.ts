@@ -29,6 +29,7 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: () => client }));
 vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ SECRET_ENCRYPTION_KEY: "a-synthetic-encryption-key-for-club-form-tests" }) }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 
+import { viewerCanSeeSchoolDetails } from "@/modules/club-forms/domain";
 import { buildClubFormsCsv } from "@/modules/club-forms/csv";
 import { TLT_FORM_TEMPLATE_KEYS, restrictedFieldKeys, parseClubFormTemplate, type ClubFormsViewer, viewerCanRevealSensitive } from "@/modules/club-forms/domain";
 import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
@@ -237,6 +238,12 @@ describe("the CSV (the staff export, reused)", () => {
       metadata: expect.objectContaining({ viewerKind: "TLT_DIRECTOR", actorAttendeeAccountId: "acct-tlt", templateKey: "club_tlt_application" }),
     }));
     expect(mocks.writeAuditLog.mock.calls[0]![0]).not.toHaveProperty("actorUserId");
+  });
+
+  it("keeps school type and church membership out of her view and file (Event Admin level)", () => {
+    expect(viewerCanSeeSchoolDetails(director, "club-a")).toBe(false);
+    expect(viewerCanSeeSchoolDetails(director, null)).toBe(false);
+    expect(viewerCanSeeSchoolDetails(sysAdmin, null)).toBe(true);
   });
 
   it.each(["pathfinder_membership_application", "club_pathfinder_of_the_year", ""])("refuses %j for the TLT director, and any viewer but staff stays refused", async (key) => {

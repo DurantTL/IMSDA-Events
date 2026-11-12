@@ -178,7 +178,7 @@ function TltFormLinksRow({ links, personId }: { links: TltFormLinks; personId: s
   if (parts.length === 0) return null;
   return (
     <p className={`${styles.entryNote} ${styles.noPrint}`}>
-      <Link href={`/account/area-clubs/tlt/forms?person=${encodeURIComponent(personId)}`}>TLT forms: {parts.join(", ")}</Link>
+      <Link className="secondary-button" href={`/account/area-clubs/tlt/forms?person=${encodeURIComponent(personId)}`}>TLT forms: {parts.join(", ")}</Link>
     </p>
   );
 }

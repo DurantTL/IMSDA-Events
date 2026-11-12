@@ -18,7 +18,7 @@ vi.mock("@/components/tlt-tag-suggestions", () => ({ TltTagSuggestions: () => nu
 vi.mock("@/components/tlt-export-button", () => ({ TltExportButton: () => null }));
 vi.mock("@/components/tlt-print-button", () => ({ TltPrintButton: () => null }));
 vi.mock("@/components/search-as-you-type", () => ({ SearchAsYouTypeForm: ({ children }: { children: unknown }) => createElement("form", null, children as never), SearchResultStatus: () => null }));
-vi.mock("@/components/navigation-link", () => ({ NavigationLink: ({ href, children }: { href: string; children: unknown }) => createElement("a", { href }, children as never) }));
+vi.mock("@/components/navigation-link", () => ({ NavigationLink: ({ href, className, children }: { href: string; className?: string; children: unknown }) => createElement("a", { className, href }, children as never) }));
 
 import { TltDirectory } from "@/components/tlt-directory";
 import type { ClubFormsViewer } from "@/modules/club-forms/domain";
@@ -90,6 +90,8 @@ describe("the directory row", () => {
     expect(html).toContain('href="/account/area-clubs/tlt/forms?person=p1"');
     expect(html).toContain("1 application, 2 recommendations");
     expect(html).not.toContain("person=p2");
+    // A full-size tap target, not a small inline link.
+    expect(html).toMatch(/<a class="secondary-button" href="\/account\/area-clubs\/tlt\/forms\?person=p1"/);
     expect(html).toContain('href="/account/area-clubs/tlt/forms"');
     expect(html).not.toContain("Sample p1</a>");
   });

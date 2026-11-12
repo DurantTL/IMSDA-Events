@@ -120,6 +120,14 @@ describe("the TLT forms pages and CSV (#1686)", () => {
     expect(mocks.countTltFormsByPerson).toHaveBeenCalledWith(viewer, ["p1"]);
   });
 
+  it.each(["pathfinder_membership_application", ""])("answers 404, not 403, to the TLT director for the CSV of form %j", async (form) => {
+    mocks.getCurrentAttendee.mockResolvedValue(attendee);
+    mocks.grantFindUnique.mockResolvedValue(grantOn);
+    const response = await EXPORT(new Request(`https://events.imsda.test/api/attendee/area-clubs/tlt-directory/forms/export?form=${form}`));
+    expect(response.status).toBe(404);
+    expect(mocks.buildClubFormsCsv).not.toHaveBeenCalled();
+  });
+
   it("shows a missing or other form as not found, not as an error", async () => {
     mocks.getCurrentAttendee.mockResolvedValue(attendee);
     mocks.grantFindUnique.mockResolvedValue(grantOn);
