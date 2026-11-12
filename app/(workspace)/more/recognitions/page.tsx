@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { AccessRestricted } from "@/components/access-restricted";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
 import { PageHeader } from "@/components/page-header";
+import { RecognitionsSwitch } from "@/components/recognitions-switch";
 import { RecognitionsWorkspace } from "@/components/recognitions-workspace";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { getPrisma } from "@/lib/prisma";
@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function RecognitionsPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const { event: requested } = await searchParams;
-  const { event, permissions, user } = await resolveEventContext(requested);
+  const { event, permissions, user, membership } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_REGISTRATION")) {
     return (
       <>
@@ -39,6 +39,8 @@ export default async function RecognitionsPage({ searchParams }: { searchParams:
       </>
     );
   }
+  // Event Admins (the Clubs Administrator is one on club events) and system administrators switch it; an Area Coordinator has no switch yet.
+  const canSwitch = user.globalRole === "SYSTEM_ADMIN" || membership?.role === "EVENT_ADMIN";
   const enabled = await isModuleEnabled(event.id, RECOGNITION_MODULE_KEY);
   if (!enabled) {
     return (
@@ -46,11 +48,8 @@ export default async function RecognitionsPage({ searchParams }: { searchParams:
         <PageHeader description="An optional tool for club events." title={staffPageTitles.recognitions} />
         <section className="page-stack">
           <div className="panel page-stack">
-            <p role="status">Recognitions are off for this event.{" "}
-              {user.globalRole === "SYSTEM_ADMIN"
-                ? <Link className="text-button" href={`/more/features?event=${encodeURIComponent(event.id)}`}>Turn them on from the event features page</Link>
-                : "A system administrator can turn them on from the event features page."}
-            </p>
+            <p role="status">Recognitions are off for this event, so nothing can be marked.</p>
+            {canSwitch ? <RecognitionsSwitch enabled={false} eventId={event.id} /> : <p className="field-help">An event administrator or the Clubs Administrator can turn them on.</p>}
           </div>
         </section>
       </>
@@ -61,6 +60,7 @@ export default async function RecognitionsPage({ searchParams }: { searchParams:
     <>
       <PageHeader description="Mark who earned a pin, patch or star, undo a mark, and see what to hand out for each club." title={staffPageTitles.recognitions} />
       <RecognitionsWorkspace canDefine={permissions.includes("CONFIGURE_EVENT")} eventId={event.id} initial={initial} />
+      {canSwitch && <RecognitionsSwitch enabled eventId={event.id} />}
     </>
   );
 }

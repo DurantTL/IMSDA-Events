@@ -11,12 +11,12 @@ const definitions = [verses, bible, again];
 const mark = (recognitionId: string, attendeeId: string, attendeeName: string, clubKey: string, clubName: string): RecognitionMark => ({ recognitionId, attendeeId, attendeeName, clubKey, clubName });
 
 describe("Recognitions module (#1683)", () => {
-  it("is an optional, off-by-default club module, not an Area Coordinator switch in this slice", () => {
+  it("is an optional, off-by-default club module, switched by the scoped helper (staff side only in this slice)", () => {
     expect(eventModuleDefinition("recognitions")).toMatchObject({ title: "Recognitions", appliesTo: "club-audience", offByDefault: true, alwaysOn: false, cardKey: "recognitions", routes: ["/more/recognitions"] });
     expect(defaultModuleKeys("CLUB")).not.toContain("recognitions");
     expect(defaultModuleKeys("GENERAL")).not.toContain("recognitions");
     expect(creationModuleKeys("CLUB")).not.toContain("recognitions");
-    expect(scopedToggleModuleKeys).not.toContain("recognitions");
+    expect(scopedToggleModuleKeys).toContain("recognitions");
   });
 
   it("adds one nullable column and an enum, and writes no module row", () => {

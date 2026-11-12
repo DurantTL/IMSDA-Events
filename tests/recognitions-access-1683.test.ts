@@ -5,6 +5,10 @@ const mocks = vi.hoisted(() => ({
   findActiveMembership: vi.fn(),
   eventFindUnique: vi.fn(),
   moduleFindUnique: vi.fn(),
+  moduleCreateMany: vi.fn(),
+  moduleDeleteMany: vi.fn(),
+  eventFindFirst: vi.fn(),
+  writeAuditLog: vi.fn(),
   tagFindFirst: vi.fn(),
   tagCreate: vi.fn(),
   tagFindMany: vi.fn(),
@@ -23,11 +27,13 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/request-context", () => ({ withRequestContext: (handler: unknown) => handler }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: () => null }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
+vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
+vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: vi.fn(), isAreaCoordinator: vi.fn() }));
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership }));
 vi.mock("@/lib/prisma", () => {
   const client = {
-    event: { findUnique: mocks.eventFindUnique },
-    eventModule: { findUnique: mocks.moduleFindUnique },
+    event: { findUnique: mocks.eventFindUnique, findFirst: mocks.eventFindFirst },
+    eventModule: { findUnique: mocks.moduleFindUnique, createMany: mocks.moduleCreateMany, deleteMany: mocks.moduleDeleteMany },
     eventTag: { findFirst: mocks.tagFindFirst, create: mocks.tagCreate, findMany: mocks.tagFindMany },
     registrationAttendee: { findFirst: mocks.attendeeFindFirst, findMany: mocks.attendeeFindMany },
     attendeeTagAssignment: { findFirst: mocks.assignmentFindFirst, findMany: mocks.assignmentFindMany, create: mocks.assignmentCreate, update: mocks.assignmentUpdate, delete: mocks.assignmentDelete, findUniqueOrThrow: mocks.assignmentFindUniqueOrThrow },
@@ -165,5 +171,50 @@ describe("marking goes through the audited tag path (#1683)", () => {
     expect(mocks.assignmentUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "as-1" }, data: expect.objectContaining({ removedByUserId: "u2", removedAt: expect.any(Date) }) }));
     expect(mocks.assignmentDelete).not.toHaveBeenCalled();
     expect(mocks.auditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ action: "ATTENDEE_TAG_REMOVED", actorUserId: "u2" }) });
+  });
+});
+
+describe("the general tag routes cannot mark a recognition (#1683)", () => {
+  it("refuses to apply or remove a recognition tag through the attendee tag service", async () => {
+    const { applyAttendeeTag, removeAttendeeTag } = await import("@/modules/tags/repository");
+    mocks.tagFindFirst.mockResolvedValue({ id: "tag-1", name: "Memory verses", isActive: true, recognitionItem: "PIN" });
+    await expect(applyAttendeeTag("event-1", "att-1", "tag-1", "u1")).rejects.toMatchObject({ code: "RECOGNITION_TAG" });
+    mocks.assignmentFindFirst.mockResolvedValue({ id: "as-1", tag: { name: "Memory verses", recognitionItem: "PIN" } });
+    await expect(removeAttendeeTag("event-1", "att-1", "tag-1", "u1")).rejects.toMatchObject({ code: "RECOGNITION_TAG" });
+    expect(mocks.assignmentCreate).not.toHaveBeenCalled();
+    expect(mocks.assignmentUpdate).not.toHaveBeenCalled();
+  });
+
+  it("answers the generic apply route with a plain 409", async () => {
+    const route = await import("@/app/api/events/[eventId]/registrations/[registrationId]/attendees/[attendeeId]/tags/route");
+    as("REGISTRATION_MANAGER");
+    mocks.tagFindFirst.mockResolvedValue({ id: "tag-1", name: "Memory verses", isActive: true, recognitionItem: "PIN" });
+    const response = await route.POST(json("POST", { tagId: "tag-1" }), { params: Promise.resolve({ eventId: "event-1", registrationId: "r1", attendeeId: "att-1" }) });
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("RECOGNITION_TAG");
+  });
+});
+
+describe("who can switch Recognitions on (#1683)", () => {
+  it("is a scoped module, switched by staff here; the coordinator side has no route in this slice", async () => {
+    const { scopedToggleModuleKeys } = await import("@/modules/event-modules/catalog");
+    expect(scopedToggleModuleKeys).toContain("recognitions");
+    const { PUT } = await import("@/app/api/events/[eventId]/recognitions/settings/route");
+    for (const role of ["REGISTRATION_MANAGER", "CHECK_IN_STAFF", "READ_ONLY_STAFF"]) {
+      as(role);
+      expect((await PUT(json("PUT", { enabled: true }), ctx)).status).toBe(403);
+    }
+    expect(mocks.moduleCreateMany).not.toHaveBeenCalled();
+  });
+
+  it("lets an Event Admin switch it on and audits the change", async () => {
+    const { PUT } = await import("@/app/api/events/[eventId]/recognitions/settings/route");
+    as("EVENT_ADMIN");
+    mocks.eventFindFirst.mockResolvedValue({ id: "event-1", name: "Sample Camporee" });
+    mocks.moduleCreateMany.mockResolvedValue({ count: 1 });
+    const response = await PUT(json("PUT", { enabled: true }), ctx);
+    expect(response.status).toBe(200);
+    expect(mocks.moduleCreateMany).toHaveBeenCalledWith({ data: [{ eventId: "event-1", moduleKey: "recognitions" }], skipDuplicates: true });
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "EVENT_MODULE_ENABLED", actorUserId: "u1" }), expect.anything());
   });
 });

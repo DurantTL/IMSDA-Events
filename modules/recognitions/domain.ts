@@ -25,6 +25,8 @@ export const recognitionInputSchema = z.object({
   item: z.enum(recognitionItems),
 });
 
+export const switchInputSchema = z.object({ enabled: z.boolean() });
+
 export const markInputSchema = z.object({
   attendeeId: z.string().trim().min(1),
   recognitionId: z.string().trim().min(1),

@@ -74,13 +74,13 @@ async function recognitionTag(eventId: string, recognitionId: string) {
 export async function markRecognition(eventId: string, attendeeId: string, recognitionId: string, actorUserId: string) {
   await recognitionTag(eventId, recognitionId);
   await assertClubAttendee(eventId, attendeeId);
-  await applyAttendeeTag(eventId, attendeeId, recognitionId, actorUserId);
+  await applyAttendeeTag(eventId, attendeeId, recognitionId, actorUserId, { allowRecognition: true });
 }
 
 /** Undo removes the mark through the same path: the row stays with its remover and time, so history is kept. */
 export async function undoRecognition(eventId: string, attendeeId: string, recognitionId: string, actorUserId: string) {
   await recognitionTag(eventId, recognitionId);
-  await removeAttendeeTag(eventId, attendeeId, recognitionId, actorUserId);
+  await removeAttendeeTag(eventId, attendeeId, recognitionId, actorUserId, { allowRecognition: true });
 }
 
 async function assertClubAttendee(eventId: string, attendeeId: string) {
