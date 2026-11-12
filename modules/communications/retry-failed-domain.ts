@@ -58,6 +58,7 @@ const LINK_EMAIL_REASONS: Record<string, RetryFailedSkipReason> = {
   CLUB_FORM_LINK: "LINK_CLUB_FORM",
   HEALTH_RECORD_LINK: "LINK_HEALTH_RECORD",
   NEW_CLUB_APPLICATION_INVITE: "LINK_CLUB_INVITE",
+  VISITING_CLUB_INVITE: "LINK_CLUB_INVITE",
 };
 
 export type RetryFailedSkippedSummary = {

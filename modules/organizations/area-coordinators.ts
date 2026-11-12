@@ -79,7 +79,7 @@ export async function currentAreaCoordinatorViewerActive() {
 /** Every active club, for the Area Coordinator's Clubs list. */
 export async function listClubsForArea() {
   const clubs = await getPrisma().organization.findMany({
-    where: { type: "CLUB", isActive: true },
+    where: { type: "CLUB", isActive: true, guestEventId: null },
     orderBy: { name: "asc" },
     select: { id: true, name: true, city: true, parentOrganization: { select: { name: true, city: true } } },
   });

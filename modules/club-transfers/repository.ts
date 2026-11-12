@@ -333,7 +333,7 @@ function leaderRecipients(leaders: Array<{ id: string; email: string; displayNam
 /** Active clubs a director may name as the member's current club (the club picker). No roster data. */
 export async function listTransferClubOptions(excludingOrganizationId: string) {
   return getPrisma().organization.findMany({
-    where: { type: "CLUB", isActive: true, id: { not: excludingOrganizationId } },
+    where: { type: "CLUB", isActive: true, guestEventId: null, id: { not: excludingOrganizationId } },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });

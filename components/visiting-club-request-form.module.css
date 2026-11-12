@@ -1,0 +1,10 @@
+/* The visiting director's request form (#835). 44px targets; wraps cleanly at 360px. */
+.form { display: grid; gap: 15px; min-width: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr)); gap: 12px; min-width: 0; }
+.field { display: grid; gap: 6px; min-width: 0; font-weight: 700; }
+.field input, .field select { width: 100%; min-width: 0; min-height: 44px; }
+.help { margin: 4px 0 0; color: var(--muted); font-size: var(--text-helper-min); font-weight: 400; }
+.agree { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-weight: 600; }
+.agree input { flex: none; width: 24px; height: 24px; margin-top: 2px; }
+.intro { margin: 0; line-height: 1.5; }
+.actions button { min-height: 44px; min-width: 44px; }

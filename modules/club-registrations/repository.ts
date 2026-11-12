@@ -1,5 +1,6 @@
 import "server-only";
 
+import { CLUB_EVENT_GATE } from "@/modules/club-registrations/event-gate";
 import { Prisma, RegistrationFormStatus } from "@prisma/client";
 import { closesRegistration, effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { getPrisma } from "@/lib/prisma";
@@ -289,8 +290,10 @@ export async function locationSeatCounts(client: Pick<Prisma.TransactionClient, 
  * event that is attendee-paid has no church bill for this workflow to build.
  */
 export async function listClubEvents(organizationId: string, now = new Date()) {
+  // A visiting guest club (#835) sees only its own event; a conference club has no guestEventId and sees them all.
+  const guest = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { guestEventId: true } });
   const events = await getPrisma().event.findMany({
-    where: { isPublished: true, archivedAt: null, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", endsAt: { gte: now } },
+    where: { ...CLUB_EVENT_GATE, endsAt: { gte: now }, ...(guest?.guestEventId ? { id: guest.guestEventId } : {}) },
     orderBy: { startsAt: "asc" },
     select: {
       ...clubEventSelect,
@@ -577,11 +580,23 @@ export async function clubDirectoryIdentity(
 export async function requireClubEvent(eventId: string): Promise<ClubEvent> {
   const event = await getPrisma().event.findFirst({
     // Same gate as `listClubEvents`: CLUB audience and church billing (#481).
-    where: { id: eventId, isPublished: true, archivedAt: null, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE" },
+    where: { id: eventId, ...CLUB_EVENT_GATE },
     select: clubEventSelect,
   });
   if (!event) throw new ClubRegistrationError("EVENT_NOT_FOUND", "That club event could not be found.");
   return event;
+}
+
+/**
+ * The club event for one club (#835). A visiting guest club (`guestEventId` set) may use only its own event; any other
+ * event reads as not found, exactly as a missing one does. A conference club (no `guestEventId`) is unchanged.
+ */
+export async function requireClubEventForClub(organizationId: string, eventId: string): Promise<ClubEvent> {
+  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { guestEventId: true } });
+  if (club?.guestEventId && club.guestEventId !== eventId) {
+    throw new ClubRegistrationError("EVENT_NOT_FOUND", "That club event could not be found.");
+  }
+  return requireClubEvent(eventId);
 }
 
 function rosterPerson(
@@ -726,7 +741,7 @@ export type ClubWorkspaceSelection = { teamKey?: string | null; draftKey?: strin
 
 /** Everything the director's page needs for one club event. */
 export async function getClubEventWorkspace(organizationId: string, eventId: string, now = new Date(), selection: ClubWorkspaceSelection = {}) {
-  const event = await requireClubEvent(eventId);
+  const event = await requireClubEventForClub(organizationId, eventId);
   const eventDate = calendarDateInEventTimeZone(event.startsAt, event.timezone);
   const teamSettings = await getTeamSettings(eventId);
   const multipleTeams = teamSettings?.allowMultipleTeams === true;
@@ -1081,7 +1096,7 @@ export async function saveClubRegistrationDraft(
   if (Buffer.byteLength(JSON.stringify(input)) > MAX_DRAFT_BYTES) {
     throw new ClubRegistrationError("DRAFT_TOO_LARGE", "This draft is too large to save.");
   }
-  const event = await requireClubEvent(eventId);
+  const event = await requireClubEventForClub(organizationId, eventId);
   const teamSettings = await getTeamSettings(eventId);
   const draftKey = clubDraftKey(teamSettings, input.draftKey);
   const members = await activeRosterFor(getPrisma(), organizationId, event);
@@ -1335,7 +1350,7 @@ export async function submitClubRegistration(
   now = new Date(),
   options: { locationId?: string | null; report?: ClubSubmissionContext["report"]; registered?: ClubSubmissionContext["registered"]; teamName?: string | null; draftKey?: string; requestContext?: SubmissionRequestContext } = {},
 ) {
-  const event = await requireClubEvent(eventId);
+  const event = await requireClubEventForClub(organizationId, eventId);
   const form = await publishedClubForm(event.id);
   if (!form) throw new ClubRegistrationError("FORM_UNAVAILABLE", "The event has no published registration form yet.");
   // Club teachers (#1681): only when the tool is on and its rule says to block. Every other club event skips this.
@@ -1440,7 +1455,7 @@ export async function amendClubRegistration(
   /** `viaClubsAdministrator` (#1232): the acting staff member is a Clubs Administrator, for the name shown in the history. */
   actingAs: { viaClubsAdministrator?: boolean } = {},
 ) {
-  const event = await requireClubEvent(eventId);
+  const event = await requireClubEventForClub(organizationId, eventId);
   // Which of the club's registrations is being changed (#809): its team's key, the empty key on an event without teams.
   const clubRegistration = await getPrisma().clubEventRegistration.findUnique({
     where: { eventId_organizationId_teamKey: { eventId, organizationId, teamKey: input.teamKey ?? NO_TEAM_KEY } },
