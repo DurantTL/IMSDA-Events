@@ -1,10 +1,13 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { clubDirectoryClubHref, clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
 import { UNAVAILABLE_STATUS } from "@/modules/system-admin/admin-hubs-model";
 import type { ClubCardCounts } from "@/modules/club-reports/club-card-status-domain";
 import { clubRecordsCounts, completedHonorsCount } from "@/modules/club-reports/club-card-status-domain";
 import { clubPageHref, clubPageReturnHref, clubRelatedCards, directoryReturnHref } from "@/modules/club-reports/club-page-links";
+
+beforeAll(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-11-12T15:00:00Z")); });
+afterAll(() => { vi.useRealTimers(); });
 
 const read = (path: string) => readFileSync(path, "utf8");
 const directory = clubSummaryHref({ clubYear: "2025-26", query: "Cedar & Oak", attention: true, page: 3 });
@@ -105,6 +108,7 @@ describe("the This club cards (#1587)", () => {
     expect(statuses({ admins: 3 })["Club admins"]).toEqual({ tone: "ok", text: "3 admins" });
     expect(statuses({ honors: 0 })["Honors"]).toEqual({ tone: "draft", text: "None earned" });
     expect(statuses({ honors: 1 })["Honors"]).toEqual({ tone: "ok", text: "1 honor" });
+    expect(clubRelatedCards({ ...base, clubYear: "2024-25", viewer: all })[2]!.href).toContain("club/honors?year=2026-27&");
     expect(statuses({ honors: 7 })["Honors"]).toEqual({ tone: "ok", text: "7 honors" });
     expect(statuses({ records: { missing: 2, submitted: 5 } })["Monthly Records"]).toEqual({ tone: "warn", text: "2 missing" });
     expect(statuses({ records: { missing: 0, submitted: 4 } })["Monthly Records"]).toEqual({ tone: "ok", text: "4 submitted" });
@@ -196,15 +200,18 @@ describe("selected club page source (#1587)", () => {
 });
 
 describe("card counts (#1587)", () => {
-  it("counts months past due with no submitted report, as the Monthly Records grid does", () => {
+  const sub = (reportMonth: string) => ({ reportMonth, status: "SUBMITTED" as const, totalPoints: 100, onTimePoints: 50 });
+  it("counts months past due with no submitted report, as the area summary does", () => {
     const now = new Date("2026-11-12T15:00:00Z"); // September's report was due Oct 10, October's is due Nov 10
-    expect(clubRecordsCounts({ clubYear: "2026-27", submittedMonths: [], joinedOn: null, now })).toEqual({ submitted: 0, missing: 2 });
-    expect(clubRecordsCounts({ clubYear: "2026-27", submittedMonths: ["2026-09"], joinedOn: null, now })).toEqual({ submitted: 1, missing: 1 });
-    expect(clubRecordsCounts({ clubYear: "2026-27", submittedMonths: ["2026-09", "2026-10"], joinedOn: null, now })).toEqual({ submitted: 2, missing: 0 });
+    expect(clubRecordsCounts({ clubYear: "2026-27", reports: [], joinedOn: null, now })).toEqual({ submitted: 0, missing: 2 });
+    expect(clubRecordsCounts({ clubYear: "2026-27", reports: [sub("2026-09")], joinedOn: null, now })).toEqual({ submitted: 1, missing: 1 });
+    expect(clubRecordsCounts({ clubYear: "2026-27", reports: [sub("2026-09"), sub("2026-10")], joinedOn: null, now })).toEqual({ submitted: 2, missing: 0 });
     // a club that joined in November owes nothing for September or October
-    expect(clubRecordsCounts({ clubYear: "2026-27", submittedMonths: [], joinedOn: "2026-11-01", now })).toEqual({ submitted: 0, missing: 0 });
+    expect(clubRecordsCounts({ clubYear: "2026-27", reports: [], joinedOn: "2026-11-01", now })).toEqual({ submitted: 0, missing: 0 });
+    // an overdue draft shows as Draft in the summary, so it is not missing
+    expect(clubRecordsCounts({ clubYear: "2026-27", reports: [sub("2026-09"), { reportMonth: "2026-10", status: "DRAFT", totalPoints: 0, onTimePoints: 0 }], joinedOn: null, now })).toEqual({ submitted: 1, missing: 0 });
     // a month not yet due is not missing
-    expect(clubRecordsCounts({ clubYear: "2026-27", submittedMonths: [], joinedOn: null, now: new Date("2026-09-20T15:00:00Z") })).toEqual({ submitted: 0, missing: 0 });
+    expect(clubRecordsCounts({ clubYear: "2026-27", reports: [], joinedOn: null, now: new Date("2026-09-20T15:00:00Z") })).toEqual({ submitted: 0, missing: 0 });
   });
 
   it("counts the latest non-voided entry per member and honor, completed only", () => {

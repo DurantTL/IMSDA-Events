@@ -1,4 +1,6 @@
 import { getPrisma } from "@/lib/prisma";
+import { logError } from "@/lib/logger";
+import { rosterYearView } from "@/modules/club-rosters/domain";
 import { completedHonorsCount, clubRecordsCounts, type ClubCardCounts } from "@/modules/club-reports/club-card-status-domain";
 import { clubJoinSelect, clubJoinedOn } from "@/modules/club-reports/domain";
 import type { ClubLinksViewer } from "@/modules/club-reports/club-page-links";
@@ -18,10 +20,13 @@ export async function loadClubCardStatuses(
   const safe = async <T,>(read: () => Promise<T>): Promise<T | null> => {
     try {
       return await read();
-    } catch {
+    } catch (error) {
+      logError("A This club card status could not be read.", error);
       return null;
     }
   };
+  // The Honors page shows the previous, current or next club year and falls back to the current one: count what it shows.
+  const honorsYear = rosterYearView(clubYear, now).clubYear;
   const counts: ClubCardCounts = {};
   const jobs: Promise<void>[] = [];
   if (viewer.canAdministerClub) {
@@ -31,7 +36,7 @@ export async function loadClubCardStatuses(
     })).then((value) => { counts.admins = value; }));
     jobs.push(safe(async () => {
       const members = await prisma.clubRosterMember.findMany({
-        where: { organizationId, clubYear, status: "ACTIVE", personId: { not: null } },
+        where: { organizationId, clubYear: honorsYear, status: "ACTIVE", personId: { not: null } },
         select: { personId: true },
       });
       const personIds = members.map((member) => member.personId!);
@@ -47,11 +52,11 @@ export async function loadClubCardStatuses(
   if (viewer.clubsAdministration && viewer.clubActive !== false) {
     jobs.push(safe(async () => {
       const [reports, club] = await Promise.all([
-        prisma.clubMonthlyReport.findMany({ where: { organizationId, clubYear, status: "SUBMITTED" }, select: { reportMonth: true } }),
+        prisma.clubMonthlyReport.findMany({ where: { organizationId, clubYear }, select: { reportMonth: true, status: true, totalPoints: true, onTimePoints: true } }),
         prisma.organization.findUnique({ where: { id: organizationId }, select: clubJoinSelect }),
       ]);
       if (!club) throw new Error("club not found");
-      return clubRecordsCounts({ clubYear, submittedMonths: reports.map((report) => report.reportMonth), joinedOn: clubJoinedOn(club), now });
+      return clubRecordsCounts({ clubYear, reports, joinedOn: clubJoinedOn(club), now });
     }).then((value) => { counts.records = value; }));
   }
   await Promise.all(jobs);

@@ -1,4 +1,5 @@
-import { clubYearMonths, isLockedForClub, monthNotDueForClub } from "@/modules/club-reports/domain";
+import { monthCell } from "@/modules/club-reports/area-summary-domain";
+import { clubYearMonths } from "@/modules/club-reports/domain";
 import type { CardStatus } from "@/modules/system-admin/admin-hubs-model";
 
 /**
@@ -32,15 +33,20 @@ export function recordsStatus(records: { missing: number; submitted: number }): 
 }
 
 /**
- * Months past due with no submitted report, by the rules the Monthly Records grid uses: a month is missing when it is
- * locked (past its due date), has no submitted report, and is not before the club joined.
+ * Months past due with no submitted report, counted as the area summary does (`monthCell`): a month with a draft shows as
+ * "Draft", not missing; a month before the club joined, or not yet due, is not missing. Submitted counts on-time and late.
  */
-export function clubRecordsCounts(input: { clubYear: string; submittedMonths: readonly string[]; joinedOn: string | null; now: Date }) {
-  const submitted = new Set(input.submittedMonths);
-  const months = clubYearMonths(input.clubYear);
+export function clubRecordsCounts(input: {
+  clubYear: string;
+  reports: ReadonlyArray<{ reportMonth: string; status: "DRAFT" | "SUBMITTED"; totalPoints: number; onTimePoints: number }>;
+  joinedOn: string | null;
+  now: Date;
+}) {
+  const byMonth = new Map(input.reports.map((report) => [report.reportMonth, report]));
+  const cells = clubYearMonths(input.clubYear).map((month) => monthCell(month, byMonth.get(month), input.now, input.joinedOn));
   return {
-    submitted: months.filter((month) => submitted.has(month)).length,
-    missing: months.filter((month) => !submitted.has(month) && !monthNotDueForClub(month, input.joinedOn, false) && isLockedForClub(month, input.now)).length,
+    submitted: cells.filter((cell) => cell.status === "SUBMITTED" || cell.status === "LATE").length,
+    missing: cells.filter((cell) => cell.status === "MISSING").length,
   };
 }
 

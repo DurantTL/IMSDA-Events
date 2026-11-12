@@ -1,3 +1,4 @@
+import { rosterYearView } from "@/modules/club-rosters/domain";
 import { safeReturnTo } from "@/lib/return-to";
 import { clubSummaryAnchors, clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
 import { adminsStatus, honorsStatus, profileStatus, recordsStatus, type ClubCardCounts } from "@/modules/club-reports/club-card-status-domain";
@@ -96,7 +97,7 @@ export function clubRelatedCards(input: { organizationId: string; clubName: stri
   if (viewer.canAdministerClub) {
     cards.push({ href: `/admin/organizations/${id}/directors?from=${from}`, title: "Club admins", description: "Who can sign in to run this club as its director.", status: statusOf(counts.admins, adminsStatus) });
     cards.push({ href: `/admin/organizations/${id}/profile?from=${from}`, title: "Club profile", description: "The club's name, sponsoring church and contact details.", status: profile });
-    cards.push({ href: `/admin/organizations/${id}/club/honors?year=${encodeURIComponent(clubYear)}&from=${from}`, title: "Honors", description: "Honors this club's members have earned. View only.", status: statusOf(counts.honors, honorsStatus) });
+    cards.push({ href: `/admin/organizations/${id}/club/honors?year=${encodeURIComponent(rosterYearView(clubYear).clubYear)}&from=${from}`, title: "Honors", description: "Honors this club's members have earned. View only.", status: statusOf(counts.honors, honorsStatus) });
   }
   // The records view lists active clubs only, so an inactive club would not be found there: no card.
   if (viewer.clubsAdministration && input.clubActive !== false) {
