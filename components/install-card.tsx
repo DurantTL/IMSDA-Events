@@ -76,16 +76,20 @@ export function restoreInstallCard(audience: InstallCardAudience) {
 }
 
 /** What each card says. The facts and steps are shared; only the place the icon opens and the Help wording differ. */
-const COPY: Record<InstallCardAudience, { install: string; hidden: string; restoreButton: string; restored: string }> = {
+const COPY: Record<InstallCardAudience, { install: string; hidden: string; installed: string; notSaved: string; restoreButton: string; restored: string }> = {
   staff: {
     install: "Add an icon that opens your staff Home. The website works fine without it.",
     hidden: "Hidden. You can bring this back from Help.",
+    installed: "Saved. Look for the IMAdventist icon on your Home Screen.",
+    notSaved: "Not saved. You can try again from Help.",
     restoreButton: "Show the Home Screen card on Home again",
     restored: "The card will show on Home again.",
   },
   account: {
     install: "Add an icon that opens your account, for your registrations, clubs and payments. The website works fine without it.",
     hidden: "Hidden. You can bring this back from Help.",
+    installed: "Saved. Look for the IMAdventist icon on your Home Screen.",
+    notSaved: "Not saved. You can try again from Help.",
     restoreButton: "Show the Home Screen card on your account again",
     restored: "The card will show on your account again.",
   },
@@ -124,52 +128,67 @@ export function InstallCard({ audience }: { audience: InstallCardAudience }) {
     installed,
   });
 
-  // After "Not now" the focused button is gone: a short status line takes its place and takes focus, so keyboard and
-  // screen-reader users hear what happened and keep their place (#1836).
-  const [justHidden, setJustHidden] = useState(false);
-  const hiddenRef = useRef<HTMLParagraphElement>(null);
-  useEffect(() => { if (justHidden) hiddenRef.current?.focus(); }, [justHidden]);
+  // After "Not now", or once the install finishes, the focused button is gone: a short status line takes its place and takes
+  // focus, so keyboard and screen-reader users hear what happened and keep their place (#1836, #1713).
+  const [status, setStatus] = useState<string | null>(null);
+  const statusRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (status) statusRef.current?.focus(); }, [status]);
 
   const notNow = useCallback(() => {
     dismissedThisLoad[audience] = true;
     safeSetItem("local", INSTALL_CARD_DISMISSED_KEYS[audience], "1");
-    setJustHidden(true);
+    setStatus(COPY[audience].hidden);
     notifyDismissed();
   }, [audience]);
 
+  const installing = useRef(false);
+
   // Called straight from the click handler so the browser still sees the tap (transient user activation).
   const install = useCallback(async () => {
+    if (installing.current) return;
     if (supportsWebInstall()) {
+      installing.current = true;
       try {
         await (navigator as Navigator & { install: () => Promise<unknown> }).install();
+        setStatus(COPY[audience].installed);
         appInstalled = true;
         notify();
       } catch {
-        // Cancelled (AbortError) or could not start: the card stays so the person can try again, and Help still explains.
+        // Cancelled (AbortError) or could not start: the card stays, with focus on Install, so the person can try again.
+      } finally {
+        installing.current = false;
       }
       return;
     }
     const event = deferredPrompt;
     if (!event) return;
-    // The browser allows one prompt per event.
-    deferredPrompt = null;
-    notify();
+    installing.current = true;
     try {
+      // The browser allows one prompt per event; the card stays visible while the prompt is open.
       await event.prompt();
       const choice = await event.userChoice;
+      deferredPrompt = null;
       if (choice.outcome === "accepted") {
+        setStatus(COPY[audience].installed);
         appInstalled = true;
-        notify();
+      } else {
+        setStatus(COPY[audience].notSaved);
       }
+      notify();
     } catch {
       // The prompt could not open; the card is gone for this page load and Help still explains how to save.
+      deferredPrompt = null;
+      setStatus(COPY[audience].notSaved);
+      notify();
+    } finally {
+      installing.current = false;
     }
-  }, []);
+  }, [audience]);
 
-  if (justHidden) {
+  if (status) {
     return (
-      <p className={styles.notice} ref={hiddenRef} role="status" tabIndex={-1}>
-        {COPY[audience].hidden}
+      <p className={styles.notice} ref={statusRef} role="status" tabIndex={-1}>
+        {status}
       </p>
     );
   }

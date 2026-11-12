@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createElement } from "react";
+import { createElement, type ComponentType } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buttonByText, click, flush, mount, type Mounted } from "./helpers/dom-render";
 
@@ -43,15 +43,37 @@ describe("account install card (#1713)", () => {
     expect(mounted.container.querySelector("#install-card-heading")).toBeNull();
   });
 
-  it("keeps the card when the person cancels the install", async () => {
+  it.each([
+    ["account", "@/components/account-install-card", "AccountInstallCard"],
+    ["staff", "@/components/staff-install-card", "StaffInstallCard"],
+  ])("moves focus to a status line after a successful install (%s)", async (_audience, modulePath, exportName) => {
+    setUserAgent(ANDROID_CHROME);
+    (Navigator.prototype as { install?: unknown }).install = vi.fn(() => Promise.resolve());
+    const loaded = (await import(/* @vite-ignore */ modulePath)) as Record<string, ComponentType>;
+    mounted = await mount(createElement(loaded[exportName]));
+    await flush();
+    const button = buttonByText(mounted.container, "Install");
+    button.focus();
+    await click(button);
+    await flush();
+    const status = mounted.container.querySelector('[role="status"]');
+    expect(status?.textContent).toBe("Saved. Look for the IMAdventist icon on your Home Screen.");
+    expect(document.activeElement).toBe(status);
+    expect(mounted.container.querySelector("#install-card-heading")).toBeNull();
+  });
+
+  it("keeps the card and focus on Install when the person cancels the install", async () => {
     setUserAgent(ANDROID_CHROME);
     (Navigator.prototype as { install?: unknown }).install = vi.fn(() => Promise.reject(Object.assign(new Error("cancelled"), { name: "AbortError" })));
     const { AccountInstallCard } = await import("@/components/account-install-card");
     mounted = await mount(createElement(AccountInstallCard));
     await flush();
-    await click(buttonByText(mounted.container, "Install"));
+    const button = buttonByText(mounted.container, "Install");
+    button.focus();
+    await click(button);
     await flush();
     expect(mounted.container.querySelector("#install-card-heading")).not.toBeNull();
+    expect(document.activeElement).toBe(button);
   });
 
   it("uses a captured beforeinstallprompt when the Web Install API is missing", async () => {

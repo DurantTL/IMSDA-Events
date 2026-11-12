@@ -30,7 +30,8 @@ describe("no service worker or Cache API (#1713)", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("has no service worker file in public/", () => {
-    expect(readdirSync(path.join(process.cwd(), "public"))).not.toEqual(expect.arrayContaining(["sw.js", "service-worker.js"]));
+  it("has no service worker file anywhere in public/", () => {
+    const names = files(path.join(process.cwd(), "public")).map((file) => path.basename(file).toLowerCase());
+    expect(names.filter((name) => /^(?:sw|service-?worker|serviceworker|workbox[\w.-]*)\.[cm]?js$|^sw[-.]/.test(name))).toEqual([]);
   });
 });
