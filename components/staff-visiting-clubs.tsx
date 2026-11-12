@@ -9,21 +9,32 @@ import type { VisitingEventOption, VisitingInviteRecord, VisitingRequestRecord }
 const statusLabels = { PENDING: "Pending approval", APPROVED: "Confirmed", DECLINED: "Cancelled" } as const;
 const statusTone = { PENDING: "gold", APPROVED: "green", DECLINED: "coral" } as const;
 
+/** The Visiting clubs tab's own short intro: what a visiting club is, in the staff's terms. */
+export function StaffVisitingIntro() {
+  return (
+    <p className={styles.help}>
+      A visiting club comes from outside the conference for one event. Send its director a private link, then approve their request here. The club is a guest for that event only, at the same prices, billed to itself. The director confirms their own conference&apos;s adult screening.
+    </p>
+  );
+}
+
 /** The Visiting clubs view (#835): the link form and list, then the requests with the waiting ones first. */
 export function StaffVisitingView({
   events,
   invites,
   requests,
   emailConfigured,
+  canOpenSetup,
 }: {
   events: VisitingEventOption[];
   invites: VisitingInviteRecord[];
   requests: VisitingRequestRecord[];
   emailConfigured: boolean;
+  canOpenSetup: boolean;
 }) {
   return (
     <div className={styles.stack}>
-      <StaffVisitingLinks emailConfigured={emailConfigured} events={events} invites={invites} />
+      <StaffVisitingLinks canOpenSetup={canOpenSetup} emailConfigured={emailConfigured} events={events} invites={invites} />
       <h2 className={styles.heading}>Visiting club requests</h2>
       {requests.length === 0 ? (
         <div className="report-empty"><p>No visiting club has asked to register yet.</p></div>

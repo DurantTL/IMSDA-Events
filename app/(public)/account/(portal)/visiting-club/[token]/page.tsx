@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { connection } from "next/server";
 import { notFound, redirect } from "next/navigation";
 import { AccountPageBanner } from "@/components/account-page-banner";
-import { VisitingClubRequestForm } from "@/components/visiting-club-request-form";
+import { VisitingClubRequestForm, VisitingClubSent } from "@/components/visiting-club-request-form";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 import { attendeeSignInRedirectPath } from "@/modules/attendee-accounts/return-redirect";
@@ -55,6 +55,16 @@ export default async function VisitingClubLinkPage({ params }: { params: Promise
           <section className="public-manage-card">
             <div className="inline-notice error" role="status">{VISITING_EMAIL_MISMATCH_MESSAGE}</div>
           </section>
+        </div>
+      </>
+    );
+  }
+  if (view.status === "SENT") {
+    return (
+      <>
+        <AccountPageBanner title="Bring your club" context={view.eventName} />
+        <div className="account-page-body">
+          <VisitingClubSent eventName={view.eventName} requestStatus={view.requestStatus} />
         </div>
       </>
     );

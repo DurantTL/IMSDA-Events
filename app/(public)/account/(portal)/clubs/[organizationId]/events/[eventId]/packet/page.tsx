@@ -1,3 +1,4 @@
+import { clubMayUseEvent } from "@/modules/club-registrations/event-gate";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
@@ -26,6 +27,8 @@ export default async function DirectorClubPacketPage({
   // Which of the club's teams (#809); absent on an event without teams.
   const teamKey = singleSearchParam((await searchParams).team);
   if (teamKey === null) notFound();
+  // A visiting guest club (#835) may use only its own event.
+  if (!(await clubMayUseEvent(organizationId, eventId))) notFound();
   const packet = await loadDirectorClubPacket(organizationId, eventId, teamKey);
   if (!packet) {
     // The club layout shows the sign-in / unlock prompts; an open club with

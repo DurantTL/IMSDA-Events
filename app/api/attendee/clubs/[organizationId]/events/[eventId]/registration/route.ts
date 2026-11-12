@@ -1,3 +1,4 @@
+import { rejectGuestClubOtherEvent } from "@/modules/club-registrations/event-gate";
 import { permissionNoticesForRegistration } from "@/modules/club-teams/permission-repository";
 import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
@@ -25,6 +26,8 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
   try {
     const { organizationId, eventId } = await context.params;
     const access = await requireRosterAccess(organizationId, new Date(), "registerForEvents");
+    const guestBlock = await rejectGuestClubOtherEvent(organizationId, eventId);
+    if (guestBlock) return guestBlock;
     const body = await request.text();
     if (Buffer.byteLength(body) > maximumBodyBytes) {
       return Response.json({ error: "REQUEST_TOO_LARGE", message: "This registration is too large." }, { status: 413 });

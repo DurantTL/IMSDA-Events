@@ -22,7 +22,7 @@ import {
 import { parseApplicationId, parseApplicationView, viewOfApplication } from "@/modules/club-applications/queue-model";
 import { isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { AdminPageHeader } from "@/components/admin-page-header";
-import { StaffVisitingMissing, StaffVisitingRecord, StaffVisitingView, visitingBackLink } from "@/components/staff-visiting-clubs";
+import { StaffVisitingIntro, StaffVisitingMissing, StaffVisitingRecord, StaffVisitingView, visitingBackLink } from "@/components/staff-visiting-clubs";
 import {
   getVisitingClubRequest,
   listVisitingClubEventOptions,
@@ -92,9 +92,9 @@ export default async function NewClubApplicationsAdminPage({
       <>
         <AdminPageHeader path="/admin/clubs/applications" />
         <section className="page-stack">
-          <StaffApplicationsIntro showSettingsLink={showSettingsLink} />
+          <StaffVisitingIntro />
           <StaffApplicationViews view={view} waitingCount={waitingCount} />
-          <StaffVisitingView emailConfigured={isAccountEmailConfigured()} events={events} invites={invites} requests={requests} />
+          <StaffVisitingView canOpenSetup={viewer === "SYSTEM_ADMIN"} emailConfigured={isAccountEmailConfigured()} events={events} invites={invites} requests={requests} />
         </section>
       </>
     );

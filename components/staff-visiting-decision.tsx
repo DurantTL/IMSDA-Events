@@ -78,7 +78,7 @@ export function StaffVisitingDecision({ request }: { request: VisitingRequestRec
                 </p>
                 <div className={styles.actions}>
                   <button className="secondary-button" disabled={busy} onClick={() => setMode(null)} type="button">Cancel</button>
-                  <button className="primary-button" disabled={busy} type="submit">Approve club</button>
+                  <button className="primary-button" disabled={busy} type="submit">{busy ? "Saving…" : "Approve club"}</button>
                 </div>
               </form>
             ) : (
@@ -95,7 +95,7 @@ export function StaffVisitingDecision({ request }: { request: VisitingRequestRec
                 </label>
                 <div className={styles.actions}>
                   <button className="secondary-button" disabled={busy} onClick={() => setMode(null)} type="button">Cancel</button>
-                  <button className="primary-button" disabled={busy} type="submit">Decline request</button>
+                  <button className="primary-button" disabled={busy} type="submit">{busy ? "Saving…" : "Decline request"}</button>
                 </div>
               </form>
             )

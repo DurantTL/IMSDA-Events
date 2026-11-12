@@ -1,3 +1,4 @@
+import { rejectGuestClubOtherEvent } from "@/modules/club-registrations/event-gate";
 import { requireRosterAccess } from "@/modules/club-rosters/access";
 import { rosterApiError } from "@/modules/club-rosters/api-errors";
 import { buildClubSchedule, clubScheduleCsv } from "@/modules/honors/roster-domain";
@@ -12,6 +13,8 @@ async function getHandler(_request: Request, { params }: Context) {
   try {
     const { organizationId, eventId } = await params;
     await requireRosterAccess(organizationId);
+    const guestBlock = await rejectGuestClubOtherEvent(organizationId, eventId);
+    if (guestBlock) return guestBlock;
     const data = await getHonorRosterData(eventId, { includeDietary: false, organizationId });
     if (!data || !data.clubs.some((club) => club.id === organizationId)) {
       return Response.json({ error: "NOT_REGISTERED", message: "Your club isn't registered for this event." }, { status: 404 });

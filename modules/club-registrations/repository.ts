@@ -1,6 +1,6 @@
 import "server-only";
 
-import { CLUB_EVENT_GATE } from "@/modules/club-registrations/event-gate";
+import { CLUB_EVENT_GATE, clubMayUseEvent } from "@/modules/club-registrations/event-gate";
 import { Prisma, RegistrationFormStatus } from "@prisma/client";
 import { closesRegistration, effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { getPrisma } from "@/lib/prisma";
@@ -592,8 +592,7 @@ export async function requireClubEvent(eventId: string): Promise<ClubEvent> {
  * event reads as not found, exactly as a missing one does. A conference club (no `guestEventId`) is unchanged.
  */
 export async function requireClubEventForClub(organizationId: string, eventId: string): Promise<ClubEvent> {
-  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { guestEventId: true } });
-  if (club?.guestEventId && club.guestEventId !== eventId) {
+  if (!(await clubMayUseEvent(organizationId, eventId))) {
     throw new ClubRegistrationError("EVENT_NOT_FOUND", "That club event could not be found.");
   }
   return requireClubEvent(eventId);

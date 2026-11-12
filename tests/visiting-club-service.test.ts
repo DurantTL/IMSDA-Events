@@ -126,6 +126,11 @@ function fakeDatabase() {
         const row = requests.find((candidate) => candidate.id === where.id);
         return row ? { ...row, event: { id: row.eventId, name: events.get(row.eventId).name }, decidedBy: row.decidedByUserId ? { displayName: "Alex Admin" } : null } : null;
       }),
+      findFirst: vi.fn(async ({ where }: any) => {
+        const invite = invites.find((row) => row.tokenHash === where.invite.tokenHash);
+        const row = invite && requests.find((candidate) => candidate.inviteId === invite.id && candidate.submittedByAccountId === where.submittedByAccountId);
+        return row ? { status: row.status, event: { name: events.get(row.eventId).name } } : null;
+      }),
       findMany: vi.fn(async ({ where }: any) => requests
         .filter((row) => (typeof where.status === "string" ? row.status === where.status : row.status !== where.status.not))
         .map((row) => ({ ...row, event: { id: row.eventId, name: events.get(row.eventId).name }, decidedBy: null }))),
@@ -320,6 +325,14 @@ describe("the director's request (#835)", () => {
     const audit = mocks.writeAuditLog.mock.calls.map(([entry]) => entry);
     expect(audit.map((entry) => entry.action)).toEqual(["VISITING_CLUB_REQUEST_SUBMITTED"]);
     expect(JSON.stringify(audit)).not.toMatch(/Vera|vera\.|555|Eagles|Synthetic Conference/);
+  });
+
+  it("shows the confirmation to the account that sent it, after the link is used, and a 404 to everyone else", async () => {
+    openInvite();
+    await submitVisitingClubRequest(account, TOKEN, answers(), NOW);
+    expect(await viewVisitingInvite(TOKEN, account, NOW)).toEqual({ status: "SENT", eventName: "Synthetic Camporee", requestStatus: "PENDING" });
+    expect(await viewVisitingInvite(TOKEN, { ...account, id: "acct-2", verifiedEmail: "someone.else@example.test" }, NOW)).toEqual({ status: "UNAVAILABLE" });
+    expect(await viewVisitingInvite("not-a-token", account, NOW)).toEqual({ status: "UNAVAILABLE" });
   });
 
   it("can't be replayed: the second submit on one link is refused and creates nothing", async () => {

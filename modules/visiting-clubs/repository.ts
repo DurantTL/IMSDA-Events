@@ -198,20 +198,33 @@ async function findOpenInvite(token: string, now: Date): Promise<OpenInvite | nu
 export type VisitingInviteView =
   | { status: "UNAVAILABLE" }
   | { status: "EMAIL_MISMATCH" }
-  | { status: "READY"; eventName: string; email: string; name: string };
+  | { status: "READY"; eventName: string; email: string; name: string }
+  | { status: "SENT"; eventName: string; requestStatus: VisitingClubStatusValue };
 
 /**
  * What the link's page needs for a signed-in account. A bad, used, expired or withdrawn link is UNAVAILABLE (the page
- * answers 404). A different account's address is EMAIL_MISMATCH, which says nothing about the event or the address.
+ * answers 404), except that the account that sent the request on a used link sees SENT, so a reload after sending still
+ * shows the confirmation. A different account's address is EMAIL_MISMATCH, which says nothing about the event or the address.
  */
 export async function viewVisitingInvite(token: string, account: VisitingAccount, now = new Date()): Promise<VisitingInviteView> {
   const invite = await findOpenInvite(token, now);
-  if (!invite) return { status: "UNAVAILABLE" };
+  if (!invite) return findSentRequest(token, account);
   if (invite.email !== account.verifiedEmail.trim().toLowerCase()) return { status: "EMAIL_MISMATCH" };
   // The event may have closed since the email went out.
   const event = await getPrisma().event.findFirst({ where: { id: invite.eventId, ...CLUB_EVENT_GATE }, select: { id: true } });
   if (!event) return { status: "UNAVAILABLE" };
   return { status: "READY", eventName: invite.eventName, email: invite.email, name: invite.name };
+}
+
+/** A used link shows its request only to the account that sent it; everyone else, and every other state, is UNAVAILABLE. */
+async function findSentRequest(token: string, account: VisitingAccount): Promise<VisitingInviteView> {
+  if (!token || token.length > 200) return { status: "UNAVAILABLE" };
+  const used = await getPrisma().visitingClubRequest.findFirst({
+    where: { invite: { tokenHash: hashOpaqueToken(token) }, submittedByAccountId: account.id },
+    select: { status: true, event: { select: { name: true } } },
+  });
+  if (!used) return { status: "UNAVAILABLE" };
+  return { status: "SENT", eventName: used.event.name, requestStatus: used.status };
 }
 
 /**
