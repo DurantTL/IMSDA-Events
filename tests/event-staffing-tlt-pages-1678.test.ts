@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -76,5 +77,22 @@ describe("the TLT staffing pages (#1678)", () => {
     mocks.eventFindFirst.mockResolvedValue(null);
     await expect(EventPage({ params, searchParams: Promise.resolve({}) })).rejects.toThrow("NEXT_NOT_FOUND");
     expect(mocks.loadStaffingSheet).not.toHaveBeenCalled();
+  });
+});
+
+describe("the TLT staffing picker's own rules (#1678)", () => {
+  const source = readFileSync("components/tlt-staffing.tsx", "utf8");
+  const css = readFileSync("components/tlt-staffing.module.css", "utf8");
+
+  it("shows Saving only on the card being saved, and drops a filter id the event has no option for", () => {
+    expect(source).toContain('savingId === option.personId ? "Saving…" : "Assign"');
+    expect(source).not.toMatch(/busy \? "Saving…" : "Assign"/);
+    expect(source).toContain("tags.some((entry) => entry.id === filters.tag)");
+    expect(source).toContain("clubs.some((entry) => entry.id === filters.club)");
+  });
+
+  it("marks both Clear filters links as same-page, and styles the empty-state link as a link", () => {
+    expect(source.match(/data-same-page/g)).toHaveLength(2);
+    expect(css).toMatch(/\.empty a \{[^}]*color: var\(--imsda-purple\)[^}]*text-decoration: underline/);
   });
 });

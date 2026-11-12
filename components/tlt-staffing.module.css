@@ -24,4 +24,4 @@
 .person { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; border-bottom: 1px solid var(--line); padding: 6px 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .personName { overflow-wrap: anywhere; }
 .role { color: var(--muted); }
-.empty a { display: inline-flex; align-items: center; min-height: 44px; }
+.empty a { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-purple); text-decoration: underline; }

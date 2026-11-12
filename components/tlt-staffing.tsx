@@ -28,13 +28,13 @@ export function TltStaffing({ endpoint, basePath, filters, initialActivities, op
   options: EventTltOption[];
 }) {
   const [activities, setActivities] = useState(initialActivities);
-  const { tag, year, club } = filters;
+  const { year } = filters;
   const [choice, setChoice] = useState<Record<string, string>>({});
   const [choiceError, setChoiceError] = useState<string | null>(null);
   const headings = useRef(new Map<string, HTMLElement>());
   useUnsavedChangesGuard(Object.values(choice).some(Boolean));
   const focusLater = (key: string) => requestAnimationFrame(() => headings.current.get(key)?.focus());
-  const filtered = Boolean(tag || year || club);
+  const [savingId, setSavingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [confirming, setConfirming] = useState<{ activity: ActivityView; person: AssignmentView } | null>(null);
@@ -42,6 +42,10 @@ export function TltStaffing({ endpoint, basePath, filters, initialActivities, op
 
   const tags = useMemo(() => [...new Map(options.flatMap((option) => option.tags).map((entry) => [entry.id, entry.name])).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "en-US")), [options]);
   const clubs = useMemo(() => [...new Map(options.map((option) => [option.clubId, option.clubName])).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "en-US")), [options]);
+  // An address naming a tag or club this event has no TLT for is ignored, so the select and the list agree.
+  const tag = tags.some((entry) => entry.id === filters.tag) ? filters.tag : "";
+  const club = clubs.some((entry) => entry.id === filters.club) ? filters.club : "";
+  const filtered = Boolean(tag || year || club);
   const shown = options.filter((option) => (!tag || option.tags.some((entry) => entry.id === tag)) && (!year || String(option.tltYear ?? "") === year) && (!club || option.clubId === club));
   const heldBy = (personId: string) => activities.filter((activity) => activity.assignments.some((assignment) => assignment.kind === "person" && assignment.assigneeId === personId));
   const nameOf = (personId: string) => options.find((option) => option.personId === personId)?.name;
@@ -79,7 +83,9 @@ export function TltStaffing({ endpoint, basePath, filters, initialActivities, op
       return;
     }
     setChoiceError(null);
+    setSavingId(option.personId);
     const saved = await send("POST", { activityId, role: "TLT", assignee: { kind: "person", id: option.personId } });
+    setSavingId(null);
     if (!saved) return;
     replace(saved);
     setChoice((current) => ({ ...current, [option.personId]: "" }));
@@ -171,12 +177,12 @@ export function TltStaffing({ endpoint, basePath, filters, initialActivities, op
               </label>
               <div className={styles.actions}>
                 <button className="primary-button" type="submit">Apply</button>
-                {filtered ? <Link className="secondary-button" scroll={false} href={basePath}>Clear filters</Link> : null}
+                {filtered ? <Link className="secondary-button" data-same-page scroll={false} href={basePath}>Clear filters</Link> : null}
               </div>
             </SearchAsYouTypeForm>
             <p className={styles.counts} role="status">{shown.length} of {options.length} registered {options.length === 1 ? "TLT" : "TLTs"} shown.</p>
             {shown.length === 0 && (
-              <p className={styles.empty}>No registered TLT matches these filters. <Link href={basePath} scroll={false}>Clear filters</Link></p>
+              <p className={styles.empty}>No registered TLT matches these filters. <Link data-same-page href={basePath} scroll={false}>Clear filters</Link></p>
             )}
             <ul className={styles.tlts}>
               {shown.map((option) => {
@@ -200,7 +206,7 @@ export function TltStaffing({ endpoint, basePath, filters, initialActivities, op
                           </select>
                           <FieldError id={`${selectId}-error`}>{choiceError === option.personId ? "Choose an activity." : undefined}</FieldError>
                         </label>
-                        <button className="primary-button" disabled={busy} onClick={() => void assign(option)} type="button">{busy ? "Saving…" : "Assign"}<span className="sr-only"> {option.name} as a TLT</span></button>
+                        <button className="primary-button" disabled={busy} onClick={() => void assign(option)} type="button">{savingId === option.personId ? "Saving…" : "Assign"}<span className="sr-only"> {option.name} as a TLT</span></button>
                       </div>
                     )}
                   </li>
