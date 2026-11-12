@@ -3,6 +3,8 @@ import { AccessRestricted } from "@/components/access-restricted";
 import { AttendeeConfigurationWorkspace } from "@/components/attendee-configuration-workspace";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listAttendeeConfiguration } from "@/modules/attendee-types/repository";
+import headerStyles from "@/components/attendee-configuration-workspace.module.css";
+import { PageHeader } from "@/components/page-header";
 import { staffPageTitles } from "@/components/staff-navigation";
 
 export const metadata: Metadata = { title: staffPageTitles.attendeeSetup };
@@ -22,5 +24,12 @@ export default async function AttendeeConfigurationPage({ searchParams }: { sear
     id: row.id, kind: row.kind, code: row.code, label: row.label,
     description: row.description, sortOrder: row.sortOrder, isActive: row.isActive,
   }));
-  return <AttendeeConfigurationWorkspace eventId={event.id} eventName={event.name} initialTypes={types} initialClassifications={classifications} canCreate={permissions.includes("CONFIGURE_EVENT")} />;
+  const header = (
+    <PageHeader
+      below={<nav aria-label="On this page" className={headerStyles.anchors}><a href="#attendee-types">Attendee types</a><a href="#attendee-groupings">Categories, tracks, and departments</a></nav>}
+      description={`Choose who can register for ${event.name} and how attendees are grouped.`}
+      title={staffPageTitles.attendeeSetup}
+    />
+  );
+  return <div className="settings-stack">{header}<AttendeeConfigurationWorkspace eventId={event.id} eventName={event.name} initialTypes={types} initialClassifications={classifications} canCreate={permissions.includes("CONFIGURE_EVENT")} canManageForms={permissions.includes("MANAGE_FORMS")} /></div>;
 }
