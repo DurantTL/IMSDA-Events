@@ -109,3 +109,14 @@ describe("club search status", () => {
     expect(clubRecordSearch.endpoint).toBe("/api/attendee/club-search");
   });
 });
+
+describe("club search keys", () => {
+  it("keeps every row key unique, so the arrow keys reach every row", () => {
+    const rows = result({ members: { items: [
+      { name: "Ada Lovelace", club: null, href: "/account/clubs/o1/roster?q=Ada+Lovelace" },
+      { name: "Adam Smith", club: null, href: "/account/clubs/o1/roster?q=Adam+Smith" },
+    ], more: true, seeAllHref: "/account/clubs/o1/roster?q=ada" } });
+    const keys = layout(true, rows, pages).entries.map((entry) => entry.key);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+});

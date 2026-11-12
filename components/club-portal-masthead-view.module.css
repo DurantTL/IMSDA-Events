@@ -52,8 +52,6 @@
   .account {
     justify-content: flex-start;
     width: 100%;
-    /* After the open search row (club-portal-search.module.css), which comes right under the brand and its search button. */
-    order: 2;
   }
 
   /* The name (and role) has its own line and the buttons always start on the next one, so the name getting a little
@@ -61,9 +59,16 @@
   .account > :global(.club-masthead-identity) {
     flex-basis: 100%;
   }
+
+  /* With the search button beside it (club-portal-search.tsx) the name still has the whole first line, less the button. */
+  .account[data-has-search] > :global(.club-masthead-identity) {
+    flex-basis: calc(100% - 56px);
+  }
 }
 
-/* With the search in the row, the gaps between the brand, the search and the account buttons are tighter, so a leader with several clubs still fits one row at 1024px. */
-.withSearch {
-  column-gap: 8px;
+/* Beside the search button a long name wraps to two lines (the row stays as tall as its buttons) instead of pushing the last button onto a new row. */
+@media (min-width: 641px) and (max-width: 1199px) {
+  .account[data-has-search] > :global(.club-masthead-identity) {
+    max-width: 12rem;
+  }
 }

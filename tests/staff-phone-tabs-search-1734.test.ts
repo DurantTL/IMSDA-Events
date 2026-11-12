@@ -74,6 +74,8 @@ describe("the phone header search", () => {
     expect(markup).toContain(`id="destination-search-input-wrap"`);
     expect(markup).toMatch(/<button[^>]*aria-label="Search pages, clubs, events and churches"[^>]*aria-expanded="false"/);
     expect(markup).toContain('id="destination-search-input"');
+    // The listbox scrolls, so it must not take Tab focus from the field (that would blur it and close the list).
+    expect(markup).toMatch(/<ul[^>]*role="listbox"[^>]*tabindex="-1"|<ul[^>]*tabindex="-1"[^>]*role="listbox"/);
     const css = read("components/staff-shell.module.css");
     expect(css).toMatch(/\.searchToggle \{[^}]*min-width: 44px; min-height: 44px/);
     expect(css).toMatch(/@media \(max-width: 800px\) \{[\s\S]*\.searchToggle \{ display: inline-flex;/);

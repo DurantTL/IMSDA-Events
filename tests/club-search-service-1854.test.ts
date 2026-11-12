@@ -302,12 +302,22 @@ describe("getClubSearchViewer", () => {
 });
 
 describe("searchClubPortal: more access shapes", () => {
-  it("gives an Area Coordinator with their own attendee account and no club role nothing", async () => {
+  it("gives an Area Coordinator act-as, with the person's own attendee session and no directed clubs, nothing", async () => {
+    mocks.currentStaffActingContext.mockResolvedValue({ userId: "usr_1", staffSessionId: "ss_1", actAsId: "act_5", role: "AREA_COORDINATOR", organizationId: null, expiresAt: new Date(NOW.getTime() + 3_600_000) });
     directed();
-    const result = await searchClubPortal(viewer, "a", NOW);
+    const asAttendee = await getClubSearchViewer();
+    expect(asAttendee).toEqual(viewer);
+    const result = await searchClubPortal(asAttendee!, "a", NOW);
     expect(result.clubs.items).toEqual([]);
     expect(result.members.items).toEqual([]);
     expect(database.memberCalls).toHaveLength(0);
+  });
+
+  it("shows two members with the same name in one club as one row", async () => {
+    database.members = [member("d1", "org_alpha", "Sam", "Synth"), member("d2", "org_alpha", "Sam", "Synth"), member("d3", "org_alpha", "Sam", "Other")];
+    const result = await searchClubPortal(viewer, "sam", NOW);
+    expect(result.members.items.map((m) => m.name)).toEqual(["Sam Other", "Sam Synth"]);
+    expect(new Set(result.members.items.map((m) => m.href)).size).toBe(result.members.items.length);
   });
 
   it("gives a Clubs Administrator acting as director only the act-as club", async () => {

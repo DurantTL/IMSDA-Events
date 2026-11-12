@@ -1,8 +1,16 @@
-/* The club masthead search (#1854): from 1200px a modest box between the brand and the account buttons, sized so a leader with several clubs (Switch club shown) keeps the masthead on one row; up to 1199px an icon button opens it on its own row. */
+/* The club masthead search (#1854): an icon button, the first of the account actions, opens the box under the masthead. It is the same at every width, so a leader with several clubs and a long name keeps the masthead on its usual rows. */
 .search {
-  position: relative;
-  flex: 0 1 200px;
-  min-width: 160px;
+  display: none;
+}
+
+/* Open, the box hangs under the masthead like a menu, from the account actions group it sits in; it never makes the masthead taller. */
+.search[data-open="true"] {
+  display: block;
+  position: absolute;
+  z-index: 41;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(26rem, 100%);
 }
 
 /* The header here is white, not the staff header's dark: the "nothing matches" line reads in the muted ink. */
@@ -38,38 +46,20 @@
   box-shadow: var(--shadow);
 }
 
-/* An icon button in the secondary-button look; hidden until the phone width. */
+/* An icon button in the secondary-button look, the first of the masthead's actions. The global phone rule makes buttons full width, so the size is pinned. */
 .toggle {
-  display: none;
+  display: inline-flex;
+  flex: none;
+  width: 44px;
   min-width: 44px;
   min-height: 44px;
   align-items: center;
   justify-content: center;
   padding: 0;
+  /* On the phone it shares the name's two-line row, which is a hair under 44px: the button must not make that row taller. */
+  margin-block: -1px;
 }
 
 .toggle[aria-expanded="true"] {
   box-shadow: inset 0 -4px var(--imsda-gold);
-}
-
-@media (max-width: 1199px) {
-  .search {
-    display: none;
-  }
-
-  /* The open row is full width on a row of its own (right under the brand row on a phone, where the account row follows it: club-portal-masthead-view.module.css). */
-  .search[data-open="true"] {
-    display: block;
-    order: 1;
-    flex: 1 1 100%;
-    max-width: none;
-  }
-
-  /* The global phone rule makes buttons full width; the icon button keeps its own size, beside the brand. */
-  .toggle {
-    display: inline-flex;
-    flex: none;
-    width: 44px;
-    margin-left: auto;
-  }
 }

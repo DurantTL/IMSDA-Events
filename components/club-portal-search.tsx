@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { DestinationSearch } from "@/components/destination-search";
@@ -10,8 +10,8 @@ import styles from "@/components/club-portal-search.module.css";
 
 /**
  * The club portal masthead's search (#1854): the same combobox as the staff header, over this club's pages, the leader's
- * own clubs and the members the roster would show them. On a phone (1199px and narrower) a search icon button opens it on
- * its own row under the masthead, as the staff header does (#1734); wider screens always show the box.
+ * own clubs and the members the roster would show them. An icon button (the first of the masthead's actions, at every width) opens it
+ * under the masthead without making the masthead taller.
  */
 export function ClubPortalSearch({ pages }: { pages: readonly ClubSearchPage[] }) {
   const pathname = usePathname();
@@ -23,14 +23,6 @@ export function ClubPortalSearch({ pages }: { pages: readonly ClubSearchPage[] }
   const toggleRef = useRef<HTMLButtonElement>(null);
   const inputId = "club-portal-search-input";
   const wrapId = `${inputId}-wrap`;
-
-  // A window wider than the toggle range (where the box is always shown) closes the row too.
-  useEffect(() => {
-    const wide = window.matchMedia("(min-width: 1200px)");
-    const onChange = () => { if (wide.matches) setOpenPath(null); };
-    wide.addEventListener("change", onChange);
-    return () => wide.removeEventListener("change", onChange);
-  }, []);
 
   // Escape with nothing left to undo (no typed words, no open list) closes the row and hands focus back to the button.
   function onKeyDownCapture(event: React.KeyboardEvent<HTMLDivElement>) {

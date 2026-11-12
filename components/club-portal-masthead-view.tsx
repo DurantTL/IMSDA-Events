@@ -48,10 +48,10 @@ export function clubMastheadModel(input: {
 export function ClubPortalMastheadView({ model, role, formsHelpContact, searchPages }: { model: ClubMastheadModel; role: ClubRole; formsHelpContact?: FormsHelpContact; searchPages?: readonly ClubSearchPage[] }) {
   return (
     <header className="club-masthead">
-      <div className={`club-masthead-inner${searchPages ? ` ${styles.withSearch}` : ""}`}>
+      <div className="club-masthead-inner">
         <BrandLink label="IMAdventist Club portal, calendar" className="club-masthead-brand" wordmark={<span><small>{PRODUCT_NAME}</small><strong>Club portal</strong></span>} />
-        {searchPages && <ClubPortalSearch pages={searchPages} />}
         <PortalMastheadActions
+          search={searchPages && <ClubPortalSearch pages={searchPages} />}
           formsHelpContact={formsHelpContact}
           signOut={model.signOut}
           identity={<>

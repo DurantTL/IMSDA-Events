@@ -114,9 +114,14 @@ async function findMembers(openClubs: { organizationId: string; name: string }[]
     take,
     select: { organizationId: true, person: { select: { firstName: true, lastName: true } } },
   });
+  // Two people with the same name in one club open the same roster search, so they are one row (keys and arrow keys stay unique).
+  const seen = new Set<string>();
   return rows.flatMap((row) => {
     if (!row.person) return [];
     const name = memberDisplayName(row.person);
-    return [{ name, club: labelClub ? names.get(row.organizationId) ?? null : null, href: clubRosterSearchHref(row.organizationId, name) }];
+    const href = clubRosterSearchHref(row.organizationId, name);
+    if (seen.has(href)) return [];
+    seen.add(href);
+    return [{ name, club: labelClub ? names.get(row.organizationId) ?? null : null, href }];
   });
 }
