@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import {
@@ -98,6 +98,13 @@ export function DestinationSearch<R extends { query: string } = StaffSearchResul
   const showFailedNote = open && recordsOn && hasQuery && recordSearch.failed && results.length > 0;
   const hasFootNotes = moreNotes.length > 0 || showFailedNote;
   const optionId = (index: number) => `${baseId}-option-${index}`;
+
+  // The row the arrow keys reach is scrolled into view, in the list and on the page, so it is never left off screen
+  // (a long list, or a panel low on a short phone). Its own scroll margin keeps it clear of a fixed bar.
+  useEffect(() => {
+    if (!expanded || active < 0) return;
+    document.getElementById(`${baseId}-option-${active}`)?.scrollIntoView?.({ block: "nearest" });
+  }, [expanded, active, baseId]);
 
   function reset() {
     setQuery("");

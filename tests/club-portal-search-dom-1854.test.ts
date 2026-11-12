@@ -94,7 +94,7 @@ describe("ClubPortalSearch", () => {
     expect(button.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("closes the panel when Escape hands focus back to the button", async () => {
+  it("closes the panel when focus goes back to its button (as Escape hands it back)", async () => {
     mounted = await mount(createElement(ClubPortalSearch, { pages }));
     const button = mounted.container.querySelector("button[aria-controls]") as HTMLButtonElement;
     const wrap = () => mounted.container.querySelector("#club-portal-search-input-wrap")!;
@@ -103,5 +103,20 @@ describe("ClubPortalSearch", () => {
     await act(async () => { input().focus(); });
     await act(async () => { button.focus(); });
     expect(wrap().getAttribute("data-open")).toBe("false");
+  });
+
+  it("stays open when the card itself is pressed, and hands focus to the button when the button closes it", async () => {
+    mounted = await mount(createElement(ClubPortalSearch, { pages }));
+    const button = mounted.container.querySelector("button[aria-controls]") as HTMLButtonElement;
+    const wrap = () => mounted.container.querySelector<HTMLDivElement>("#club-portal-search-input-wrap")!;
+    await click(button);
+    await act(async () => { input().focus(); });
+    const press = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    await act(async () => { wrap().dispatchEvent(press); });
+    expect(press.defaultPrevented).toBe(true);
+    expect(wrap().getAttribute("data-open")).toBe("true");
+    await click(button);
+    expect(wrap().getAttribute("data-open")).toBe("false");
+    expect(document.activeElement).toBe(button);
   });
 });

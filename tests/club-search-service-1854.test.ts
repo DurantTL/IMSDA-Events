@@ -155,7 +155,7 @@ describe("searchClubPortal: club director", () => {
     expect(result.members.items).toHaveLength(CLUB_SEARCH_GROUP_LIMIT);
     expect(result.members.more).toBe(true);
     expect(result.members.seeAllHref).toBe(clubRosterSearchHref("org_alpha", "sam"));
-    expect(database.memberCalls[0].take).toBe(CLUB_SEARCH_GROUP_LIMIT + 1);
+    expect(database.memberCalls[0].take).toBe(CLUB_SEARCH_GROUP_LIMIT * 2 + 1);
   });
 });
 
@@ -318,6 +318,17 @@ describe("searchClubPortal: more access shapes", () => {
     const result = await searchClubPortal(viewer, "sam", NOW);
     expect(result.members.items.map((m) => m.name)).toEqual(["Sam Other", "Sam Synth"]);
     expect(new Set(result.members.items.map((m) => m.href)).size).toBe(result.members.items.length);
+  });
+
+  it("still fills five rows when same-name pairs are joined", async () => {
+    database.members = [
+      member("f1", "org_alpha", "Sam", "Aaberg"), member("f2", "org_alpha", "Sam", "Aaberg"),
+      member("f3", "org_alpha", "Sam", "Abbot"), member("f4", "org_alpha", "Sam", "Abbot"),
+      ...["Bravo", "Charlie", "Delta"].map((last, i) => member(`f${i + 5}`, "org_alpha", "Sam", last)),
+    ];
+    const result = await searchClubPortal(viewer, "sam", NOW);
+    expect(result.members.items.map((m) => m.name)).toEqual(["Sam Aaberg", "Sam Abbot", "Sam Bravo", "Sam Charlie", "Sam Delta"]);
+    expect(result.members.more).toBe(false);
   });
 
   it("keeps See all when joining same-name rows leaves five or fewer of the rows read", async () => {

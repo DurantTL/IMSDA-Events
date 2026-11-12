@@ -45,8 +45,25 @@ export function ClubPortalSearch({ pages }: { pages: readonly ClubSearchPage[] }
   function toggle() {
     const next = !open;
     setOpen(next);
-    // The field is already in the page (hidden by the stylesheet until open), so it takes focus once it is shown.
-    if (next) requestAnimationFrame(() => document.getElementById(inputId)?.focus());
+    if (!next) {
+      // Closing hides the field: focus stays on the button, never falls to the page.
+      toggleRef.current?.focus();
+      return;
+    }
+    // The field is already in the page (hidden by the stylesheet until open), so it takes focus once it is shown, and the
+    // panel is scrolled just enough to be seen whole (or from its top) on a short screen.
+    requestAnimationFrame(() => {
+      document.getElementById(inputId)?.focus({ preventScroll: true });
+      document.getElementById(wrapId)?.scrollIntoView?.({ block: "nearest" });
+    });
+  }
+
+  // A press on the card itself (its padding, a note, a heading) keeps focus in the field, so it does not close the panel.
+  // Controls in it (the field, the clear button, options, links) behave as usual.
+  function onMouseDown(event: React.MouseEvent<HTMLDivElement>) {
+    const target = event.target;
+    if (target instanceof Element && target.closest("input, button, a, [role=\"option\"]")) return;
+    event.preventDefault();
   }
 
   return (
@@ -67,7 +84,7 @@ export function ClubPortalSearch({ pages }: { pages: readonly ClubSearchPage[] }
         {open ? <X aria-hidden="true" size={20} /> : <Search aria-hidden="true" size={20} />}
       </button>
       </span>
-      <div className={styles.search} id={wrapId} data-open={open ? "true" : "false"} onBlurCapture={onBlurCapture} onKeyDownCapture={onKeyDownCapture}>
+      <div className={styles.search} id={wrapId} data-open={open ? "true" : "false"} onBlurCapture={onBlurCapture} onMouseDown={onMouseDown} onKeyDownCapture={onKeyDownCapture}>
         <DestinationSearch destinations={destinations} inputId={inputId} onNavigated={() => setOpen(false)} records={clubRecordSearch} />
       </div>
     </>

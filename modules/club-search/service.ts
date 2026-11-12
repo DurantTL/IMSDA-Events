@@ -57,7 +57,7 @@ export const clubSearchRateLimitKey = (viewer: ClubSearchViewer) => (viewer.kind
 
 /** A leader holds a handful of clubs; this only bounds a pathological account. */
 const MAX_CLUBS = 20;
-const take = CLUB_SEARCH_GROUP_LIMIT + 1;
+const memberTake = CLUB_SEARCH_GROUP_LIMIT * 2 + 1;
 
 function group<T>(rows: T[], seeAllHref: string | null, moreRead = false) {
   const more = moreRead || rows.length > CLUB_SEARCH_GROUP_LIMIT;
@@ -112,7 +112,8 @@ async function findMembers(openClubs: { organizationId: string; name: string }[]
       },
     },
     orderBy: [{ person: { lastName: "asc" } }, { person: { firstName: "asc" } }, { id: "asc" }],
-    take,
+    // Twice the rows shown (plus one), so a same-name pair joined into one row still leaves five to show.
+    take: memberTake,
     select: { organizationId: true, person: { select: { firstName: true, lastName: true } } },
   });
   // Two people with the same name in one club open the same roster search, so they are one row (keys and arrow keys stay unique).
@@ -125,5 +126,6 @@ async function findMembers(openClubs: { organizationId: string; name: string }[]
     seen.add(href);
     return [{ name, club: labelClub ? names.get(row.organizationId) ?? null : null, href }];
   });
-  return { rows: joined, more: rows.length > CLUB_SEARCH_GROUP_LIMIT };
+  // More match when more than five rows remain after joining, or when the read was cut short.
+  return { rows: joined, more: joined.length > CLUB_SEARCH_GROUP_LIMIT || rows.length === memberTake };
 }

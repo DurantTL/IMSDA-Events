@@ -73,3 +73,9 @@
   margin-top: 0;
   box-shadow: none;
 }
+
+/* Scrolling a row or the panel into view keeps it clear of the club pages' fixed phone bar (73px, `club-portal-nav`). */
+.search[data-open="true"],
+.search :global([role="option"]) {
+  scroll-margin-bottom: calc(73px + 12px + env(safe-area-inset-bottom, 0px));
+}
