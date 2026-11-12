@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Prisma } from "@prisma/client";
+import { formatPersonName } from "@/lib/person-name";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { calendarDateOf, clubSchoolGradeLabels, clubYearFor } from "@/modules/club-rosters/domain";
@@ -76,7 +77,7 @@ export async function listTltDirectoryRows(now = new Date()): Promise<TltDirecto
   const rows: TltDirectoryRow[] = [];
   for (const member of latest.values()) {
     const profile = profileByPerson.get(member.personId!);
-    const name = `${member.person?.firstName ?? ""} ${member.person?.lastName ?? ""}`.replace(/\s+/g, " ").trim();
+    const name = formatPersonName({ firstName: member.person?.firstName ?? "", lastName: member.person?.lastName ?? "" });
     rows.push({
       personId: member.personId!,
       rosterMemberId: member.id,

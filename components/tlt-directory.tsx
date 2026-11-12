@@ -115,7 +115,7 @@ export function TltDirectory({ slice, total, clubs, filters, positions, tags }: 
         <Link className="secondary-button" href="/account/area-clubs/tlt/lists">Position types and tags</Link>
       </div>
 
-      <SearchResultStatus message={`${slice.total} of ${total} TLTs shown`} />
+      <SearchResultStatus message={`${slice.total} ${slice.total === 1 ? "TLT" : "TLTs"} found`} />
       <ListPager hrefFor={pagerHref} label="TLT pages" noun="TLTs" nounOne="TLT" part="count" slice={slice} />
 
       {rows.length === 0 ? (
