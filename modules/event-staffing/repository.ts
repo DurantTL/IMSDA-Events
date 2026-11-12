@@ -316,7 +316,11 @@ export async function addTltAssignment(actor: StaffingActor, eventId: string, in
       const activity = await loadActivity(tx, eventId, input.activityId);
       const conflict = assignmentConflict(activity, { role: "TLT", assignee: input.assignee });
       if (conflict) throw new StaffingError(conflict.code, conflict.message);
-      await assertOnEvent(tx, eventId, input.assignee);
+      const registered = await tx.registrationAttendee.findFirst({
+        where: { eventId, personId: input.assignee.id, registration: { eventId, status: { in: [...ACTIVE_REGISTRATION_STATUSES] } } },
+        select: { id: true },
+      });
+      if (!registered) throw new StaffingError("NOT_ON_EVENT", "Only TLTs registered for this event can be assigned.");
       if (!(await personIsCurrentTlt(tx, input.assignee.id, now))) {
         throw new StaffingError("NOT_ON_EVENT", "Only a TLT on a current club roster can be assigned here.");
       }

@@ -13,6 +13,8 @@
 .filters { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); align-items: end; }
 .field { display: grid; gap: 4px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; color: var(--imsda-navy); }
 .field select { min-height: 44px; width: 100%; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--field-border); border-radius: var(--radius-element); background: var(--card); font: inherit; font-weight: 400; color: inherit; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.actions a, .actions button { min-height: 44px; display: inline-flex; align-items: center; }
 .tlts { grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
 .tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .tag { padding: 2px 8px; border-radius: var(--radius-pill); background: var(--imsda-purple-soft); color: var(--imsda-purple); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
@@ -22,3 +24,4 @@
 .person { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; border-bottom: 1px solid var(--line); padding: 6px 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .personName { overflow-wrap: anywhere; }
 .role { color: var(--muted); }
+.empty a { display: inline-flex; align-items: center; min-height: 44px; }

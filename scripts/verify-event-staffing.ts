@@ -11,6 +11,8 @@
  * - one lead per activity (a new lead replaces the old), one row per person per activity, the database's own checks hold;
  * - activities and assignments are audited with ids and counts only; another event's rows are never touched;
  * - gaps are worked out on the rows (no lead, 2 of 4 lifeguards, 0 of 3 TLTs), and a cancelled person counts for nothing;
+ * - the TLT director's path (addTltAssignment): a registered current TLT is assigned; an unregistered one, a registered non-TLT and a role other than TLT are refused;
+ *   a TLT who cancels stops counting, and one who stops being a TLT stops counting too; her removals reach TLT rows only;
  * - the CSV holds names, activity and role and no contact detail, and is audited with counts;
  * - each assigned person's own list holds their assignments only, for a published event with the tool on;
  * - switching off hides the sheet and keeps the rows.
@@ -28,7 +30,9 @@ import type { AuthenticatedUser } from "@/modules/access/authorization";
 import { assertStaffingAccess, requireStaffStaffingReader, requireStaffStaffingWriter } from "@/modules/event-staffing/access";
 import { activityGaps, summarizeStaffing } from "@/modules/event-staffing/domain";
 import { listOwnAssignments } from "@/modules/event-staffing/own-assignments";
-import { addAssignment, buildStaffingExport, createActivity, deleteActivity, listPickerPeople, loadStaffingSheet, removeAssignment, updateActivity } from "@/modules/event-staffing/repository";
+import { addAssignment, addTltAssignment, buildStaffingExport, createActivity, deleteActivity, listPickerPeople, loadStaffingSheet, removeAssignment, updateActivity } from "@/modules/event-staffing/repository";
+import { clubYearFor } from "@/modules/club-rosters/domain";
+import { tltCounts } from "@/modules/event-staffing/tlt-director";
 import { applyStaffingSettings, requireStaffStaffingToggleAccess } from "@/modules/event-staffing/settings";
 import { findActiveMembership } from "@/modules/events/repository";
 
@@ -43,11 +47,12 @@ const ids = {
   event: `${P}_event`, other: `${P}_other`, unpublished: `${P}_unpub`, general: `${P}_gen`,
   admin: `${P}_admin`, eventAdmin: `${P}_eadmin`, manager: `${P}_mgr`, readOnly: `${P}_ro`, kitchen: `${P}_kit`, stranger: `${P}_stranger`, helperStaff: `${P}_hstaff`,
   ac: `${P}_ac`, expired: `${P}_expired`, revoked: `${P}_revoked`, plain: `${P}_plain`, samAccount: `${P}_sam`,
-  sam: `${P}_psam`, pat: `${P}_ppat`, lee: `${P}_plee`, gone: `${P}_pgone`, wait: `${P}_pwait`, away: `${P}_paway`, nobody: `${P}_pnobody`,
+  club: `${P}_club`, sam: `${P}_psam`, pat: `${P}_ppat`, lee: `${P}_plee`, gone: `${P}_pgone`, wait: `${P}_pwait`, away: `${P}_paway`, nobody: `${P}_pnobody`,
 };
 const userIds = [ids.admin, ids.eventAdmin, ids.manager, ids.readOnly, ids.kitchen, ids.stranger, ids.helperStaff];
 const accountIds = [ids.ac, ids.expired, ids.revoked, ids.plain, ids.samAccount];
 const personIds = [ids.sam, ids.pat, ids.lee, ids.gone, ids.wait, ids.away, ids.nobody];
+const clubIds = [ids.club];
 const eventIds = [ids.event, ids.other, ids.unpublished, ids.general];
 const asUser = (id: string, name: string, globalRole: "SYSTEM_ADMIN" | null = null) => ({ id, email: `${id}@example.test`, displayName: name, globalRole }) as AuthenticatedUser;
 const admin = asUser(ids.admin, "Staffing Admin", "SYSTEM_ADMIN");
@@ -84,6 +89,8 @@ async function cleanup() {
   await prisma.areaCoordinatorGrant.deleteMany({ where: { attendeeAccountId: { in: accountIds } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   await prisma.attendeeAccount.deleteMany({ where: { id: { in: accountIds } } });
+  await prisma.clubRosterMember.deleteMany({ where: { organizationId: { in: clubIds } } });
+  await prisma.organization.deleteMany({ where: { id: { in: clubIds } } });
   await prisma.person.deleteMany({ where: { id: { in: personIds } } });
 }
 
@@ -105,7 +112,7 @@ async function main() {
   await prisma.user.createMany({ data: [admin, eventAdmin, manager, readOnly, kitchen, stranger].map((user) => ({ id: user.id, email: user.email, displayName: user.displayName, ...(user.globalRole ? { globalRole: user.globalRole } : {}) })) });
   await prisma.user.create({ data: { id: ids.helperStaff, email: `${ids.helperStaff}@example.test`, displayName: "Hal Helper" } });
   await prisma.areaCoordinatorGrant.createMany({ data: [
-    { attendeeAccountId: ids.ac, grantedByUserId: ids.admin },
+    { attendeeAccountId: ids.ac, grantedByUserId: ids.admin, tltDirector: true },
     { attendeeAccountId: ids.revoked, grantedByUserId: ids.admin, revokedAt: new Date(), revokedByUserId: ids.admin },
   ] });
   await prisma.person.createMany({ data: [
@@ -117,6 +124,7 @@ async function main() {
     { id: ids.away, firstName: "Otto", lastName: "Elsewhere" },
     { id: ids.nobody, firstName: "Nora", lastName: "Unregistered" },
   ] });
+  await prisma.organization.create({ data: { id: ids.club, type: "CLUB", name: "Sample Staffing Pathfinders", normalizedName: `sample staffing pathfinders ${P}` } });
   const base = { audience: "CLUB" as const, timezone: "America/Chicago", isPublished: true, billingMode: "DEFERRED_ORGANIZATION_INVOICE" as const };
   const dates = { startsAt: new Date("2027-05-07T14:00:00Z"), endsAt: new Date("2027-05-08T22:00:00Z") };
   await prisma.event.create({ data: { id: ids.event, slug: `${P}-event`, name: "Sample Spring Camporee 2027", ...base, ...dates } });
@@ -276,6 +284,41 @@ async function main() {
   await prisma.areaCoordinatorGrant.update({ where: { attendeeAccountId: ids.ac }, data: { revokedAt: null } });
   await deleteActivity(ac, ids.event, archery.id);
 
+  // The TLT director's path (#1678 part 2): a registered, current TLT is assigned; everyone else is refused; counts follow the rows.
+  const tltDirector = { kind: "tlt-director" as const, accountId: ids.ac, canWrite: false as const };
+  const frisbee = await createActivity(ac, ids.event, { name: "Frisbee", description: "", location: "", timeText: "", tltsNeeded: 3, lifeguardsNeeded: 0, helpersNeeded: 0 });
+  const clubYear = clubYearFor(new Date());
+  for (const [personId, isTlt] of [[ids.pat, true], [ids.lee, true], [ids.nobody, true], [ids.sam, false]] as const) {
+    await prisma.clubRosterMember.create({ data: { organizationId: ids.club, clubYear, personId, attendeeType: "YOUTH", isTlt, status: "ACTIVE", source: "DIRECTOR" } });
+  }
+  const assignTlt = (personId: string, activityId = frisbee.id) => addTltAssignment(tltDirector, ids.event, { activityId, role: "TLT", assignee: { kind: "person", id: personId } });
+  await refused(() => assignTlt(ids.nobody), "a TLT who is not registered for the event is refused", "NOT_ON_EVENT");
+  await refused(() => assignTlt(ids.wait), "a waitlisted person is refused", "NOT_ON_EVENT");
+  await refused(() => assignTlt(ids.sam), "a registered person who is not a TLT is refused", "NOT_ON_EVENT");
+  await refused(() => addTltAssignment(ac, ids.event, { activityId: frisbee.id, role: "TLT", assignee: { kind: "person", id: ids.pat } }), "an Area Coordinator cannot assign a TLT", "NOT_PERMITTED");
+  await refused(() => addAssignment(tltDirector, ids.event, { activityId: frisbee.id, role: "HELPER", assignee: { kind: "person", id: ids.pat } }), "the TLT director cannot add a helper", "NOT_PERMITTED");
+  assert(await prisma.eventStaffingAssignment.count({ where: { activityId: frisbee.id } }) === 0, "no refusal wrote a row");
+  await assignTlt(ids.pat);
+  await refused(() => assignTlt(ids.pat), "the same TLT twice is refused", "CONFLICT");
+  const withTlts = await assignTlt(ids.lee);
+  assert(withTlts.assignments.filter((entry) => entry.role === "TLT" && entry.active).length === 2, "two registered TLTs are assigned");
+  const tltAudit = await prisma.auditLog.findMany({ where: { eventId: ids.event, entityType: "EventStaffingAssignment", metadata: { path: ["viaTltDirector"], equals: true } } });
+  assert(tltAudit.length === 2 && tltAudit.every((row) => !row.actorUserId && !/Pat|Lee|Example|Sample|Frisbee/.test(JSON.stringify(row.metadata) + row.summary)), "her assignments are audited by account and ids only");
+  assert(tltCounts(await loadStaffingSheet(ids.event)).assigned === 2, "both count");
+  await prisma.registration.updateMany({ where: { eventId: ids.event, accountHolderPersonId: ids.lee }, data: { status: "CANCELLED" } });
+  assert(tltCounts(await loadStaffingSheet(ids.event)).assigned === 1, "a TLT who cancels stops counting");
+  await prisma.registration.updateMany({ where: { eventId: ids.event, accountHolderPersonId: ids.lee }, data: { status: "CONFIRMED" } });
+  await prisma.clubRosterMember.updateMany({ where: { organizationId: ids.club, personId: ids.pat }, data: { isTlt: false } });
+  assert(tltCounts(await loadStaffingSheet(ids.event)).assigned === 1, "a TLT who is no longer a TLT stops counting");
+  await prisma.clubRosterMember.updateMany({ where: { organizationId: ids.club, personId: ids.pat }, data: { isTlt: true } });
+  const frisbeeNow = (await loadStaffingSheet(ids.event)).find((entry) => entry.id === frisbee.id)!;
+  await refused(() => removeAssignment(tltDirector, ids.event, "no-such-assignment"), "her removal of a missing assignment is refused", "ASSIGNMENT_NOT_FOUND");
+  const canoeLead = (await loadStaffingSheet(ids.event)).find((entry) => entry.id === canoe.id)!.assignments.find((entry) => entry.role === "LEAD")!;
+  await refused(() => removeAssignment(tltDirector, ids.event, canoeLead.id), "she cannot take a lead off", "NOT_PERMITTED");
+  const afterRemove = await removeAssignment(tltDirector, ids.event, frisbeeNow.assignments.find((entry) => entry.assigneeId === ids.pat)!.id);
+  assert(afterRemove.assignments.length === 1, "she can take a TLT off");
+  await deleteActivity(ac, ids.event, frisbee.id);
+
   // Switching off hides it and keeps the rows.
   await applyStaffingSettings(ac, ids.event, { enabled: false });
   await refused(() => assertStaffingAccess(ac, ids.event, "read"), "hidden once off", "MODULE_OFF");
@@ -284,7 +327,7 @@ async function main() {
   await applyStaffingSettings(ac, ids.event, { enabled: true });
   assert((await loadStaffingSheet(ids.event)).length === 2, "switching back on shows them again");
   await deleteActivity(ac, ids.event, surprise.id);
-  assert(await prisma.auditLog.count({ where: { eventId: ids.event, action: "EVENT_STAFFING_ACTIVITY_DELETED" } }) === 2 && (await loadStaffingSheet(ids.event)).length === 1, "a delete removes the activity and is audited");
+  assert(await prisma.auditLog.count({ where: { eventId: ids.event, action: "EVENT_STAFFING_ACTIVITY_DELETED" } }) === 3 && (await loadStaffingSheet(ids.event)).length === 1, "a delete removes the activity and is audited");
 
   console.log("Event staffing verified.");
 }

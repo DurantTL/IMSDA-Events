@@ -17,9 +17,13 @@ export const dynamic = "force-dynamic";
  * same "not found" for everyone else, for an event without the sheet, and for one she cannot see. Activities, leads and helpers
  * are not changed here: that stays with the event's Area Coordinators and administrators.
  */
-export default async function TltStaffingEventPage({ params }: { params: Promise<{ eventId: string }> }) {
+export default async function TltStaffingEventPage({ params, searchParams }: { params: Promise<{ eventId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   if (!(await currentTltDirector())) notFound();
   const { eventId } = await params;
+  const query = await searchParams;
+  const one = (value: string | string[] | undefined) => (typeof value === "string" ? value.slice(0, 64) : Array.isArray(value) ? (value[0] ?? "").slice(0, 64) : "");
+  const year = one(query.year);
+  const filters = { tag: one(query.tag), club: one(query.club), year: ["1", "2", "3", "4"].includes(year) ? year : "" };
   const loaded = await (async () => {
     const actor = await requireTltDirectorStaffingActor();
     const event = await assertStaffingAccess(actor, eventId, "read");
@@ -40,7 +44,7 @@ export default async function TltStaffingEventPage({ params }: { params: Promise
       {loaded === null ? (
         <p className="inline-notice error" role="alert">This event could not be loaded. Try again.</p>
       ) : (
-        <TltStaffing endpoint={`/api/attendee/area-clubs/tlt-staffing/${encodeURIComponent(eventId)}/assignments`} initialActivities={loaded.activities} options={loaded.options} />
+        <TltStaffing basePath={`/account/area-clubs/tlt/staffing/${encodeURIComponent(eventId)}`} endpoint={`/api/attendee/area-clubs/tlt-staffing/${encodeURIComponent(eventId)}/assignments`} filters={filters} initialActivities={loaded.activities} options={loaded.options} />
       )}
     </section>
   );

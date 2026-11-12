@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   activityFindFirst: vi.fn(),
   activityFindMany: vi.fn(),
   assignmentFindFirst: vi.fn(),
+  assignmentFindMany: vi.fn(),
+  activityGroupBy: vi.fn(),
   assignmentCreate: vi.fn(),
   assignmentDelete: vi.fn(),
   assignmentDeleteMany: vi.fn(),
@@ -39,8 +41,8 @@ vi.mock("@/modules/tlt-directory/repository", () => ({ listTltDirectoryRows: moc
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/lib/prisma", () => {
   const tx = {
-    eventStaffingActivity: { findFirst: mocks.activityFindFirst, findMany: mocks.activityFindMany },
-    eventStaffingAssignment: { findFirst: mocks.assignmentFindFirst, create: mocks.assignmentCreate, delete: mocks.assignmentDelete, deleteMany: mocks.assignmentDeleteMany },
+    eventStaffingActivity: { findFirst: mocks.activityFindFirst, findMany: mocks.activityFindMany, groupBy: mocks.activityGroupBy },
+    eventStaffingAssignment: { findFirst: mocks.assignmentFindFirst, findMany: mocks.assignmentFindMany, create: mocks.assignmentCreate, delete: mocks.assignmentDelete, deleteMany: mocks.assignmentDeleteMany },
     registrationAttendee: { findFirst: mocks.attendeeFindFirst, findMany: mocks.attendeeFindMany },
     eventMembership: { findFirst: mocks.membershipFindFirst, findMany: mocks.membershipFindMany },
     areaCoordinatorGrant: { findMany: mocks.grantFindMany, findFirst: mocks.grantFindFirst },
@@ -77,20 +79,6 @@ const activityRow = { id: "act-1", name: "Canoe", description: "", location: "La
 const director: StaffingActor = { kind: "tlt-director", accountId: "acct-tlt", canWrite: false };
 const sam = { firstName: "Sam", lastName: "Sample" };
 
-const personas = {
-  "an ordinary Area Coordinator (director setting off)": "ac",
-  "an Area Coordinator who leads an activity on the event": "ac",
-  "an Area Coordinator without the second sign-in step": "ac",
-  "an Area Coordinator whose grant ended": "ac",
-  "an Event Admin of the event": "staff",
-  "the Clubs Administrator": "staff",
-  "a system administrator": "staff",
-  "a club director": "attendee",
-  "staff acting as a coordinator": "act-as",
-  "an attendee, assigned or not": "attendee",
-  "nobody signed in": "anonymous",
-} as const;
-
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.currentTltDirector.mockResolvedValue({ accountId: "acct-tlt" });
@@ -126,8 +114,16 @@ describe("who may use the TLT director's staffing routes", () => {
     expect(audit).not.toHaveProperty("actorUserId");
   });
 
-  it.each(Object.keys(personas))("answers %s with 404 and changes nothing", async () => {
+  // Every other person reaches her routes as "not the TLT director" (`currentTltDirector` answers null for an ordinary or event
+  // Area Coordinator, no second step, a revoked grant, a club director, staff acting as a coordinator and anyone signed out:
+  // tlt-directory-permissions-1686 covers each). What differs here is only which session they arrive with.
+  it.each([
+    ["nobody signed in", () => { mocks.getCurrentSession.mockResolvedValue({ user: null }); }],
+    ["an Event Admin, the Clubs Administrator or a system administrator (a staff session)", () => { mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", email: "u@example.org", displayName: "U", globalRole: "SYSTEM_ADMIN" } }); mocks.findActiveMembership.mockResolvedValue({ eventId: "event-1", userId: "u", role: "EVENT_ADMIN", status: "ACTIVE", permissions: [] }); }],
+    ["an Area Coordinator who leads an activity (a coordinator session)", () => { mocks.currentAreaCoordinator.mockResolvedValue({ id: "acct-ac" }); }],
+  ])("answers %s with 404 and changes nothing", async (_name, signIn) => {
     mocks.currentTltDirector.mockResolvedValue(null);
+    signIn();
     expect((await tltPost(request("POST", tltBody), ctx)).status).toBe(404);
     expect((await tltDelete(request("DELETE", { id: "asg-1" }), ctx)).status).toBe(404);
     expect(mocks.assignmentCreate).not.toHaveBeenCalled();
@@ -162,7 +158,10 @@ describe("only a registered, current TLT can be assigned", () => {
     mocks.attendeeFindFirst.mockResolvedValue(null);
     const answer = await tltPost(request("POST", tltBody), ctx);
     expect(answer.status).toBe(422);
-    expect((await answer.json()).error).toBe("NOT_ON_EVENT");
+    const body = await answer.json();
+    expect(body.error).toBe("NOT_ON_EVENT");
+    expect(body.message).toBe("Only TLTs registered for this event can be assigned.");
+    expect(body.message).not.toMatch(/staff/i);
     expect(mocks.attendeeFindFirst.mock.calls[0]![0].where).toEqual({ eventId: "event-1", personId: "person-tlt", registration: { eventId: "event-1", status: { in: ["SUBMITTED", "CONFIRMED"] } } });
     expect(mocks.assignmentCreate).not.toHaveBeenCalled();
   });
@@ -282,14 +281,20 @@ describe("gaps and counts", () => {
     expect(summarizeStaffing(sheet).gaps.map((gap) => gap.text)).toEqual(["Canoe: no lead", "Canoe: 1 of 3 TLTs"]);
   });
 
-  it("lists events with the sheet on, with TLTs needed against assigned", async () => {
+  it("lists upcoming events with the sheet on, soonest first, from grouped counts, counting only registered current TLTs", async () => {
     mocks.eventFindMany.mockResolvedValue([{ id: "event-1", name: "Sample Spring Camporee", startsAt: new Date("2027-04-23T15:00:00.000Z"), timezone: "America/Chicago" }]);
-    mocks.activityFindMany.mockResolvedValue([{ ...activityRow, tltsNeeded: 2, assignments: [tltRow("a1", "p1", sam)] }]);
-    mocks.attendeeFindMany.mockResolvedValue([{ personId: "p1" }]);
-    mocks.rosterFindMany.mockResolvedValue([{ personId: "p1" }]);
-    const [row] = await listTltStaffingEvents();
-    expect(row).toMatchObject({ id: "event-1", activityCount: 1, tltsNeeded: 2, tltsAssigned: 1 });
-    expect(mocks.eventFindMany.mock.calls[0]![0].where).toMatchObject({ archivedAt: null, isPublished: true, audience: "CLUB", modules: { some: { moduleKey: "event-staffing" } } });
+    mocks.activityGroupBy.mockResolvedValue([{ eventId: "event-1", _count: { _all: 2 }, _sum: { tltsNeeded: 5 } }]);
+    mocks.assignmentFindMany.mockResolvedValue([{ eventId: "event-1", personId: "p1" }, { eventId: "event-1", personId: "p2" }, { eventId: "event-1", personId: "p3" }]);
+    mocks.attendeeFindMany.mockResolvedValue([{ eventId: "event-1", personId: "p1" }, { eventId: "event-1", personId: "p2" }]);
+    mocks.rosterFindMany.mockResolvedValue([{ personId: "p1" }, { personId: "p3" }]);
+    const now = new Date("2027-03-01T12:00:00.000Z");
+    const [row] = await listTltStaffingEvents(now);
+    expect(row).toMatchObject({ id: "event-1", activityCount: 2, tltsNeeded: 5, tltsAssigned: 1 });
+    const query = mocks.eventFindMany.mock.calls[0]![0];
+    expect(query.where).toMatchObject({ archivedAt: null, isPublished: true, audience: "CLUB", endsAt: { gte: now }, modules: { some: { moduleKey: "event-staffing" } } });
+    expect(query.orderBy[0]).toEqual({ startsAt: "asc" });
+    expect(mocks.assignmentFindMany.mock.calls[0]![0].select).toEqual({ eventId: true, personId: true });
+    expect(mocks.activityFindMany).not.toHaveBeenCalled();
   });
 });
 
