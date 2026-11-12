@@ -83,6 +83,9 @@ export function ClubOptionalFeatures({ organizationId, initialEnabled }: { organ
             {key === "master-guide-tracking" && saved.includes(key) && (
               <p><Link className="secondary-button" href={`/account/clubs/${organizationId}/master-guide`}>Open Master Guide tracking</Link></p>
             )}
+            {key === "fill-in-letters" && saved.includes(key) && (
+              <p><Link className="secondary-button" href={`/account/clubs/${organizationId}/letters`}>Open letters</Link></p>
+            )}
             {key === "staff-training-records" && saved.includes(key) && (
               <p><Link className="secondary-button" href={`/account/clubs/${organizationId}/staff-training`}>Open staff training</Link></p>
             )}
