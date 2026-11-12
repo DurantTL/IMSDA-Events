@@ -1,0 +1,92 @@
+.anchors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.anchors a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.anchorTarget {
+  scroll-margin-top: 16px;
+}
+
+.sectionsHead {
+  display: grid;
+  gap: 4px;
+}
+
+.sectionsHead h2,
+.addGroup h2 {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 1.125rem);
+}
+
+.sectionsHead p {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cardTitle {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chips :global(.status-chip) {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.addGroup {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 12px);
+}
+
+.addButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.addButtons button,
+.addGroup :global(.event-block-picker) button {
+  min-height: 44px;
+}
+
+.status {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.saveBar :global(.primary-button) {
+  min-height: 44px;
+}
