@@ -32,6 +32,14 @@ function ChoicePreview({ field, mark }: { field: RegistrationFormField; mark: "r
   );
 }
 
+/** A short plain-text line for an Information block on the canvas: the Markdown marks and any note are not drawn here (the live preview shows the real thing). */
+function informationSummary(field: RegistrationFormField) {
+  const plain = (field.information?.text ?? "").replace(/[#*_>\[\]()`-]/g, "").replace(/\s+/g, " ").trim();
+  if (!plain) return "Write the text this block shows.";
+  const clipped = plain.length > 160 ? `${plain.slice(0, 157)}...` : plain;
+  return field.information?.note ? `${clipped} (with a highlighted note)` : clipped;
+}
+
 /** A picture of the control a respondent gets. Never interactive: it is shown inside the button that selects the question. */
 export function FieldPreviewControl({ field }: { field: RegistrationFormField }) {
   switch (field.type) {
@@ -56,6 +64,8 @@ export function FieldPreviewControl({ field }: { field: RegistrationFormField })
       return <span className="fb-acknowledgment">{field.acknowledgment?.source === "TEXT" && field.acknowledgment.text ? field.acknowledgment.text : "The agreement wording is shown here."}<span className="fb-choice"><span className="fb-choice-mark check" />I acknowledge this.</span></span>;
     case "SIGNATURE":
       return <span className="fb-acknowledgment">{field.signature?.text ? field.signature.text : "The statement to be signed is shown here."}<span className="fb-input">Type your full name to sign</span></span>;
+    case "INFORMATION":
+      return <span className="fb-acknowledgment">{informationSummary(field)}</span>;
     case "CALCULATED":
       return <span className="fb-fee">{field.priceCents === undefined ? "Fee set in the question settings" : `Fee: ${formatCents(field.priceCents)}`}</span>;
     case "ADDRESS":
@@ -174,7 +184,7 @@ function CanvasStep({ section, sectionIndex, paletteDrag, onSelect, onAction, on
                       aria-label={`${field.label || "Untitled question"}, ${fieldTypeLabels[field.type]}${chips.length > 0 ? `, ${chips.map((chip) => chip.label).join(", ")}` : ""}. ${selected ? "Selected." : "Select to edit."}`}
                       onClick={() => onSelect(field.id, sectionIndex)}
                     >
-                      <span className="fb-q-label" aria-hidden="true">{field.label}{field.required && <span className="fb-required"> *</span>}</span>
+                      <span className="fb-q-label" aria-hidden="true">{field.label}{field.required && field.type !== "INFORMATION" && <span className="fb-required"> *</span>}</span>
                       <span className="fb-control" aria-hidden="true"><FieldPreviewControl field={field} /></span>
                       {field.helpText && <span className="fb-field-help" aria-hidden="true">{field.helpText}</span>}
                       {/* Text chips, never colour alone; plain spans inside the button, so they add no tab stops. They are in the button's name above. */}

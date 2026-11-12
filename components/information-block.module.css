@@ -1,0 +1,65 @@
+/* The Information block (#284): a heading, text and an optional highlighted note on a registration form. Display only. */
+.block {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-container);
+  background: var(--secondary-bg);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.heading {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  line-height: 1.3;
+}
+
+.text {
+  font-size: var(--text-helper-min);
+  line-height: 1.55;
+}
+
+.text > * {
+  margin: 0 0 8px;
+}
+
+.text > :last-child {
+  margin-bottom: 0;
+}
+
+.text :is(h4, h5) {
+  margin: 4px 0 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.9375rem);
+}
+
+.text :is(ul, ol) {
+  padding-left: 22px;
+}
+
+.text a {
+  color: var(--imsda-purple);
+  font-weight: 700;
+}
+
+.note {
+  padding: 10px 12px;
+  border-left: 4px solid var(--imsda-gold);
+  border-radius: var(--radius-sm);
+  background: var(--imsda-gold-soft);
+  font-size: var(--text-helper-min);
+  line-height: 1.5;
+}
+
+.note > * {
+  margin: 0 0 6px;
+}
+
+.note > :last-child {
+  margin-bottom: 0;
+}
