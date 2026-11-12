@@ -92,7 +92,7 @@ export async function searchClubPortal(viewer: ClubSearchViewer, rawQuery: strin
   return {
     query,
     clubs: group(clubRows, null),
-    // "More" counts the rows read, before same-name rows are joined, so a joined pair never hides that more people match.
+    // "More" is more than five rows after joining, or a read that hit its limit, so a joined pair never hides that more people match.
     members: group(members.rows, onlyClub ? clubRosterSearchHref(onlyClub.organizationId, query) : null, members.more),
   };
 }

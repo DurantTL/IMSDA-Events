@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import {
@@ -99,13 +99,6 @@ export function DestinationSearch<R extends { query: string } = StaffSearchResul
   const hasFootNotes = moreNotes.length > 0 || showFailedNote;
   const optionId = (index: number) => `${baseId}-option-${index}`;
 
-  // The row the arrow keys reach is scrolled into view, in the list and on the page, so it is never left off screen
-  // (a long list, or a panel low on a short phone). Its own scroll margin keeps it clear of a fixed bar.
-  useEffect(() => {
-    if (!expanded || active < 0) return;
-    document.getElementById(`${baseId}-option-${active}`)?.scrollIntoView?.({ block: "nearest" });
-  }, [expanded, active, baseId]);
-
   function reset() {
     setQuery("");
     setOpen(false);
@@ -147,10 +140,15 @@ export function DestinationSearch<R extends { query: string } = StaffSearchResul
     event.stopPropagation();
     const next = resolved.action;
     switch (next.type) {
-      case "move":
+      case "move": {
         setOpen(true);
         setActive(next.index);
+        // The row the arrow keys reach is brought into view (in the list, and on the page on a short phone). Only the
+        // keys do this: a row under the mouse is never scrolled away from the pointer.
+        const id = optionId(next.index);
+        requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView?.({ block: "nearest" }));
         break;
+      }
       case "choose":
         choose(results[next.index]);
         break;
