@@ -34,7 +34,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
       initialFilter={filter}
       initialRegistrationId={registration}
     />
-    <StaffApprovalsFinance rows={staffApprovals.rows} totals={staffApprovals.totals} />
+    <StaffApprovalsFinance eventId={event.id} rows={staffApprovals.rows} totals={staffApprovals.totals} />
     </>
   );
 }

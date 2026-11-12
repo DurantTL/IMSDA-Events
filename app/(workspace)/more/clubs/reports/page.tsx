@@ -27,6 +27,7 @@ export default async function EventClubReportsPage({ searchParams }: { searchPar
         clubYear={clubYear}
         initialClubs={await restrictToOverseenClubs({ eventId: event.id, systemAdmin }, await listClubReportsForYear(clubYear))}
         now={calendarDateIn(now)}
+        registeredOnly={!systemAdmin}
         viewOnlyReportHref={{ base: "/more/clubs/reports", query: `?event=${event.id}` }}
       />
     </>
