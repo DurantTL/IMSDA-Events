@@ -367,7 +367,7 @@ describe("station undo (#1577)", () => {
   function undoPrisma(options: { attendee?: unknown; active?: unknown; audit?: unknown } = {}) {
     const prisma = {
       registrationAttendee: { findFirst: vi.fn().mockResolvedValue("attendee" in options ? options.attendee : { id: "attendee_1" }) },
-      checkIn: { findFirst: vi.fn().mockResolvedValue("active" in options ? options.active : { checkedInAt: new Date("2026-11-01T15:00:00.000Z") }) },
+      checkIn: { findFirst: vi.fn().mockResolvedValue("active" in options ? options.active : { id: "checkin_1", checkedInAt: new Date("2026-11-01T15:00:00.000Z") }) },
       auditLog: { findFirst: vi.fn().mockResolvedValue("audit" in options ? options.audit : madeHere) },
     };
     mocks.getPrisma.mockReturnValue(prisma);
@@ -386,6 +386,7 @@ describe("station undo (#1577)", () => {
     }));
     expect(mocks.undoCheckIn).toHaveBeenCalledWith("event_1", "attendee_1", "user_1", {
       auditContext: { station: { id: "station_1", label: "Front desk tablet" } },
+      expectedCheckInId: "checkin_1",
     });
   });
 
@@ -430,7 +431,7 @@ describe("station undo (#1577)", () => {
 });
 
 describe("station hand out list (#1577)", () => {
-  function handOutPrisma(options: { types?: Array<{ name: string }>; assignments?: Array<{ eventLodgingUnitId: string | null }>; units?: unknown[] } = {}) {
+  function handOutPrisma(options: { types?: Array<{ name: string }>; assignments?: Array<{ attendeeId?: string; eventLodgingUnitId: string | null }>; units?: unknown[] } = {}) {
     const prisma = {
       issuedAssetType: { findMany: vi.fn().mockResolvedValue(options.types ?? []) },
       eventLodgingAssignment: { findMany: vi.fn().mockResolvedValue(options.assignments ?? []) },
@@ -442,7 +443,7 @@ describe("station hand out list (#1577)", () => {
 
   it("lists one name badge each and nothing else without a room-linked type", async () => {
     const prisma = handOutPrisma();
-    await expect(stationHandOutList(station, ["attendee_1", "attendee_3"])).resolves.toEqual(["Name badge × 2"]);
+    await expect(stationHandOutList(station, ["attendee_1", "attendee_3"])).resolves.toEqual({ lines: ["Name badge × 2"], keyTypes: [], rooms: [] });
     expect(prisma.issuedAssetType.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { eventId: "event_1", active: true, roomLinked: true } }));
     expect(prisma.eventLodgingAssignment.findMany).not.toHaveBeenCalled();
   });
@@ -450,10 +451,17 @@ describe("station hand out list (#1577)", () => {
   it("adds a key line per room-linked type and distinct room of the newly checked-in people", async () => {
     const prisma = handOutPrisma({
       types: [{ name: "Cabin key" }],
-      assignments: [{ eventLodgingUnitId: "unit_1" }, { eventLodgingUnitId: "unit_1" }],
-      units: [{ unit: { name: "K-204", building: { name: "K-204" } } }],
+      assignments: [
+        { attendeeId: "attendee_1", eventLodgingUnitId: "unit_1" },
+        { attendeeId: "attendee_3", eventLodgingUnitId: "unit_1" },
+      ],
+      units: [{ id: "unit_1", unit: { name: "K-204", building: { name: "K-204" } } }],
     });
-    await expect(stationHandOutList(station, ["attendee_1", "attendee_3"])).resolves.toEqual(["Name badge × 2", "Cabin key K-204"]);
+    await expect(stationHandOutList(station, ["attendee_1", "attendee_3"])).resolves.toEqual({
+      lines: ["Name badge × 2", "Cabin key K-204"],
+      keyTypes: ["Cabin key"],
+      rooms: [{ attendeeId: "attendee_1", label: "K-204" }, { attendeeId: "attendee_3", label: "K-204" }],
+    });
     expect(prisma.eventLodgingAssignment.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { eventId: "event_1", attendeeId: { in: ["attendee_1", "attendee_3"] }, cancelledAt: null, eventLodgingUnitId: { not: null } },
     }));
@@ -463,20 +471,20 @@ describe("station hand out list (#1577)", () => {
   it("names the building when it differs from the room, like the lodging pages", async () => {
     handOutPrisma({
       types: [{ name: "Cabin key" }],
-      assignments: [{ eventLodgingUnitId: "unit_1" }],
-      units: [{ unit: { name: "Cabin 3", building: { name: "Pine Row" } } }],
+      assignments: [{ attendeeId: "attendee_1", eventLodgingUnitId: "unit_1" }],
+      units: [{ id: "unit_1", unit: { name: "Cabin 3", building: { name: "Pine Row" } } }],
     });
-    await expect(stationHandOutList(station, ["attendee_1"])).resolves.toEqual(["Name badge × 1", "Cabin key Cabin 3, Pine Row"]);
+    await expect(stationHandOutList(station, ["attendee_1"])).resolves.toMatchObject({ lines: ["Name badge × 1", "Cabin key Cabin 3, Pine Row"] });
   });
 
   it("has no room line when the people have no active room", async () => {
     handOutPrisma({ types: [{ name: "Cabin key" }], assignments: [] });
-    await expect(stationHandOutList(station, ["attendee_1"])).resolves.toEqual(["Name badge × 1"]);
+    await expect(stationHandOutList(station, ["attendee_1"])).resolves.toMatchObject({ lines: ["Name badge × 1"], rooms: [] });
   });
 
   it("returns nothing and reads nothing for nobody newly checked in", async () => {
     const prisma = handOutPrisma();
-    await expect(stationHandOutList(station, [])).resolves.toEqual([]);
+    await expect(stationHandOutList(station, [])).resolves.toEqual({ lines: [], keyTypes: [], rooms: [] });
     expect(prisma.issuedAssetType.findMany).not.toHaveBeenCalled();
   });
 });

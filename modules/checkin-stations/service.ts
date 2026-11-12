@@ -226,34 +226,49 @@ function unitDisplayName(unit: { name: string; building: { name: string } }) {
  * room-linked item type of the event, per room the newly checked-in people are housed in. Event-scoped and only about
  * the people given (the ones newly checked in by this request); it returns no names and no other data.
  */
-export async function stationHandOutList(station: ResolvedStation, newlyCheckedInIds: string[]): Promise<string[]> {
+export type StationHandOut = {
+  /** The finished lines: "Name badge × 2", "Cabin key K-204". */
+  lines: string[];
+  /** The room-linked item type names, and each person's room label, so the screen can adjust after an undo. */
+  keyTypes: string[];
+  rooms: Array<{ attendeeId: string; label: string }>;
+};
+
+export async function stationHandOutList(station: ResolvedStation, newlyCheckedInIds: string[]): Promise<StationHandOut> {
   const ids = [...new Set(newlyCheckedInIds)];
-  if (ids.length === 0) return [];
+  if (ids.length === 0) return { lines: [], keyTypes: [], rooms: [] };
   const eventId = station.station.eventId;
   const prisma = getPrisma();
-  const lines = [stationBadgeLine(ids.length)];
+  const badge = [stationBadgeLine(ids.length)];
   const types = await prisma.issuedAssetType.findMany({
     where: { eventId, active: true, roomLinked: true },
     orderBy: { name: "asc" },
     select: { name: true },
   });
-  if (types.length === 0) return lines;
+  if (types.length === 0) return { lines: badge, keyTypes: [], rooms: [] };
   const assignments = await prisma.eventLodgingAssignment.findMany({
     where: { eventId, attendeeId: { in: ids }, cancelledAt: null, eventLodgingUnitId: { not: null } },
-    select: { eventLodgingUnitId: true },
+    select: { attendeeId: true, eventLodgingUnitId: true },
   });
+  const keyTypes = types.map((type) => type.name);
   const unitIds = [...new Set(assignments.map((row) => row.eventLodgingUnitId).filter((id): id is string => Boolean(id)))];
-  if (unitIds.length === 0) return lines;
+  if (unitIds.length === 0) return { lines: badge, keyTypes, rooms: [] };
   const units = await prisma.eventLodgingUnit.findMany({
     where: { eventId, id: { in: unitIds } },
-    select: { unit: { select: { name: true, building: { select: { name: true } } } } },
+    select: { id: true, unit: { select: { name: true, building: { select: { name: true } } } } },
   });
-  const labels = [...new Set(units.map((row) => unitDisplayName(row.unit)))]
+  const labelByUnit = new Map(units.map((row) => [row.id, unitDisplayName(row.unit)]));
+  const rooms = assignments.flatMap((row) => {
+    const label = row.eventLodgingUnitId ? labelByUnit.get(row.eventLodgingUnitId) : undefined;
+    return row.attendeeId && label ? [{ attendeeId: row.attendeeId, label }] : [];
+  });
+  const labels = [...new Set(rooms.map((room) => room.label))]
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  for (const type of types) {
-    for (const label of labels) lines.push(`${type.name} ${label}`);
+  const lines = [...badge];
+  for (const type of keyTypes) {
+    for (const label of labels) lines.push(`${type} ${label}`);
   }
-  return lines;
+  return { lines, keyTypes, rooms };
 }
 
 /**
@@ -272,7 +287,7 @@ export async function undoStationCheckIn(station: ResolvedStation, attendeeId: s
   const active = await prisma.checkIn.findFirst({
     where: { eventId, registrationAttendeeId: attendeeId, undoneAt: null },
     orderBy: { checkedInAt: "desc" },
-    select: { checkedInAt: true },
+    select: { id: true, checkedInAt: true },
   });
   if (!active) throw new StationServiceError("NOTHING_TO_UNDO");
   const entry = await prisma.auditLog.findFirst({
@@ -292,6 +307,7 @@ export async function undoStationCheckIn(station: ResolvedStation, attendeeId: s
   if (metadata.station?.id !== station.station.id) throw new StationServiceError("NOT_THIS_STATION");
   const undone = await undoCheckIn(eventId, attendeeId, station.starter.id, {
     auditContext: { station: { id: station.station.id, label: station.station.label } },
+    expectedCheckInId: active.id,
   });
   if (!undone) throw new StationServiceError("NOTHING_TO_UNDO");
   return { undone: true as const, attendeeId };

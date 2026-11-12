@@ -111,6 +111,14 @@ describe("station audit context (#892)", () => {
     });
   });
 
+  it("leaves a newer check-in alone when the station meant an older one", async () => {
+    const tx = undoClient();
+    await expect(undoCheckIn("event_1", "attendee_1", "user_1", { auditContext: station, expectedCheckInId: "checkin_old" })).resolves.toBeNull();
+    expect(tx.checkIn.updateMany).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+    await expect(undoCheckIn("event_1", "attendee_1", "user_1", { auditContext: station, expectedCheckInId: "checkin_1" })).resolves.toEqual({ id: "checkin_1" });
+  });
+
   it("leaves a desk undo exactly as it was", async () => {
     const tx = undoClient();
     await undoCheckIn("event_1", "attendee_1", "user_1");

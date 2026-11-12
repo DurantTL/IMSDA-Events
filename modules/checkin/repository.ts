@@ -226,7 +226,7 @@ export async function undoCheckIn(
   eventId: string,
   attendeeId: string,
   actorUserId: string,
-  options: { auditContext?: StationAuditContext } = {},
+  options: { auditContext?: StationAuditContext; expectedCheckInId?: string } = {},
 ) {
   const prisma = getPrisma();
   const stationMetadata = stationAuditMetadata(options.auditContext);
@@ -238,6 +238,8 @@ export async function undoCheckIn(
           orderBy: { checkedInAt: "desc" },
         });
         if (!active) return null;
+        // A station checked which check-in it was undoing; if a newer one has taken its place, leave it alone.
+        if (options.expectedCheckInId && active.id !== options.expectedCheckInId) return null;
         const claimed = await tx.checkIn.updateMany({
           where: { id: active.id, undoneAt: null },
           data: {

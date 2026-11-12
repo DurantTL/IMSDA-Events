@@ -61,7 +61,9 @@
 .cisHandOut { margin-top: 8px; border: 2px solid var(--green); border-radius: var(--radius-card); background: var(--green-soft); padding: 14px 16px; }
 .cisHandOut h3 { margin: 0 0 6px; font-size: max(var(--type-staff-floor, 0px), 1.05rem); }
 .cisHandOut ul { margin: 0; padding-left: 1.25rem; font-size: max(var(--type-staff-floor, 0px), 1.1rem); font-weight: 700; }
-.cisJustIn { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding-right: 8px; }
+.cisJustIn { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding: 0 8px; }
 .cisJustIn .cisPersonBody { flex: 1 1 12rem; }
 .cisUndoStatus { min-width: 0; }
-.cisUndoStatus:empty { display: none; }
+/* Stays in the accessibility tree so the message is announced; with nothing in it, it takes no space. */
+.cisUndoStatus:empty { height: 0; margin-top: -16px; }
+.cisUndoStatus:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }

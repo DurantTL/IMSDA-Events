@@ -111,7 +111,7 @@ beforeEach(() => {
   mocks.checkLookupRateLimit.mockResolvedValue({ allowed: true, decisions: [] });
   mocks.lookupStationFamily.mockResolvedValue({ registrationId: "registration_1" });
   mocks.checkInStationFamily.mockResolvedValue([{ attendeeId: "attendee_1", status: "CHECKED_IN" }]);
-  mocks.stationHandOutList.mockResolvedValue(["Name badge × 1"]);
+  mocks.stationHandOutList.mockResolvedValue({ lines: ["Name badge × 1"], keyTypes: [], rooms: [] });
   mocks.undoStationCheckIn.mockResolvedValue({ undone: true, attendeeId: "attendee_1" });
   mocks.recordStationPayment.mockResolvedValue({ state: "PAID" });
   mocks.noteStationSquareAppPayment.mockResolvedValue({ state: "DUE", balanceCents: 1000, squareAppNote: null });
@@ -200,7 +200,7 @@ describe("check-in station API: scope and results (#892)", () => {
     const response = await checkInPost(post("/api/check-in-station/check-in", body));
     expect(response.status).toBe(200);
     expect(mocks.checkInStationFamily).toHaveBeenCalledWith(station, body);
-    expect(await response.json()).toEqual({ results: [{ attendeeId: "attendee_1", status: "CHECKED_IN" }], handOut: ["Name badge × 1"] });
+    expect(await response.json()).toEqual({ results: [{ attendeeId: "attendee_1", status: "CHECKED_IN" }], handOut: ["Name badge × 1"], handOutParts: { keyTypes: [], rooms: [] } });
   });
 
   it("rejects a check-in with no people or a malformed key", async () => {
@@ -340,6 +340,7 @@ describe("check-in station API: hand out and undo (#1577)", () => {
         { attendeeId: "attendee_3", status: "NEEDS_DESK_REVIEW" },
       ],
       handOut: ["Name badge × 1"],
+      handOutParts: { keyTypes: [], rooms: [] },
     });
     expect(mocks.stationHandOutList).toHaveBeenCalledWith(station, ["attendee_1"]);
   });
@@ -348,7 +349,7 @@ describe("check-in station API: hand out and undo (#1577)", () => {
     mocks.stationHandOutList.mockRejectedValue(new Error("lodging read failed"));
     const response = await checkInPost(post("/api/check-in-station/check-in", body));
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ handOut: [] });
+    expect(await response.json()).toMatchObject({ handOut: [], handOutParts: { keyTypes: [], rooms: [] } });
   });
 
   it("undoes a person through the service and returns the person's id", async () => {
