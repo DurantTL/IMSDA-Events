@@ -166,3 +166,20 @@
 .status {
   color: var(--muted);
 }
+
+/* The picker sits inside the banner block's .form-stack, whose label (grid) and input (own border) rules would turn
+   the shared search field into two rows inside a double border. Restore the shared one-row look here. */
+.panel :global(.search-field) {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 400;
+}
+
+.panel :global(.search-field) input {
+  min-height: var(--touch-target, 44px);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}

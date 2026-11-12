@@ -40,7 +40,8 @@ function LibraryCard({
   image: ImageLibraryRecord;
   busy: boolean;
   onUse: (image: ImageLibraryRecord) => void;
-  onChanged: () => void;
+  /** Called after a saved change; `retired` names an image that was just retired. */
+  onChanged: (retired?: string) => void;
   onError: (message: string) => void;
 }) {
   const savedTags = image.tags.join(", ");
@@ -67,7 +68,7 @@ function LibraryCard({
       const result = await readJson(response);
       if (!response.ok) throw new Error(result.message ?? "That change could not be saved.");
       setMessage({ tone: "success", text: savedMessage() });
-      onChanged();
+      onChanged(body.retired === true ? image.displayName : undefined);
     } catch (caught) {
       setMessage({ tone: "error", text: notSavedMessage(caught instanceof Error ? caught.message : "the server did not answer. Try again.") });
     } finally {
@@ -261,7 +262,11 @@ export function EventImageLibraryPicker({
             image={image}
             busy={busy}
             onUse={use}
-            onChanged={refresh}
+            onChanged={(retired) => {
+              // A retired card leaves the list while "Show retired" is off, taking its own "Saved." with it.
+              setStatus(retired && !showRetired ? `Retired ${retired}. Turn on Show retired to restore it.` : "");
+              refresh();
+            }}
             onError={setError}
           />
         ))}
