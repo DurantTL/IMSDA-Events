@@ -103,7 +103,7 @@ export function EventTeamSettingsPanel({ eventId, initialSettings }: { eventId: 
       <div className="section-heading">
         <div>
           <p className="eyebrow">Club registration</p>
-          <h2 id="team-settings-heading"><UsersRound aria-hidden="true" size={18} /> Teams</h2>
+          <h3 id="team-settings-heading"><UsersRound aria-hidden="true" size={18} /> Teams</h3>
           <p>
             For events where a club enters named teams, like the Pathfinder Bible Experience. Leave everything off for an event
             with one registration per club and no limits on who goes.
@@ -148,7 +148,7 @@ export function EventTeamSettingsPanel({ eventId, initialSettings }: { eventId: 
           <label>Union place<input maxLength={120} onChange={(event) => set("unionPlace", event.target.value)} value={draft.unionPlace} /></label>
         </fieldset>
         <div className="intro-actions">
-          <button className="primary-button" disabled={busy} type="submit">{busy ? "Saving…" : "Save team rules"}</button>
+          <button className="secondary-button" disabled={busy} type="submit">{busy ? "Saving…" : "Save team rules"}</button>
         </div>
       </form>
     </section>

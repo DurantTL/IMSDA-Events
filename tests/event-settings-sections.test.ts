@@ -302,9 +302,10 @@ describe("Delete event panel (#704)", () => {
 });
 
 describe("Event settings save and publish clarity (#742)", () => {
-  it("has no second Event settings title: the staff header carries the H1", () => {
+  it("has one Event settings title: the page's own PageHeader draws the H1 (#1586)", () => {
     const markup = render();
-    expect(markup).not.toMatch(/<h1/);
+    expect(markup.match(/<h1/g)).toHaveLength(1);
+    expect(markup).toMatch(/<h1[^>]*>Event settings<\/h1>/);
     expect(markup).not.toMatch(/<h2[^>]*>Event settings<\/h2>/);
   });
 
