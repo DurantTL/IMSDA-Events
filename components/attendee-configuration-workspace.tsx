@@ -4,7 +4,6 @@ import { cardCell } from "@/components/table-card-labels";
 import styles from "@/components/attendee-configuration-workspace.module.css";
 import { EmptyState } from "@/components/empty-state";
 import { ageBandInputAttributes } from "@/modules/attendee-types/age-limits";
-import { staffPageTitles } from "@/components/staff-navigation";
 import { useState } from "react";
 import Link from "next/link";
 import { Info } from "lucide-react";
@@ -32,17 +31,18 @@ async function responseJson(response: Response) {
 
 export function AttendeeConfigurationWorkspace({
   eventId,
-  eventName,
   initialTypes,
   initialClassifications,
   canCreate = false,
+  canManageForms = false,
 }: {
   eventId: string;
-  eventName: string;
   initialTypes: AttendeeTypeRow[];
   initialClassifications: ClassificationRow[];
   /** Whether the viewer may add types and groupings: the forms and the empty-state action show only then (#743). */
   canCreate?: boolean;
+  /** Whether the viewer may open the registration form builder (MANAGE_FORMS), where prices are set; the link shows only then. */
+  canManageForms?: boolean;
 }) {
   const [types, setTypes] = useState(initialTypes);
   const [classifications, setClassifications] = useState(initialClassifications);
@@ -122,12 +122,12 @@ export function AttendeeConfigurationWorkspace({
   }
 
   return <div className="settings-stack">
-    <div className="page-intro"><div><p className="eyebrow">Event configuration</p><h2 className="duplicate-page-title">{staffPageTitles.attendeeSetup}</h2><p>{`Configure stable attendee identities and independent categories, tracks, and departments for ${eventName}.`}</p></div></div>
-    <p className="usage-note"><Info aria-hidden="true" size={16} /><span>Where this shows up: attendee types fill the attendee-type field in the <Link href={`/registration-builder?event=${eventId}`}>registration form</Link>, and appear throughout <Link href={`/more/reports?event=${eventId}`}>reports</Link> and <Link href={`/check-in?event=${eventId}`}>check-in</Link>.</span></p>
+    <p className="usage-note"><Info aria-hidden="true" size={16} /><span>Where this shows up: attendee types fill the attendee-type field in the {canManageForms ? <Link href={`/registration-builder?event=${eventId}`}>registration form</Link> : "registration form"}, and appear throughout <Link href={`/more/reports?event=${eventId}`}>reports</Link> and <Link href={`/check-in?event=${eventId}`}>check-in</Link>. Prices are set in the registration form, not here.</span></p>
     {error && <p className="form-error" role="alert">{error}</p>}
-    <section className="panel"><div className="section-heading"><div><h2>Attendee types</h2><p>Codes are permanent identities. Labels, descriptions, sort order, age bands, and active status may be edited; prior registration snapshots remain unchanged.</p></div></div>
+    <section className="panel" id="attendee-types"><div className="section-heading"><div><h2>Attendee types</h2><p>Codes are permanent identities. Labels, descriptions, sort order, age bands, and active status may be edited; prior registration snapshots remain unchanged.</p></div></div>
       {types.length === 0 ? (
         <EmptyState
+          announce={false}
           canCreate={canCreate}
           hint={canCreate ? undefined : "Ask an event administrator to add attendee types."}
           title="No attendee types yet"
@@ -145,8 +145,17 @@ export function AttendeeConfigurationWorkspace({
       </tr>)}</tbody></table></div>}
       {canCreate && <form className="form-stack inset-form" action={addType} onChange={(event) => setAddTypeOpen(addFormHasInput(event.currentTarget, { sortOrder: "0" }))}><div className="form-grid two-column"><label>Permanent code<input id="attendee-type-code-input" name="code" required placeholder="ADULT" /></label><label>Display label<input name="label" required placeholder="Adult" /></label></div><label>Description<input name="description" /></label><div className="form-grid three-column"><label>Minimum age<input name="minimumAge" {...ageBandInputAttributes} type="number" /></label><label>Maximum age<input name="maximumAge" {...ageBandInputAttributes} type="number" /></label><label>Sort order<input name="sortOrder" defaultValue="0" type="number" /></label></div><button className="primary-button" disabled={saving} type="submit">Add attendee type</button></form>}
     </section>
-    <section className="panel"><div className="section-heading"><div><h2>Categories, tracks, and departments</h2><p>Categories, tracks, and departments are independent of attendee type, and an attendee can have several of each. Codes and dimension are permanent once created.</p></div></div>
-      <div className="table-wrap"><table className="editable-settings-table table-cards table-cards-xwide" role="table"><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Dimension</th><th role="columnheader" scope="col">Code</th><th role="columnheader" scope="col">Label</th><th role="columnheader" scope="col">Description</th><th role="columnheader" scope="col">Sort order</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Actions</th></tr></thead><tbody role="rowgroup">{classifications.map((row) => <tr key={row.id} role="row">
+    <section className="panel" id="attendee-groupings"><div className="section-heading"><div><h2>Categories, tracks, and departments</h2><p>Categories, tracks, and departments are independent of attendee type, and an attendee can have several of each. Codes and dimension are permanent once created.</p></div></div>
+      {classifications.length === 0 ? (
+        <EmptyState
+          announce={false}
+          canCreate={canCreate}
+          hint={canCreate ? undefined : "Ask an event administrator to add groupings."}
+          title="No categories, tracks, or departments yet"
+        >
+          Groupings, such as a track or a department, are optional labels you can add to attendees. Add one below when you need it.
+        </EmptyState>
+      ) : <div className="table-wrap"><table className="editable-settings-table table-cards table-cards-xwide" role="table"><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Dimension</th><th role="columnheader" scope="col">Code</th><th role="columnheader" scope="col">Label</th><th role="columnheader" scope="col">Description</th><th role="columnheader" scope="col">Sort order</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Actions</th></tr></thead><tbody role="rowgroup">{classifications.map((row) => <tr key={row.id} role="row">
         <td {...cardCell("Dimension")}>{row.kind.toLowerCase()}</td>
         <th role="rowheader" scope="row"><code>{row.code}</code></th>
         <td {...cardCell("Label")}><input aria-label={`Label for ${row.code}`} value={row.label} onChange={(event) => setClassifications((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, label: event.target.value } : candidate))} /></td>
@@ -154,8 +163,8 @@ export function AttendeeConfigurationWorkspace({
         <td {...cardCell("Sort order")}><input aria-label={`Sort order for ${row.code}`} min="-10000" max="10000" type="number" value={row.sortOrder} onChange={(event) => setClassifications((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, sortOrder: Number(event.target.value) } : candidate))} /></td>
         <td {...cardCell("Status")}>{row.isActive ? "Active" : "Inactive"}</td>
         <td {...cardCell(null)}><span className="form-actions"><button className="secondary-button" disabled={saving} type="button" onClick={() => updateClassification(row, {})}>Save</button><button className="secondary-button" disabled={saving} type="button" onClick={() => toggleClassification(row)}>{row.isActive ? "Deactivate" : "Activate"}</button></span></td>
-      </tr>)}</tbody></table></div>
-      <form className="form-stack inset-form" action={addClassification} onChange={(event) => setAddGroupingOpen(addFormHasInput(event.currentTarget, { kind: "CATEGORY" }))}><div className="form-grid three-column"><label>Dimension<select name="kind"><option value="CATEGORY">Category</option><option value="TRACK">Track</option><option value="DEPARTMENT">Department</option></select></label><label>Permanent code<input name="code" required placeholder="WORSHIP" /></label><label>Display label<input name="label" required placeholder="Worship" /></label></div><button className="primary-button" disabled={saving} type="submit">Add grouping</button></form>
+      </tr>)}</tbody></table></div>}
+      <form className="form-stack inset-form" action={addClassification} onChange={(event) => setAddGroupingOpen(addFormHasInput(event.currentTarget, { kind: "CATEGORY" }))}><div className="form-grid three-column"><label>Dimension<select name="kind"><option value="CATEGORY">Category</option><option value="TRACK">Track</option><option value="DEPARTMENT">Department</option></select></label><label>Permanent code<input name="code" required placeholder="WORSHIP" /></label><label>Display label<input name="label" required placeholder="Worship" /></label></div><button className="secondary-button" disabled={saving} type="submit">Add grouping</button></form>
     </section>
   </div>;
 }

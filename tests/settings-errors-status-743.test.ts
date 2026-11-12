@@ -392,7 +392,7 @@ describe("empty states offer a create action only to an authorized viewer (#743)
 
   it("attendee types", () => {
     const render = (canCreate: boolean) => renderToStaticMarkup(createElement(AttendeeConfigurationWorkspace, {
-      eventId: "e1", eventName: "Synthetic", initialTypes: [], initialClassifications: [], canCreate,
+      eventId: "e1", initialTypes: [], initialClassifications: [], canCreate,
     }));
     // #981: the add form is open below, so there is no scroll-to-form button.
     expect(render(true)).toContain("No attendee types yet");
