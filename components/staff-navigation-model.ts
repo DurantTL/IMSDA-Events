@@ -40,6 +40,8 @@ export type StaffNavigationInput = {
   /** The admin roles held and the one chosen, from the server; `null` when the person holds none. */
   adminRoleView: { held: readonly AdminRole[]; active: AdminRole | null; counts: AdminRoleCounts; healthImport?: boolean } | null;
   siteContentEditor: boolean;
+  /** An active Youth Admin who is not a system administrator (#1685). */
+  youthDirectory?: boolean;
   hasEvents: boolean;
   /** The event the page is in, with what the viewer may do in it. */
   selectedEvent?: {
@@ -84,6 +86,7 @@ export function buildStaffNavigation(input: StaffNavigationInput): StaffNavigati
     activeRole,
     hasEvents: input.hasEvents,
     siteContentEditor,
+    youthDirectory: Boolean(input.youthDirectory),
     healthImport: adminRoleView?.healthImport !== false,
     clubYear: requestedClubYear(search.get("year")),
     counts: adminRoleView?.counts ?? {},

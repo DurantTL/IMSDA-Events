@@ -3,7 +3,7 @@ import { ActAsBanner } from "@/components/act-as-banner";
 import { AppShell } from "@/components/app-shell";
 import { removableModuleKeys } from "@/components/event-modules-page-model";
 import { listActiveEventPermissionsForUser, listActiveEventRolesForUser } from "@/modules/access/membership-repository";
-import { resolveAdminRoleView } from "@/modules/access/admin-roles";
+import { isActiveYouthAdministrator, resolveAdminRoleView } from "@/modules/access/admin-roles";
 import type { AdminRoleCounts } from "@/modules/access/admin-roles-domain";
 import { eventPermissions } from "@/modules/access/permissions";
 import { findSwitchableAttendeeAccountForStaff } from "@/modules/attendee-accounts/current-attendee";
@@ -52,6 +52,8 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
   const adminRoleView = await resolveAdminRoleView(user);
   // A Site content editor who is not a system administrator reaches Homepage & site content from the sidebar (#111).
   const siteContentEditor = !isSystemAdmin && (await canManageSiteContent(user));
+  // A Youth Admin (#1685) gets the Youth directory in the Clubs area and in Find a page; a system administrator has it already.
+  const youthDirectory = !isSystemAdmin && (await isActiveYouthAdministrator(user.id));
   const clubFormsAccess = staffClubFormsAccess(
     user,
     events
@@ -105,6 +107,7 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
         events={shellEvents}
         user={user}
         siteContentEditor={siteContentEditor}
+        youthDirectory={youthDirectory}
         adminRoleView={adminRoleView.held.length > 0 ? { held: adminRoleView.held, active: adminRoleView.active, counts: adminRoleCounts, healthImport: healthRecordsEnabled() } : null}
       >
         {children}

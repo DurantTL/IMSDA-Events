@@ -109,7 +109,8 @@ export default async function YouthDirectoryPage({ searchParams }: { searchParam
 
       <section className={`panel ${styles.panel}`} aria-labelledby="youth-filters-heading">
         <h2 id="youth-filters-heading">Filter</h2>
-        <GetFilterForm className={styles.toolbar} action="/admin/youth">
+        {/* Keyed by the address, so Apply, Back and Clear put every dropdown back to what the address says. */}
+        <GetFilterForm key={youthQueryString(query)} className={styles.toolbar} action="/admin/youth">
           {query.sort.key !== DEFAULT_YOUTH_SORT.key || query.sort.dir !== DEFAULT_YOUTH_SORT.dir ? (
             <>
               <input type="hidden" name="sort" value={query.sort.key ?? DEFAULT_YOUTH_SORT.key!} />
@@ -174,35 +175,35 @@ export default async function YouthDirectoryPage({ searchParams }: { searchParam
           </div>
         ) : (
           <>
+            <div className="report-table-wrap">
+              <table role="table" className="report-table table-cards">
+                <caption>Youth by grade and school type</caption>
+                <thead role="rowgroup">
+                  <tr role="row">
+                    <th role="columnheader" scope="col">Grade</th>
+                    {gradeCounts.columns.map((column) => <th key={column.key} role="columnheader" scope="col">{column.label}</th>)}
+                    <th role="columnheader" scope="col">Total</th>
+                  </tr>
+                </thead>
+                <tbody role="rowgroup">
+                  {gradeCounts.rows.map((row) => (
+                    <tr role="row" key={row.key}>
+                      <th role="rowheader" scope="row">{row.label}</th>
+                      {gradeCounts.columns.map((column) => <td key={column.key} {...cardCell(column.label)}>{row.bySchoolType[column.key] ?? 0}</td>)}
+                      <td {...cardCell("Total")}>{row.total}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot role="rowgroup">
+                  <tr role="row">
+                    <th role="rowheader" scope="row">All grades</th>
+                    {gradeCounts.columns.map((column) => <td key={column.key} {...cardCell(column.label)}>{column.total}</td>)}
+                    <td {...cardCell("Total")}>{gradeCounts.total}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
             <div className={styles.countGrid}>
-              <div className={styles.tableScroll}>
-                <table className={styles.counts}>
-                  <caption>Youth by grade and school type</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Grade</th>
-                      {gradeCounts.columns.map((column) => <th key={column.key} scope="col">{column.label}</th>)}
-                      <th scope="col">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {gradeCounts.rows.map((row) => (
-                      <tr key={row.key}>
-                        <th scope="row">{row.label}</th>
-                        {gradeCounts.columns.map((column) => <td key={column.key}>{row.bySchoolType[column.key] ?? 0}</td>)}
-                        <td>{row.total}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <th scope="row">All grades</th>
-                      {gradeCounts.columns.map((column) => <td key={column.key}>{column.total}</td>)}
-                      <td>{gradeCounts.total}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
               <div>
                 <h3 id="youth-by-grade-heading">Youth by grade</h3>
                 <ul className={styles.bars} aria-labelledby="youth-by-grade-heading">
@@ -215,8 +216,7 @@ export default async function YouthDirectoryPage({ searchParams }: { searchParam
                   ))}
                 </ul>
               </div>
-            </div>
-            <div>
+              <div>
               <h3 id="youth-by-club-heading">Youth by club</h3>
               <ul className={styles.bars} aria-labelledby="youth-by-club-heading">
                 {clubCounts.map((club) => (
@@ -227,6 +227,7 @@ export default async function YouthDirectoryPage({ searchParams }: { searchParam
                   </li>
                 ))}
               </ul>
+              </div>
             </div>
           </>
         )}

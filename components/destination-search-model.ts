@@ -66,6 +66,8 @@ export type DestinationSearchContext = {
   clubsAdmin?: { healthImport: boolean };
   /** An active Site content editor who is not a system administrator (#111): Homepage & site content is searchable. */
   siteContentEditor?: boolean;
+  /** An active Youth Admin who is not a system administrator (#1685): the Youth directory is searchable. A system administrator already has it in the System destinations. */
+  youthDirectory?: boolean;
 };
 
 /** What each scope means, for the label beside a result. */
@@ -99,6 +101,7 @@ const destinationKeywords: Record<string, readonly string[]> = {
   "/admin/event-templates": ["template", "starting point", "new event"],
   "/archived-events": ["archive", "finished events", "old events", "past events", "put away"],
   "/admin/organizations": ["church", "churches", "club directory", "organizations", "directors"],
+  "/admin/youth": ["youth", "pathfinders", "grade", "school", "school type", "outreach", "church member", "directory"],
   "/admin/clubs": ["clubs dashboard", "what is waiting", "club year"],
   "/admin/clubs/reports": ["review monthly records", "records to review", "review records", "club reports"],
   [clubsAdminRecordsHref]: ["monthly record", "monthly records", "club reports", "records"],
@@ -225,6 +228,17 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
       description: "Notices, announcements, featured events, header links and the footer on the public pages.",
       href: "/admin/site-content",
       keywords: destinationKeywords["/admin/site-content"] ?? [],
+    });
+  }
+
+  if (context.youthDirectory && !context.isSystemAdmin) {
+    add({
+      key: "Clubs:youth-directory:/admin/youth",
+      scope: "Clubs",
+      label: "Youth directory",
+      description: "Every active youth on a club roster by grade, school type and club, with counts and a CSV export.",
+      href: "/admin/youth",
+      keywords: destinationKeywords["/admin/youth"] ?? [],
     });
   }
 

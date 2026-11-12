@@ -87,6 +87,7 @@ export function AppShell({
   user,
   adminRoleView = null,
   siteContentEditor = false,
+  youthDirectory = false,
 }: {
   attendeeAccountAvailable?: boolean;
   /** The default event was chosen automatically (#465): show the notice on pages without `?event=`. */
@@ -107,6 +108,8 @@ export function AppShell({
   adminRoleView?: { held: AdminRole[]; active: AdminRole | null; counts: AdminRoleCounts; healthImport?: boolean } | null;
   /** An active Site content editor who is not a system administrator (#111): adds Homepage & site content to the Admin area. */
   siteContentEditor?: boolean;
+  /** An active Youth Admin who is not a system administrator (#1685): adds the Youth directory to the Clubs area and to Find a page. */
+  youthDirectory?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -151,6 +154,7 @@ export function AppShell({
     isSystemAdmin,
     adminRoleView,
     siteContentEditor,
+    youthDirectory,
     hasEvents: events.length > 0,
     selectedEvent: selectedEvent ? { ...selectedEvent, clubFormsAccess: selectedEvent.clubFormsAccess } : undefined,
     eventlessProfile,
@@ -185,6 +189,7 @@ export function AppShell({
     hiddenCardKeys: selectedHiddenCardKeys,
     clubsAdmin: held.includes("CLUBS_ADMIN") ? { healthImport: viewer.healthImport } : undefined,
     siteContentEditor,
+    youthDirectory,
   });
   const attendeePreviewHref = selectedEvent
     ? `/account/events/${encodeURIComponent(selectedEvent.slug)}?preview=staff`

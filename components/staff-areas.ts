@@ -44,6 +44,8 @@ export type StaffAreaViewer = {
   activeRole: AdminRole | null;
   hasEvents: boolean;
   siteContentEditor: boolean;
+  /** An active Youth Admin who is not a system administrator (#1685): adds the Youth directory to the Clubs area. Showing it grants nothing; the page checks the role. */
+  youthDirectory?: boolean;
   /** The health record import exists only while the Health Record feature is on (#1232). */
   healthImport: boolean;
   /** `?year=` the viewer picked, carried by the club pages that read it. */
@@ -171,6 +173,8 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
       ],
     },
     { key: "leaders", destination: "/admin/clubs/leaders", visible: clubs },
+    // A system administrator reaches the Youth directory from the Clubs hub and Find a page; a Youth Admin has no other Clubs tab.
+    { key: "youth-directory", destination: "/admin/youth", visible: (v) => Boolean(v.youthDirectory) && !v.isSystemAdmin },
     { key: "transfers", destination: "/admin/clubs/transfers", visible: clubs },
     {
       key: "monthly-records",
@@ -344,6 +348,7 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
   // Club invites is the Invited view of Club leaders (#1589).
   if (under(pathname, "/admin/clubs/leaders") || under(pathname, "/admin/clubs/invites")) return place("clubs", "leaders");
   if (under(pathname, "/admin/clubs/transfers")) return place("clubs", "transfers");
+  if (under(pathname, "/admin/youth")) return place("clubs", "youth-directory");
   if (under(pathname, "/admin/clubs/import")) return place("clubs", "club-summary", "/admin/clubs/import");
   if (under(pathname, "/admin/clubs/health-import")) return place("clubs", "club-summary", clubsAdminHealthImportHref);
   if (under(pathname, "/admin/organizations/background-checks") || under(pathname, "/admin/background-checks")) return place("clubs", "club-administration", "/admin/organizations/background-checks");
