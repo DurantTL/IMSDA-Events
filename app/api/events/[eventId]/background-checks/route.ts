@@ -12,7 +12,10 @@ import { eventFileScope } from "@/modules/reporting/export-scope";
 async function getHandler(_request: Request, context: { params: Promise<{ eventId: string }> }) {
   try {
     const { eventId } = await context.params;
-    await requirePermission(await getCurrentSession(), eventId, "VIEW_REPORTS", findActiveMembership);
+    const session = await getCurrentSession();
+    await requirePermission(session, eventId, "VIEW_REPORTS", findActiveMembership);
+    // The download carries contact details, so it also needs the sensitive-data permission.
+    await requirePermission(session, eventId, "VIEW_SENSITIVE_DATA", findActiveMembership);
     const flags = await listEventBackgroundFlags(eventId, { includeContact: true });
     if (!flags) {
       return Response.json(
