@@ -5,6 +5,7 @@ import {
   calculateFormTotal,
   fieldPriceWindows,
   fieldPricingLabel,
+  isLateRateLine,
   registrationFormDefinitionSchema,
   resolveFieldPrices,
   type FieldPriceWindow,
@@ -260,5 +261,26 @@ describe("builder save shape", () => {
     const windows: FieldPriceWindow[] = [{ startsOn: "2026-10-01", label: "Regular", choicePricesCents: { A: 1, B: 2 } }, { startsOn: "2026-11-01", label: "Late", choicePricesCents: { B: 3 } }];
     expect(updatePriceWindow(windows, 1, { label: "Late" })[1]!.label).toBe("Late");
     expect(pruneWindowChoicePrices(windows, ["A"]).map((entry) => entry.choicePricesCents)).toEqual([{ A: 1 }, undefined]);
+  });
+});
+
+describe("late rate on stored lines (#1509)", () => {
+  const lines = (date: string, field: Record<string, unknown> = threeTier) => calculateFormLineItems(definitionOf(field), {}, date);
+  it("only the last window is the late rate", () => {
+    expect(isLateRateLine(lines("2026-10-01")[0]!)).toBe(false); // starting label
+    expect(isLateRateLine(lines("2026-10-20")[0]!)).toBe(false); // middle window
+    expect(isLateRateLine(lines("2026-12-01")[0]!)).toBe(true); // last window
+  });
+  it("one-window lines carry no earlierRate key and read as late; unlabelled lines are not late", () => {
+    const one = { priceCents: 900, latePricing: { startsOn: "2026-11-01", label: "Late", priceCents: 1400 } };
+    expect(lines("2026-12-01", one)[0]).not.toHaveProperty("earlierRate");
+    expect(isLateRateLine(lines("2026-12-01", one)[0]!)).toBe(true);
+    expect(lines("2026-10-01", one)[0]).not.toHaveProperty("pricingLabel");
+    expect(isLateRateLine(lines("2026-10-01", one)[0]!)).toBe(false);
+    // The last window carries no new key either.
+    expect(lines("2026-12-01")[0]).not.toHaveProperty("earlierRate");
+  });
+  it("an old stored line with only a pricingLabel is late", () => {
+    expect(isLateRateLine({ pricingLabel: "Late registration pricing" })).toBe(true);
   });
 });

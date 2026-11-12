@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isLateRateLine } from "@/modules/forms/definition";
 import { teamLabel } from "@/modules/club-teams/domain";
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
@@ -296,7 +297,8 @@ function sourceFor(row: FactsRow, context: SourceContext, placesFor: (registrati
       addedAfterSubmission: attendee.createdAt.getTime() > submittedAt + LATE_ADDITION_GRACE_MS,
       substituted: substitutedAttendeeIds.has(attendee.id),
       chargeCents: own.reduce((total, line) => total + (line.amountCents as number), 0),
-      lateRate: own.some((line) => typeof line.pricingLabel === "string"),
+      // Only the last price window is the late rate; earlier labelled rates carry `earlierRate` (see isEarlierRateLabel/isLateRateLine, and club-event-reports for the same rule). Old stored lines have no flag.
+      lateRate: own.some(isLateRateLine),
       transferredFrom,
       adjustmentCents: row.adjustments
         .filter((adjustment) => adjustment.registrationAttendeeId === attendee.id)

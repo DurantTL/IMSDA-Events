@@ -714,7 +714,7 @@ export function resolveBillingContactName(responses: Record<string, unknown>): s
 export type RegistrationFormDefinition = z.infer<typeof registrationFormDefinitionSchema>;
 export type RegistrationFormField = z.infer<typeof formFieldSchema>;
 export type ChoiceUsage = Record<string, Record<string, { total: number; first: number; second: number }>>;
-export type FormCalculation = { subtotalCents: number; processingFeeCents: number; totalCents: number; lineItems: Array<{ key: string; label: string; amountCents: number; pricingLabel?: string; attendeeIndex?: number; attendeeLabel?: string }> };
+export type FormCalculation = { subtotalCents: number; processingFeeCents: number; totalCents: number; lineItems: Array<{ key: string; label: string; amountCents: number; pricingLabel?: string; earlierRate?: true; attendeeIndex?: number; attendeeLabel?: string }> };
 export type AttendeeRosterConfig = {
   enabled: boolean;
   minAttendees: number;
@@ -1775,6 +1775,23 @@ export function activePriceWindow(field: Pick<RegistrationFormField, "latePricin
 }
 
 /** The label of the pricing in force on `pricingDate`: the latest started window, else the starting-price label, else none. */
+/**
+ * True when the label in force belongs to a rate before the field's last window: the starting-price label or a
+ * middle window. Only the last window (and every one-window `latePricing`) is the late rate. Mirrors the club
+ * packet rule in `modules/reporting/club-event-reports.ts`; `lateRate` in attendance reconciliation reads it.
+ */
+export function isEarlierRateLabel(field: Pick<RegistrationFormField, "latePricing" | "pricingWindows" | "basePricingLabel">, pricingDate = localCalendarDate()): boolean {
+  const windows = fieldPriceWindows(field);
+  const started = activePriceWindows(field, pricingDate).length;
+  if (windows.length === 0 || fieldPricingLabel(field, pricingDate) === undefined) return false;
+  return started < windows.length;
+}
+
+/** Whether a stored line item is at the late rate: it has a pricing label that is not an earlier rate. Old stored lines have no flag, so any label reads as late, as before. */
+export function isLateRateLine(line: { pricingLabel?: unknown; earlierRate?: unknown }): boolean {
+  return typeof line.pricingLabel === "string" && line.earlierRate !== true;
+}
+
 export function fieldPricingLabel(field: Pick<RegistrationFormField, "latePricing" | "pricingWindows" | "basePricingLabel">, pricingDate = localCalendarDate()): string | undefined {
   const window = activePriceWindow(field, pricingDate);
   if (window) return window.label;
@@ -1853,6 +1870,7 @@ function pricedLineItem(
     label: attendee ? `${field.label} — ${attendee.label}` : field.label,
     amountCents: Math.round(amountCents),
     ...(pricingLabel !== undefined ? { pricingLabel } : {}),
+    ...(pricingLabel !== undefined && isEarlierRateLabel(field, pricingDate) ? { earlierRate: true as const } : {}),
     ...(attendee ? { attendeeIndex: attendee.index, attendeeLabel: attendee.label } : {}),
   };
 }

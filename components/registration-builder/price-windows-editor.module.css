@@ -61,13 +61,6 @@
   gap: 8px;
 }
 
-.button {
-  min-height: 44px;
-  min-width: 44px;
-  padding: 0 12px;
-  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-}
-
 .warning {
   color: var(--muted);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
