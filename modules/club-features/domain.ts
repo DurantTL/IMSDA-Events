@@ -9,7 +9,7 @@
 
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
-export const CLUB_OPTIONAL_FEATURE_KEYS = ["roster-health-flags", "master-guide-tracking"] as const;
+export const CLUB_OPTIONAL_FEATURE_KEYS = ["roster-health-flags", "staff-training-records", "master-guide-tracking"] as const;
 export type ClubOptionalFeatureKey = (typeof CLUB_OPTIONAL_FEATURE_KEYS)[number];
 
 export const clubOptionalFeatureDefinitions: Record<ClubOptionalFeatureKey, { title: string; description: string }> = {
@@ -20,6 +20,10 @@ export const clubOptionalFeatureDefinitions: Record<ClubOptionalFeatureKey, { ti
   "master-guide-tracking": {
     title: "Master Guide tracking",
     description: "Keeps a list of your Master Guide candidates with their start date, mentor and where they are in the approval chain: the club approves, then an Area Coordinator. A candidate must be 16 or older to start and 18 or older for the club to approve. It never shows a birth date.",
+  },
+  "staff-training-records": {
+    title: "Staff training records",
+    description: "Lets your director and deputy record the NAD certifications (Basic Staff, Instructor, Counselor, Secretary/Treasurer, Director) and workshops each adult on your roster has completed, with the date and who signed off. It adds a Staff training page to your club. It is only a record: nothing is required, and other club roles and people outside your club can't see it.",
   },
 };
 

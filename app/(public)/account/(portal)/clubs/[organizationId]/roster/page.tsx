@@ -17,6 +17,7 @@ import { listRoster } from "@/modules/club-rosters/repository";
 import { listTransferClubOptions } from "@/modules/club-transfers/repository";
 import { personIdsMovedToOtherClubs } from "@/modules/earned-awards/order-source";
 import { rosterHealthAvailable } from "@/modules/club-features/roster-health";
+import { staffTrainingAvailable } from "@/modules/staff-training/repository";
 import { requireHealthViewerForClub } from "@/modules/health-records/access";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { HealthRecordError } from "@/modules/health-records/errors";
@@ -91,6 +92,8 @@ export default async function ClubRosterPage({
     : null;
   // The optional roster health list (#1709): the link is shown exactly when that page would open, with its own check.
   const showRosterHealth = await rosterHealthAvailable(organizationId, access.capabilities);
+  // The optional staff training records (#1697): shown exactly when that page would open.
+  const showStaffTraining = await staffTrainingAvailable(organizationId, access.capabilities);
   return (
     <>
       {registrationHref && <BackLink href={registrationHref}>Back to registration</BackLink>}
@@ -100,6 +103,11 @@ export default async function ClubRosterPage({
       {showRosterHealth && (
         <p>
           <a className="secondary-button club-event-action" href={`/account/clubs/${organizationId}/roster-health`}>Open roster health</a>
+        </p>
+      )}
+      {showStaffTraining && (
+        <p>
+          <a className="secondary-button club-event-action" href={`/account/clubs/${organizationId}/staff-training`}>Open staff training</a>
         </p>
       )}
       {/* From August a director is offered next year's roster (#414); nothing rolls over until they confirm it. */}
