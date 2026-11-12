@@ -9,6 +9,7 @@ import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   buildResults,
   buildScoredEventDefinition,
+  keepsInspectionShape,
   normalizeScoredEventName,
   parseScoreText,
   resultsForClub,
@@ -160,6 +161,17 @@ async function loadSubjects(eventId: string): Promise<Subjects> {
     }
   }
   return { clubs, people };
+}
+
+/** The clubs registered for the event (active registrations), the only clubs a club score can be entered for. Lean: no people. */
+export async function loadRegisteredClubs(eventId: string): Promise<Array<{ organizationId: string; name: string; orgCode: string | null }>> {
+  const rows = await getPrisma().clubEventRegistration.findMany({
+    where: { eventId, registration: { status: { in: [...activeRegistrationStatuses] } } },
+    select: { organizationId: true, organization: { select: { name: true, orgCode: true } } },
+  });
+  const clubs = new Map<string, { name: string; orgCode: string | null }>();
+  for (const row of rows) clubs.set(row.organizationId, { name: row.organization.name, orgCode: row.organization.orgCode });
+  return [...clubs].map(([organizationId, club]) => ({ organizationId, ...club })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function definitionFromRow(row: { id: string; name: string; kind: string; unit: string; higherWins: boolean; ribbonMode: string; ribbonPlaces: number; ribbonBands: Prisma.JsonValue }): ScoredEventDefinition {
@@ -331,6 +343,34 @@ export async function applyEventScoringAction(actor: EventScoringActor, eventId:
   return loadEventScoringView(eventId, actor);
 }
 
+/**
+ * Enters or corrects one score and returns nothing else, so a caller on a slow connection sends and receives very little.
+ * The same checks and the same rule after publishing as the full action, which uses this too. `context` lets a caller that
+ * saves many scores in a row look up the registered clubs and the published state once.
+ */
+export async function enterScore(
+  actor: EventScoringActor,
+  eventId: string,
+  entry: { scoredEventId: string; subjectId: string; value: string | null },
+  context?: { clubIds?: ReadonlySet<string>; published?: boolean },
+): Promise<void> {
+  try {
+    await assertScopedToggleAllowed(moduleKey, toggleActor(actor));
+  } catch (error) {
+    if (error instanceof ScopedToggleError) throw new EventScoringError(error.code, error.message);
+    throw error;
+  }
+  await scopedEvent(eventId, actor.kind);
+  const capabilities = scoringCapabilities(actor);
+  if (!capabilities.canEnter) throw new EventScoringError("NOT_PERMITTED", "Your role doesn't include entering scores.");
+  if (!(await scopedModuleIsOn(eventId, moduleKey))) throw new EventScoringError("NOT_AVAILABLE", "Camporee scoring is off for this event. Turn it on first.");
+  await saveScore(actor, eventId, entry, capabilities, context);
+}
+
+export async function isScoringPublished(eventId: string): Promise<boolean> {
+  return isPublished(eventId);
+}
+
 async function isPublished(eventId: string): Promise<boolean> {
   const state = await getPrisma().eventScoringState.findUnique({ where: { eventId }, select: { publishedAt: true } });
   return Boolean(state?.publishedAt);
@@ -374,8 +414,12 @@ async function saveScoredEvent(actor: EventScoringActor, eventId: string, input:
 async function writeScoredEvent(actor: EventScoringActor, eventId: string, input: { id?: string }, data: Omit<Prisma.ScoredActivityUncheckedCreateInput, "eventId">, published: boolean) {
   await getPrisma().$transaction(async (tx) => {
     if (input.id) {
-      const existing = await tx.scoredActivity.findFirst({ where: { id: input.id, eventId }, select: { id: true, kind: true, unit: true, higherWins: true, _count: { select: { scores: true } } } });
+      const existing = await tx.scoredActivity.findFirst({ where: { id: input.id, eventId }, select: { id: true, kind: true, unit: true, higherWins: true, inspectionKind: true, _count: { select: { scores: true } } } });
       if (!existing) throw new EventScoringError("NOT_FOUND", "That scored event could not be found.");
+      // An inspection event (#1896) is always a score for each club, entered as a number, highest wins.
+      if (existing.inspectionKind && !keepsInspectionShape(data)) {
+        throw new EventScoringError("INVALID", "This is an inspection. It stays a score for each club, entered as a number, where the highest score wins.", "kind");
+      }
       // Changing what a score means once scores exist would silently change every one of them.
       if (existing._count.scores > 0 && (existing.kind !== data.kind || existing.unit !== data.unit || existing.higherWins !== data.higherWins)) {
         throw new EventScoringError("INVALID", "Scores are already entered, so who is scored, the unit and which direction wins can't change. Remove the scores first, or add a new scored event.", "kind");
@@ -401,18 +445,19 @@ async function deleteScoredEvent(actor: EventScoringActor, eventId: string, id: 
   });
 }
 
-async function saveScore(actor: EventScoringActor, eventId: string, entry: { scoredEventId: string; subjectId: string; value: string | null }, capabilities: ScoringCapabilities) {
+async function saveScore(actor: EventScoringActor, eventId: string, entry: { scoredEventId: string; subjectId: string; value: string | null }, capabilities: ScoringCapabilities, context?: { clubIds?: ReadonlySet<string>; published?: boolean }) {
   const prisma = getPrisma();
   const row = await prisma.scoredActivity.findFirst({ where: { id: entry.scoredEventId, eventId } });
   if (!row) throw new EventScoringError("NOT_FOUND", "That scored event could not be found.");
   const definition = definitionFromRow(row);
-  const published = await isPublished(eventId);
+  const published = context?.published ?? await isPublished(eventId);
   if (published && !capabilities.canCorrectAfterPublish) {
     throw new EventScoringError("NOT_PERMITTED", "Results are published. Only the Clubs Administrator or event administrators can correct a score now.");
   }
   // Only a club or Pathfinder registered for this event can be scored.
-  const subjects = await loadSubjects(eventId);
-  const organizationId = definition.kind === "CLUB" ? (subjects.clubs.has(entry.subjectId) ? entry.subjectId : null) : subjects.people.get(entry.subjectId)?.organizationId ?? null;
+  const clubIds = definition.kind === "CLUB" ? (context?.clubIds ?? new Set((await loadRegisteredClubs(eventId)).map((club) => club.organizationId))) : null;
+  const people = definition.kind === "PATHFINDER" ? (await loadSubjects(eventId)).people : null;
+  const organizationId = clubIds ? (clubIds.has(entry.subjectId) ? entry.subjectId : null) : people?.get(entry.subjectId)?.organizationId ?? null;
   if (!organizationId) throw new EventScoringError("INVALID", definition.kind === "CLUB" ? "Choose a club registered for this event." : "Choose a Pathfinder registered for this event.", "subject");
   const existing = await prisma.activityScore.findUnique({ where: { scoredEventId_subjectId: { scoredEventId: definition.id, subjectId: entry.subjectId } }, select: { id: true, valueHundredths: true } });
   const audit = (action: string, summary: string, before: number | null, after: number | null) => auditEntry(actor, eventId, action, "ActivityScore", existing?.id ?? definition.id, summary, {

@@ -324,6 +324,8 @@ const pages: PageSpec[] = [
   { ...area("debrief", `/account/area-clubs/events/${clubEventId}/debrief`), expectText: /Event debrief/ },
   // The optional Budget sheet (#1682): the coordinator's switch, the sheet and its cost lines (switched on in seedBudgetSheet).
   { ...area("budget", `/account/area-clubs/events/${clubEventId}/budget`), expectText: /Budget sheet/ },
+  // The optional Inspections tool (#1896): the switch, the phone score entry and the CSV import (switched on in seedInspections).
+  { ...area("inspections", `/account/area-clubs/events/${clubEventId}/inspections`), expectText: /Inspections/ },
   area("team-permissions", "/account/area-clubs/team-permissions"),
   area("new-club-applications", "/account/area-clubs/applications"),
   area("points", "/account/area-clubs/points"),
@@ -459,6 +461,8 @@ const pages: PageSpec[] = [
   { ...staff("debrief", `/more/debrief?event=${clubEventId}`, "system-admin"), expectText: /Event debrief/ },
   // The optional Budget sheet (#1682): the switch, the figures, the cost lines and the totals.
   { ...staff("budget", `/more/budget?event=${clubEventId}`, "system-admin"), expectText: /Budget sheet/ },
+  // The optional Inspections tool (#1896): the switch, the score rows and the import.
+  { ...staff("inspections", `/more/inspections?event=${clubEventId}`, "system-admin"), expectText: /Inspections/ },
   // Home (#1568): the work waiting for this person, and the upcoming events they can open.
   { ...staff("home-needs-you", "/home", "system-admin"), expectText: /Needs you/ },
   { ...staff("home-coming-up", "/home/coming-up", "system-admin"), expectText: /Coming up/ },
@@ -1246,6 +1250,18 @@ async function seedDebriefPages(prisma: PrismaClient): Promise<PageSpec[]> {
     await onDebriefEnabled(tx, { eventId: clubEventId, actor: { kind: "staff", userId: admin.id } });
   });
   return [{ name: "area-debrief-fill", path: `/events/${clubEventSlug}/forms/debrief`, role: "area" }];
+}
+
+/** Inspections (#1896) switched on for the club weekend, on top of Camporee scoring, with its two inspection events, so the audited pages show the score rows and not only the switch. */
+async function seedInspections(prisma: PrismaClient): Promise<void> {
+  await prisma.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "event-scoring" }, { eventId: clubEventId, moduleKey: "inspection-scoring" }], skipDuplicates: true });
+  for (const [index, [inspectionKind, name]] of ([["campsite", "Campsite inspection"], ["uniform", "Uniform inspection"]] as const).entries()) {
+    await prisma.scoredActivity.upsert({
+      where: { eventId_inspectionKind: { eventId: clubEventId, inspectionKind } },
+      create: { eventId: clubEventId, name, normalizedName: name.toLowerCase(), kind: "CLUB", unit: "POINTS", higherWins: true, ribbonMode: "PLACES", ribbonPlaces: 3, ribbonBands: [], inspectionKind, sortOrder: 900 + index },
+      update: {},
+    });
+  }
 }
 
 /** The Budget sheet (#1682) switched on for the club weekend, with two synthetic cost lines, so the audited pages show a sheet and not only the switch. */
@@ -4838,6 +4854,7 @@ async function main() {
     pages.push(...await seedInformationForm(prisma));
     pages.push(...await seedDebriefPages(prisma));
     await seedBudgetSheet(prisma);
+    await seedInspections(prisma);
     pages.push(...await seedEventTemplatePages(prisma));
     const cookies = await mintSessions(prisma, tokens);
     console.log(`Auditing ${pages.length} pages at ${widths.join(", ")} px; output in ${outDir}`);
