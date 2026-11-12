@@ -7,6 +7,7 @@
  */
 
 import { ageOn, parseCalendarDate } from "@/modules/club-rosters/domain";
+import { ministriesIncludeKind } from "@/modules/organizations/area-coordinator-ministries-domain";
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
 export const MASTER_GUIDE_FEATURE_KEY = "master-guide-tracking" as const;
@@ -71,7 +72,7 @@ export function canManageMasterGuide(capabilities: Pick<ClubCapabilities, "editP
  * rule as every other coordinator page. A club with no kind, or a coordinator with no ministries, is refused.
  */
 export function areaCoordinatorMayApproveForClub(ministries: readonly string[], clubKind: string | null | undefined): boolean {
-  return typeof clubKind === "string" && ministries.includes(clubKind);
+  return ministriesIncludeKind(ministries, clubKind);
 }
 
 function pad(value: number) {

@@ -50,8 +50,7 @@ async function postHandler(request: Request, context: RouteContext) {
   try {
     const { eventId } = await context.params;
     const access = await authorizeImageLibrary(eventId);
-    // The size limit is checked against the declared length before the body is read; a request that does not state its
-    // size is refused, so the check cannot be skipped.
+    // The size is checked against the declared length before the body is read.
     const declaredLength = request.headers.get("content-length");
     if (declaredLength === null || !/^\d+$/.test(declaredLength)) {
       return Response.json({ error: "LENGTH_REQUIRED", message: "The upload must state its size." }, { status: 411 });
