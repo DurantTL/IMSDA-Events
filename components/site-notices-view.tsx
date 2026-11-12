@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { AlertTriangle, Info, Siren } from "lucide-react";
+import { isCalendarPagePath } from "@/modules/calendar/calendar-href";
 import { linkText, noticeLevelLabels, type HubNotice } from "@/modules/site-content/hub-content-domain";
 import styles from "@/components/site-notices-view.module.css";
 
 const icons = { INFO: Info, URGENT: AlertTriangle, EMERGENCY: Siren } as const;
 
-/** A staff-written link: a path on this site goes through next/link, an https address is a plain link. */
+/**
+ * A staff-written link: a path on this site goes through next/link, an https address is a plain link. A link into the
+ * calendar is a plain link too, so the calendar loads with its own Content-Security-Policy (map tiles, #1212).
+ */
 export function HubLink({ href, className, children }: { href: string; className?: string; children: React.ReactNode }) {
-  return href.startsWith("/") ? <Link className={className} href={href}>{children}</Link> : <a className={className} href={href}>{children}</a>;
+  return href.startsWith("/") && !isCalendarPagePath(href) ? <Link className={className} href={href}>{children}</Link> : <a className={className} href={href}>{children}</a>;
 }
 
 /** The notices as drawn: pure, so the preview and the tests render exactly what the pages do. Nothing when there are none. */

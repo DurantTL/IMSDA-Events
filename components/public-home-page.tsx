@@ -1,5 +1,6 @@
 import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
+import { isCalendarPagePath } from "@/modules/calendar/calendar-href";
 import { CalendarDays, ChevronRight } from "lucide-react";
 import { BrandLink } from "@/components/brand-link";
 import { PublicExploreNav } from "@/components/public-explore-nav";
@@ -142,7 +143,7 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
         <ul className="home-places-list">
           {tiles.map((tile) => (
             <li key={tile.position}>
-              <Link className="home-place" href={tile.href}>
+              <PlaceLink className="home-place" href={tile.href}>
                 <span className="home-place-icon"><HomepageMinistryIconView icon={tile.icon} /></span>
                 <span className="home-place-text">
                   <strong>{tile.name}</strong>
@@ -151,7 +152,7 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
                   {tile.closing && <span className="home-place-flag">{tile.closing.line}</span>}
                 </span>
                 <ChevronRight size={20} aria-hidden="true" />
-              </Link>
+              </PlaceLink>
             </li>
           ))}
         </ul>
@@ -285,4 +286,9 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
       </div>
     </Wrapper>
   );
+}
+
+/** A ministry tile's link: a full page load into the calendar (its map needs the calendar's own policy, #1212), else next/link. */
+function PlaceLink({ href, className, children }: { href: string; className: string; children: React.ReactNode }) {
+  return isCalendarPagePath(href) ? <a className={className} href={href}>{children}</a> : <Link className={className} href={href}>{children}</Link>;
 }
