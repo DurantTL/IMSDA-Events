@@ -65,7 +65,7 @@ export function TltFormsInbox({ slice, filters, forms, clubs }: {
         </div>
       </SearchAsYouTypeForm>
 
-      {filters.personId ? <p className="inline-notice" role="status">Showing the forms tied to one TLT on a roster. Clear the filters to see every TLT form.</p> : null}
+      {filters.personId ? <p className="inline-notice" role="status">These are the forms tied to one TLT on a roster. Clear the filters to see every TLT form.</p> : null}
 
       <div className={styles.actions}>
         {filters.form
