@@ -106,13 +106,3 @@ describe("Club event options and the jump bar (#1586)", () => {
     expect(read("components/event-general-link-panel.tsx")).toMatch(/<h3 id="general-link-heading"/);
   });
 });
-
-describe("Phone order (#1586)", () => {
-  it("shows the form, then the one save bar, then Publish readiness, below 980px", () => {
-    const css = read("components/event-settings-layout.module.css");
-    expect(css).toMatch(/max-width: 980px/);
-    expect(css).toMatch(/\.main \{ order: 1; \}/);
-    expect(css).toMatch(/\.savebar \{ order: 2; \}/);
-    expect(css).toMatch(/\.side \{ order: 3; \}/);
-  });
-});

@@ -100,7 +100,6 @@ import styles from "@/components/public-page-overview.module.css";
 import readinessStyles from "@/components/event-settings-readiness.module.css";
 import archiveStyles from "@/components/event-archive-download.module.css";
 import { ExportLink } from "@/components/export-link";
-import layoutStyles from "@/components/event-settings-layout.module.css";
 import { PageHeader } from "@/components/page-header";
 import { staffPageTitles } from "@/components/staff-navigation";
 
@@ -977,7 +976,7 @@ export function EventSettingsWorkspace({
       </nav>
 
       <form className="event-settings-layout" noValidate onSubmit={save}>
-        <div className={`event-settings-main ${layoutStyles.main}`}>
+        <div className="event-settings-main">
           {errorItems.length > 0 && (
             <FormErrorSummary
               items={errorItems}
@@ -1297,7 +1296,7 @@ export function EventSettingsWorkspace({
           )}
         </div>
 
-        <aside className={`event-settings-side ${layoutStyles.side}`}>
+        <aside className="event-settings-side">
           <section className="panel event-readiness-panel" id="event-readiness-panel">
             <p className="eyebrow">Publish readiness</p>
             <h2>{readiness.ready ? "Ready to publish" : `${readiness.completedCount} of ${readiness.items.length} required ready`}</h2>
@@ -1464,7 +1463,7 @@ export function EventSettingsWorkspace({
           )}
 
         </aside>
-        <div className={`event-savebar ${layoutStyles.savebar}${savebarPinned ? " is-pinned" : ""}`} role="region" aria-label="Save event settings">
+        <div className={`event-savebar${savebarPinned ? " is-pinned" : ""}`} role="region" aria-label="Save event settings">
           <p className="event-savebar-status" aria-live={saveMessage && saveMessage.kind !== "success" ? "assertive" : "polite"}>
             {saveMessage
               ? <span className={saveMessage.kind === "success" ? "event-savebar-ok" : "event-savebar-error"} >{saveMessage.text}</span>

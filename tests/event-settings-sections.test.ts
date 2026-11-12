@@ -312,8 +312,8 @@ describe("Event settings save and publish clarity (#742)", () => {
   it("makes Save event settings the one submit button, in a sticky bar", () => {
     const markup = render();
     expect(markup.match(/type="submit"/g)).toHaveLength(1);
-    expect(markup).toContain('class="event-savebar ');
-    expect(markup.slice(markup.indexOf('class="event-savebar '))).toContain("Save event settings");
+    expect(markup).toContain('class="event-savebar"');
+    expect(markup.slice(markup.indexOf('class="event-savebar"'))).toContain("Save event settings");
     expect(markup).toContain("Saving never publishes the event");
   });
 
