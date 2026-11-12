@@ -1,0 +1,36 @@
+.sheet { display: grid; gap: 20px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.block { display: grid; gap: 10px; break-inside: avoid; }
+.heading { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.note { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; }
+.empty { margin: 0; color: var(--muted); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; white-space: nowrap; }
+.actions button, .toolbar button, .toolbar a, .form button, .removeButton { min-height: 44px; }
+.gaps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.gap { margin: 0; color: var(--danger); font-weight: 700; overflow-wrap: anywhere; }
+.noGaps { margin: 0; font-weight: 600; }
+.activities { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.activity { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 14px; break-inside: avoid; }
+.activityName { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1rem); overflow-wrap: anywhere; }
+.details { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+.counts { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; font-variant-numeric: tabular-nums; }
+.people { list-style: none; margin: 0; padding: 0; display: grid; }
+.person { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; border-bottom: 1px solid var(--line); padding: 6px 0; }
+.personName { overflow-wrap: anywhere; }
+.role { color: var(--muted); }
+.form { display: grid; gap: 12px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 14px; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 12px; }
+.field { display: grid; gap: 4px; font-weight: 600; }
+.field input, .field select { min-height: 44px; font: inherit; font-weight: 400; max-width: 100%; }
+.field .help { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; }
+.printTitle { display: none; margin: 0; font-size: max(var(--type-staff-floor, 0px), 16pt); }
+
+@media print {
+  .noPrint { display: none !important; }
+  .printTitle { display: block; }
+  .sheet { gap: 10px; font-size: max(var(--type-staff-floor, 0px), 10pt); }
+  .activity { border-color: currentColor; padding: 8px; }
+  .gap { color: inherit; }
+  .sheet[data-print="activities"] .activity { break-after: page; }
+  .sheet[data-print="activities"] .printHideInSheets { display: none !important; }
+}

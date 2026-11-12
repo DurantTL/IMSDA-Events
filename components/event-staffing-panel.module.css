@@ -1,0 +1,4 @@
+.panel { display: grid; gap: 14px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.state { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.panel button { min-height: 44px; }

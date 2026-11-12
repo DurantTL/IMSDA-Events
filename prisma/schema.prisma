@@ -884,6 +884,7 @@ model User {
 
   staffHomeLayout           StaffHomeLayout?
   memberships               EventMembership[]
+  eventStaffingAssignments  EventStaffingAssignment[]
   clubsAdministratorGrant   ClubsAdministratorGrant?
   siteContentEditorGrant    SiteContentEditorGrant?
   siteContentRevisionsCreated   SiteContentRevision[] @relation("SiteContentRevisionCreatedBy")
@@ -1920,6 +1921,8 @@ model Event {
   debrief                             EventDebrief?                    @relation("EventDebrief")
   debriefsCarriedHere                 EventDebrief[]                   @relation("EventDebriefCarriedFrom")
   budgetCostLines                     EventBudgetCostLine[]            @relation("EventBudgetCostLines")
+  staffingActivities                  EventStaffingActivity[]          @relation("EventStaffingActivities")
+  staffingAssignments                 EventStaffingAssignment[]        @relation("EventStaffingAssignments")
   formTestSubmissions                 FormTestSubmission[]
   publicFormSubmissions               PublicRegistrationSubmission[]
   capacityReservations                RegistrationCapacityReservation[]
@@ -2096,6 +2099,61 @@ model EventBudgetCostLine {
   event Event @relation("EventBudgetCostLines", fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId, createdAt])
+}
+
+/// What an assignment on an event's staffing sheet is for (#1678). TLT is part of the table from the start so a later change can
+/// assign TLTs (by help-area tag) without reshaping it; the first slice only writes LEAD, HELPER and LIFEGUARD.
+enum EventStaffingRole {
+  LEAD
+  HELPER
+  LIFEGUARD
+  TLT
+}
+
+/// One activity on an event's optional staffing sheet (#1678): a name, optional text, and how many TLTs, lifeguards and other
+/// helpers it needs. Plain table names so volunteers and shifts (#65, #201, #203) can extend the boundary. Kept when the Event
+/// staffing module is switched off.
+model EventStaffingActivity {
+  id               String   @id @default(cuid())
+  eventId          String
+  name             String
+  description      String   @default("")
+  location         String   @default("")
+  timeText         String   @default("")
+  tltsNeeded       Int      @default(0)
+  lifeguardsNeeded Int      @default(0)
+  helpersNeeded    Int      @default(0)
+  position         Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  event       Event                     @relation("EventStaffingActivities", fields: [eventId], references: [id], onDelete: Cascade)
+  assignments EventStaffingAssignment[]
+
+  @@index([eventId, position])
+}
+
+/// One person in one role on one activity (#1678): a registered person (`personId`) or an event staff user (`userId`), never both
+/// and never neither (database check). At most one LEAD per activity and one row per person per activity (unique indexes).
+model EventStaffingAssignment {
+  id         String            @id @default(cuid())
+  eventId    String
+  activityId String
+  role       EventStaffingRole
+  personId   String?
+  userId     String?
+  createdAt  DateTime          @default(now())
+
+  event    Event                 @relation("EventStaffingAssignments", fields: [eventId], references: [id], onDelete: Cascade)
+  activity EventStaffingActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  person   Person?               @relation(fields: [personId], references: [id], onDelete: Cascade)
+  user     User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, personId])
+  @@unique([activityId, userId])
+  @@index([eventId, personId])
+  @@index([eventId, userId])
+  @@index([activityId, role])
 }
 
 enum ModuleRequestStatus {
@@ -2599,6 +2657,7 @@ model Person {
   lodgingRoommateAsked       EventLodgingRoommateRequest[] @relation("LodgingRoommateTargetPerson")
   lodgingRulesAsA            EventLodgingRule[] @relation("LodgingRulePersonA")
   lodgingRulesAsB            EventLodgingRule[] @relation("LodgingRulePersonB")
+  eventStaffingAssignments   EventStaffingAssignment[]
 
   @@index([lastName, firstName])
 }
