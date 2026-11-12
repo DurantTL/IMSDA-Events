@@ -1382,9 +1382,9 @@ export function EventSettingsWorkspace({
 
           {mode === "edit" && initialEvent && canDownloadEventArchive && (
             <section className="panel" aria-labelledby="event-archive-download-heading">
-              <h2 id="event-archive-download-heading">Event archive</h2>
+              <h2 id="event-archive-download-heading">Download event records</h2>
               <p className={archiveStyles.help}>One zip of this event&rsquo;s exports you can already download, with a contents page. Health records are never included.</p>
-              <ExportLink className={`secondary-button ${archiveStyles.link}`} href={`/api/events/${encodeURIComponent(initialEvent.id)}/exports/event-archive`}>Download event archive</ExportLink>
+              <ExportLink className={`secondary-button ${archiveStyles.link}`} href={`/api/events/${encodeURIComponent(initialEvent.id)}/exports/event-archive`}>Download event archive (.zip)</ExportLink>
             </section>
           )}
 

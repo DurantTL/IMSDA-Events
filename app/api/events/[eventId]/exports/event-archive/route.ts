@@ -5,6 +5,7 @@ import { findEventArchiveFacts } from "@/modules/events/archive-download-facts";
 import { findActiveMembership } from "@/modules/events/repository";
 import { effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { resolveLocationFilter } from "@/modules/event-locations/filter";
+import { InformationFormError } from "@/modules/information-forms/errors";
 import { listInformationForms } from "@/modules/information-forms/repository";
 import { buildInformationFormResponsesCsv } from "@/modules/information-forms/responses";
 import { buildAttendeeListingRows, attendeeListingCsv, filterAttendeeListing, parseAttendeeListingQuery } from "@/modules/registrations/attendee-listing";
@@ -16,7 +17,7 @@ import { exportFileName, zipDownloadResponse } from "@/modules/reporting/export-
 import { eventFileScope } from "@/modules/reporting/export-scope";
 import { buildZip } from "@/modules/reporting/zip";
 import { logError } from "@/lib/logger";
-import { withRequestContext } from "@/lib/request-context";
+import { CORRELATION_HEADER, currentCorrelationId, withRequestContext } from "@/lib/request-context";
 import { GET as invoicesExport } from "@/app/api/events/[eventId]/exports/invoices/route";
 import { GET as billingResponsibilityExport } from "@/app/api/events/[eventId]/exports/billing-responsibility/route";
 import { GET as churchOwedExport } from "@/app/api/events/[eventId]/exports/church-owed/route";
@@ -37,13 +38,14 @@ import { GET as attendanceReconciliationExport } from "@/app/api/events/[eventId
 const BOM = "﻿";
 const text = (csv: string) => new TextEncoder().encode(csv.startsWith(BOM) ? csv : BOM + csv);
 
-const financeExports = [
+type FinanceExport = { name: string; segment: string; handler: typeof invoicesExport; sectioned?: boolean };
+const financeExports: readonly FinanceExport[] = [
   { name: "finalized-invoices.csv", segment: "invoices", handler: invoicesExport },
   { name: "billing-responsibility.csv", segment: "billing-responsibility", handler: billingResponsibilityExport },
-  { name: "church-owed.csv", segment: "church-owed", handler: churchOwedExport },
-  { name: "scholarship-fund.csv", segment: "scholarship-fund", handler: scholarshipFundExport },
+  { name: "church-owed.csv", segment: "church-owed", handler: churchOwedExport, sectioned: true },
+  { name: "scholarship-fund.csv", segment: "scholarship-fund", handler: scholarshipFundExport, sectioned: true },
   { name: "attendance-reconciliation.csv", segment: "attendance-reconciliation", handler: attendanceReconciliationExport },
-] as const;
+];
 
 async function getHandler(request: Request, context: { params: Promise<{ eventId: string }> }) {
   try {
@@ -62,7 +64,7 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
 
     const files: ArchiveFile[] = [];
     const notIncluded: ArchiveSkip[] = [];
-    const include = (name: string, csv: string) => files.push({ name, data: text(csv) });
+    const include = (name: string, csv: string, sectioned = false) => files.push({ name, data: text(csv), ...(sectioned ? { sectioned } : {}) });
 
     // Registrations: the registrations export's own gate and rows, without the staff notes column.
     if (permissions.has("VIEW_REPORTS")) {
@@ -77,20 +79,27 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
     if (permissions.has("VIEW_REPORTS") && permissions.has("VIEW_SENSITIVE_DATA")) {
       const query = parseAttendeeListingQuery(new URLSearchParams());
       const registrations = await listRegistrations(eventId, { statuses: query.statuses });
-      include("attendees.csv", attendeeListingCsv(filterAttendeeListing(buildAttendeeListingRows(registrations, { showDietaryDetails: false }), query)));
+      include("attendees.csv", attendeeListingCsv(filterAttendeeListing(buildAttendeeListingRows(registrations, { showDietaryDetails: false }), query), { omitDietaryColumns: true }));
     } else {
       notIncluded.push({ name: "attendees.csv", reason: "FORBIDDEN" });
     }
 
+    const correlationId = currentCorrelationId();
     // Finance: each existing route, called in place with the same session.
     for (const item of financeExports) {
       const response = await item.handler(
-        new Request(new URL(`/api/events/${encodeURIComponent(eventId)}/exports/${item.segment}`, request.url)),
+        new Request(new URL(`/api/events/${encodeURIComponent(eventId)}/exports/${item.segment}`, request.url), {
+          headers: correlationId ? { [CORRELATION_HEADER]: correlationId } : {},
+        }),
         { params: Promise.resolve({ eventId }) },
       );
-      if (response.status === 200) include(item.name, await response.text());
+      if (response.status === 200) include(item.name, await response.text(), item.sectioned);
       else if (response.status === 401 || response.status === 403) notIncluded.push({ name: item.name, reason: "FORBIDDEN" });
-      else if (response.status === 400 || response.status === 404) notIncluded.push({ name: item.name, reason: "EMPTY" });
+      else if (response.status === 400 || response.status === 404) {
+        // An export that says it does not apply to this event (not billed after the event) reads differently from an empty one.
+        const code = ((await response.json().catch(() => null)) as { error?: unknown } | null)?.error;
+        notIncluded.push({ name: item.name, reason: code === "NOT_DEFERRED_EVENT" ? "NOT_APPLICABLE" : "EMPTY" });
+      }
       else throw new Error(`Archive export ${item.segment} answered ${response.status}.`);
     }
 
@@ -135,6 +144,9 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
   } catch (error) {
     if (error instanceof AccessDeniedError) {
       return Response.json({ error: error.code, message: error.message }, { status: error.status });
+    }
+    if (error instanceof InformationFormError && error.code === "EXPORT_TOO_LARGE") {
+      return Response.json({ error: error.code, message: error.message }, { status: 409 });
     }
     logError("Unable to build the event archive", error);
     return Response.json({ error: "EVENT_ARCHIVE_DOWNLOAD_FAILED", message: "The archive could not be made. Nothing was downloaded; try again." }, { status: 500 });

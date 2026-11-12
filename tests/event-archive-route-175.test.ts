@@ -131,6 +131,9 @@ describe("event archive download route (#175)", () => {
     expect(dependencies.listNotesForRegistration).not.toHaveBeenCalled();
     const attendees = files!.get("attendees.csv")!;
     expect(attendees).not.toContain("peanut allergy synthetic");
+    expect(attendees).not.toContain("Dietary needs");
+    expect(attendees).not.toContain("Meal preference");
+    expect(attendees).not.toContain("Vegan");
   });
 
   it("gives a reports-only role the registrations and lists the finance and forms files as not included", async () => {
@@ -161,6 +164,23 @@ describe("event archive download route (#175)", () => {
     const failed = await download();
     expect(failed.response.status).toBe(500);
     expect(dependencies.writeAuditLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells an export that does not apply from one with nothing in it, and passes the correlation id to inner requests", async () => {
+    dependencies.finance["billing-responsibility"]!.mockResolvedValue(Response.json({ error: "NOT_DEFERRED_EVENT" }, { status: 404 }));
+    const { files } = await download();
+    expect(files!.get("CONTENTS.txt")).toContain("billing-responsibility.csv: Not included: not used for this event");
+    const inner = dependencies.finance.invoices!.mock.calls[0]![0] as Request;
+    expect(inner.headers.get("x-correlation-id")).toBeTruthy();
+  });
+
+  it("answers 409 with the form's own message when a form is over the export cap", async () => {
+    const { InformationFormError } = await import("@/modules/information-forms/errors");
+    dependencies.buildInformationFormResponsesCsv.mockRejectedValue(new InformationFormError("EXPORT_TOO_LARGE", "This form has 99,999 responses, more than one export can hold."));
+    const { response } = await download();
+    expect(response.status).toBe(409);
+    expect((await response.json()).message).toMatch(/99,999 responses/);
+    expect(dependencies.writeAuditLog).not.toHaveBeenCalled();
   });
 
   it("writes one audit row with file names and a checksum and no personal data", async () => {

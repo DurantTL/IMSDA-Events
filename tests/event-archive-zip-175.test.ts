@@ -1,5 +1,16 @@
 import { inflateRawSync } from "node:zlib";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({}) }));
+vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
+vi.mock("@/modules/registrations/repository", () => ({ getRegistrationById: vi.fn(), listRegistrations: vi.fn() }));
+vi.mock("@/modules/promo-codes/repository", () => ({ claimPromoCode: vi.fn(), PublicPromoCodeError: class extends Error {}, PromoCodeOperationError: class extends Error {} }));
+
+import { formTemplates } from "@/modules/forms/definition";
+import { buildAttendeeListingRows, attendeeListingCsv } from "@/modules/registrations/attendee-listing";
+import { toCsv } from "@/modules/reporting/csv";
+import { fundCsvRows, summarizeFund } from "@/modules/scholarship-funds/domain";
 import { buildArchiveContents, countCsvDataRows, eventAllowsArchiveDownload, sha256Hex } from "@/modules/reporting/event-archive";
 import { buildZip, crc32 } from "@/modules/reporting/zip";
 
@@ -93,5 +104,48 @@ describe("event archive contents (#175)", () => {
     expect(eventAllowsArchiveDownload({ ...base, lifecycleState: "PUBLISHED" })).toBe(false);
     expect(eventAllowsArchiveDownload({ ...base, lifecycleState: "COMPLETE" })).toBe(false);
     expect(eventAllowsArchiveDownload({ isPublished: false, lifecycleState: "COMPLETE", archivedAt: new Date() })).toBe(true);
+  });
+});
+
+describe("sectioned files and the attendees file (#175)", () => {
+  it("labels the scholarship fund export as lines, not rows, so headers and summary lines are not counted as data", () => {
+    const summary = summarizeFund(
+      [{ id: "c1", sponsorKey: "name:church a", sponsorName: "Test Church A", organizationId: null, amountCents: 10_000 }],
+      [{ id: "a1", sponsorKey: "name:church a", sponsorName: "Test Church A", organizationId: null, amountCents: 4_000, pledged: false, settled: false, active: true }],
+    );
+    const csv = toCsv(fundCsvRows({
+      eventName: "Test Event", summary,
+      contributions: [{ id: "c1", receivedOn: "2027-01-15", sponsorName: "Test Church A", method: "CHECK", amountCents: 10_000, reversesContributionId: null, note: null }],
+      awards: [{ id: "a1", confirmationCode: "REG-1", sponsorName: "Test Church A", amountCents: 4_000, pledged: false, settled: false, active: true, createdOn: "2027-01-16" }],
+    }));
+    const data = new TextEncoder().encode(csv);
+    const text = buildArchiveContents({ eventName: "E", eventId: "e", lifecycleState: "CLOSED", generatedBy: "Pat", generatedAt: new Date(), files: [{ name: "scholarship-fund.csv", data, sectioned: true }], notIncluded: [] });
+    const lines = csv.split("\r\n").filter(Boolean).length;
+    expect(text).toContain(`Lines: ${lines} (sectioned file`);
+    expect(text).not.toMatch(/scholarship-fund\.csv\r\n\s+Rows:/);
+  });
+
+  it("says a skipped export does not apply to this event", () => {
+    const text = buildArchiveContents({ eventName: "E", eventId: "e", lifecycleState: "CLOSED", generatedBy: "Pat", generatedAt: new Date(), files: [], notIncluded: [{ name: "billing-responsibility.csv", reason: "NOT_APPLICABLE" }] });
+    expect(text).toContain("billing-responsibility.csv: Not included: not used for this event");
+  });
+
+  it("leaves both dietary columns out of the archive's attendee file, even when meal type comes from diet choices", () => {
+    const definition = formTemplates.find((template) => template.key === "leadership_weekend")!.definition;
+    const registration = {
+      id: "r1", confirmationCode: "LW-1", status: "CONFIRMED", attendeeCount: 1, totalAmountCents: 0, paidCents: 0, balanceCents: 0,
+      accountHolder: { id: "p1", firstName: "Holder", lastName: "Synthetic", email: "holder@example.test", phone: "" },
+      attendees: [{ id: "a1", firstName: "Guest", lastName: "Synthetic", email: "", phone: "", attendeeType: "Adult", responses: { dietary_needs: ["Vegan"], food_allergies: "synthetic peanut" } }],
+      publicSubmission: { definition, responses: {}, attendeeResponses: [] },
+    };
+    const rows = buildAttendeeListingRows([registration] as never, { showDietaryDetails: false });
+    const full = attendeeListingCsv(rows);
+    expect(full).toContain("Meal preference");
+    expect(full).toContain("Vegan");
+    const archive = attendeeListingCsv(rows, { omitDietaryColumns: true });
+    expect(archive).not.toContain("Meal preference");
+    expect(archive).not.toContain("Dietary needs");
+    expect(archive).not.toMatch(/vegan|peanut|gluten/i);
+    expect(archive).toContain("Guest Synthetic");
   });
 });

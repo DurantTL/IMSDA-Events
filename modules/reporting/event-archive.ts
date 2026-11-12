@@ -20,10 +20,10 @@ export function sha256Hex(data: Uint8Array): string {
 }
 
 /**
- * The data rows of a CSV: every record after the header, where a quoted newline stays inside its record. A leading
+ * The non-blank records of a CSV, where a quoted newline stays inside its record. A leading
  * byte-order mark is ignored and a blank file has none.
  */
-export function countCsvDataRows(csv: string): number {
+export function countCsvRecords(csv: string): number {
   const text = csv.replace(/^﻿/, "");
   let records = 0;
   let inQuotes = false;
@@ -49,15 +49,22 @@ export function countCsvDataRows(csv: string): number {
     }
   }
   if (recordHasContent) records += 1;
-  return Math.max(records - 1, 0);
+  return records;
 }
 
-export type ArchiveFile = { name: string; data: Uint8Array };
-export type ArchiveSkip = { name: string; reason: "FORBIDDEN" | "EMPTY" };
+/** Data rows of a one-table CSV: every record after the header. */
+export function countCsvDataRows(csv: string): number {
+  return Math.max(countCsvRecords(csv) - 1, 0);
+}
+
+/** `sectioned` marks a file made of a title, summary lines and several tables, where "rows" has no single meaning. */
+export type ArchiveFile = { name: string; data: Uint8Array; sectioned?: boolean };
+export type ArchiveSkip = { name: string; reason: "FORBIDDEN" | "EMPTY" | "NOT_APPLICABLE" };
 
 export const ARCHIVE_SKIP_TEXT: Record<ArchiveSkip["reason"], string> = {
   FORBIDDEN: "Not included: your role can't download this export",
   EMPTY: "Not included: nothing to export",
+  NOT_APPLICABLE: "Not included: not used for this event",
 };
 
 function centralTime(at: Date): string {
@@ -85,12 +92,16 @@ export function buildArchiveContents(input: {
     "",
     "Health records are never included in this archive. This archive is a copy to keep and read; it is not for reimport.",
     "",
-    "Files (data rows exclude the header row)",
+    "Files (rows exclude the header row)",
   ];
   if (input.files.length === 0) lines.push("  None.");
   for (const file of input.files) {
     const csv = new TextDecoder().decode(file.data);
-    lines.push(`  ${file.name}`, `    Rows: ${countCsvDataRows(csv)}`, `    SHA-256: ${sha256Hex(file.data)}`);
+    lines.push(
+      `  ${file.name}`,
+      file.sectioned ? `    Lines: ${countCsvRecords(csv)} (sectioned file: title, summary and several tables, each with its own header)` : `    Rows: ${countCsvDataRows(csv)}`,
+      `    SHA-256: ${sha256Hex(file.data)}`,
+    );
   }
   lines.push("", "Not included");
   if (input.notIncluded.length === 0) lines.push("  Nothing was left out.");
