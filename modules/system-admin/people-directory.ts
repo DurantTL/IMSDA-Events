@@ -222,6 +222,8 @@ export type PersonDetail = {
   clubsAdministrator: boolean;
   siteContentEditor: boolean;
   areaCoordinator: boolean;
+  /** The TLT director setting on the Area Coordinator role (#1686); on only while the role is current. */
+  tltDirector?: boolean;
   staff: null | {
     status: string;
     signInDisabled: boolean;
@@ -317,7 +319,7 @@ export async function getPersonDetail(
         status: true,
         disabledAt: true,
         emailVerifiedAt: true,
-        areaCoordinatorGrant: { select: { revokedAt: true, expiresAt: true } },
+        areaCoordinatorGrant: { select: { revokedAt: true, expiresAt: true, tltDirector: true } },
         mfaEnrollment: { select: { status: true } },
         _count: { select: { passkeys: { where: { revokedAt: null } } } },
         sessions: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
@@ -345,6 +347,7 @@ export async function getPersonDetail(
     clubsAdministrator: Boolean(user?.clubsAdministratorGrant && !user.clubsAdministratorGrant.revokedAt),
     siteContentEditor: Boolean(user?.siteContentEditorGrant && !user.siteContentEditorGrant.revokedAt),
     areaCoordinator: Boolean(account?.areaCoordinatorGrant && isGrantCurrent(account.areaCoordinatorGrant, now)),
+    tltDirector: Boolean(account?.areaCoordinatorGrant && account.areaCoordinatorGrant.tltDirector && isGrantCurrent(account.areaCoordinatorGrant, now)),
     staff: full && user ? {
       status: user.accountStatus,
       signInDisabled: Boolean(user.credential?.disabledAt),

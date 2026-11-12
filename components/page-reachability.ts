@@ -74,7 +74,7 @@ export function linkedRoutesBySource(): Record<string, Set<string>> {
     ...clubPortalNavItems({ base: clubBase, role: "DIRECTOR", capabilities: leader }),
     ...clubReporterNavItems({ base: clubBase, capabilities: leader }),
     ...areaClubPortalNavItems({ organizationId: "[organizationId]" }),
-    ...coordinatorNavItems({ showWaitlists: true }),
+    ...coordinatorNavItems({ showWaitlists: true, showTlt: true }),
     ...accountPortalNavItems({ hasAccount: true, directedClubCount: 2, areaCoordinator: true, actingRole: null }),
   ];
   for (const item of items) portal.add(pathOf(item.href));
@@ -121,6 +121,7 @@ export const reviewedPages: Readonly<Record<string, ReviewedPage>> = {
   [`${area}/supplies`]: { kind: "redirect", why: "A coordinator never sees club supplies (#918); the page answers not found." },
   "/account/area/health": { kind: "linked", parent: "/account/area-clubs/overview", linkedIn: "modules/club-reports/area-card-domain.ts", link: "/account/area/health", why: "The Event health information card on the coordinator's Overview; the page does its own switch, step and window checks." },
   "/account/area-clubs/reports/export": { kind: "linked", parent: "/account/area-clubs/reports", linkedIn: "components/coordinator-destinations.tsx", link: "/account/area-clubs/reports/export?year=", why: "The More export options link beside the full-year CSV on Monthly Records and Points (#1761)." },
+  "/account/area-clubs/tlt/lists": { kind: "linked", parent: "/account/area-clubs/tlt", linkedIn: "components/tlt-directory.tsx", link: "/account/area-clubs/tlt/lists", why: "The Manage lists button on the TLT directory (#1686); the page does its own TLT director check." },
   "/account/area-clubs/roster-export": { kind: "linked", parent: "/account/area-clubs/overview", linkedIn: "components/coordinator-overview.tsx", link: "/account/area-clubs/roster-export?year=", why: "The Export rosters link in Clubs at a glance (#1760), also linked from the Clubs page and each club's view-only page." },
   "/account/area-clubs/events/[eventId]": { kind: "linked", parent: "/account/area-clubs/events", linkedIn: "components/coordinator-destinations.tsx", link: "/account/area-clubs/events/${encodeURIComponent(event.id)}", why: "A button on each row of the Club events list, for the signed-in Area Coordinator (#1731)." },
   "/account/area-clubs/events/[eventId]/report": { kind: "linked", parent: "/account/area-clubs/events", linkedIn: "components/coordinator-destinations.tsx", link: "/account/area-clubs/events/${encodeURIComponent(event.id)}/report", why: "A button on each row of the Club events list, for the signed-in Area Coordinator (#1731)." },

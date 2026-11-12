@@ -70,7 +70,8 @@ const memberSelect = {
 
 type StoredMember = Prisma.ClubRosterMemberGetPayload<{ select: typeof memberSelect }>;
 
-function ageFrom(member: StoredMember, onDate: string) {
+/** Whole years on a date from the sealed birth date, opened here and never returned; null without one (also used by the TLT directory, #1686). */
+export function ageFrom(member: Pick<StoredMember, "sealedBirthDate">, onDate: string) {
   return member.sealedBirthDate ? ageOn(openBirthDate(member.sealedBirthDate), onDate) : null;
 }
 
