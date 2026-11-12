@@ -1,11 +1,15 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
+import { cache } from "react";
+import { cookies } from "next/headers";
 
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
+import { hashOpaqueToken } from "@/modules/access/tokens";
+import { staffSessionCookie } from "@/modules/security/session-cookies";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 
 export const STAFF_TIMED_OUT_NOTICE =
@@ -23,7 +27,7 @@ export const STAFF_TIMED_OUT_NOTICE =
  * address belongs to staff, and an anonymous visitor always gets false. With the
  * switch off, or on any failure, it is false.
  */
-export async function isStaffSessionTimedOutForLinkedAttendee(): Promise<boolean> {
+export const isStaffSessionTimedOutForLinkedAttendee = cache(async function isStaffSessionTimedOutForLinkedAttendee(): Promise<boolean> {
   try {
     if (!(await isUnifiedSignInEnabled())) return false;
     const staff = await getCurrentSession();
@@ -40,39 +44,41 @@ export async function isStaffSessionTimedOutForLinkedAttendee(): Promise<boolean
     logError("The staff timed-out check failed", error);
     return false;
   }
-}
+});
 
 /**
- * An opaque marker for the current staff sign-out (#1947), used only to show the "staff sign-in ended" notice once
- * per sign-out. Null unless `isStaffSessionTimedOutForLinkedAttendee` is true. Otherwise a hash of the linked staff
- * user's newest session start (signing out revokes a session and signing in again starts a new one, so the marker
- * changes with each sign-in/sign-out cycle); with no session on record it is a fixed value. It is never a token and
- * never leaves the server unhashed. Never throws.
+ * An opaque marker for this browser's own ended staff sign-in (#1947), used only to show the "staff sign-in ended"
+ * notice once per sign-out. It reads this browser's staff session cookie, finds that session's row and requires it to
+ * belong to the staff user linked to the signed-in attendee account. Null unless the #1092 check says the staff side
+ * has ended and such a row exists, so a browser that never held a staff session gets none. The marker is a short hash
+ * of that session's id: never a token, and it changes with each new staff sign-in. Never throws.
  */
-export async function staffSignInEndedMarker(): Promise<string | null> {
+export const staffSignInEndedMarker = cache(async function staffSignInEndedMarker(): Promise<string | null> {
   try {
     if (!(await isStaffSessionTimedOutForLinkedAttendee())) return null;
     const attendee = await getCurrentAttendee();
     if (!attendee.account) return null;
+    const token = staffSessionCookie.read(await cookies());
+    if (!token) return null;
     const prisma = getPrisma();
+    const own = await prisma.userSession.findUnique({
+      where: { tokenHash: hashOpaqueToken(token) },
+      select: { id: true, userId: true },
+    });
+    if (!own) return null;
     const linked = await prisma.user.findFirst({
       where: { attendeeAccountId: attendee.account.id, accountStatus: "ACTIVE" },
       select: { id: true },
     });
-    if (!linked) return null;
-    const latest = await prisma.userSession.findFirst({
-      where: { userId: linked.id },
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true },
-    });
-    return staffEndedMarkerFrom(linked.id, latest?.createdAt ?? null);
+    if (!linked || linked.id !== own.userId) return null;
+    return staffEndedMarkerFrom(own.id);
   } catch (error) {
     logError("The staff sign-in ended marker failed", error);
     return null;
   }
-}
+});
 
-/** The pure part of the marker: a short hash, so no id or time is readable in the page. */
-export function staffEndedMarkerFrom(userId: string, latestSessionStart: Date | null): string {
-  return createHash("sha256").update(`${userId}:${latestSessionStart ? latestSessionStart.toISOString() : "none"}`).digest("hex").slice(0, 16);
+/** The pure part of the marker: a short hash, so no id is readable in the page. */
+export function staffEndedMarkerFrom(sessionId: string): string {
+  return createHash("sha256").update(`staff-ended:${sessionId}`).digest("hex").slice(0, 16);
 }

@@ -1,19 +1,36 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** #1947: the account portal's staff link and the "staff sign-in ended" notice. Synthetic data only. */
 vi.mock("server-only", () => ({}));
+const m = vi.hoisted(() => ({
+  cookie: vi.fn(),
+  enabled: vi.fn(),
+  staff: vi.fn(),
+  attendee: vi.fn(),
+  findSession: vi.fn(),
+  findUser: vi.fn(),
+}));
+vi.mock("next/headers", () => ({ cookies: async () => ({}) }));
+vi.mock("@/modules/security/session-cookies", () => ({ staffSessionCookie: { read: m.cookie } }));
+vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
+vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ userSession: { findUnique: m.findSession }, user: { findFirst: m.findUser } }) }));
+vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: m.staff }));
+vi.mock("@/modules/account-merge/account-link", () => ({ isUnifiedSignInEnabled: m.enabled }));
+vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: m.attendee }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }), unstable_rethrow: () => {} }));
 
 import { AccountHeaderActions } from "@/components/account-header-actions";
 import {
   StaffSignInEndedNotice,
+  dismissNotice,
+  isNoticeVisible,
   noticeAlreadySeen,
   recordNoticeSeen,
 } from "@/components/staff-signin-ended-notice";
 import { accountSignOutMode, otherWorkspaceContextsForAttendee } from "@/modules/access/workspace-contexts";
-import { staffEndedMarkerFrom } from "@/modules/account-merge/staff-timeout";
+import { staffEndedMarkerFrom, staffSignInEndedMarker } from "@/modules/account-merge/staff-timeout";
 
 function topBar(input: { staffSession: boolean; staffSignInEnded: boolean }) {
   const contexts = otherWorkspaceContextsForAttendee({ hasStaffSession: input.staffSession, isSystemAdmin: false });
@@ -26,12 +43,14 @@ describe("account portal top bar staff link (#1947)", () => {
     const html = topBar({ staffSession: true, staffSignInEnded: false });
     expect(html).toContain("Staff workspace");
     expect(html).toContain('href="/home"');
+    expect(html).toContain('aria-label="Staff workspace"');
     expect(html).not.toContain("Staff sign-in");
   });
 
   it("staff side ended: Staff sign-in to /sign-in?staff=1, no Staff workspace", () => {
     const html = topBar({ staffSession: false, staffSignInEnded: true });
     expect(html).toContain("Staff sign-in");
+    expect(html).toContain('aria-label="Staff sign-in"');
     expect(html).toContain('href="/sign-in?staff=1"');
     expect(html).not.toContain("Staff workspace");
   });
@@ -72,12 +91,50 @@ describe("staff sign-in ended notice (#1947)", () => {
 });
 
 describe("staff sign-out marker (#1947)", () => {
-  it("changes with the newest staff session and is opaque", () => {
-    const a = staffEndedMarkerFrom("user-1", new Date("2026-11-12T10:00:00Z"));
-    const b = staffEndedMarkerFrom("user-1", new Date("2026-11-12T12:00:00Z"));
-    expect(a).not.toBe(b);
-    expect(a).toBe(staffEndedMarkerFrom("user-1", new Date("2026-11-12T10:00:00Z")));
-    expect(a).toMatch(/^[0-9a-f]{16}$/);
-    expect(staffEndedMarkerFrom("user-1", null)).toMatch(/^[0-9a-f]{16}$/);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    m.enabled.mockResolvedValue(true);
+    m.staff.mockResolvedValue({ user: null });
+    m.attendee.mockResolvedValue({ account: { id: "acct-1" }, via: "attendee" });
+    m.cookie.mockReturnValue("synthetic-token");
+    m.findSession.mockResolvedValue({ id: "sess-1", userId: "user-1" });
+    m.findUser.mockResolvedValue({ id: "user-1" });
+  });
+
+  it("is a short opaque hash of the session id", () => {
+    expect(staffEndedMarkerFrom("sess-1")).toMatch(/^[0-9a-f]{16}$/);
+    expect(staffEndedMarkerFrom("sess-1")).not.toBe(staffEndedMarkerFrom("sess-2"));
+  });
+
+  it("is the hash of this browser's own ended session when it belongs to the linked user", async () => {
+    expect(await staffSignInEndedMarker()).toBe(staffEndedMarkerFrom("sess-1"));
+  });
+
+  it("is null with no staff cookie", async () => {
+    m.cookie.mockReturnValue(null);
+    expect(await staffSignInEndedMarker()).toBeNull();
+  });
+
+  it("is null when the cookie has no session row", async () => {
+    m.findSession.mockResolvedValue(null);
+    expect(await staffSignInEndedMarker()).toBeNull();
+  });
+
+  it("is null when the cookie's session belongs to another user", async () => {
+    m.findSession.mockResolvedValue({ id: "sess-9", userId: "user-2" });
+    expect(await staffSignInEndedMarker()).toBeNull();
+  });
+});
+
+describe("staff sign-in ended notice remount (#1947)", () => {
+  it("stays hidden after Dismiss when the page is shown again, and the key is stored", () => {
+    const data = new Map<string, string>();
+    const storage = { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v) };
+    expect(isNoticeVisible(storage, "remount")).toBe(true);
+    recordNoticeSeen(storage, "remount"); // first display records the key; the same view stays visible
+    expect(isNoticeVisible(storage, "remount")).toBe(true);
+    dismissNotice(storage, "remount");
+    expect(isNoticeVisible(storage, "remount")).toBe(false); // tab away and back: still hidden
+    expect(noticeAlreadySeen(storage, "remount")).toBe(true); // a reload stays hidden too
   });
 });

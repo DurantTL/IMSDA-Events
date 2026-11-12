@@ -1,21 +1,21 @@
-.notice {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin: 0 0 16px;
-  padding: 12px 14px;
-  border: 1px solid var(--imsda-navy);
-  border-radius: var(--radius-element);
-  background: var(--card);
-  color: var(--ink, inherit);
+/* Sits in the overview's content column: the same width and side inset as .attendee-ov-layout. */
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto 16px;
 }
 
-.text {
-  flex: 1 1 auto;
-  min-width: 0;
+.notice {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.notice > div {
+  flex: 1 1 16rem;
+}
+
+.notice p {
   margin: 0;
   font-size: max(var(--type-staff-floor, 0px), 0.9rem);
-  line-height: 1.4;
 }
 
 .link {
@@ -23,7 +23,6 @@
   align-items: center;
   min-height: 44px;
   font-weight: 800;
-  color: var(--imsda-navy);
 }
 
 .dismiss {
@@ -32,14 +31,16 @@
   min-height: 44px;
 }
 
-.dismiss:focus-visible,
-.link:focus-visible {
-  outline: 3px solid var(--imsda-purple);
-  outline-offset: 2px;
+@media (max-width: 1228px) {
+  .wrap {
+    margin-right: 24px;
+    margin-left: 24px;
+  }
 }
 
-@media (max-width: 480px) {
-  .notice {
-    flex-direction: column;
+@media (max-width: 580px) {
+  .wrap {
+    margin-right: 12px;
+    margin-left: 12px;
   }
 }

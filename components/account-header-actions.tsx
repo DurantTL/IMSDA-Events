@@ -31,17 +31,17 @@ export function AccountHeaderActions({
       identity={identity && <span className="club-masthead-identity" translate="no">{identity}</span>}
       leading={<>
         {staffSignInEnded && (
-          <Link className={styles.action} href={STAFF_SIGN_IN_HREF}>
+          <Link aria-label="Staff sign-in" className={styles.action} href={STAFF_SIGN_IN_HREF}>
             <KeyRound size={16} aria-hidden="true" />
-            <span>Staff sign-in</span>
+            <span className={styles.label}>Staff sign-in</span>
           </Link>
         )}
         {contexts.map((context) => (
-        <Link className={styles.action} href={context.href} key={context.kind}>
+        <Link aria-label={context.label} className={styles.action} href={context.href} key={context.kind}>
           {context.kind === "system_admin"
             ? <ShieldCheck size={16} aria-hidden="true" />
             : <LayoutDashboard size={16} aria-hidden="true" />}
-          <span>{context.label}</span>
+          <span className={styles.label}>{context.label}</span>
         </Link>
         ))}
       </>}

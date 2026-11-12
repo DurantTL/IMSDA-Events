@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { Info } from "lucide-react";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { STAFF_SIGN_IN_HREF } from "@/components/public-header-links";
 import styles from "@/components/staff-signin-ended-notice.module.css";
@@ -35,39 +36,70 @@ function browserStorage(): Storage | null {
 }
 
 const seenAtLoad = new Map<string, boolean>();
+const dismissed = new Set<string>();
 const noSubscribe = () => () => {};
 
-/** What this browser already knew when the notice first asked: later writes do not hide it mid-view. */
-function wasSeenBefore(marker: string): boolean {
+/**
+ * Whether the notice shows for this sign-out. The storage answer is read once per page session (so recording the key
+ * on first display does not hide the notice mid-view); a dismissal is remembered here and in storage, so coming back
+ * to Overview by in-page navigation, or reloading, does not bring it back.
+ */
+export function isNoticeVisible(storage: Pick<Storage, "getItem"> | null, marker: string): boolean {
+  if (dismissed.has(marker)) return false;
   let seen = seenAtLoad.get(marker);
   if (seen === undefined) {
-    seen = noticeAlreadySeen(browserStorage(), marker);
+    seen = noticeAlreadySeen(storage, marker);
     seenAtLoad.set(marker, seen);
   }
-  return seen;
+  return !seen;
+}
+
+/** Dismissal: remembered for this page session and recorded in storage. */
+export function dismissNotice(storage: Pick<Storage, "setItem"> | null, marker: string): void {
+  dismissed.add(marker);
+  recordNoticeSeen(storage, marker);
 }
 
 /**
  * The "your staff sign-in ended" notice on /account (#1947), shown once per sign-out. `marker` is an opaque value the
- * server derives from the staff sign-out; the browser remembers it so a later visit for the same sign-out stays quiet.
- * It renders on the server and first paint, then hides itself if the marker was already seen.
+ * server derives from this browser's ended staff session; the browser remembers it so a later visit stays quiet.
+ * It reuses the overview's notice look and sits in the same column as the cards.
  */
 export function StaffSignInEndedNotice({ marker }: { marker: string }) {
-  const [dismissed, setDismissed] = useState(false);
-  const seenBefore = useSyncExternalStore(noSubscribe, () => wasSeenBefore(marker), () => false);
+  const [, setTick] = useState(0);
+  const visible = useSyncExternalStore(noSubscribe, () => isNoticeVisible(browserStorage(), marker), () => true);
   useEffect(() => {
     recordNoticeSeen(browserStorage(), marker);
   }, [marker]);
-  if (dismissed || seenBefore) return null;
+  if (!visible) return null;
   return (
-    <div className={styles.notice} role="status">
-      <p className={styles.text}>
-        {STAFF_SIGN_IN_ENDED_TEXT}{" "}
-        <Link className={styles.link} href={STAFF_SIGN_IN_HREF}>Staff sign-in</Link>
-      </p>
-      <button className={`secondary-button ${styles.dismiss}`} type="button" aria-label="Dismiss the staff sign-in notice" onClick={() => setDismissed(true)}>
-        Dismiss
-      </button>
+    <div className={styles.wrap}>
+      <div className={`attendee-ov-notice ${styles.notice}`} role="status">
+        <Info size={20} aria-hidden="true" />
+        <div>
+          <p>
+            {STAFF_SIGN_IN_ENDED_TEXT}{" "}
+            <Link className={`empty-state-link ${styles.link}`} href={STAFF_SIGN_IN_HREF}>Staff sign-in</Link>
+          </p>
+        </div>
+        <button
+          className={`secondary-button ${styles.dismiss}`}
+          type="button"
+          aria-label="Dismiss the staff sign-in notice"
+          onClick={() => {
+            dismissNotice(browserStorage(), marker);
+            setTick((tick) => tick + 1);
+            // The button is about to disappear: hand focus to the page's main heading.
+            const heading = document.querySelector<HTMLElement>("main h1");
+            if (heading) {
+              heading.setAttribute("tabindex", "-1");
+              heading.focus();
+            }
+          }}
+        >
+          Dismiss
+        </button>
+      </div>
     </div>
   );
 }

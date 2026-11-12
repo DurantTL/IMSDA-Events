@@ -127,11 +127,11 @@ export default async function AttendeeAccountOverviewPage() {
         <p>Here are your event plans and anything you need to finish.</p>
       </AccountPageBanner>
 
-      {staffEndedMarker && <StaffSignInEndedNotice marker={staffEndedMarker} />}
       {invites.length > 0 && <ClubInviteAccept invites={invites} fill="first" />}
       {areaInvites.length > 0 && <AreaCoordinatorInviteAccept invites={areaInvites} fill={invites.length > 0 ? "none" : "first"} />}
       {instructorInvites.length > 0 && <InstructorInviteAccept invites={instructorInvites} fill={invites.length > 0 || areaInvites.length > 0 ? "none" : "first"} />}
 
+      {staffEndedMarker && <StaffSignInEndedNotice marker={staffEndedMarker} />}
       <div className="attendee-ov-layout">
         <div className="attendee-ov-main">
           <section aria-labelledby="attendee-ov-upcoming">
