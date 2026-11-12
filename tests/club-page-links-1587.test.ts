@@ -103,7 +103,7 @@ describe("the This club cards (#1587)", () => {
     expect(statuses({ admins: 0 })["Club admins"]).toEqual({ tone: "warn", text: "No admins" });
     expect(statuses({ admins: 1 })["Club admins"]).toEqual({ tone: "ok", text: "1 admin" });
     expect(statuses({ admins: 3 })["Club admins"]).toEqual({ tone: "ok", text: "3 admins" });
-    expect(statuses({ honors: 0 })["Honors"]).toEqual({ tone: "draft", text: "None this year" });
+    expect(statuses({ honors: 0 })["Honors"]).toEqual({ tone: "draft", text: "None earned" });
     expect(statuses({ honors: 1 })["Honors"]).toEqual({ tone: "ok", text: "1 honor" });
     expect(statuses({ honors: 7 })["Honors"]).toEqual({ tone: "ok", text: "7 honors" });
     expect(statuses({ records: { missing: 2, submitted: 5 } })["Monthly Records"]).toEqual({ tone: "warn", text: "2 missing" });

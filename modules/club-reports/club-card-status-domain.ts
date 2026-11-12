@@ -23,7 +23,7 @@ export function profileStatus(club: { isActive: boolean; hasChurch: boolean }): 
 }
 
 export function honorsStatus(count: number): CardStatus {
-  return count > 0 ? { tone: "ok", text: plural(count, "honor", "honors") } : { tone: "draft", text: "None this year" };
+  return count > 0 ? { tone: "ok", text: plural(count, "honor", "honors") } : { tone: "draft", text: "None earned" };
 }
 
 export function recordsStatus(records: { missing: number; submitted: number }): CardStatus {
