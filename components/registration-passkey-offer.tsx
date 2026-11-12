@@ -53,7 +53,7 @@ export function RegistrationPasskeyOffer({ eligible, embedded = false }: { eligi
 
   return (
     <section className={styles.offer} aria-labelledby="registration-passkey-offer-title">
-      <h3 id="registration-passkey-offer-title">Add a passkey for faster sign-in</h3>
+      <h2 id="registration-passkey-offer-title">Add a passkey for faster sign-in</h2>
       <p>Next time, sign in with your fingerprint, face or screen lock instead of typing a code.</p>
       <div className={styles.actions}>
         {embedded ? (

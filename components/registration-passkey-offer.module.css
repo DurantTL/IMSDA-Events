@@ -8,8 +8,9 @@
   text-align: left;
 }
 
-.offer h3 {
+.offer h2 {
   margin: 0;
+  font-weight: 700;
   font-size: var(--text-helper-min);
 }
 
