@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { adminBackLink } from "@/components/admin-section-nav";
-import { ChurchClubPrintButton, ChurchClubSummaryView, ChurchClubYearPicker } from "@/components/church-club-summary";
+import { BackLink } from "@/components/back-link";
+import { ChurchClubPrintButton, ChurchClubSummaryView, ChurchClubNoPrint } from "@/components/church-club-summary";
 import { DetailPage } from "@/components/page-templates/detail-page";
 import { activeAdminSection } from "@/modules/access/admin-section";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -35,19 +36,19 @@ export default async function StaffChurchClubSummaryPage({
   const { summary } = result;
   const path = `/admin/organizations/${organizationId}/church-clubs`;
   const section = await activeAdminSection(user, path);
-  const yearHref = (year: string) => (year === view.currentClubYear ? path : `${path}?year=${encodeURIComponent(year)}`);
+  const back = section ? adminBackLink(section, path) : null;
   return (
     <>
+      {/* One club-year control: the Clubs shell's year picker, which keeps this page and reads ?year= here. */}
       <AdminPageHeader back={null} path={path} year={view.clubYear} />
+      {back && <ChurchClubNoPrint><BackLink href={back.href} variant="staff">{back.label}</BackLink></ChurchClubNoPrint>}
       <DetailPage
         header={{
           title: "Church club summary",
-          description: <>For <span translate="no">{summary.church.name}</span>, club year {summary.clubYear}. View only.</>,
-          back: (section ? adminBackLink(section, path) : null) ?? undefined,
+          description: <ChurchClubNoPrint>For <span translate="no">{summary.church.name}</span>, club year {summary.clubYear}. View only.</ChurchClubNoPrint>,
           secondary: <ChurchClubPrintButton />,
         }}
       >
-        <ChurchClubYearPicker currentClubYear={view.currentClubYear} current={view.clubYear} hrefFor={yearHref} years={view.choices} />
         <ChurchClubSummaryView summary={summary} />
       </DetailPage>
     </>

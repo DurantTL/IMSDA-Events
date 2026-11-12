@@ -15,7 +15,8 @@ import { directorGrantIsActive } from "@/modules/organizations/director-grants-d
  * leader display names and roles (no account email), counts from grouped queries (no roster rows), event names and dates,
  * and Monthly Record statuses. Returns null when the organization is not a church.
  */
-export async function getChurchClubSummary(churchId: string, clubYear: string, now = new Date()): Promise<ChurchClubSummary | null> {
+/** Reached only through `loadChurchClubSummary`, which holds the access gate; do not export or call it from a page. */
+async function getChurchClubSummary(churchId: string, clubYear: string, now = new Date()): Promise<ChurchClubSummary | null> {
   const prisma = getPrisma();
   const church = await prisma.organization.findUnique({ where: { id: churchId }, select: { id: true, name: true, type: true } });
   if (!church || church.type !== "CHURCH") return null;

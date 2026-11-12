@@ -189,7 +189,7 @@ describe("what the summary holds", () => {
     const result = await loadChurchClubSummary(admin, "church-1", "2026-27", now);
     if (result.kind !== "ok") throw new Error("expected ok");
     const html = renderToStaticMarkup(createElement(ChurchClubSummaryView, { summary: result.summary }));
-    for (const text of ["Alpha Adventurers", "Dana Director (Director)", "9 active, 2 adults and staff", "Fall Camporee, Oct 17, 2026"]) expect(html).toContain(text);
+    for (const text of ["Alpha Adventurers", "Dana Director (Director)", "9 members (2 adults and staff)", "Fall Camporee, Oct 17, 2026"]) expect(html).toContain(text);
     expect(html).not.toMatch(/@|birth|health|guardian/i);
   });
 });

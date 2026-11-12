@@ -1,6 +1,6 @@
-/* Church club summary (#1711): staff read-only, and it prints on one page. */
-.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.printButtonNote { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+/* Church club summary (#1711): staff read-only, and it prints on one landscape letter page. */
+.sheet { display: grid; gap: 12px; }
+.printOnly { display: none; }
 .clubs { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
 .club { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); padding: 14px 16px; break-inside: avoid; }
 .clubName { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); font-weight: 800; overflow-wrap: anywhere; }
@@ -10,8 +10,8 @@
 .facts dd { margin: 0; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
 .plain { margin: 0; padding: 0; list-style: none; }
 .none { color: var(--muted); }
-.monthsHeading { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-.months { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.75rem, 1fr)); gap: 4px; margin: 0; padding: 0; list-style: none; }
+/* Three across on a phone, six on a tablet, all twelve in one row on a wide screen: August never wraps alone. */
+.months { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 0; list-style: none; }
 .month { display: grid; gap: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.3; }
 .monthName { color: var(--muted); }
 .monthStatus { color: var(--ink); font-weight: 700; }
@@ -20,16 +20,31 @@
 .due { background: var(--imsda-gold-soft); }
 .future .monthStatus { color: var(--muted); font-weight: 400; }
 .empty { margin: 0; border: 1px dashed var(--line); border-radius: var(--radius-card); padding: 14px 16px; color: var(--muted); }
-.years { display: flex; flex-wrap: wrap; gap: 8px; }
-.years a { min-height: 44px; }
 
-@page { size: landscape; margin: 0.4in; }
+@media (min-width: 640px) {
+  .months { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1180px) {
+  .months { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+}
+
+/* A named page, so only this sheet prints landscape (an unnamed @page would apply to every page once loaded). */
+@page churchClubs { size: letter landscape; margin: 0.4in; }
 
 @media print {
   .noPrint { display: none !important; }
-  .clubs { gap: 6px; }
-  .club { gap: 4px; padding: 6px 8px; border-radius: 0; border-color: var(--muted); }
-  .facts { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px 12px; }
-  .months { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 2px; }
-  .month { padding: 1px 3px; border-radius: 0; }
+  /* Print sizes are set once here, in points, so the sheet fits one page. */
+  .sheet { --print-title: 9pt; --print-text: 7.5pt; page: churchClubs; gap: 3pt; }
+  .printOnly { display: block; margin: 0; font-size: var(--print-title); font-weight: 700; }
+  .clubs { gap: 3pt; }
+  .club { gap: 2pt; padding: 3pt 5pt; border-radius: 0; border-color: var(--muted); }
+  .clubName { font-size: var(--print-title); line-height: 1.2; }
+  .facts { grid-template-columns: 1.2fr 0.8fr 1.4fr 0.9fr; gap: 0 8pt; }
+  .facts dt, .facts dd, .month { font-size: var(--print-text); line-height: 1.2; }
+  .inlineList li { display: inline; }
+  .inlineList li:not(:last-child)::after { content: "; "; }
+  .eventList { columns: 2; column-gap: 8pt; }
+  .months { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 1pt; }
+  .month { padding: 0 2pt; border-radius: 0; }
 }

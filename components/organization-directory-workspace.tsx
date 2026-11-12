@@ -430,10 +430,10 @@ export function OrganizationDirectoryWorkspace({
                     {organization.type === "CHURCH" && (
                       <li>
                         <Link
-                          aria-label={`Club summary for ${organization.name}`}
+                          aria-label={`Church club summary for ${organization.name}`}
                           href={`/admin/organizations/${organization.id}/church-clubs`}
                         >
-                          <Eye aria-hidden="true" size={14} /> Club summary
+                          <Eye aria-hidden="true" size={14} /> Church club summary
                         </Link>
                       </li>
                     )}
