@@ -57,7 +57,7 @@ describe("Baptism follow-up is an optional, off-by-default event module (#1680)"
   });
 
   it("is turned on only by the existing system administrator module service, and the migration writes no module row", () => {
-    const migration = readFileSync("prisma/migrations/20270136100000_baptism_follow_up/migration.sql", "utf8").replace(/^--.*$/gm, "");
+    const migration = readFileSync("prisma/migrations/20270141100000_baptism_follow_up/migration.sql", "utf8").replace(/^--.*$/gm, "");
     expect(migration).not.toContain('"EventModule"');
     expect(migration).not.toMatch(/^\s*(INSERT|UPDATE|DELETE|DROP)\b/im);
   });
