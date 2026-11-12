@@ -1,0 +1,12 @@
+/* Download event archive on Event settings (#175). */
+.help {
+  margin: 4px 0 12px;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}

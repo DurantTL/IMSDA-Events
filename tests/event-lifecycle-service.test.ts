@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const dependencies = vi.hoisted(() => ({ getPrisma: vi.fn() }));
+const dependencies = vi.hoisted(() => ({ getPrisma: vi.fn(), keepPublished: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: dependencies.getPrisma }));
+vi.mock("@/modules/events/image-library", () => ({ keepPublishedHeaderImagesForEvent: dependencies.keepPublished }));
 
 import { EventLifecycleError, getEventLifecycle, transitionEventLifecycle } from "@/modules/events/lifecycle-repository";
 import { EventOperationError } from "@/modules/events/operation-error";
@@ -73,6 +74,16 @@ const now = new Date("2027-07-01T12:00:00.000Z");
 beforeEach(() => vi.clearAllMocks());
 
 describe("transitionEventLifecycle (#156)", () => {
+  it("keeps the published banner in the image library after a move into a public state, not otherwise (#1913)", async () => {
+    mockPrisma(row({ lifecycleState: "TEST" }));
+    await transitionEventLifecycle({ eventId: "event-1", toState: "PUBLISHED", expectedFromState: "TEST", actor: configure, now });
+    expect(dependencies.keepPublished).toHaveBeenCalledWith("event-1");
+    dependencies.keepPublished.mockClear();
+    mockPrisma(row({ isPublished: true, lifecycleState: "PUBLISHED" }));
+    await transitionEventLifecycle({ eventId: "event-1", toState: "DRAFT", actor: configure, now });
+    expect(dependencies.keepPublished).not.toHaveBeenCalled();
+  });
+
   it("locks the row, then moves state and isPublished together, then writes history and audit", async () => {
     const { tx, order } = mockPrisma(row({ lifecycleState: "TEST" }));
     const result = await transitionEventLifecycle({ eventId: "event-1", toState: "PUBLISHED", expectedFromState: "TEST", actor: configure, reason: " go live ", now });
