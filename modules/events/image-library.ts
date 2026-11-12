@@ -119,17 +119,15 @@ const recordSelect = {
 type RecordRow = Prisma.EventImageLibraryImageGetPayload<{ select: typeof recordSelect }>;
 
 /** Decides which using events' titles a viewer may see (event ids are the ones the viewer can configure). */
-export type LibraryViewer = { canConfigureEvent: (eventId: string) => Promise<boolean> };
+export type LibraryViewer = {
+  /** The subset of these event ids the viewer can configure, looked up once per list call. */
+  configurableEventIds: (eventIds: string[]) => Promise<Set<string>>;
+};
 
-async function toRecord(eventId: string, row: RecordRow, viewer?: LibraryViewer): Promise<ImageLibraryRecord> {
+function toRecord(eventId: string, row: RecordRow, configurable: Set<string>): ImageLibraryRecord {
   const events = new Map<string, string>();
   for (const copy of row.copies) events.set(copy.event.id, copy.event.name);
-  const eventTitles: string[] = [];
-  if (viewer) {
-    for (const [id, name] of events) {
-      if (await viewer.canConfigureEvent(id)) eventTitles.push(name);
-    }
-  }
+  const eventTitles = [...events].filter(([id]) => configurable.has(id)).map(([, name]) => name);
   return {
     id: row.id,
     displayName: row.displayName,
@@ -144,6 +142,12 @@ async function toRecord(eventId: string, row: RecordRow, viewer?: LibraryViewer)
     usage: { eventCount: events.size, eventTitles },
     url: libraryFileUrl(eventId, row.id),
   };
+}
+
+async function configurableFor(rows: RecordRow[], viewer?: LibraryViewer) {
+  if (!viewer) return new Set<string>();
+  const ids = [...new Set(rows.flatMap((row) => row.copies.map((copy) => copy.event.id)))];
+  return ids.length > 0 ? viewer.configurableEventIds(ids) : new Set<string>();
 }
 
 export async function listLibraryImages(
@@ -182,7 +186,8 @@ export async function listLibraryImages(
     take: LIST_LIMIT,
     select: recordSelect,
   });
-  return Promise.all(rows.map((row) => toRecord(eventId, row, viewer)));
+  const configurable = await configurableFor(rows, viewer);
+  return rows.map((row) => toRecord(eventId, row, configurable));
 }
 
 /** Every tag in use, for the picker's tag filter. */
@@ -196,7 +201,7 @@ export async function listLibraryTags(): Promise<string[]> {
 
 export async function getLibraryImageRecord(eventId: string, imageId: string, viewer?: LibraryViewer) {
   const row = await getPrisma().eventImageLibraryImage.findUnique({ where: { id: imageId }, select: recordSelect });
-  return row ? toRecord(eventId, row, viewer) : null;
+  return row ? toRecord(eventId, row, await configurableFor([row], viewer)) : null;
 }
 
 /** The stored file, for the staff-only preview route. */
@@ -233,6 +238,16 @@ type SourceEvent = { id: string; name: string; startsAt: Date };
 
 async function loadSourceEvent(eventId: string): Promise<SourceEvent | null> {
   return getPrisma().event.findUnique({ where: { id: eventId }, select: { id: true, name: true, startsAt: true } });
+}
+
+/** An upload records its event's title and start only when that event is published and not archived (#1913). */
+async function loadPublishedSourceEvent(eventId: string): Promise<SourceEvent | null> {
+  const event = await getPrisma().event.findUnique({
+    where: { id: eventId },
+    select: { id: true, name: true, startsAt: true, isPublished: true, archivedAt: true },
+  });
+  if (!event || !event.isPublished || event.archivedAt) return null;
+  return { id: event.id, name: event.name, startsAt: event.startsAt };
 }
 
 type StoreInput = {
@@ -296,7 +311,7 @@ export async function addUploadToLibrary(
     checksum,
     displayName: safeDisplayName(file.name, type),
     altText: options.altText ?? "",
-    source: await loadSourceEvent(eventId),
+    source: await loadPublishedSourceEvent(eventId),
     createdByUserId: actorUserId,
   });
 }

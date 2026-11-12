@@ -43,7 +43,14 @@ function LibraryCard({
   onChanged: () => void;
   onError: (message: string) => void;
 }) {
-  const [tagText, setTagText] = useState(image.tags.join(", "));
+  const savedTags = image.tags.join(", ");
+  const [tagText, setTagText] = useState(savedTags);
+  const [seenTags, setSeenTags] = useState(savedTags);
+  // The saved tags changed (after Save tags, or a reload): show them. The card itself stays mounted, so the message stays.
+  if (seenTags !== savedTags) {
+    setSeenTags(savedTags);
+    setTagText(savedTags);
+  }
   const [saving, setSaving] = useState<"" | "tags" | "retired">("");
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
@@ -206,8 +213,7 @@ export function EventImageLibraryPicker({
         <h3 className={styles.title}>Image library</h3>
         <button type="button" className="secondary-button" onClick={onClose}>Close library</button>
       </div>
-      <div className={styles.filters}>
-        <div>
+      <div>
           <label className="search-field">
             <Search aria-hidden="true" size={18} />
             <span className="sr-only">Search images by event name, file name or tag</span>
@@ -215,7 +221,8 @@ export function EventImageLibraryPicker({
             <SearchClearButton onClear={() => search.setValue("")} visible={search.value !== ""} />
           </label>
           <SearchResultStatus message={loading ? "" : `${images.length} ${images.length === 1 ? "image" : "images"} listed.`} />
-        </div>
+      </div>
+      <div className={styles.filters}>
         <label>
           Tag
           <select value={tag} onChange={(event) => setTag(event.target.value)}>
@@ -249,7 +256,7 @@ export function EventImageLibraryPicker({
       <ul className={styles.grid}>
         {images.map((image) => (
           <LibraryCard
-            key={`${image.id}-${image.tags.join("|")}-${image.retired}`}
+            key={image.id}
             eventId={eventId}
             image={image}
             busy={busy}

@@ -135,7 +135,7 @@ describe("image library routes for an event editor", () => {
     expect(response.status).toBe(200);
     expect(dependencies.listLibraryImages).toHaveBeenCalledWith(eventId, expect.objectContaining({
       q: "camp", tag: "forest", year: 2026, includeRetired: true,
-    }), expect.objectContaining({ canConfigureEvent: expect.any(Function) }));
+    }), expect.objectContaining({ configurableEventIds: expect.any(Function) }));
     expect(await response.json()).toEqual({ images: [], tags: ["forest"] });
   });
 

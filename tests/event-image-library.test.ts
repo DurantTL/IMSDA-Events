@@ -144,6 +144,17 @@ describe("adding an upload to the library", () => {
     expect(db.library).toHaveLength(0);
   });
 
+  it("records no source title or date for an unpublished or archived event", async () => {
+    const db = fakeDatabase();
+    await addUploadToLibrary(file(PNG, "image/png"), "usr_1", "event_draft");
+    expect(db.library[0]).toMatchObject({ sourceEventId: null, sourceEventTitle: "", sourceEventStartsAt: null });
+    (db.client.event.findUnique as unknown as { mockResolvedValueOnce: (v: unknown) => void }).mockResolvedValueOnce({
+      id: "event_a", name: "Camporee 2026", startsAt: new Date(), isPublished: true, archivedAt: new Date(),
+    });
+    await addUploadToLibrary(file(PNG_2, "image/png"), "usr_1", "event_a");
+    expect(db.library[1]).toMatchObject({ sourceEventId: null, sourceEventTitle: "" });
+  });
+
   it("stores its own copy with the event's title and start, and does not add the same bytes twice", async () => {
     const db = fakeDatabase();
     const first = await addUploadToLibrary(file(PNG, "image/png"), "usr_1", "event_a");
@@ -175,10 +186,10 @@ describe("using a library image in an event", () => {
     // A copy nothing shows is not "used".
     expect((await listLibraryImages("event_b"))[0].usage).toEqual({ eventCount: 0, eventTitles: [] });
     db.shown.add(first.assetId);
-    const all = { canConfigureEvent: async () => true };
+    const all = { configurableEventIds: async (ids: string[]) => new Set(ids) };
     expect((await listLibraryImages("event_b", {}, all))[0].usage).toEqual({ eventCount: 1, eventTitles: ["Retreat 2027"] });
     // A viewer who cannot configure that event sees the count but not its title.
-    const none = { canConfigureEvent: async () => false };
+    const none = { configurableEventIds: async () => new Set<string>() };
     expect((await listLibraryImages("event_a", {}, none))[0].usage).toEqual({ eventCount: 1, eventTitles: [] });
   });
 

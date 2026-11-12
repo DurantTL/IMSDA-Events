@@ -35,10 +35,15 @@ export function imageLibraryApiError(error: unknown, operation: string) {
 /** Which events' titles this viewer may see in "where it is used": the ones they can configure (system admins: all). */
 export function libraryViewer(access: Awaited<ReturnType<typeof authorizeImageLibrary>>): LibraryViewer {
   return {
-    canConfigureEvent: async (eventId) => {
-      if (access.user.globalRole === "SYSTEM_ADMIN") return true;
-      const membership = await findActiveMembership(access.user.id, eventId);
-      return membership?.status === "ACTIVE" && effectivePermissions(access.user, membership).includes("CONFIGURE_EVENT");
+    configurableEventIds: async (eventIds) => {
+      if (access.user.globalRole === "SYSTEM_ADMIN") return new Set(eventIds);
+      // One lookup per event id, run together, with the same membership and permission rules as every route.
+      const checks = await Promise.all(eventIds.map(async (eventId) => {
+        const membership = await findActiveMembership(access.user.id, eventId);
+        const allowed = membership?.status === "ACTIVE" && effectivePermissions(access.user, membership).includes("CONFIGURE_EVENT");
+        return allowed ? eventId : null;
+      }));
+      return new Set(checks.filter((id): id is string => id !== null));
     },
   };
 }
