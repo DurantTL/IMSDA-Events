@@ -98,6 +98,8 @@ import {
 } from "@/modules/events/settings-layout";
 import styles from "@/components/public-page-overview.module.css";
 import readinessStyles from "@/components/event-settings-readiness.module.css";
+import archiveStyles from "@/components/event-archive-download.module.css";
+import { ExportLink } from "@/components/export-link";
 
 type EventSettingsWorkspaceProps = {
   mode: "create" | "edit";
@@ -113,6 +115,8 @@ type EventSettingsWorkspaceProps = {
   calendarPrefill?: CalendarPrefill;
   /** Whether to offer Archive / Unarchive: system administrators and the event's Event Admin (#635). The server decides again. */
   canArchiveEvent?: boolean;
+  /** Whether to offer Download event archive (#175): the event is closed or archived and the viewer can view reports or manage finance. The server decides again. */
+  canDownloadEventArchive?: boolean;
   /** Edit mode: the Platform settings defaults a new event is seeded from, to label timezone and edit verification (#1258). */
   platformDefaults?: EventPlatformDefaults;
   /** Edit mode: the event's email sender against the central one, to label display name and reply-to (#1258). */
@@ -251,6 +255,7 @@ export function EventSettingsWorkspace({
   canOpenPlatformSettings = false,
   calendarPrefill,
   canArchiveEvent = false,
+  canDownloadEventArchive = false,
   platformDefaults,
   emailSender,
 }: EventSettingsWorkspaceProps) {
@@ -1372,6 +1377,14 @@ export function EventSettingsWorkspace({
               ) : (
                 <p>Publish the event and at least one registration form to unlock its public link and website embed code.</p>
               )}
+            </section>
+          )}
+
+          {mode === "edit" && initialEvent && canDownloadEventArchive && (
+            <section className="panel" aria-labelledby="event-archive-download-heading">
+              <h2 id="event-archive-download-heading">Event archive</h2>
+              <p className={archiveStyles.help}>One zip of this event&rsquo;s exports you can already download, with a contents page. Health records are never included.</p>
+              <ExportLink className={`secondary-button ${archiveStyles.link}`} href={`/api/events/${encodeURIComponent(initialEvent.id)}/exports/event-archive`}>Download event archive</ExportLink>
             </section>
           )}
 
