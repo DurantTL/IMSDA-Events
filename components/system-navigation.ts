@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   HeartPulse,
   Church,
+  GraduationCap,
   ClipboardList,
   ClipboardPen,
   CloudCog,
@@ -96,6 +97,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
       { href: "/admin/clubs/applications", label: "New club applications", description: "Applications waiting for review.", icon: UserPlus },
       { href: "/admin/clubs/leaders", label: "Club leaders", description: "Every current Director, Deputy, Registrar and Reporter across clubs, and the invites still waiting.", icon: Users, alsoActiveFor: ["/admin/clubs/invites"] },
       { href: "/admin/clubs/transfers", label: "Club member transfers", description: "Members moving from one club to another.", icon: ArrowRightLeft },
+      { href: "/admin/youth", label: "Youth directory", description: "Every active youth on a club roster by grade, school type and club, with counts and a CSV export.", icon: GraduationCap },
     ],
   },
   {
@@ -241,6 +243,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/clubs\/reports(\/|$)/, "Review monthly records"],
   [/^\/admin\/clubs\/summary(\/|$)/, "Club summary"],
   [/^\/admin\/clubs\/transfers(\/|$)/, "Club member transfers"],
+  [/^\/admin\/youth(\/|$)/, "Youth directory"],
   [/^\/admin\/forms(\/|$)/, "All forms"],
   [/^\/admin\/form-templates\/[^/]+(\/|$)/, "Form template"],
   [/^\/admin\/form-templates(\/|$)/, "Form templates"],

@@ -220,7 +220,8 @@ const hubDefs: Record<HubKey, HubDef> = {
     stats: clubStats,
     actions: [{ href: "/admin/clubs/applications", label: "Review applications", gate: hubGates.clubs, metric: "applicationsWaiting" }],
     groups: [
-      { title: "Directory", cards: [clubCards.clubsAndChurches, clubCards.summary, clubCards.leaders] },
+      // The Youth directory (#1685) is for system administrators and Youth Admins; a Clubs Administrator without that grant never sees the card.
+      { title: "Directory", cards: [clubCards.clubsAndChurches, clubCards.summary, clubCards.leaders, { href: "/admin/youth", gate: hubGates.system }] },
       { title: "Records", cards: [clubCards.records] },
       { title: "Changes", cards: [clubCards.applications, clubCards.transfers] },
     ],
