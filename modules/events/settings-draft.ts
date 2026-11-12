@@ -18,6 +18,7 @@ export function draftFromEvent(event: EventSettingsRecord | null): EventSettings
     timezone: (event?.timezone as EventSettingsInput["timezone"] | undefined)
       ?? "America/Chicago",
     location: event?.location ?? null,
+    mapSiteOrganizationId: event?.mapSiteOrganizationId ?? null,
     capacity: event?.capacity ?? null,
     publicInfoUrl: event?.publicInfoUrl ?? null,
     supportContact: event?.supportContact ?? null,
@@ -61,6 +62,7 @@ export function eventSettingsRequestBody(draft: EventSettingsInput) {
   return {
     ...draft,
     location: draft.location || null,
+    mapSiteOrganizationId: draft.mapSiteOrganizationId || null,
     publicInfoUrl: draft.publicInfoUrl || null,
     supportContact: draft.supportContact || null,
     tagline: draft.tagline || null,

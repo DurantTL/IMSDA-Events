@@ -18,8 +18,9 @@ const squareFontOrigins = [
   "https://d1g145x70srn7h.cloudfront.net",
 ].join(" ");
 
-// OpenStreetMap's tile server, for the public club map (#437) and the
-// church-location pin picker (#480) only.
+// OpenStreetMap's tile server, for the public club map (#437), the public
+// calendar's event map (#1212) and the church-location pin picker (#480) only.
+// /calendar means exactly that page, not /calendar/feed.ics or /embed/calendar.
 export const mapTileOrigin = "https://tile.openstreetmap.org";
 
 // The only origins a public event page's video or map block may frame (#816).
@@ -57,7 +58,7 @@ function pathPolicy(pathname: string, embedAllowedOrigins: string): PathPolicy {
 
   if (pathname === "/embed" || pathname.startsWith("/embed/")) {
     policy.frameAncestors = embedAllowedOrigins;
-  } else if (/^\/clubs\/?$/.test(pathname) || /^\/admin\/organizations\/[^/]+\/location\/?$/.test(pathname)) {
+  } else if (/^\/clubs\/?$/.test(pathname) || /^\/calendar\/?$/.test(pathname) || /^\/admin\/organizations\/[^/]+\/location\/?$/.test(pathname)) {
     policy.imageOrigins.push(mapTileOrigin);
   } else if (/^\/events\/[^/]+\/?$/.test(pathname)) {
     // Exactly the public event page: registration subpaths stay locked.

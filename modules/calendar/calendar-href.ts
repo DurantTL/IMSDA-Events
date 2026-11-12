@@ -28,3 +28,11 @@ export function calendarHref(params: CalendarHrefParams, hash?: string) {
   const query = search.toString();
   return `${query ? `/calendar?${query}` : "/calendar"}${hash ? `#${hash}` : ""}`;
 }
+
+/**
+ * Whether a link goes to the public calendar page (#1212). The calendar has its own Content-Security-Policy (it shows
+ * map tiles), which only a full page load picks up, so links into it from other pages render a plain `<a>`.
+ */
+export function isCalendarPagePath(href: string) {
+  return /^\/calendar\/?(?:[?#]|$)/.test(href);
+}

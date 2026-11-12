@@ -1951,6 +1951,9 @@ model Event {
   featured             Boolean            @default(false)
   featuredOrder        Int?
   featureUntil         String?
+  /// The host church or site whose map location is this event's pin on the public calendar map (#1212). Optional: an event without one is simply not on the map. The pin uses that organization's `ChurchLocation` coordinates.
+  mapSiteOrganizationId String?
+  mapSiteOrganization  Organization?      @relation("EventMapSite", fields: [mapSiteOrganizationId], references: [id], onDelete: SetNull)
   /// Short label for filtering the public calendar, e.g. "Youth" or "Camp meeting".
   calendarCategory     String?
   /// Set when staff archive the event (#635): hidden from pickers, default selection and every public page, and registration
@@ -2138,6 +2141,7 @@ model Event {
 
   @@index([badgeBackgroundAssetId])
   @@index([archivedAt])
+  @@index([mapSiteOrganizationId])
 }
 
 /// A feature turned on for one event (#741). A row means "enabled"; the
@@ -3038,6 +3042,8 @@ model Organization {
   meetingNotes       ClubMeetingNote[]
   yearStandings      ClubYearStanding[]
   churchLocation     ChurchLocation?
+  /// Events that use this church or site as their public map pin (#1212).
+  mapSiteEvents      Event[]            @relation("EventMapSite")
   churchGeocodeResult ChurchGeocodeResult?
   staffActAs         StaffActAs[]
   memberHonorEntries MemberHonorEntry[]

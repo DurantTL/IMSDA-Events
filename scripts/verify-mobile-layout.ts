@@ -230,6 +230,7 @@ const pages: PageSpec[] = [
   { name: "public-profile-sign-in", path: "/profile/sign-in", role: "visitor", signInPage: true },
   { name: "public-recover-registration", path: "/recover-registration", role: "visitor" },
   { name: "public-calendar", path: "/calendar", role: "visitor" },
+  { name: "public-calendar-upcoming", path: "/calendar?view=list", role: "visitor" },
   { name: "public-calendar-widget", path: "/embed/calendar?filter=everything&limit=12", role: "visitor" },
   { name: "public-calendar-year", path: "/calendar?view=year&filter=everything", role: "visitor" },
   { name: "public-calendar-year-day", path: "/calendar?view=year&year=2026&filter=everything&date=2026-10-10", role: "visitor" },

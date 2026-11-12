@@ -17,6 +17,7 @@ import { CalendarDatesConfirmation, CalendarLinkBanner } from "@/components/cale
 import { getCalendarLinkNotice } from "@/modules/calendar/event-links";
 import { decideEventArchiveAccess } from "@/modules/events/archive";
 import { findEventArchiveFacts } from "@/modules/events/archive-download-facts";
+import { listMapSiteOptions } from "@/modules/events/map-site";
 import { getEventSettings } from "@/modules/events/repository";
 import { eventAllowsArchiveDownload } from "@/modules/reporting/event-archive";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -42,7 +43,7 @@ export default async function EventSettingsPage({
     );
   }
   const { user } = await getCurrentSession();
-  const [settings, archiveFacts, locations, coordinators, teamSettings, generalLink, linkNotice, platform, emailSettings] = await Promise.all([getEventSettings(event.id), findEventArchiveFacts(event.id), listEventLocations(event.id), listActiveAreaCoordinators(), getTeamSettings(event.id), getGeneralLinkSettings(event.id), getCalendarLinkNotice(event.id), getPlatformSettings(), loadEventEmailSettings(getPrisma(), event.id)]);
+  const [settings, archiveFacts, locations, coordinators, teamSettings, generalLink, linkNotice, platform, emailSettings, mapSiteOptions] = await Promise.all([getEventSettings(event.id), findEventArchiveFacts(event.id), listEventLocations(event.id), listActiveAreaCoordinators(), getTeamSettings(event.id), getGeneralLinkSettings(event.id), getCalendarLinkNotice(event.id), getPlatformSettings(), loadEventEmailSettings(getPrisma(), event.id), listMapSiteOptions()]);
   if (!settings) notFound();
   return (
     <>
@@ -50,7 +51,7 @@ export default async function EventSettingsPage({
       {linkNotice && <CalendarLinkBanner key={`calendar-link-${event.id}`} eventId={event.id} notice={linkNotice} />}
       {/* Keyed on the event's dates too: after Update from the calendar banner the form remounts with the new dates,
           so a later save can't write the old ones back (the server also refuses a save over a newer version). */}
-      <EventSettingsWorkspace key={`${event.id}:${settings.startsOn}:${settings.endsOn}`} mode="edit" initialEvent={settings} initialLocations={locations} areaCoordinators={coordinators} canDeleteEvent={user?.globalRole === "SYSTEM_ADMIN"} canOpenPlatformSettings={user?.globalRole === "SYSTEM_ADMIN"} canArchiveEvent={decideEventArchiveAccess({ globalRole: user?.globalRole, eventRole: membership?.role ?? null }).allowed}
+      <EventSettingsWorkspace key={`${event.id}:${settings.startsOn}:${settings.endsOn}`} mode="edit" initialEvent={settings} initialLocations={locations} mapSiteOptions={mapSiteOptions} areaCoordinators={coordinators} canDeleteEvent={user?.globalRole === "SYSTEM_ADMIN"} canOpenPlatformSettings={user?.globalRole === "SYSTEM_ADMIN"} canArchiveEvent={decideEventArchiveAccess({ globalRole: user?.globalRole, eventRole: membership?.role ?? null }).allowed}
         canDownloadEventArchive={Boolean(archiveFacts && eventAllowsArchiveDownload(archiveFacts) && (permissions.includes("VIEW_REPORTS") || permissions.includes("MANAGE_FINANCE")))}
         // Where each value comes from (#1258): the defaults a new event is seeded from, and the event's sender against the central one. Names and addresses only.
         platformDefaults={{ defaultTimezone: platform.defaultTimezone, defaultAttendeeEditPolicy: platform.defaultAttendeeEditPolicy }}

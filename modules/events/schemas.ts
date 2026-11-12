@@ -119,6 +119,8 @@ export const eventSettingsInputSchema = z.object({
   endTime: timeOfDaySchema.optional(),
   timezone: z.enum(eventTimeZones),
   location: nullableText(200),
+  /** The host church or site whose map location is the event's pin (#1212). Absent keeps the stored one; null (or blank) removes the pin. The server checks the organization exists and is active. */
+  mapSiteOrganizationId: z.string().trim().max(64).nullable().transform((value) => (value === "" ? null : value)).optional(),
   publicInfoUrl: publicInfoUrlSchema,
   supportContact: nullableText(200),
   // Public header and help (#651). Plain text only; absent on update keeps the stored value.
