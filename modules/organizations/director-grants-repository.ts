@@ -310,6 +310,9 @@ export async function grantClubTeamRole(
   let messageId: string | null = null;
   await serializable(async (tx) => {
     const club = await requireClub(tx, organizationId, { mustBeActive: true });
+    if (visitingClubPastWindow(club, now)) {
+      throw new OrganizationOperationError("VISITING_CLUB_PAST_WINDOW", VISITING_CLUB_PAST_WINDOW_MESSAGE);
+    }
     const existing = await tx.clubDirectorGrant.findMany({
       where: { organizationId, attendeeAccountId: accountId, revokedAt: null },
       select: { effectiveFrom: true, effectiveTo: true },

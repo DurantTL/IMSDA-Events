@@ -379,11 +379,12 @@ export async function createClubTeamInvite(
   const prisma = getPrisma();
   const club = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { id: true, name: true, type: true, isActive: true },
+    select: { id: true, name: true, type: true, isActive: true, guestEventId: true, guestEvent: { select: { endsAt: true } } },
   });
   if (!club || club.type !== "CLUB" || !club.isActive) {
     throw new ClubInviteError("INVITE_NOT_FOUND", "That club could not be found.");
   }
+  if (visitingClubPastWindow(club, now)) throw new ClubInviteError("INVITE_NOT_OPEN", VISITING_CLUB_PAST_WINDOW_MESSAGE);
   const email = input.email.trim().toLowerCase();
   // Scoped to club-assignable roles (#425): a pending staff import invite for the same
   // email (always DIRECTOR/DEPUTY) is a different thing and shouldn't invisibly block this.
@@ -545,10 +546,11 @@ export async function resendClubTeamInvite(organizationId: string, inviteId: str
       where: { id: inviteId, organizationId },
       select: {
         id: true, email: true, name: true, role: true, status: true, sentAt: true,
-        organization: { select: { name: true, isActive: true } },
+        organization: { select: { name: true, isActive: true, guestEventId: true, guestEvent: { select: { endsAt: true } } } },
       },
     });
     if (!invite || !invite.organization.isActive) throw new ClubInviteError("INVITE_NOT_FOUND", "That invite could not be found.");
+    if (visitingClubPastWindow(invite.organization, now)) throw new ClubInviteError("INVITE_NOT_OPEN", VISITING_CLUB_PAST_WINDOW_MESSAGE);
     if (!clubRoleIsAssignableByClub(invite.role)) {
       throw new ClubInviteError("INVITE_ROLE_NOT_ALLOWED", "Only conference staff can manage that invite.");
     }

@@ -15,6 +15,7 @@ const statusByCode: Record<VisitingClubErrorCode, number> = {
   ALREADY_DECIDED: 409,
   INVALID_REASON: 400,
   ACCOUNT_NOT_FOUND: 409,
+  EVENT_ENDED: 409,
 };
 
 const noStore = { "Cache-Control": "private, no-store, max-age=0" };

@@ -38,9 +38,11 @@ export const VISITING_CLUB_ACCESS_DAYS_AFTER_EVENT = 30;
 /** Shown when someone tries to give or accept a role on a visiting club after its window. */
 export const VISITING_CLUB_PAST_WINDOW_MESSAGE = "This visiting club's event ended more than 30 days ago, so its roles have ended.";
 
-/** Whether a club is a visiting club whose event ended more than 30 days ago. A conference club never is. */
+/** Whether a club is a visiting club whose event ended more than 30 days ago (or whose event was not loaded). A conference club never is. */
 export function visitingClubPastWindow(club: { guestEventId?: string | null; guestEvent?: { endsAt: Date } | null }, now: Date): boolean {
-  if (!club.guestEventId || !club.guestEvent) return false;
+  if (!club.guestEventId) return false;
+  // A visiting club whose event was not loaded cannot be shown to be inside the window, so it is refused.
+  if (!club.guestEvent) return true;
   return club.guestEvent.endsAt.getTime() < visitingClubAccessCutoff(now).getTime();
 }
 
