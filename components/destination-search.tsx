@@ -210,6 +210,8 @@ export function DestinationSearch<R extends { query: string } = StaffSearchResul
         hidden={!expanded}
         id={listId}
         role="listbox"
+        // A scrolling list is focusable in Chrome; Tab from the field would land on it, blur the field and close the panel.
+        tabIndex={-1}
       >
         {groups
           ? (open ? groups : []).map((group) => (

@@ -22,7 +22,6 @@ export type ClubSearchClub = {
 
 /** A roster member as the search shows them: a name, the club (only when the leader has more than one) and a link. Nothing else. */
 export type ClubSearchMember = {
-  id: string;
   name: string;
   club: string | null;
   href: string;

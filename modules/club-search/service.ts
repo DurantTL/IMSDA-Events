@@ -112,11 +112,11 @@ async function findMembers(openClubs: { organizationId: string; name: string }[]
     },
     orderBy: [{ person: { lastName: "asc" } }, { person: { firstName: "asc" } }, { id: "asc" }],
     take,
-    select: { id: true, organizationId: true, person: { select: { firstName: true, lastName: true } } },
+    select: { organizationId: true, person: { select: { firstName: true, lastName: true } } },
   });
   return rows.flatMap((row) => {
     if (!row.person) return [];
     const name = memberDisplayName(row.person);
-    return [{ id: row.id, name, club: labelClub ? names.get(row.organizationId) ?? null : null, href: clubRosterSearchHref(row.organizationId, name) }];
+    return [{ name, club: labelClub ? names.get(row.organizationId) ?? null : null, href: clubRosterSearchHref(row.organizationId, name) }];
   });
 }

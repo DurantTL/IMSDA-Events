@@ -1,9 +1,8 @@
-/* The club masthead search (#1854): a box between the brand and the account buttons; on a phone an icon button opens it on its own row. */
+/* The club masthead search (#1854): from 1200px a modest box between the brand and the account buttons, sized so a leader with several clubs (Switch club shown) keeps the masthead on one row; up to 1199px an icon button opens it on its own row. */
 .search {
   position: relative;
-  flex: 1 1 260px;
-  min-width: 0;
-  max-width: 420px;
+  flex: 0 1 200px;
+  min-width: 160px;
 }
 
 /* The header here is white, not the staff header's dark: the "nothing matches" line reads in the muted ink. */
@@ -53,12 +52,12 @@
   box-shadow: inset 0 -4px var(--imsda-gold);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 1199px) {
   .search {
     display: none;
   }
 
-  /* The open row sits right under the brand row and the icon button, full width; the account row follows it (club-portal-masthead-view.module.css). */
+  /* The open row is full width on a row of its own (right under the brand row on a phone, where the account row follows it: club-portal-masthead-view.module.css). */
   .search[data-open="true"] {
     display: block;
     order: 1;

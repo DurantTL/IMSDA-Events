@@ -34,7 +34,7 @@ function clubGroups(result: ClubSearchResult): RecordGroupView[] {
     badgeSpoken: "Club",
   }));
   const members: ResultEntry[] = result.members.items.map((member) => ({
-    key: `member:${member.id}`,
+    key: `member:${member.href}`,
     kind: "record",
     label: member.name,
     description: member.club ?? "",

@@ -62,3 +62,8 @@
     flex-basis: 100%;
   }
 }
+
+/* With the search in the row, the gaps between the brand, the search and the account buttons are tighter, so a leader with several clubs still fits one row at 1024px. */
+.withSearch {
+  column-gap: 8px;
+}

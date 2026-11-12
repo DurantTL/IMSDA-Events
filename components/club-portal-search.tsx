@@ -10,7 +10,7 @@ import styles from "@/components/club-portal-search.module.css";
 
 /**
  * The club portal masthead's search (#1854): the same combobox as the staff header, over this club's pages, the leader's
- * own clubs and the members the roster would show them. On a phone (640px and narrower) a search icon button opens it on
+ * own clubs and the members the roster would show them. On a phone (1199px and narrower) a search icon button opens it on
  * its own row under the masthead, as the staff header does (#1734); wider screens always show the box.
  */
 export function ClubPortalSearch({ pages }: { pages: readonly ClubSearchPage[] }) {
@@ -24,9 +24,9 @@ export function ClubPortalSearch({ pages }: { pages: readonly ClubSearchPage[] }
   const inputId = "club-portal-search-input";
   const wrapId = `${inputId}-wrap`;
 
-  // A window wider than the phone (where the box is always shown) closes the row too.
+  // A window wider than the toggle range (where the box is always shown) closes the row too.
   useEffect(() => {
-    const wide = window.matchMedia("(min-width: 641px)");
+    const wide = window.matchMedia("(min-width: 1200px)");
     const onChange = () => { if (wide.matches) setOpenPath(null); };
     wide.addEventListener("change", onChange);
     return () => wide.removeEventListener("change", onChange);

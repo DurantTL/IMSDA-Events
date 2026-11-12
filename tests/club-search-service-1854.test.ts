@@ -122,14 +122,14 @@ describe("searchClubPortal: club director", () => {
 
   it("holds only id, name, club label and href for a member", async () => {
     const result = await searchClubPortal(viewer, "lovelace", NOW);
-    expect(result.members.items).toEqual([{ id: "m1", name: "Ada Lovelace", club: null, href: "/account/clubs/org_alpha/roster?q=Ada+Lovelace" }]);
-    expect(Object.keys(result.members.items[0]).sort()).toEqual(["club", "href", "id", "name"]);
+    expect(result.members.items).toEqual([{ name: "Ada Lovelace", club: null, href: "/account/clubs/org_alpha/roster?q=Ada+Lovelace" }]);
+    expect(Object.keys(result.members.items[0]).sort()).toEqual(["club", "href", "name"]);
     expect(JSON.stringify(result)).not.toContain("sealed");
   });
 
   it("selects only the id and the first and last name from the database", async () => {
     await searchClubPortal(viewer, "ada", NOW);
-    expect(database.memberCalls[0].select).toEqual({ id: true, organizationId: true, person: { select: { firstName: true, lastName: true } } });
+    expect(database.memberCalls[0].select).toEqual({ organizationId: true, person: { select: { firstName: true, lastName: true } } });
   });
 
   it("finds the club by name or sponsoring church and links to its portal", async () => {
@@ -171,7 +171,7 @@ describe("searchClubPortal: more than one club", () => {
       ["Ada Lovelace", "Alpha Pathfinders"],
       ["Adam Smith", "Alpha Pathfinders"],
     ]);
-    expect(result.members.items.find((m) => m.id === "m5")?.href).toBe("/account/clubs/org_beta/roster?q=Ada+Betaclub");
+    expect(result.members.items.find((m) => m.name === "Ada Betaclub")?.href).toBe("/account/clubs/org_beta/roster?q=Ada+Betaclub");
     expect(result.members.seeAllHref).toBeNull();
   });
 
@@ -183,7 +183,7 @@ describe("searchClubPortal: more than one club", () => {
   it("gives a director's clubs only where that club's own gate is open", async () => {
     directed(ALPHA, club("org_beta", "Beta Adventurers", "REPORTER"));
     const result = await searchClubPortal(viewer, "ada", NOW);
-    expect(result.members.items.map((m) => m.id)).toEqual(["m1", "m2"]);
+    expect(result.members.items.map((m) => m.name)).toEqual(["Ada Lovelace", "Adam Smith"]);
     expect(database.memberCalls[0].where).toMatchObject({ organizationId: { in: ["org_alpha"] } });
     expect(result.clubs.items.map((c) => c.id)).toEqual([]);
   });
@@ -193,7 +193,7 @@ describe("searchClubPortal: deputy and registrar", () => {
   it("gives a deputy members and clubs", async () => {
     directed(club("org_alpha", "Alpha Pathfinders", "DEPUTY"));
     const result = await searchClubPortal(viewer, "ada", NOW);
-    expect(result.members.items.map((m) => m.id)).toEqual(["m1", "m2"]);
+    expect(result.members.items.map((m) => m.name)).toEqual(["Ada Lovelace", "Adam Smith"]);
     expect(result.clubs.items.map((c) => c.id)).toEqual([]);
     expect((await searchClubPortal(viewer, "alpha", NOW)).clubs.items.map((c) => c.id)).toEqual(["org_alpha"]);
   });
@@ -201,7 +201,7 @@ describe("searchClubPortal: deputy and registrar", () => {
   it("gives a registrar members, with no extra fields", async () => {
     directed(club("org_alpha", "Alpha Pathfinders", "REGISTRAR"));
     const result = await searchClubPortal(viewer, "lovelace", NOW);
-    expect(result.members.items.map((m) => Object.keys(m).sort())).toEqual([["club", "href", "id", "name"]]);
+    expect(result.members.items.map((m) => Object.keys(m).sort())).toEqual([["club", "href", "name"]]);
   });
 });
 
@@ -271,7 +271,7 @@ describe("searchClubPortal: staff acting as a club director", () => {
   it("searches only the act-as club, never another club the same browser's account directs", async () => {
     directed(ALPHA, BETA);
     const result = await searchClubPortal(acting, "ada", NOW);
-    expect(result.members.items.map((m) => m.id)).toEqual(["m1", "m2"]);
+    expect(result.members.items.map((m) => m.name)).toEqual(["Ada Lovelace", "Adam Smith"]);
     expect(database.memberCalls[0].where).toMatchObject({ organizationId: { in: ["org_alpha"] } });
     expect(mocks.listDirectedClubs).not.toHaveBeenCalled();
     expect((await searchClubPortal(acting, "beta", NOW)).clubs.items).toEqual([]);
@@ -298,5 +298,38 @@ describe("getClubSearchViewer", () => {
     mocks.currentStaffActingContext.mockResolvedValue({ userId: "usr_1", staffSessionId: "ss_1", actAsId: "act_2", role: "AREA_COORDINATOR", organizationId: null, expiresAt: NOW });
     mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
     expect(await getClubSearchViewer()).toBeNull();
+  });
+});
+
+describe("searchClubPortal: more access shapes", () => {
+  it("gives an Area Coordinator with their own attendee account and no club role nothing", async () => {
+    directed();
+    const result = await searchClubPortal(viewer, "a", NOW);
+    expect(result.clubs.items).toEqual([]);
+    expect(result.members.items).toEqual([]);
+    expect(database.memberCalls).toHaveLength(0);
+  });
+
+  it("gives a Clubs Administrator acting as director only the act-as club", async () => {
+    const acting = { kind: "ACTING", actAsId: "act_9", organizationId: "org_alpha" } as const;
+    mocks.currentStaffActingContext.mockResolvedValue({ userId: "usr_1", staffSessionId: "ss_1", actAsId: "act_9", role: "CLUB_DIRECTOR", organizationId: "org_alpha", viaClubsAdministrator: true, expiresAt: new Date(NOW.getTime() + 3_600_000) });
+    mocks.organization.mockResolvedValue({ type: "CLUB", isActive: true, name: "Alpha Pathfinders", parentOrganization: { name: "Synthville Church" } });
+    mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
+    directed(ALPHA, BETA);
+    const result = await searchClubPortal(acting, "ada", NOW);
+    expect(result.members.items.map((m) => m.name)).toEqual(["Ada Lovelace", "Adam Smith"]);
+    expect(database.memberCalls[0].where).toMatchObject({ organizationId: { in: ["org_alpha"] } });
+    expect((await searchClubPortal(acting, "beta", NOW)).clubs.items).toEqual([]);
+  });
+
+  it("gives an act-as on an inactive club nothing", async () => {
+    const acting = { kind: "ACTING", actAsId: "act_9", organizationId: "org_alpha" } as const;
+    mocks.currentStaffActingContext.mockResolvedValue({ userId: "usr_1", staffSessionId: "ss_1", actAsId: "act_9", role: "CLUB_DIRECTOR", organizationId: "org_alpha", expiresAt: new Date(NOW.getTime() + 3_600_000) });
+    mocks.organization.mockResolvedValue({ type: "CLUB", isActive: false, name: "Alpha Pathfinders", parentOrganization: null });
+    mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
+    const result = await searchClubPortal(acting, "a", NOW);
+    expect(result.clubs.items).toEqual([]);
+    expect(result.members.items).toEqual([]);
+    expect(database.memberCalls).toHaveLength(0);
   });
 });

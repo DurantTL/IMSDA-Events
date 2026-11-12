@@ -17,7 +17,7 @@ const pages = [
 const answer = {
   query: "ada",
   clubs: { items: [], more: false, seeAllHref: null },
-  members: { items: [{ id: "m1", name: "Ada Lovelace", club: null, href: "/account/clubs/o1/roster?q=Ada+Lovelace" }], more: true, seeAllHref: "/account/clubs/o1/roster?q=ada" },
+  members: { items: [{ name: "Ada Lovelace", club: null, href: "/account/clubs/o1/roster?q=Ada+Lovelace" }], more: true, seeAllHref: "/account/clubs/o1/roster?q=ada" },
 };
 
 let mounted: Mounted;
@@ -62,6 +62,20 @@ describe("ClubPortalSearch", () => {
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe("/api/attendee/club-search?q=ada");
     expect(options()).toEqual(["Ada Lovelace", "See all member results"]);
     expect([...mounted.container.querySelectorAll('[role="group"]')].map((group) => group.querySelector("span")?.textContent)).toEqual(["Members"]);
+  });
+
+  it("moves focus on to the next real control on Tab, never to the list", async () => {
+    const { createElement: h } = await import("react");
+    mounted = await mount(h("div", null, h(ClubPortalSearch, { pages }), h("button", { id: "after", type: "button" }, "After")));
+    await act(async () => { input().focus(); });
+    const list = mounted.container.querySelector('[role="listbox"]')!;
+    expect(list.getAttribute("tabindex")).toBe("-1");
+    // Tab order as a browser builds it: real controls and anything with a tabindex of 0 or more, in document order.
+    const tabbable = [...mounted.container.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input:not([disabled]), [tabindex]")].filter((el) => el.getAttribute("tabindex") !== "-1");
+    expect(tabbable).not.toContain(list);
+    const next = tabbable[tabbable.indexOf(input()) + 1];
+    expect(next).toBeDefined();
+    expect(["BUTTON", "A"]).toContain(next.tagName);
   });
 
   it("moves with the arrow keys and opens the active row with Enter", async () => {

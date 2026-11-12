@@ -15,7 +15,7 @@ function result(overrides: Partial<ClubSearchResult> = {}): ClubSearchResult {
   const base = emptyClubSearchResult("ada");
   base.clubs = { items: [{ id: "o1", name: "Alpha Pathfinders", sponsoringChurch: "Synthville Church", href: "/account/clubs/o1" }], more: false, seeAllHref: null };
   base.members = {
-    items: [{ id: "m1", name: "Ada Lovelace", club: "Alpha Pathfinders", href: "/account/clubs/o1/roster?q=Ada+Lovelace" }],
+    items: [{ name: "Ada Lovelace", club: "Alpha Pathfinders", href: "/account/clubs/o1/roster?q=Ada+Lovelace" }],
     more: true,
     seeAllHref: "/account/clubs/o1/roster?q=ada",
   };
@@ -73,9 +73,9 @@ describe("club search groups", () => {
 
   it("shows the club name beside a member only when the result carries one", () => {
     const typed = layout(true, result(), []);
-    expect(typed.entries.find((entry) => entry.key === "member:m1")?.description).toBe("Alpha Pathfinders");
-    const single = result({ members: { items: [{ id: "m2", name: "Adam Smith", club: null, href: "/x" }], more: false, seeAllHref: null } });
-    expect(layout(true, single, []).entries.find((entry) => entry.key === "member:m2")?.description).toBe("");
+    expect(typed.entries.find((entry) => entry.key === "member:/account/clubs/o1/roster?q=Ada+Lovelace")?.description).toBe("Alpha Pathfinders");
+    const single = result({ members: { items: [{ name: "Adam Smith", club: null, href: "/x" }], more: false, seeAllHref: null } });
+    expect(layout(true, single, []).entries.find((entry) => entry.key === "member:/x")?.description).toBe("");
   });
 
   it("offers See all only where a page takes the words (one club's roster)", () => {
