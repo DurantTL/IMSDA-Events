@@ -46,6 +46,13 @@ describe("saving a header banner (#1913)", () => {
     expect(dependencies.keepHeaderImageInLibrary).toHaveBeenCalledWith("event_1", "asset_hero", "Tents under tall pines");
   });
 
+  it("does not keep a banner that is still a draft section", async () => {
+    mockPrisma();
+    const draft = { ...heroInput.sections[0]!, isPublished: false } as EventContentInput["sections"][number];
+    await replaceEventContent("event_1", { sections: [draft] }, "user_1");
+    expect(dependencies.keepHeaderImageInLibrary).not.toHaveBeenCalled();
+  });
+
   it("does nothing for a page without a banner", async () => {
     mockPrisma();
     await replaceEventContent("event_1", {

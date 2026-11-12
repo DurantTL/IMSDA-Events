@@ -334,9 +334,9 @@ export async function replaceEventContent(
     }
     throw error;
   }
-  // Every header image is kept in the shared library (#1913). After the save has committed; never fails it.
+  // Every published header image is kept in the shared library (#1913). After the save has committed; never fails it.
   for (const entry of prepared) {
-    if (entry.section.kind !== "HERO") continue;
+    if (entry.section.kind !== "HERO" || !entry.section.isPublished) continue;
     const hero = entry.data as { assetId?: string; alt?: string } | null;
     if (hero?.assetId) await keepHeaderImageInLibrary(eventId, hero.assetId, hero.alt ?? "");
   }

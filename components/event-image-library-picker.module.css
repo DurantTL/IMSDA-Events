@@ -135,12 +135,6 @@
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
 
-.retiredBadge {
-  color: var(--coral);
-  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-  font-weight: 800;
-}
-
 .tagForm {
   display: grid;
   gap: 8px;
@@ -158,31 +152,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--touch-target, 44px);
-  border: 1px solid var(--imsda-navy);
-  border-radius: var(--radius-element);
-  background: var(--imsda-navy);
-  padding: 0 16px;
-  color: var(--card);
-  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.button.quiet {
-  background: transparent;
-  color: var(--imsda-navy);
-}
-
-.button:disabled {
-  cursor: var(--cursor-busy, not-allowed);
-  opacity: 0.6;
 }
 
 .message {

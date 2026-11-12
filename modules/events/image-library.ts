@@ -60,7 +60,7 @@ export type ImageLibraryRecord = {
   sourceEventStartsAt: string | null;
   createdAt: string;
   retired: boolean;
-  /** Events that hold a copy of this image. */
+  /** Events whose content blocks show a copy of this image. Titles only for events the viewer can configure. */
   usage: { eventCount: number; eventTitles: string[] };
   url: string;
 };
@@ -112,14 +112,24 @@ const recordSelect = {
   sourceEventStartsAt: true,
   createdAt: true,
   retiredAt: true,
-  copies: { select: { event: { select: { id: true, name: true } } } },
+  // Only copies a content block actually shows count as "used" (#1913).
+  copies: { where: { blockRefs: { some: {} } }, select: { event: { select: { id: true, name: true } } } },
 } as const;
 
 type RecordRow = Prisma.EventImageLibraryImageGetPayload<{ select: typeof recordSelect }>;
 
-function toRecord(eventId: string, row: RecordRow): ImageLibraryRecord {
+/** Decides which using events' titles a viewer may see (event ids are the ones the viewer can configure). */
+export type LibraryViewer = { canConfigureEvent: (eventId: string) => Promise<boolean> };
+
+async function toRecord(eventId: string, row: RecordRow, viewer?: LibraryViewer): Promise<ImageLibraryRecord> {
   const events = new Map<string, string>();
   for (const copy of row.copies) events.set(copy.event.id, copy.event.name);
+  const eventTitles: string[] = [];
+  if (viewer) {
+    for (const [id, name] of events) {
+      if (await viewer.canConfigureEvent(id)) eventTitles.push(name);
+    }
+  }
   return {
     id: row.id,
     displayName: row.displayName,
@@ -131,7 +141,7 @@ function toRecord(eventId: string, row: RecordRow): ImageLibraryRecord {
     sourceEventStartsAt: row.sourceEventStartsAt ? row.sourceEventStartsAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
     retired: row.retiredAt !== null,
-    usage: { eventCount: events.size, eventTitles: [...events.values()] },
+    usage: { eventCount: events.size, eventTitles },
     url: libraryFileUrl(eventId, row.id),
   };
 }
@@ -139,6 +149,7 @@ function toRecord(eventId: string, row: RecordRow): ImageLibraryRecord {
 export async function listLibraryImages(
   eventId: string,
   filters: ImageLibraryFilters = {},
+  viewer?: LibraryViewer,
 ): Promise<ImageLibraryRecord[]> {
   const where: Prisma.EventImageLibraryImageWhereInput[] = [];
   if (!filters.includeRetired) where.push({ retiredAt: null });
@@ -171,7 +182,7 @@ export async function listLibraryImages(
     take: LIST_LIMIT,
     select: recordSelect,
   });
-  return rows.map((row) => toRecord(eventId, row));
+  return Promise.all(rows.map((row) => toRecord(eventId, row, viewer)));
 }
 
 /** Every tag in use, for the picker's tag filter. */
@@ -183,9 +194,9 @@ export async function listLibraryTags(): Promise<string[]> {
   return [...new Set(rows.flatMap((row) => row.tags))].sort();
 }
 
-export async function getLibraryImageRecord(eventId: string, imageId: string) {
+export async function getLibraryImageRecord(eventId: string, imageId: string, viewer?: LibraryViewer) {
   const row = await getPrisma().eventImageLibraryImage.findUnique({ where: { id: imageId }, select: recordSelect });
-  return row ? toRecord(eventId, row) : null;
+  return row ? toRecord(eventId, row, viewer) : null;
 }
 
 /** The stored file, for the staff-only preview route. */
@@ -318,10 +329,15 @@ export async function addEventAssetToLibrary(
   let result: { id: string; created: boolean };
   const existing = await prisma.eventImageLibraryImage.findUnique({
     where: { checksum: asset.checksum },
-    select: { id: true },
+    select: { id: true, altText: true },
   });
   if (existing) {
     result = { id: existing.id, created: false };
+    // A later save that supplies alt text fills in a library entry that has none.
+    const alt = options.altText?.trim();
+    if (!existing.altText && alt) {
+      await prisma.eventImageLibraryImage.update({ where: { id: existing.id }, data: { altText: alt.slice(0, MAX_ALT_LENGTH) } });
+    }
   } else {
     const bytes = new Uint8Array(await readAsset(asset.storageKey));
     result = await storeNewImage({
@@ -395,16 +411,34 @@ export async function applyLibraryImageToEvent(
   }
 }
 
-export async function updateLibraryImageTags(imageId: string, rawTags: unknown): Promise<string[]> {
+export async function updateLibraryImageTags(
+  eventId: string,
+  imageId: string,
+  rawTags: unknown,
+  actorUserId: string,
+): Promise<string[]> {
   const tags = normalizeTags(rawTags);
-  try {
-    await getPrisma().eventImageLibraryImage.update({ where: { id: imageId }, data: { tags } });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-      throw new ImageLibraryError("IMAGE_NOT_FOUND", "That image is no longer in the library.");
-    }
-    throw error;
-  }
+  const prisma = getPrisma();
+  const image = await prisma.eventImageLibraryImage.findUnique({
+    where: { id: imageId },
+    select: { id: true, displayName: true, sourceEventId: true },
+  });
+  if (!image) throw new ImageLibraryError("IMAGE_NOT_FOUND", "That image is no longer in the library.");
+  await prisma.$transaction(async (tx) => {
+    await tx.eventImageLibraryImage.update({ where: { id: imageId }, data: { tags } });
+    await tx.auditLog.create({
+      data: {
+        eventId,
+        actorUserId,
+        action: "EVENT_IMAGE_LIBRARY_TAGS_CHANGED",
+        entityType: "EventImageLibraryImage",
+        entityId: imageId,
+        correlationId: randomUUID(),
+        summary: `Changed the tags on the library image "${image.displayName}".`,
+        metadata: { imageId, sourceEventId: image.sourceEventId, tags, productionWrite: false },
+      },
+    });
+  });
   return tags;
 }
 
@@ -418,7 +452,7 @@ export async function setLibraryImageRetired(
   const prisma = getPrisma();
   const image = await prisma.eventImageLibraryImage.findUnique({
     where: { id: imageId },
-    select: { id: true, displayName: true, retiredAt: true },
+    select: { id: true, displayName: true, retiredAt: true, sourceEventId: true },
   });
   if (!image) throw new ImageLibraryError("IMAGE_NOT_FOUND", "That image is no longer in the library.");
   if ((image.retiredAt !== null) === retired) return;
@@ -438,32 +472,53 @@ export async function setLibraryImageRetired(
         entityId: imageId,
         correlationId: randomUUID(),
         summary: `${retired ? "Retired" : "Restored"} the library image "${image.displayName}".`,
-        metadata: { imageId, productionWrite: false },
+        metadata: { imageId, sourceEventId: image.sourceEventId, productionWrite: false },
       },
     });
   });
 }
 
 /**
- * Keeps a saved header image. Best effort and meant for after the save has committed: a failure is logged and never
- * thrown, so the page save the person made always stands.
+ * Keeps a published header image. Only published content enters the library from events: the caller passes a banner
+ * that is published, and the event itself must be published and not archived. Best effort and meant for after the save
+ * has committed: a failure is logged and never thrown, so the page save the person made always stands.
  */
 export async function keepHeaderImageInLibrary(eventId: string, assetId: string, altText: string): Promise<void> {
   try {
+    const event = await getPrisma().event.findUnique({ where: { id: eventId }, select: { isPublished: true, archivedAt: true } });
+    if (!event || !event.isPublished || event.archivedAt) return;
     await addEventAssetToLibrary(assetId, { altText });
   } catch (error) {
     logError("Keeping a header image in the shared library failed", error, { eventId, assetId });
   }
 }
 
+/** When an event is published, its already-published banner joins the library. Best effort, like the save hook. */
+export async function keepPublishedHeaderImagesForEvent(eventId: string): Promise<void> {
+  try {
+    const sections = await getPrisma().eventContentSection.findMany({
+      where: { eventId, kind: "HERO", isPublished: true },
+      select: { data: true },
+    });
+    for (const section of sections) {
+      const data = section.data as { assetId?: unknown; alt?: unknown } | null;
+      if (typeof data?.assetId === "string" && data.assetId) {
+        await keepHeaderImageInLibrary(eventId, data.assetId, typeof data.alt === "string" ? data.alt : "");
+      }
+    }
+  } catch (error) {
+    logError("Keeping an event's header image in the shared library failed", error, { eventId });
+  }
+}
+
 /**
- * Backfill for `npm run event-image-library:sync`: adds every existing header image to the library. Safe to repeat;
+ * Backfill for `npm run event-image-library:sync`: adds the header images of published banners on published events. Safe to repeat;
  * images already there are only linked. Reads event sections and files and writes only library rows and copies.
  */
 export async function syncHeaderImagesToLibrary() {
   const prisma = getPrisma();
   const sections = await prisma.eventContentSection.findMany({
-    where: { kind: "HERO" },
+    where: { kind: "HERO", isPublished: true, event: { isPublished: true, archivedAt: null } },
     select: { eventId: true, data: true },
   });
   const counts = { added: 0, alreadyThere: 0, skipped: 0 };

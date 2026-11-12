@@ -1,5 +1,5 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { authorizeImageLibrary, imageLibraryApiError } from "@/modules/events/image-library-http";
+import { authorizeImageLibrary, imageLibraryApiError, libraryViewer } from "@/modules/events/image-library-http";
 import {
   getLibraryImageRecord,
   ImageLibraryError,
@@ -24,9 +24,9 @@ async function patchHandler(request: Request, context: RouteContext) {
     if (body.retired !== undefined && typeof body.retired !== "boolean") {
       return Response.json({ error: "INVALID_REQUEST", message: "Retired must be true or false." }, { status: 400 });
     }
-    if (body.tags !== undefined) await updateLibraryImageTags(imageId, body.tags);
+    if (body.tags !== undefined) await updateLibraryImageTags(eventId, imageId, body.tags, access.user.id);
     if (typeof body.retired === "boolean") await setLibraryImageRetired(eventId, imageId, body.retired, access.user.id);
-    const image = await getLibraryImageRecord(eventId, imageId);
+    const image = await getLibraryImageRecord(eventId, imageId, libraryViewer(access));
     if (!image) throw new ImageLibraryError("IMAGE_NOT_FOUND", "That image is no longer in the library.");
     return Response.json({ image });
   } catch (error) {

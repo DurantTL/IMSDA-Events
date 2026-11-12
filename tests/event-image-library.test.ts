@@ -22,6 +22,7 @@ import {
   addUploadToLibrary,
   ImageLibraryError,
   keepHeaderImageInLibrary,
+  keepPublishedHeaderImagesForEvent,
   listLibraryImages,
   normalizeTags,
   setLibraryImageRetired,
@@ -36,10 +37,13 @@ type Row = Record<string, unknown> & { id: string };
 function fakeDatabase() {
   const library: Row[] = [];
   const assets: Row[] = [];
+  /** Asset ids a content block shows. */
+  const shown = new Set<string>();
   const audits: Row[] = [];
   const events: Row[] = [
-    { id: "event_a", name: "Camporee 2026", startsAt: new Date("2026-05-01T00:00:00.000Z") },
-    { id: "event_b", name: "Retreat 2027", startsAt: new Date("2027-03-01T00:00:00.000Z") },
+    { id: "event_a", name: "Camporee 2026", startsAt: new Date("2026-05-01T00:00:00.000Z"), isPublished: true, archivedAt: null },
+    { id: "event_b", name: "Retreat 2027", startsAt: new Date("2027-03-01T00:00:00.000Z"), isPublished: true, archivedAt: null },
+    { id: "event_draft", name: "Draft Event", startsAt: new Date("2027-04-01T00:00:00.000Z"), isPublished: false, archivedAt: null },
   ];
   let counter = 0;
   const nextId = (prefix: string) => `${prefix}_${++counter}`;
@@ -52,7 +56,7 @@ function fakeDatabase() {
         if (!row) return null;
         return {
           ...row,
-          copies: assets.filter((a) => a.libraryImageId === row.id).map((a) => ({
+          copies: assets.filter((a) => a.libraryImageId === row.id && shown.has(a.id)).map((a) => ({
             event: { id: a.eventId, name: events.find((e) => e.id === a.eventId)?.name },
           })),
         };
@@ -63,7 +67,7 @@ function fakeDatabase() {
           .filter((r) => includeRetired || r.retiredAt === null)
           .map((r) => ({
             ...r,
-            copies: assets.filter((a) => a.libraryImageId === r.id).map((a) => ({ event: { id: a.eventId, name: events.find((e) => e.id === a.eventId)?.name } })),
+            copies: assets.filter((a) => a.libraryImageId === r.id && shown.has(a.id)).map((a) => ({ event: { id: a.eventId, name: events.find((e) => e.id === a.eventId)?.name } })),
           }));
       }),
       create: vi.fn(async ({ data }: { data: Row }) => {
@@ -98,7 +102,7 @@ function fakeDatabase() {
     $transaction: vi.fn(async (operation: (tx: unknown) => unknown) => operation(client)),
   };
   dependencies.getPrisma.mockReturnValue(client);
-  return { client, library, assets, audits };
+  return { client, library, assets, audits, shown };
 }
 
 // Real file signatures, so the checks are the production checks.
@@ -168,8 +172,14 @@ describe("using a library image in an event", () => {
     expect(db.assets[0]).toMatchObject({ eventId: "event_b", libraryImageId: id, uploadedByUserId: "usr_2" });
     // The event's copy is its own file, apart from the library's.
     expect(db.assets[0].storageKey).not.toBe(db.library[0].storageKey);
-    const { usage } = (await listLibraryImages("event_b"))[0];
-    expect(usage).toEqual({ eventCount: 1, eventTitles: ["Retreat 2027"] });
+    // A copy nothing shows is not "used".
+    expect((await listLibraryImages("event_b"))[0].usage).toEqual({ eventCount: 0, eventTitles: [] });
+    db.shown.add(first.assetId);
+    const all = { canConfigureEvent: async () => true };
+    expect((await listLibraryImages("event_b", {}, all))[0].usage).toEqual({ eventCount: 1, eventTitles: ["Retreat 2027"] });
+    // A viewer who cannot configure that event sees the count but not its title.
+    const none = { canConfigureEvent: async () => false };
+    expect((await listLibraryImages("event_a", {}, none))[0].usage).toEqual({ eventCount: 1, eventTitles: [] });
   });
 
   it("refuses a retired image, and an image that is not there", async () => {
@@ -194,7 +204,7 @@ describe("retiring", () => {
     expect(await listLibraryImages("event_b", { includeRetired: true })).toHaveLength(1);
     expect(db.assets.find((a) => a.id === assetId)).toEqual(assetBefore);
     expect(existsSync(path.join(storageDir, String(db.library[0].storageKey)))).toBe(true);
-    expect(db.audits.at(-1)).toMatchObject({ action: "EVENT_IMAGE_LIBRARY_RETIRED", eventId: "event_b" });
+    expect(db.audits.at(-1)).toMatchObject({ action: "EVENT_IMAGE_LIBRARY_RETIRED", eventId: "event_b", metadata: { imageId: id, sourceEventId: "event_a" } });
 
     await setLibraryImageRetired("event_b", id, false, "usr_1");
     expect(await listLibraryImages("event_b")).toHaveLength(1);
@@ -206,9 +216,15 @@ describe("tags", () => {
   it("stores the normalized list", async () => {
     const db = fakeDatabase();
     const { id } = await addUploadToLibrary(file(PNG, "image/png"), "usr_1", "event_a");
-    expect(await updateLibraryImageTags(id, [" Camporee", "FOREST", "forest"])).toEqual(["camporee", "forest"]);
+    expect(await updateLibraryImageTags("event_b", id, [" Camporee", "FOREST", "forest"], "usr_2")).toEqual(["camporee", "forest"]);
     expect(db.library[0].tags).toEqual(["camporee", "forest"]);
-    await expect(updateLibraryImageTags("missing", ["a"])).rejects.toMatchObject({ code: "IMAGE_NOT_FOUND" });
+    expect(db.audits.at(-1)).toMatchObject({
+      action: "EVENT_IMAGE_LIBRARY_TAGS_CHANGED",
+      eventId: "event_b",
+      actorUserId: "usr_2",
+      metadata: { imageId: id, sourceEventId: "event_a" },
+    });
+    await expect(updateLibraryImageTags("event_b", "missing", ["a"], "usr_2")).rejects.toMatchObject({ code: "IMAGE_NOT_FOUND" });
   });
 });
 
@@ -243,6 +259,38 @@ describe("keeping header images", () => {
     expect(db.assets[0].libraryImageId).toBe(db.library[0].id);
   });
 
+  it("never adds a banner of a draft or archived event", async () => {
+    const db = fakeDatabase();
+    const draftAsset = await eventAsset(db, "event_draft", PNG);
+    await keepHeaderImageInLibrary("event_draft", draftAsset, "Draft");
+    (db.client.event.findUnique as unknown as { mockResolvedValueOnce: (v: unknown) => void }).mockResolvedValueOnce({ isPublished: true, archivedAt: new Date() });
+    const archivedAsset = await eventAsset(db, "event_a", PNG_2);
+    await keepHeaderImageInLibrary("event_a", archivedAsset, "Archived");
+    expect(db.library).toHaveLength(0);
+  });
+
+  it("fills in alt text on an existing library image that has none", async () => {
+    const db = fakeDatabase();
+    const first = await eventAsset(db, "event_a", PNG);
+    await keepHeaderImageInLibrary("event_a", first, "");
+    expect(db.library[0].altText).toBe("");
+    await keepHeaderImageInLibrary("event_a", first, "Pines at dawn");
+    expect(db.library[0].altText).toBe("Pines at dawn");
+    await keepHeaderImageInLibrary("event_a", first, "Something else");
+    expect(db.library[0].altText).toBe("Pines at dawn");
+  });
+
+  it("publishing an event keeps its published banner only", async () => {
+    const db = fakeDatabase();
+    const asset = await eventAsset(db, "event_a", PNG);
+    db.client.eventContentSection.findMany.mockResolvedValue([{ data: { assetId: asset, alt: "Pines" } }] as never);
+    await keepPublishedHeaderImagesForEvent("event_a");
+    expect(db.client.eventContentSection.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { eventId: "event_a", kind: "HERO", isPublished: true },
+    }));
+    expect(db.library).toHaveLength(1);
+  });
+
   it("never fails the save: a library error is logged and swallowed", async () => {
     const db = fakeDatabase();
     db.client.eventAsset.findUnique.mockRejectedValueOnce(new Error("database down"));
@@ -260,6 +308,10 @@ describe("keeping header images", () => {
       { eventId: "event_b", data: { assetId: "" } },
     ] as never);
     expect(await syncHeaderImagesToLibrary()).toEqual({ added: 2, alreadyThere: 0, skipped: 1 });
+    // Only published banners of published, unarchived events are read.
+    expect(db.client.eventContentSection.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { kind: "HERO", isPublished: true, event: { isPublished: true, archivedAt: null } },
+    }));
     expect(await syncHeaderImagesToLibrary()).toEqual({ added: 0, alreadyThere: 2, skipped: 1 });
     expect(db.library).toHaveLength(2);
   });

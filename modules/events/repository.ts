@@ -22,6 +22,7 @@ import { writeCreationModules, writeDefaultModules } from "@/modules/event-modul
 import { afterCreationModules, reprojectDebriefBatches } from "@/modules/event-debriefs/lifecycle";
 import { eventInstant, keepClockTime } from "@/modules/events/event-times";
 import { creationModuleKeys, type EventModuleKey } from "@/modules/event-modules/catalog";
+import { keepPublishedHeaderImagesForEvent } from "@/modules/events/image-library";
 import { linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
 
 export { EventOperationError } from "@/modules/events/operation-error";
@@ -635,6 +636,8 @@ export async function updateEventSettings(
  */
 export async function publishEvent(eventId: string, actorUserId: string) {
   await runLegacyTransition({ eventId, actorUserId, toState: "PUBLISHED", alreadyDone: isPublicState });
+  // A banner saved while the event was a draft joins the shared image library now (#1913). Best effort.
+  await keepPublishedHeaderImagesForEvent(eventId);
   return getEventSettings(eventId);
 }
 

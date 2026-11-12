@@ -135,7 +135,7 @@ describe("image library routes for an event editor", () => {
     expect(response.status).toBe(200);
     expect(dependencies.listLibraryImages).toHaveBeenCalledWith(eventId, expect.objectContaining({
       q: "camp", tag: "forest", year: 2026, includeRetired: true,
-    }));
+    }), expect.objectContaining({ canConfigureEvent: expect.any(Function) }));
     expect(await response.json()).toEqual({ images: [], tags: ["forest"] });
   });
 
@@ -169,7 +169,7 @@ describe("image library routes for an event editor", () => {
     dependencies.getLibraryImageRecord.mockResolvedValue({ id: imageId });
     const response = await patchRoute(request(`${base}/${imageId}`, "PATCH", JSON.stringify({ tags: ["a"], retired: true }), { "content-type": "application/json" }), imageParams);
     expect(response.status).toBe(200);
-    expect(dependencies.updateLibraryImageTags).toHaveBeenCalledWith(imageId, ["a"]);
+    expect(dependencies.updateLibraryImageTags).toHaveBeenCalledWith(eventId, imageId, ["a"], "usr_admin");
     expect(dependencies.setLibraryImageRetired).toHaveBeenCalledWith(eventId, imageId, true, "usr_admin");
     const bad = await patchRoute(request(`${base}/${imageId}`, "PATCH", JSON.stringify({}), { "content-type": "application/json" }), imageParams);
     expect(bad.status).toBe(400);

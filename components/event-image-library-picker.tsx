@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Search } from "lucide-react";
+import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
+import { SearchClearButton } from "@/components/search-clear-button";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import type { EventAssetRecord } from "@/modules/events/asset-repository";
 import type { ImageLibraryRecord } from "@/modules/events/image-library";
 import styles from "./event-image-library-picker.module.css";
@@ -40,10 +44,12 @@ function LibraryCard({
   onError: (message: string) => void;
 }) {
   const [tagText, setTagText] = useState(image.tags.join(", "));
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<"" | "tags" | "retired">("");
+  const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
   async function patch(body: { tags?: string[]; retired?: boolean }) {
-    setSaving(true);
+    setSaving(body.tags ? "tags" : "retired");
+    setMessage(null);
     onError("");
     try {
       const response = await fetch(`/api/events/${eventId}/image-library/${image.id}`, {
@@ -53,11 +59,12 @@ function LibraryCard({
       });
       const result = await readJson(response);
       if (!response.ok) throw new Error(result.message ?? "That change could not be saved.");
+      setMessage({ tone: "success", text: savedMessage() });
       onChanged();
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "That change could not be saved.");
+      setMessage({ tone: "error", text: notSavedMessage(caught instanceof Error ? caught.message : "the server did not answer. Try again.") });
     } finally {
-      setSaving(false);
+      setSaving("");
     }
   }
 
@@ -67,7 +74,7 @@ function LibraryCard({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className={styles.thumb} src={image.url} alt="" loading="lazy" />
       <p className={styles.name}>{image.displayName}</p>
-      {image.retired && <p className={styles.retiredBadge}>Retired</p>}
+      {image.retired && <p className={styles.meta}><span className="status-chip">Retired</span></p>}
       <p className={styles.meta}>
         {image.sourceEventTitle ? `From ${image.sourceEventTitle}` : "Uploaded to the library"}
         {when ? `, ${when}` : ""}
@@ -87,16 +94,17 @@ function LibraryCard({
           <input value={tagText} maxLength={400} onChange={(event) => setTagText(event.target.value)} />
         </label>
         <div className={styles.actions}>
-          <button type="button" className={`${styles.button} ${styles.quiet}`} disabled={saving} onClick={() => patch({ tags: tagText.split(",") })}>
-            Save tags
+          <button type="button" className="secondary-button" aria-busy={saving === "tags" || undefined} disabled={saving !== ""} onClick={() => patch({ tags: tagText.split(",") })}>
+            {saving === "tags" ? "Saving…" : "Save tags"}
           </button>
-          <button type="button" className={`${styles.button} ${styles.quiet}`} disabled={saving} onClick={() => patch({ retired: !image.retired })}>
-            {image.retired ? "Restore" : "Retire"}
+          <button type="button" className="secondary-button" aria-busy={saving === "retired" || undefined} disabled={saving !== ""} onClick={() => patch({ retired: !image.retired })}>
+            {saving === "retired" ? "Saving…" : image.retired ? "Restore" : "Retire"}
           </button>
         </div>
+        <FormMessage tone={message?.tone ?? "success"} message={message?.text ?? ""} alwaysMounted />
       </div>
       {!image.retired && (
-        <button type="button" className={styles.button} disabled={busy} onClick={() => onUse(image)}>
+        <button type="button" className="primary-button" disabled={busy} onClick={() => onUse(image)}>
           Use this image
         </button>
       )}
@@ -116,7 +124,8 @@ export function EventImageLibraryPicker({
 }) {
   const [images, setImages] = useState<ImageLibraryRecord[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
-  const [query, setQuery] = useState("");
+  const search = useClientSearch("");
+  const query = search.term;
   const [tag, setTag] = useState("");
   const [year, setYear] = useState("");
   const [showRetired, setShowRetired] = useState(false);
@@ -128,7 +137,7 @@ export function EventImageLibraryPicker({
 
   useEffect(() => {
     const controller = new AbortController();
-    const timer = setTimeout(async () => {
+    void (async () => {
       setLoading(true);
       try {
         const params = new URLSearchParams();
@@ -136,7 +145,7 @@ export function EventImageLibraryPicker({
         if (tag) params.set("tag", tag);
         if (/^\d{4}$/.test(year)) params.set("year", year);
         if (showRetired) params.set("includeRetired", "true");
-        const response = await fetch(`/api/events/${eventId}/image-library?${params}`, { signal: controller.signal });
+        const response = await fetch(`/api/events/${eventId}/image-library?${params}`, { signal: controller.signal, cache: "no-store" });
         const result = await readJson(response);
         if (!response.ok) throw new Error(result.message ?? "The image library could not be loaded.");
         setImages(result.images as ImageLibraryRecord[]);
@@ -148,11 +157,8 @@ export function EventImageLibraryPicker({
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
-    }, 250);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
+    })();
+    return () => controller.abort();
   }, [eventId, query, tag, year, showRetired, reload]);
 
   const refresh = useCallback(() => setReload((count) => count + 1), []);
@@ -198,13 +204,18 @@ export function EventImageLibraryPicker({
     <section className={styles.panel} aria-label="Image library">
       <div className={styles.head}>
         <h3 className={styles.title}>Image library</h3>
-        <button type="button" className={`${styles.button} ${styles.quiet}`} onClick={onClose}>Close library</button>
+        <button type="button" className="secondary-button" onClick={onClose}>Close library</button>
       </div>
       <div className={styles.filters}>
-        <label>
-          Search
-          <input type="search" value={query} maxLength={80} placeholder="Event name, file name or tag" onChange={(event) => setQuery(event.target.value)} />
-        </label>
+        <div>
+          <label className="search-field">
+            <Search aria-hidden="true" size={18} />
+            <span className="sr-only">Search images by event name, file name or tag</span>
+            <input {...search.inputProps} type="search" autoComplete="off" maxLength={80} placeholder="Search images" />
+            <SearchClearButton onClear={() => search.setValue("")} visible={search.value !== ""} />
+          </label>
+          <SearchResultStatus message={loading ? "" : `${images.length} ${images.length === 1 ? "image" : "images"} listed.`} />
+        </div>
         <label>
           Tag
           <select value={tag} onChange={(event) => setTag(event.target.value)}>
@@ -214,7 +225,8 @@ export function EventImageLibraryPicker({
         </label>
         <label>
           Year of the event
-          <input inputMode="numeric" value={year} maxLength={4} placeholder="2026" onChange={(event) => setYear(event.target.value.replace(/\D/g, ""))} />
+          <input inputMode="numeric" value={year} maxLength={4} onChange={(event) => setYear(event.target.value.replace(/\D/g, ""))} />
+          <small className={styles.meta}>For example 2026</small>
         </label>
         <label className={styles.check}>
           <input type="checkbox" checked={showRetired} onChange={(event) => setShowRetired(event.target.checked)} />

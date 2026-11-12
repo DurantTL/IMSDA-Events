@@ -1,5 +1,5 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { authorizeImageLibrary, imageLibraryApiError } from "@/modules/events/image-library-http";
+import { authorizeImageLibrary, imageLibraryApiError, libraryViewer } from "@/modules/events/image-library-http";
 import {
   addUploadToLibrary,
   getLibraryImageRecord,
@@ -19,7 +19,7 @@ function dateParam(value: string | null) {
 async function getHandler(request: Request, context: RouteContext) {
   try {
     const { eventId } = await context.params;
-    await authorizeImageLibrary(eventId);
+    const access = await authorizeImageLibrary(eventId);
     const params = new URL(request.url).searchParams;
     const year = Number(params.get("year"));
     const [images, tags] = await Promise.all([
@@ -30,7 +30,7 @@ async function getHandler(request: Request, context: RouteContext) {
         from: dateParam(params.get("from")),
         to: dateParam(params.get("to")),
         includeRetired: params.get("includeRetired") === "true",
-      }),
+      }, libraryViewer(access)),
       listLibraryTags(),
     ]);
     return Response.json({ images, tags });
@@ -51,7 +51,7 @@ async function postHandler(request: Request, context: RouteContext) {
       return Response.json({ error: "FILE_REQUIRED", message: "Choose an image to upload." }, { status: 400 });
     }
     const added = await addUploadToLibrary(file, access.user.id, eventId);
-    const image = await getLibraryImageRecord(eventId, added.id);
+    const image = await getLibraryImageRecord(eventId, added.id, libraryViewer(access));
     return Response.json({ image, created: added.created }, { status: added.created ? 201 : 200 });
   } catch (error) {
     return imageLibraryApiError(error, "Uploading to the image library");
