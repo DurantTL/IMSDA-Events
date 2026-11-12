@@ -1,0 +1,8 @@
+.card { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-info); background: var(--card); }
+.heading { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); line-height: 1.35; font-weight: 700; }
+.note { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
+.switchBlock { display: grid; gap: 8px; }
+.switchRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.switchRow button { min-height: 44px; min-width: 44px; }
+.state { font-weight: 700; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.problem { margin: 0; color: var(--coral); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
