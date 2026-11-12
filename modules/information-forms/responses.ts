@@ -9,6 +9,7 @@ import { InformationFormError } from "@/modules/information-forms/errors";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { sendInformationFormSubmittedAlert } from "@/modules/information-forms/submission-alert";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { debriefFormAccess, hasAnsweredDebrief } from "@/modules/event-debriefs/access";
 import { toCsv } from "@/modules/reporting/csv";
 
 /** One member row with its text trimmed and a typed-in age as a number; anything unexpected is left for the validator to refuse. */
@@ -211,10 +212,24 @@ export async function buildInformationFormMembersCsv(target: InformationFormTarg
 }
 
 /**
+ * Whether one stored answer says something: non-blank text, a chosen option (a yes/no choice is stored as its text), a
+ * number, a ticked box, or a filled group such as an address. An unticked box says nothing, so it cannot carry an empty send.
+ */
+function hasAnswerText(value: unknown): boolean {
+  if (typeof value === "string") return value.trim() !== "";
+  if (Array.isArray(value)) return value.some(hasAnswerText);
+  if (typeof value === "number") return true;
+  if (typeof value === "boolean") return value;
+  if (value && typeof value === "object") return Object.values(value).some(hasAnswerText);
+  return false;
+}
+
+/**
  * Stores one submitted response against the form's current published version (#1148). The same `idempotencyKey` for the
  * same form stores once and returns the stored response, so a retried submit never doubles. Used by the public fill
  * page (part C); the caller has already decided who is allowed to answer, and passes the signed-in account if any.
  */
+
 export async function storeInformationFormResponse(input: {
   formId: string;
   idempotencyKey: string;
@@ -235,6 +250,16 @@ export async function storeInformationFormResponse(input: {
   const isOpen = form.status === InformationFormStatus.OPEN && version && (!form.opensAt || form.opensAt <= now) && (!form.closesAt || form.closesAt > now);
   if (!isOpen || !version) throw new InformationFormError("FORM_NOT_OPEN", "This form is not taking answers right now.");
   if (form.fillAccess === "SIGNED_IN" && !input.attendeeAccountId) throw new InformationFormError("SIGN_IN_REQUIRED", "Sign in to answer this form.");
+  // The debrief and the director evaluation (#1679) take an answer only from the people they were sent to, one each. Decided
+  // here, on the server, whatever page or request got this far.
+  const debrief = form.purpose ? await debriefFormAccess(form.id, input.attendeeAccountId, now) : { kind: "NOT_DEBRIEF" as const };
+  if (debrief.kind === "DENIED") {
+    if (debrief.reason === "SIGN_IN_REQUIRED") throw new InformationFormError("SIGN_IN_REQUIRED", "Sign in to answer this form.");
+    throw new InformationFormError("NOT_ALLOWED", "This form is not available to your account.");
+  }
+  if (debrief.kind === "ALLOWED" && input.attendeeAccountId && await hasAnsweredDebrief(form.id, input.attendeeAccountId)) {
+    throw new InformationFormError("ALREADY_ANSWERED", "You have already answered this form. Thank you.");
+  }
   const definition = parseInformationFormDefinition(version.definition);
   // Only keys the version asks (and shows) are kept, so a stray key can never be stored.
   const answers: Record<string, unknown> = {};
@@ -248,14 +273,32 @@ export async function storeInformationFormResponse(input: {
   }
   const check = validateTestResponses(definition, answers, {}, undefined, { ignoreAvailability: true });
   if (!check.isValid) throw new InformationFormError("ANSWERS_INVALID", check.issues[0]!.message, check.issues.map((issue) => ({ key: issue.key, message: issue.message })));
+  // An empty send would use up the one answer the debrief takes from each person, so it is refused with a plain reason (#1679).
+  if (form.purpose && !Object.values(answers).some(hasAnswerText)) {
+    throw new InformationFormError("ANSWERS_INVALID", "Answer at least one question before sending.");
+  }
   // Read before the response is written; a failed read counts as on (the settings module's own rule).
   const alertEnabled = await isNotificationEnabled("INFORMATION_FORM_SUBMITTED");
   try {
-    const created = await prisma.informationFormResponse.create({ data: {
+    const data = {
       formId: form.id, versionId: version.id, answers: answers as Prisma.InputJsonValue,
       attendeeAccountId: input.attendeeAccountId ?? null,
       idempotencyKey: input.idempotencyKey,
-    }, select: { id: true, submittedAt: true } });
+    };
+    const select = { id: true, submittedAt: true } as const;
+    const accountId = input.attendeeAccountId;
+    const created = form.purpose && accountId
+      // One answer per person holds under concurrent sends: the check and the write share a lock on this form and person (#1679).
+      ? await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${form.id}), hashtext(${accountId}))`;
+        // A retried send of the same answer returns the stored one rather than "already answered".
+        const retried = await tx.informationFormResponse.findUnique({ where: { formId_idempotencyKey: { formId: form.id, idempotencyKey: input.idempotencyKey } }, select });
+        if (retried) return { ...retried, retried: true as const };
+        if (await hasAnsweredDebrief(form.id, accountId, tx)) throw new InformationFormError("ALREADY_ANSWERED", "You have already answered this form. Thank you.");
+        return tx.informationFormResponse.create({ data, select });
+      })
+      : await prisma.informationFormResponse.create({ data, select });
+    if ("retried" in created) return { id: created.id, created: false };
     // After the response is stored, and never throwing: the saved response stands whatever happens to the alert (#1222).
     await sendInformationFormSubmittedAlert({ responseId: created.id, formId: form.id, submittedAt: created.submittedAt }, alertEnabled);
     return { id: created.id, created: true };

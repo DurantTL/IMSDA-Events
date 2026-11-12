@@ -28,7 +28,6 @@ import {
   scheduledEmailAbandonedClaimWhere,
   SCHEDULED_EMAIL_MAX_LATE_MS,
   SCHEDULED_EMAIL_STATUS_LABELS,
-  SCHEDULED_EMAIL_TEMPLATE_LABELS,
   SCHEDULED_EMAIL_TRIGGER_LABELS,
   SCHEDULE_EXCLUSION_LABELS,
   ScheduleProjectionError,
@@ -57,6 +56,8 @@ import {
   type ScheduledEmailStatus,
   type ScheduledEmailTemplateKey,
 } from "@/modules/communications/scheduled-email-domain";
+import { scheduledEmailTemplateLabel } from "@/modules/communications/scheduled-email-options";
+import { runDebriefBatch } from "@/modules/event-debriefs/dispatch";
 import { assertAnnouncementTextSendable } from "@/modules/communications/announcement-send-check";
 import { enqueueSelectedAudienceMessage } from "@/modules/communications/transactional-messages";
 
@@ -153,7 +154,7 @@ export function toReviewView(review: ScheduledEmailReview): ScheduledEmailReview
 async function loadEventFacts(client: Client, eventId: string) {
   const event = await client.event.findUnique({
     where: { id: eventId },
-    select: { id: true, timezone: true, startsAt: true, registrationClosesOn: true, paymentDueOn: true, billingMode: true },
+    select: { id: true, timezone: true, startsAt: true, endsAt: true, registrationClosesOn: true, paymentDueOn: true, billingMode: true },
   });
   if (!event) throw new MessagingError("MESSAGE_NOT_FOUND", "That event is no longer available.");
   return event;
@@ -417,7 +418,7 @@ export async function buildScheduledEmailReview(
     },
     template: {
       key: content.templateKey,
-      label: SCHEDULED_EMAIL_TEMPLATE_LABELS[content.templateKey],
+      label: scheduledEmailTemplateLabel(content.templateKey),
       versionNumber: template.versionNumber,
       enabled: template.enabled,
     },
@@ -455,8 +456,11 @@ type BatchRow = Prisma.ScheduledEmailBatchGetPayload<Record<string, never>>;
 export type ScheduledEmailRecord = {
   id: string;
   name: string;
-  templateKey: ScheduledEmailTemplateKey;
+  /** A staff template, or one of the debrief's two (#1679). */
+  templateKey: ScheduledEmailTemplateKey | "EVENT_DEBRIEF_INVITE" | "EVENT_DEBRIEF_REMINDER";
   templateLabel: string;
+  /** Made and timed by the event's Debrief module: it cannot be edited, paused or approved here, only cancelled. */
+  managedByDebrief: boolean;
   announcementTitle: string;
   announcementBody: string;
   status: ScheduledEmailStatus;
@@ -493,8 +497,12 @@ async function toRecord(client: Client, row: BatchRow): Promise<ScheduledEmailRe
   const [byStatus, byCode, delivery, event] = await Promise.all([
     client.scheduledEmailRecipient.groupBy({ by: ["status"], where: { batchId: row.id }, _count: { _all: true } }),
     client.scheduledEmailRecipient.groupBy({ by: ["exclusionCode"], where: { batchId: row.id, status: "EXCLUDED" }, _count: { _all: true } }),
-    client.messageOutbox.groupBy({ by: ["status"], where: { scheduledEmailRecipient: { batchId: row.id } }, _count: { _all: true } }),
-    client.event.findUnique({ where: { id: row.eventId }, select: { timezone: true, startsAt: true, registrationClosesOn: true, paymentDueOn: true } }),
+    client.messageOutbox.groupBy({
+      by: ["status"],
+      where: row.trigger === "AFTER_EVENT_END" ? { eventId: row.eventId, metadata: { path: ["debriefBatchId"], equals: row.id } } : { scheduledEmailRecipient: { batchId: row.id } },
+      _count: { _all: true },
+    }),
+    client.event.findUnique({ where: { id: row.eventId }, select: { timezone: true, startsAt: true, endsAt: true, registrationClosesOn: true, paymentDueOn: true } }),
   ]);
   const recipientCounts = { PLANNED: 0, QUEUED: 0, EXCLUDED: 0, CANCELLED: 0 };
   for (const entry of byStatus) recipientCounts[entry.status] = entry._count._all;
@@ -509,8 +517,9 @@ async function toRecord(client: Client, row: BatchRow): Promise<ScheduledEmailRe
   return {
     id: row.id,
     name: row.name,
-    templateKey: row.templateKey as ScheduledEmailTemplateKey,
-    templateLabel: SCHEDULED_EMAIL_TEMPLATE_LABELS[row.templateKey as ScheduledEmailTemplateKey] ?? row.templateKey,
+    templateKey: row.templateKey as ScheduledEmailRecord["templateKey"],
+    templateLabel: scheduledEmailTemplateLabel(row.templateKey),
+    managedByDebrief: row.trigger === "AFTER_EVENT_END",
     announcementTitle: row.announcementTitle ?? "",
     announcementBody: row.announcementBody ?? "",
     status: row.status,
@@ -572,6 +581,11 @@ async function requireBatch(client: Client, eventId: string, scheduleId: string)
 
 function stateError(message: string) {
   return new MessagingError("SCHEDULE_STATE", message);
+}
+
+/** A debrief batch (#1679) is made, timed and approved by the event's Debrief module, so the staff edit, pause and approve paths leave it alone. Cancelling stays. */
+function refuseDebriefBatch(row: { trigger: string }) {
+  if (row.trigger === "AFTER_EVENT_END") throw stateError("This email is managed by the event's Debrief. Switch the Debrief off to stop it, or cancel it here.");
 }
 
 /** Retries a serializable transaction that PostgreSQL asked to be repeated. */
@@ -740,6 +754,7 @@ export async function updateScheduledEmail(
   const input = scheduledEmailUpdateSchema.parse(rawInput);
   const prisma = getPrisma();
   const current = await requireBatch(prisma, eventId, input.scheduleId);
+  refuseDebriefBatch(current);
   if (!canEditSchedule(current.status) || current.claimToken) {
     throw stateError("A schedule that has started sending, or has finished, cannot be edited. Cancel it and create a new schedule instead.");
   }
@@ -794,6 +809,7 @@ export async function reviewStoredScheduledEmail(
   options: { now?: Date } = {},
 ): Promise<ScheduledEmailReviewView> {
   const row = await requireBatch(getPrisma(), eventId, scheduleId);
+  refuseDebriefBatch(row);
   return toReviewView(await buildScheduledEmailReview(eventId, permissions, storedContent(row), options));
 }
 
@@ -825,6 +841,7 @@ export async function activateScheduledEmail(
   const input = scheduledEmailActivateSchema.parse(rawInput);
   const prisma = getPrisma();
   const current = await requireBatch(prisma, eventId, scheduleId);
+  refuseDebriefBatch(current);
   if (current.status === "ACTIVE" && current.revision === input.expectedRevision && current.activatedByUserId === actorUserId) {
     return { schedule: await toRecord(prisma, current), replayed: true };
   }
@@ -905,6 +922,7 @@ export async function activateScheduledEmail(
  */
 export async function pauseScheduledEmail(eventId: string, actorUserId: string, scheduleId: string): Promise<ScheduledEmailRecord> {
   const prisma = getPrisma();
+  refuseDebriefBatch(await requireBatch(prisma, eventId, scheduleId));
   const paused = await prisma.scheduledEmailBatch.updateMany({
     where: { id: scheduleId, eventId, status: "ACTIVE", claimToken: null },
     data: { status: "PAUSED", pausedAt: new Date(), pauseReason: "Paused by staff." },
@@ -950,7 +968,7 @@ export async function cancelScheduledEmail(eventId: string, actorUserId: string,
       throw stateError(`A ${row.status.toLowerCase()} schedule cannot be cancelled.`);
     }
     const cancelledMessages = await tx.messageOutbox.updateMany({
-      where: { status: "PENDING", OR: [{ scheduledEmailRecipient: { batchId: scheduleId } }, { metadata: { path: ["scheduledEmailBatchId"], equals: scheduleId } }] },
+      where: { status: "PENDING", OR: [{ scheduledEmailRecipient: { batchId: scheduleId } }, { metadata: { path: ["scheduledEmailBatchId"], equals: scheduleId } }, { metadata: { path: ["debriefBatchId"], equals: scheduleId } }] },
       data: { status: "CANCELLED", lockedAt: null, lockToken: null, lastError: "The schedule was cancelled before this was sent." },
     });
     const cancelledRecipients = await tx.scheduledEmailRecipient.updateMany({
@@ -1233,6 +1251,8 @@ export async function runScheduledEmailBatch(batchId: string, options: { now?: D
   });
   if (claimed.count !== 1) return { batchId, outcome: "skipped", queued: 0, excluded: 0, messageIds: [] };
   const batch = await prisma.scheduledEmailBatch.findUniqueOrThrow({ where: { id: batchId } });
+  // The debrief's invitation and reminder (#1679) go to the event's debrief audience, not to registrations, so they have their own send path.
+  if (batch.trigger === "AFTER_EVENT_END") return runDebriefBatch(prisma, batch, claimToken, now);
   const result: ScheduledDispatchResult = { batchId, outcome: "completed", queued: 0, excluded: 0, messageIds: [] };
 
   // 1. Gates. Each one stops the send; none of them sends anything on a guess.

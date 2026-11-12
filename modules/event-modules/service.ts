@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { AccessDeniedError, type AuthenticatedUser } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { onDebriefDisabled, onDebriefEnabled } from "@/modules/event-debriefs/lifecycle";
 import { approvePendingRequestsForEnabledModule } from "@/modules/event-modules/request-approval";
 import { deliverRequestEmails } from "@/modules/event-modules/request-email";
 import {
@@ -246,6 +247,8 @@ export async function enableModuleInTransaction(
     summary: `Turned on the ${eventModuleDefinition(key).title} module.`,
     metadata: { eventId, moduleKey: key },
   }, tx);
+  // The Debrief (#1679) makes its questions and schedules its emails the moment it is switched on, however it is switched on.
+  if (key === "debrief") await onDebriefEnabled(tx, { eventId, actor: { kind: "staff", userId: actor!.id } });
   return { changed: true, messageIds };
 }
 
@@ -290,6 +293,7 @@ export async function disableModule(
       summary: `Turned off the ${eventModuleDefinition(key).title} module.`,
       metadata: { eventId, moduleKey: key },
     }, tx);
+    if (key === "debrief") await onDebriefDisabled(tx, { eventId, actor: { kind: "staff", userId: actor!.id } });
     return { changed: true };
   });
 }

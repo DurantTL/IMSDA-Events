@@ -252,6 +252,8 @@ jobs:
       - run: npm run test:event-scoring
       # Real-database check of the optional Attendance points tool (#1677): off by default, who may switch it (the shared helper), each voted rule (directors and staff, TLTs with a supervising adult, Area Coordinator children, Pathfinders present), check-in against registration, an override with a reason, apply and undo audited, points on the club points board with the event as the reason, and names for staff only.
       - run: npm run test:attendance-points
+      # Real-database check of the optional Event debrief (#1679): off by default, who may switch it, the form and the two scheduled emails made on switching on, one invitation per person however often it runs, the reminder only to people who have not answered, non-recipients refused, one answer each, switching off, moved dates, and the copy for next year.
+      - run: npm run test:event-debrief
       - run: npm run test:honor-class-requirements
       # Real-database check of the Honors Weekend class waitlist (#831): join order, offers to the
       # next in line (one director emailed per offer), accept once, an unaccepted offer passing on

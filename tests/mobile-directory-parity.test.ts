@@ -199,6 +199,8 @@ const moreOnlyPages: Record<string, (scenario: Scenario) => boolean> = {
   "/more/event-scoring": (scenario) => scenario.clubEvent && (scenario.clubOversight || has(scenario, "MANAGE_REGISTRATION")),
   // app/(workspace)/more/attendance-points/page.tsx (`resolveClubOversight().allowed`, #1677)
   "/more/attendance-points": (scenario) => scenario.clubOversight && scenario.clubEvent,
+  // app/(workspace)/more/debrief/page.tsx (switching: system administrator or Event Admin; reading: MANAGE_FORMS; #1679)
+  "/more/debrief": (scenario) => scenario.clubEvent && (scenario.clubOversight || has(scenario, "MANAGE_FORMS")),
   // app/(workspace)/community/page.tsx
   "/community": (scenario) => has(scenario, "MANAGE_COMMUNICATIONS"),
   // app/(workspace)/more/reports/page.tsx

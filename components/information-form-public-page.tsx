@@ -10,6 +10,7 @@ import { publicInformationFormKey, publicInformationFormPath, resolvePublicInfor
 import { checkInformationFormClientRateLimit, checkInformationFormRateLimit } from "@/modules/rate-limit/service";
 import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { debriefFormAccess, hasAnsweredDebrief } from "@/modules/event-debriefs/access";
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -72,7 +73,8 @@ export async function InformationFormPublicPage({ target }: { target: PublicInfo
   const { form } = view;
   // Signed-in visitors never get a browser draft, like the public registration form (#1263).
   const { account } = await getCurrentAttendee();
-  if (form.fillAccess === "SIGNED_IN") {
+  // The Debrief's own forms (#1679) always need a sign-in, whatever their access setting says.
+  if (form.fillAccess === "SIGNED_IN" || form.purpose) {
     const path = publicInformationFormPath(target);
     if (!account) {
       return (
@@ -91,6 +93,26 @@ export async function InformationFormPublicPage({ target }: { target: PublicInfo
           <div className="intro-actions">
             <Link className="primary-button information-form-action" href={twoStepPathFor(path)}>Continue sign in</Link>
           </div>
+        </Notice>
+      );
+    }
+  }
+
+  if (form.purpose && account) {
+    // Only the people the debrief was sent to, and one answer each (#1679). The same rule is enforced again when an answer is sent.
+    const access = await debriefFormAccess(form.id, account.id);
+    if (access.kind === "DENIED") {
+      if (access.reason === "MODULE_OFF" || access.reason === "EVALUATION_OFF") notFound();
+      return (
+        <Notice eyebrow={view.eventName ?? "Not available"} title={form.name}>
+          <p>This form is not available to your account. It was sent to the people who helped run this event.</p>
+        </Notice>
+      );
+    }
+    if (await hasAnsweredDebrief(form.id, account.id)) {
+      return (
+        <Notice eyebrow={view.eventName ?? "Thank you"} title={form.name}>
+          <p>You have already answered this form. Thank you.</p>
         </Notice>
       );
     }

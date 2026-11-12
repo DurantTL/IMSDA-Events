@@ -20,6 +20,7 @@ import { normalizeLocationName, shiftCalendarDate } from "@/modules/event-locati
 import { createRegistrationFormFromDefinitionInTransaction, createRegistrationFormFromTemplateInTransaction } from "@/modules/forms/repository";
 import { getEventSettings } from "@/modules/events/repository";
 import { writeCreationModules } from "@/modules/event-modules/defaults";
+import { afterCreationModules } from "@/modules/event-debriefs/lifecycle";
 import { formIndexToNameAfterEvent } from "@/modules/forms/event-form-naming";
 import { loadFormTemplate } from "@/modules/forms/seeded-templates";
 import { DEFAULT_EVENT_TIME_ZONE, eventInstant } from "@/modules/events/event-times";
@@ -472,6 +473,7 @@ export async function applyEventTemplate(
       });
       // The modules chosen on the features step (#965), in this same transaction; skipped means the audience's defaults.
       await writeCreationModules(tx, event.id, payload.audience, input.features?.modules);
+      await afterCreationModules(tx, { eventId: event.id, moduleKeys: creationModuleKeys(payload.audience, input.features?.modules), actorUserId });
       if (input.calendarEntryId) {
         await linkNewEventToCalendarEntry(tx, { entryId: input.calendarEntryId, eventId: event.id, actorUserId });
       }
