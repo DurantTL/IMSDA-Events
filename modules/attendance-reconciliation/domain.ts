@@ -18,10 +18,9 @@
  */
 
 import { CHURCH_BILLED_STATUSES, type ClubRegistrationStatus } from "@/modules/club-registrations/church-owed";
-
-/** Bump when the rules below change, so a version made under the old rules is never mistaken for a current one. */
 import { isAttendeeTypeRestricted, promoAppliesToAttendeeType } from "@/modules/promo-codes/domain";
 
+/** Bump when the rules below change, so a version made under the old rules is never mistaken for a current one. */
 export const RECONCILIATION_RULE_VERSION = "attended-v1";
 
 export type CorrectionKind = "MARK_ATTENDED" | "MARK_NOT_ATTENDED" | "CLEAR";

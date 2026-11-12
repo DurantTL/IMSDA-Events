@@ -555,7 +555,7 @@ export function PromoCodeWorkspace({
                   <input name="maximumDiscount" type="number" min="0.01" step="0.01" defaultValue={optionalMoneyValue(editedPromo?.maximumDiscountCents ?? null)} />
                 </label>
               )}
-              <fieldset className={styles.appliesTo}>
+              <fieldset className={styles.appliesTo} onChange={() => setTypeError("")}>
                 <legend className={styles.appliesToLegend}>Applies to</legend>
                 <label>
                   <input
