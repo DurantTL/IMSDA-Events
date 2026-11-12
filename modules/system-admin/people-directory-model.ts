@@ -557,7 +557,7 @@ export function parseGrantParam(value: unknown): GrantItem[] {
     if (extra.length === 0) {
       if ((kind === "sa" || kind === "ca" || kind === "ac") && id === undefined) item = { type: kind };
       else if (kind === "ac" && id && role === undefined) {
-        const ministries = parseMinistriesInput(id.split("+"));
+        const ministries = parseMinistriesInput(id.split(/[+ ]/));
         if (ministries) item = { type: "ac", ministries };
       }
       else if (kind === "e" && id && idPattern.test(id) && (eventRoles as readonly string[]).includes(role ?? "")) item = { type: "event", eventId: id, role: role as EventRole };

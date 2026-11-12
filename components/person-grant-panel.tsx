@@ -15,7 +15,8 @@ function itemLabel(row: GrantPlanRow, eventNames: Names, clubNames: Names) {
   const { item } = row;
   if (item.type === "sa") return systemRoleText.SYSTEM_ADMIN.name;
   if (item.type === "ca") return systemRoleText.CLUBS_ADMIN.name;
-  if (item.type === "ac") return item.ministries ? `${systemRoleText.AREA_COORDINATOR.name} (${ministriesLabel(item.ministries)})` : systemRoleText.AREA_COORDINATOR.name;
+  // Already a coordinator: their own ministries are kept (changed in the Area Coordinator setting), so the invite's are not shown.
+  if (item.type === "ac") return item.ministries && row.state !== "has" ? `${systemRoleText.AREA_COORDINATOR.name} (${ministriesLabel(item.ministries)})` : systemRoleText.AREA_COORDINATOR.name;
   if (item.type === "event") return `${eventNames[item.eventId] ?? "An event"}: ${roleLabel(item.role)}`;
   return `${clubNames[item.organizationId] ?? "A club"}: ${clubDirectorRoleLabels[item.role]}`;
 }

@@ -572,6 +572,7 @@ describe("accepting an Area Coordinator invite", () => {
     await acceptAreaCoordinatorInvite("aci-1", account, now);
     expect(mocks.areaUpsert.mock.calls[0]![0].update).not.toHaveProperty("ministries");
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_GRANTED", metadata: expect.objectContaining({ ministries: ["PATHFINDER"] }) }), expect.anything());
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_INVITE_ACCEPTED", metadata: { actorAttendeeAccountId: "acct-acc", inviteMinistries: ["ADVENTURER"], appliedMinistries: ["PATHFINDER"] } }), expect.anything());
   });
 
   it("keeps the ministries of an already active grant when an invite is accepted again (#843)", async () => {

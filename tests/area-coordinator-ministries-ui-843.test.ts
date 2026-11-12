@@ -37,6 +37,21 @@ describe("the deferred Area Coordinator grant", () => {
     expect(url).toBe("/api/admin/accounts/acct-1");
     expect(JSON.parse(init.body)).toEqual({ action: "area-coordinator", on: true, ministries: ["ADVENTURER"] });
   });
+
+  it("reads a hand-typed link whose + arrived as a space", () => {
+    const grant = new URL("https://events.imsda.test/admin/people/account/acct-1?grant=ac:PATHFINDER+ADVENTURER").searchParams.get("grant");
+    expect(parseGrantParam(grant)).toEqual([{ type: "ac", ministries: ["PATHFINDER", "ADVENTURER"] }]);
+  });
+
+  it("shows no ministries when the person is already a coordinator, since theirs are kept", async () => {
+    mounted = await mount(createElement(PersonGrantPanel, {
+      rows: [{ key: "ac", item: { type: "ac", ministries: ["ADVENTURER"] }, state: "has" as const }],
+      person: { staffId: null, accountId: "acct-1", staffEmail: null, accountEmail: "pat@example.test", displayName: "Pat Example" },
+      eventNames: {}, clubNames: {}, cleanHref: "/admin/people/account/acct-1",
+    }));
+    expect(mounted.container.textContent).not.toContain("Adventurer");
+    expect(mounted.container.textContent).toContain("Already has this");
+  });
 });
 
 describe("the Area Coordinator CSV dialog", () => {
