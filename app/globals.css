@@ -10247,10 +10247,17 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-masthead-brand small { color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .club-masthead-brand strong { font-size: 1.05rem; }
 .club-masthead-identity { min-width: 0; max-width: 100%; overflow-wrap: anywhere; color: var(--muted); font-size: 0.9rem; }
-/* On a phone the role sits on its own line under the name, so the web font swapping in cannot move where the name ends and the role starts (#1557). */
+/* On a phone (#1894) the brand and the icon buttons share one row and the name and role sit on one line under them that
+   never wraps (it ends in an ellipsis instead), so the web font swapping in cannot re-wrap it (#1557). The row is what the
+   "Your account" panel hangs from. */
 @media (max-width: 640px) {
-  .club-masthead-role { display: block; }
-  .club-masthead-sep { display: none; }
+  .club-masthead-inner { position: relative; justify-content: flex-start; gap: 2px 4px; padding: 6px 0 4px; }
+  .club-masthead-brand { flex: 0 1 auto; gap: 8px; margin-right: auto; min-width: 0; }
+  /* The wordmark gives way before a button wraps (room for one more icon button in the row). */
+  .club-masthead-brand > span:not([data-navigation-pending]) { min-width: 0; }
+  .club-masthead-brand small, .club-masthead-brand strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .club-masthead-brand strong { font-size: 1rem; }
+  .club-masthead-identity { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 }
 .account-portal .account-nav a { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
 .club-banner { background: var(--imsda-navy); color: #fff; }
@@ -10263,9 +10270,12 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-banner-year strong { font-size: 1.05rem; }
 @media (max-width: 640px) {
   .club-masthead-inner, .club-banner-inner { width: calc(100% - 24px); }
-  .club-banner-inner { padding: 14px 0; }
-  .club-banner h1 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font-size: 1.25rem; }
-  .club-banner-year { flex: 0 0 auto; padding: 6px 10px; }
+  /* A slim band on a phone (#1894): the title, one subtitle line and the club year as a one-line chip under them. */
+  .club-banner-inner { gap: 6px 12px; padding: 10px 0; }
+  .club-banner h1 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font-size: 1.2rem; }
+  .club-banner-identity p { margin-top: 2px; }
+  .club-banner-year { display: flex; flex: 0 0 auto; align-items: baseline; gap: 8px; padding: 3px 10px; border-radius: var(--radius-pill); text-align: left; }
+  .club-banner-year strong { font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 }
 @media print {
   .club-masthead, .club-banner { display: none !important; }
