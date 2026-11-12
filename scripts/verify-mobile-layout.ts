@@ -482,6 +482,10 @@ const pages: PageSpec[] = [
   staff("club-leaders-invited", "/admin/clubs/leaders?status=invited", "system-admin"),
   staff("club-leaders-draft", "/admin/clubs/leaders?status=draft", "system-admin"),
   staff("club-applications", "/admin/clubs/applications", "system-admin"),
+  // The queue's other views and one application on its own, with its Decision section (#1589 part B): the seeded waiting application at a church that already has a club.
+  staff("club-applications-decided", "/admin/clubs/applications?status=decided", "system-admin"),
+  staff("club-applications-links", "/admin/clubs/applications?status=links", "system-admin"),
+  staff("club-application-record", `/admin/clubs/applications?application=${P}_application_0`, "system-admin"),
   staff("club-reports-summary", "/admin/clubs/summary", "system-admin"),
   staff("club-reports-summary-monthly", "/admin/clubs/summary?view=records", "system-admin"),
   staff("club-reports-summary-points", "/admin/clubs/summary?view=points", "system-admin"),
@@ -491,6 +495,7 @@ const pages: PageSpec[] = [
   staff("clubs-forms-missing", "/admin/club-forms?view=missing&year=2026-27", "system-admin"),
   staff("club-leaders", "/admin/clubs/leaders", "system-admin"),
   staff("club-transfers", "/admin/clubs/transfers", "system-admin"),
+  staff("club-transfers-overdue", "/admin/clubs/transfers?view=overdue", "system-admin"),
   staff("background-checks", "/admin/organizations/background-checks", "system-admin"),
   staff("club-as-director", `/admin/organizations/${clubA}/club`, "system-admin"),
   staff("club-as-director-honors", `/admin/organizations/${clubA}/club/honors`, "system-admin"),

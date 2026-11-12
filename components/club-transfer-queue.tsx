@@ -1,10 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeftRight, ChevronDown, Filter } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TransferDate, transferEventLabel } from "@/components/transfer-format";
+import styles from "@/components/club-transfer-queue.module.css";
 import {
+  parseStaffQueueView,
+  staffQueueEmptyText,
+  staffQueueHref,
   memberTransferStaffReasonLabels,
   memberTransferStaffStatusLabels,
   staffQueueFilters,
@@ -38,9 +44,9 @@ type Candidate = { rosterMemberId: string; firstName: string; lastName: string; 
 /** One queue card. Hook-free so it renders on its own in tests. */
 export function StaffTransferCard({ transfer, onAction }: { transfer: StaffTransferRecord; onAction: (action: Action) => void }) {
   return (
-    <li className="transfer-card">
+    <li className={`transfer-card ${styles.card}`} id={`transfer-${transfer.id}`}>
       <div className="transfer-card-head">
-        <strong translate="no">{transfer.matchedMemberName ?? transfer.requestedName}</strong>
+        <h3 className={styles.name} translate="no">{transfer.matchedMemberName ?? transfer.requestedName}</h3>
         <span className={`status-chip ${transfer.overdue || transfer.status === "DECLINED" || transfer.status === "UNMATCHED" ? "coral" : "gold"}`}>
           {transfer.overdue ? "Overdue" : memberTransferStaffStatusLabels[transfer.status as MemberTransferStatus]}
         </span>
@@ -67,15 +73,26 @@ export function StaffTransferCard({ transfer, onAction }: { transfer: StaffTrans
       <div className="transfer-card-actions">
         {transfer.canFinish && <button className="primary-button" onClick={() => onAction({ transfer, kind: "finish" })} type="button">Finish</button>}
         {transfer.canOverride && <button className="secondary-button" onClick={() => onAction({ transfer, kind: "override" })} type="button">Override</button>}
-        {transfer.canCancel && <button className="secondary-button" onClick={() => onAction({ transfer, kind: "cancel" })} type="button">Close</button>}
+        {transfer.canCancel && (
+          // Close ends the request without moving anyone, so it sits apart from Finish and Override.
+          <div className={styles.closeZone}>
+            <button className={`secondary-button ${styles.close}`} onClick={() => onAction({ transfer, kind: "cancel" })} type="button">Close</button>
+          </div>
+        )}
       </div>
     </li>
   );
 }
 
-export function ClubTransferQueue() {
-  const [filter, setFilter] = useState<StaffQueueFilter>("open");
+/**
+ * `filter` is the page's `?view=`, read on the server; changing the select puts the new view in the address (Back undoes it)
+ * and the page passes it back in, which reloads the list.
+ */
+export function ClubTransferQueue({ filter = "open" }: { filter?: StaffQueueFilter }) {
+  const router = useRouter();
   const [transfers, setTransfers] = useState<StaffTransferRecord[] | null>(null);
+  // The view the cards on screen belong to; while it trails `filter` the list stays put and is marked busy.
+  const [loadedFilter, setLoadedFilter] = useState<StaffQueueFilter | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [action, setAction] = useState<Action | null>(null);
@@ -85,17 +102,24 @@ export function ClubTransferQueue() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
 
+  // Only the newest read may draw the list: a slower answer for a view the person already left is dropped, so the
+  // cards never sit under another view's name.
+  const latestRead = useRef(0);
   const load = useCallback(async () => {
+    const read = ++latestRead.current;
     setError("");
     try {
       const response = await fetch(`${API}?filter=${encodeURIComponent(filter)}`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as { transfers?: StaffTransferRecord[]; message?: string };
+      if (read !== latestRead.current) return;
       if (!response.ok) throw new Error(result.message ?? "The transfer queue could not be loaded.");
       setTransfers(result.transfers ?? []);
     } catch (caught) {
+      if (read !== latestRead.current) return;
       setError(caught instanceof Error ? caught.message : "The transfer queue could not be loaded.");
       setTransfers([]);
     }
+    setLoadedFilter(filter);
   }, [filter]);
 
   useEffect(() => {
@@ -163,7 +187,6 @@ export function ClubTransferQueue() {
     <section aria-labelledby="transfer-queue-heading" className="panel">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Clubs</p>
           <h2 id="transfer-queue-heading"><ArrowLeftRight aria-hidden="true" size={18} /> Member transfer queue</h2>
           <p>
             Requests a sending club hasn&apos;t answered in 14 days, declined requests, and requests that didn&apos;t
@@ -176,7 +199,11 @@ export function ClubTransferQueue() {
           <Filter aria-hidden="true" size={16} />
           <span>Show</span>
           <span className="transfer-filter-select">
-            <select onChange={(event) => setFilter(event.target.value as StaffQueueFilter)} value={filter}>
+            <select onChange={(event) => {
+              setNotice("");
+              // Keep the reader's place (B17): only the list below changes.
+              router.push(staffQueueHref(parseStaffQueueView(event.target.value)), { scroll: false });
+            }} value={filter}>
               {staffQueueFilters.map((value) => <option key={value} value={value}>{filterLabels[value]}</option>)}
             </select>
             <ChevronDown aria-hidden="true" size={15} />
@@ -185,10 +212,11 @@ export function ClubTransferQueue() {
       </div>
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
-      {transfers === null ? <p className="report-empty">Loading…</p> : transfers.length === 0 ? (
-        <p className="report-empty">Nothing here.</p>
-      ) : (
-        <ul className="transfer-list">
+      {transfers === null || (loadedFilter !== filter && transfers.length === 0) ? <p className="report-empty">Loading…</p> : transfers.length === 0 ? (error ? null : <div className="report-empty">
+          <p>{staffQueueEmptyText[filter]}</p>
+          {filter !== "open" && <p><Link className={styles.emptyLink} href={staffQueueHref("open")} scroll={false}>Show all open transfers</Link></p>}
+        </div>) : (
+        <ul aria-busy={loadedFilter !== filter} className="transfer-list" inert={loadedFilter !== filter}>
           {transfers.map((transfer) => <StaffTransferCard key={transfer.id} onAction={(next) => void start(next)} transfer={transfer} />)}
         </ul>
       )}

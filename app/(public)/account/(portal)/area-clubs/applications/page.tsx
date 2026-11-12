@@ -46,7 +46,7 @@ export default async function AreaNewClubApplicationsPage() {
           </EmptyState>
         </div>
       ) : (
-        <NewClubApplicationsQueue applications={applications} canDecide={false} churches={[]} collapseCancelled />
+        <NewClubApplicationsQueue applications={applications} collapseCancelled />
       )}
     </section>
   );
