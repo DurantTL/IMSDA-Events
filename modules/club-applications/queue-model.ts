@@ -1,9 +1,9 @@
 /**
- * The staff applications queue's views (#1589): Waiting (the default), Decided and Private links, kept in the address as
+ * The staff applications queue's views (#1589): Waiting (the default), Decided, Private links and Visiting clubs (#835), kept in the address as
  * `?status=`, plus `?application=<id>` for one application on its own. No server-only code, so pages and components share it.
  */
 
-export const APPLICATION_VIEWS = ["waiting", "decided", "links"] as const;
+export const APPLICATION_VIEWS = ["waiting", "decided", "links", "visiting"] as const;
 export type ApplicationView = (typeof APPLICATION_VIEWS)[number];
 
 export const APPLICATIONS_PATH = "/admin/clubs/applications";
@@ -12,6 +12,7 @@ export const APPLICATION_VIEW_LABELS: Record<ApplicationView, string> = {
   waiting: "Waiting",
   decided: "Decided",
   links: "Private links",
+  visiting: "Visiting clubs",
 };
 
 function firstValue(value: unknown): string | undefined {

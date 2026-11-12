@@ -13,7 +13,7 @@ export function hidesFieldPrice(type: string): boolean {
 /**
  * A price left behind when a field moves into a type that hides the price
  * input could never be seen or edited, yet is still charged (#680). Clear it,
- * and the late price with it. A price on an ADDRESS is never meaningful, so
+ * and the late price (or price windows) with it. A price on an ADDRESS is never meaningful, so
  * that clears whatever the previous type was. Otherwise it clears only when
  * the type moves from one that shows the price to one that hides it; moving
  * between choice types (SELECT to RADIO) keeps what is stored, so a price
@@ -22,11 +22,10 @@ export function hidesFieldPrice(type: string): boolean {
 export function hiddenPricePatchForType(
   previousType: string,
   nextType: string,
-): { priceCents?: undefined; latePricing?: undefined } {
-  if (nextType === "ADDRESS" || nextType === "SIGNATURE") return { priceCents: undefined, latePricing: undefined };
-  return hidesFieldPrice(nextType) && !hidesFieldPrice(previousType)
-    ? { priceCents: undefined, latePricing: undefined }
-    : {};
+): { priceCents?: undefined; latePricing?: undefined; pricingWindows?: undefined; basePricingLabel?: undefined } {
+  const cleared = { priceCents: undefined, latePricing: undefined, pricingWindows: undefined, basePricingLabel: undefined };
+  if (nextType === "ADDRESS" || nextType === "SIGNATURE") return cleared;
+  return hidesFieldPrice(nextType) && !hidesFieldPrice(previousType) ? cleared : {};
 }
 
 /**
@@ -34,12 +33,15 @@ export function hiddenPricePatchForType(
  * is spread last, so it wins over the carried-over `latePricing`.
  */
 export function pricingPatchForTypeChange(
-  field: Pick<RegistrationFormField, "type" | "latePricing">,
+  field: Pick<RegistrationFormField, "type" | "latePricing" | "pricingWindows" | "basePricingLabel">,
   nextType: string,
-): Partial<Pick<RegistrationFormField, "priceCents" | "latePricing">> {
+): Partial<Pick<RegistrationFormField, "priceCents" | "latePricing" | "pricingWindows" | "basePricingLabel">> {
   const changedPricingKind = isChoiceFieldType(nextType) !== isChoiceFieldType(field.type);
   return {
     latePricing: changedPricingKind ? undefined : field.latePricing,
+    // Only written when the field has them, so a field without windows gets the same patch as before.
+    ...(field.pricingWindows !== undefined ? { pricingWindows: changedPricingKind ? undefined : field.pricingWindows } : {}),
+    ...(field.basePricingLabel !== undefined ? { basePricingLabel: changedPricingKind ? undefined : field.basePricingLabel } : {}),
     ...hiddenPricePatchForType(field.type, nextType),
   };
 }

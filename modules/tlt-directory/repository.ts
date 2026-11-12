@@ -82,7 +82,7 @@ export async function listTltDirectoryRows(now = new Date()): Promise<TltDirecto
       isTlt: true,
       status: "ACTIVE",
       personId: { not: null },
-      organization: { type: "CLUB", isActive: true },
+      organization: { type: "CLUB", isActive: true, guestEventId: null },
     },
     select: {
       id: true,
@@ -198,7 +198,7 @@ export async function updateTltProfile(input: TltProfileUpdate, actor: TltDirect
         attendeeType: "YOUTH",
         isTlt: true,
         status: "ACTIVE",
-        organization: { type: "CLUB", isActive: true },
+        organization: { type: "CLUB", isActive: true, guestEventId: null },
       },
       select: { id: true },
     });
@@ -475,7 +475,7 @@ export async function confirmTltMoveUp(input: TltMoveUpRequest, actor: TltDirect
         attendeeType: "YOUTH",
         isTlt: true,
         status: "ACTIVE",
-        organization: { type: "CLUB", isActive: true },
+        organization: { type: "CLUB", isActive: true, guestEventId: null },
       },
       select: { personId: true },
     });

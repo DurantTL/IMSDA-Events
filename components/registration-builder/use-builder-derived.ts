@@ -73,7 +73,7 @@ export function useBuilderDerived(eventId: string | null, state: BuilderState) {
   );
   const previewStep = previewSteps[previewStepIndex] ?? null;
   const paymentMethodFields = allFields.filter((field) => field.scope === "REGISTRATION" && isChoiceFieldType(field.type));
-  const scheduledPriceFields = allFields.filter((field) => field.latePricing);
+  const scheduledPriceFields = allFields.filter((field) => field.latePricing || field.pricingWindows);
   const publishedVersion = selectedForm?.versions.find((version) => version.status === "PUBLISHED") ?? null;
   const isHistorical = Boolean(selectedVersion && selectedForm && selectedVersion.id !== selectedForm.activeVersion.id);
   // The current version is always editable. When it is live or withdrawn, the

@@ -58,6 +58,7 @@ import { formatPersonName } from "@/lib/person-name";
 export type MemberTransferErrorCode =
   | "TRANSFER_NOT_FOUND"
   | "CLUB_NOT_FOUND"
+  | "GUEST_CLUB"
   | "SAME_CLUB"
   | "REASON_REQUIRED"
   | "ALREADY_ON_ROSTER"
@@ -77,6 +78,7 @@ export type MemberTransferErrorCode =
 const statusByCode: Record<MemberTransferErrorCode, 400 | 403 | 404 | 409> = {
   TRANSFER_NOT_FOUND: 404,
   CLUB_NOT_FOUND: 400,
+  GUEST_CLUB: 403,
   SAME_CLUB: 400,
   REASON_REQUIRED: 400,
   ALREADY_ON_ROSTER: 409,
@@ -330,10 +332,16 @@ function leaderRecipients(leaders: Array<{ id: string; email: string; displayNam
   return leaders.map((leader) => ({ accountId: leader.id, email: leader.email, name: leader.displayName }));
 }
 
+/** A visiting guest club (#835) belongs to one event only, so it takes no part in member transfers. */
+export async function isGuestClub(organizationId: string) {
+  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { guestEventId: true } });
+  return Boolean(club?.guestEventId);
+}
+
 /** Active clubs a director may name as the member's current club (the club picker). No roster data. */
 export async function listTransferClubOptions(excludingOrganizationId: string) {
   return getPrisma().organization.findMany({
-    where: { type: "CLUB", isActive: true, id: { not: excludingOrganizationId } },
+    where: { type: "CLUB", isActive: true, guestEventId: null, id: { not: excludingOrganizationId } },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
@@ -380,9 +388,10 @@ async function requestTransferOnce(toOrganizationId: string, input: RequestTrans
   const clubYear = clubYearFor(now);
   return getPrisma().$transaction(async (tx) => {
     const [fromClub, toClub] = await Promise.all([
-      tx.organization.findFirst({ where: { id: input.fromOrganizationId, type: "CLUB", isActive: true }, select: { id: true, name: true } }),
-      tx.organization.findUniqueOrThrow({ where: { id: toOrganizationId }, select: { name: true } }),
+      tx.organization.findFirst({ where: { id: input.fromOrganizationId, type: "CLUB", isActive: true, guestEventId: null }, select: { id: true, name: true } }),
+      tx.organization.findUniqueOrThrow({ where: { id: toOrganizationId }, select: { name: true, guestEventId: true } }),
     ]);
+    if (toClub.guestEventId) throw new MemberTransferError("GUEST_CLUB", "A visiting club can't request member transfers.");
     if (!fromClub) throw new MemberTransferError("CLUB_NOT_FOUND", "Choose the member's current club from the list.");
 
     // Only the requesting club's own roster is consulted here, so this can't reveal anything about the other club.

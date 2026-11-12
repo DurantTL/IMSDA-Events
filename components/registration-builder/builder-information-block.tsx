@@ -26,6 +26,8 @@ export function informationTypePatch(field: RegistrationFormField, nextType: Reg
       creditCentsPerUnit: undefined,
       capUnitsAtAttendeeCount: undefined,
       latePricing: undefined,
+      pricingWindows: undefined,
+      basePricingLabel: undefined,
       ageBounds: undefined,
       autoDate: undefined,
       optionalWhen: undefined,

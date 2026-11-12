@@ -1,3 +1,5 @@
+import { clubMayUseEvent } from "@/modules/club-registrations/event-gate";
+import { notFound } from "next/navigation";
 import { ExportLink } from "@/components/export-link";
 import type { Metadata } from "next";
 import { ClubSetupHelp } from "@/components/role-setup-help";
@@ -23,6 +25,8 @@ export default async function ClubSchedulePage({
   // The club layout shows the sign-in and authenticator steps.
   if (access.state !== "OPEN") return clubAccessClosed(access);
 
+  // A visiting guest club (#835) may use only its own event.
+  if (!(await clubMayUseEvent(organizationId, eventId))) notFound();
   const back = `/account/clubs/${organizationId}/events/${eventId}`;
   // Only this club's people are loaded; dietary answers are never read here.
   const data = await getHonorRosterData(eventId, { includeDietary: false, organizationId });

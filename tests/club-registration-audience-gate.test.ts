@@ -15,6 +15,8 @@ import { getClubEventWorkspace, listClubEvents } from "@/modules/club-registrati
  */
 function mockPrisma() {
   const prisma = {
+    // The guest club rule (#835) reads the club's `guestEventId`; a conference club has none.
+    organization: { findUnique: vi.fn().mockResolvedValue({ guestEventId: null }) },
     event: {
       findMany: vi.fn().mockResolvedValue([]),
       findFirst: vi.fn().mockResolvedValue(null),

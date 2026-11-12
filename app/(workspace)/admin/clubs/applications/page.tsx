@@ -22,6 +22,13 @@ import {
 import { parseApplicationId, parseApplicationView, viewOfApplication } from "@/modules/club-applications/queue-model";
 import { isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import { StaffVisitingIntro, StaffVisitingMissing, StaffVisitingRecord, StaffVisitingView, visitingBackLink } from "@/components/staff-visiting-clubs";
+import {
+  getVisitingClubRequest,
+  listVisitingClubEventOptions,
+  listVisitingClubInvites,
+  listVisitingClubRequests,
+} from "@/modules/visiting-clubs/repository";
 
 export const metadata: Metadata = { title: "New club applications" };
 export const dynamic = "force-dynamic";
@@ -35,7 +42,7 @@ export const dynamic = "force-dynamic";
 export default async function NewClubApplicationsAdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string | string[]; application?: string | string[] }>;
+  searchParams: Promise<{ status?: string | string[]; application?: string | string[]; visiting?: string | string[] }>;
 }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
@@ -43,7 +50,19 @@ export default async function NewClubApplicationsAdminPage({
   const viewer = user.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : "CLUBS_ADMIN";
   const query = await searchParams;
   const applicationId = parseApplicationId(query.application);
+  const visitingId = parseApplicationId(query.visiting);
   const showSettingsLink = viewer === "SYSTEM_ADMIN";
+
+  // One visiting club request on its own (#835), where Approve and Decline live.
+  if (visitingId) {
+    const request = await getVisitingClubRequest(user, visitingId);
+    return (
+      <>
+        <AdminPageHeader back={visitingBackLink} path="/admin/clubs/applications" />
+        {request ? <StaffVisitingRecord request={request} /> : <StaffVisitingMissing />}
+      </>
+    );
+  }
 
   if (applicationId) {
     const [application, churches] = await Promise.all([getNewClubApplication(viewer, applicationId), listPublicSponsorOptions()]);
@@ -62,6 +81,24 @@ export default async function NewClubApplicationsAdminPage({
   }
 
   const view = parseApplicationView(query.status);
+  if (view === "visiting") {
+    const [events, invites, requests, waitingCount] = await Promise.all([
+      listVisitingClubEventOptions(user),
+      listVisitingClubInvites(user),
+      listVisitingClubRequests(user),
+      countWaitingNewClubApplications(viewer),
+    ]);
+    return (
+      <>
+        <AdminPageHeader path="/admin/clubs/applications" />
+        <section className="page-stack">
+          <StaffVisitingIntro />
+          <StaffApplicationViews view={view} waitingCount={waitingCount} />
+          <StaffVisitingView canOpenSetup={viewer === "SYSTEM_ADMIN"} emailConfigured={isAccountEmailConfigured()} events={events} invites={invites} requests={requests} />
+        </section>
+      </>
+    );
+  }
   const [applications, invites, waitingCount] = await Promise.all([
     view === "links" ? [] : listNewClubApplications(viewer, new Date(), view),
     view === "links" ? listNewClubInvites(viewer) : [],

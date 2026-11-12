@@ -1,3 +1,4 @@
+import { clubMayUseEvent } from "@/modules/club-registrations/event-gate";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
@@ -15,6 +16,8 @@ export default async function DirectorBlankTeamFormPage({ params }: { params: Pr
   const { organizationId, eventId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
   if (access.state !== "OPEN") return clubAccessClosed(access);
+  // A visiting guest club (#835) may use only its own event.
+  if (!(await clubMayUseEvent(access.club.organizationId, eventId))) notFound();
   const form = await loadBlankTeamForm(eventId, { publishedClubOnly: true });
   if (!form) notFound();
   return (

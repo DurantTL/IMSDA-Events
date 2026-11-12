@@ -2,6 +2,7 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { clubMayUseEvent } from "@/modules/club-registrations/event-gate";
 import { logError } from "@/lib/logger";
 import { formatPersonName } from "@/lib/person-name";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -110,7 +111,9 @@ function personName(person: { firstName: string; lastName: string } | null): str
   return formatPersonName(person ?? {}, "sorted") || "Unnamed person";
 }
 
-async function clubEvent(eventId: string) {
+async function clubEvent(eventId: string, organizationId: string) {
+  // A visiting guest club (#835) may use only its own event.
+  if (!(await clubMayUseEvent(organizationId, eventId))) throw new ClubTeacherError("EVENT_NOT_FOUND", "That club event could not be found.");
   const event = await getPrisma().event.findFirst({
     where: { id: eventId, isPublished: true, archivedAt: null, audience: "CLUB" },
     select: { id: true, startsAt: true, timezone: true },
@@ -137,7 +140,7 @@ export async function loadClubTeacherStep(organizationId: string, eventId: strin
   const rule = await activeTeacherRule(eventId);
   if (!rule) return null;
   const prisma = getPrisma();
-  const event = await clubEvent(eventId);
+  const event = await clubEvent(eventId, organizationId);
   const ageDate = teacherAgeDate(event);
   const [members, rows, locations, count] = await Promise.all([
     prisma.clubRosterMember.findMany({
@@ -192,7 +195,7 @@ export async function loadClubTeacherStepOrNull(organizationId: string, eventId:
 export async function setClubTeachers(organizationId: string, eventId: string, actor: TeacherActor, input: TeacherEntriesInput) {
   const rule = await activeTeacherRule(eventId);
   if (!rule) throw new ClubTeacherError("NOT_AVAILABLE", "Club teachers are not being collected for this event.");
-  const event = await clubEvent(eventId);
+  const event = await clubEvent(eventId, organizationId);
   const prisma = getPrisma();
   const ids = input.teachers.map((teacher) => teacher.rosterMemberId);
   const members = ids.length === 0 ? [] : await prisma.clubRosterMember.findMany({
@@ -242,7 +245,7 @@ export async function setClubTeachers(organizationId: string, eventId: string, a
 export async function assertTeachersMeetRule(eventId: string, organizationId: string, headcount: number): Promise<void> {
   const rule = await activeTeacherRule(eventId);
   if (!rule || !rule.requireTeachers) return;
-  const event = await clubEvent(eventId);
+  const event = await clubEvent(eventId, organizationId);
   const rows = await getPrisma().clubEventTeacher.findMany({ where: { eventId, organizationId }, select: { rosterMember: { select: ageFields } } });
   // Only teachers who are 18 or older count toward the number (#1727).
   const ageDate = teacherAgeDate(event);
