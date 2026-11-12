@@ -885,6 +885,7 @@ model User {
   staffHomeLayout           StaffHomeLayout?
   memberships               EventMembership[]
   clubsAdministratorGrant   ClubsAdministratorGrant?
+  youthAdministratorGrant   YouthAdministratorGrant?
   siteContentEditorGrant    SiteContentEditorGrant?
   siteContentRevisionsCreated   SiteContentRevision[] @relation("SiteContentRevisionCreatedBy")
   siteContentRevisionsPublished SiteContentRevision[] @relation("SiteContentRevisionPublishedBy")
@@ -2964,6 +2965,24 @@ model AreaCoordinatorInvite {
 /// staff user, kept after removal for the record. Read on every request, so a
 /// removal takes effect on the next one.
 model ClubsAdministratorGrant {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  grantedByUserId String?
+  grantedAt       DateTime  @default(now())
+  revokedAt       DateTime?
+  revokedByUserId String?
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([revokedAt])
+}
+
+/// A Youth Admin (#1685): the conference youth director. Holds the Area
+/// Coordinator view (read only) plus the youth directory. Given and taken away
+/// by system administrators; one row per staff user, kept after removal for the
+/// record. Read on every request, so a removal takes effect on the next one.
+model YouthAdministratorGrant {
   id              String    @id @default(cuid())
   userId          String    @unique
   grantedByUserId String?

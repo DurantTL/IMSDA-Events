@@ -80,6 +80,7 @@ function person(over: Partial<PersonDetail> = {}): PersonDetail {
     accountId: "a-target",
     systemAdministrator: false,
     clubsAdministrator: false,
+    youthAdministrator: false,
     siteContentEditor: false,
     areaCoordinator: false,
     staff: { status: "ACTIVE", signInDisabled: false, displayName: "Sample Person", jobTitle: "", phone: "", bio: "", twoStep: "On", lastSignedInAt: null },

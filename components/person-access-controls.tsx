@@ -76,9 +76,9 @@ function Chip({ tone, children }: { tone?: "green" | "coral"; children: ReactNod
 
 // ---------------------------------------------------------------- System-wide
 
-type RoleKind = "system-administrator" | "clubs-administrator" | "site-content-editor" | "area-coordinator";
+type RoleKind = "system-administrator" | "clubs-administrator" | "youth-administrator" | "site-content-editor" | "area-coordinator";
 
-const roleKeys = { "system-administrator": "SYSTEM_ADMIN", "clubs-administrator": "CLUBS_ADMIN", "site-content-editor": "SITE_CONTENT_EDITOR", "area-coordinator": "AREA_COORDINATOR" } as const;
+const roleKeys = { "system-administrator": "SYSTEM_ADMIN", "clubs-administrator": "CLUBS_ADMIN", "youth-administrator": "YOUTH_ADMIN", "site-content-editor": "SITE_CONTENT_EDITOR", "area-coordinator": "AREA_COORDINATOR" } as const;
 
 const roleCopy: Record<RoleKind, { grantNote: string | null; revokeBody: string; noun: string }> = {
   "system-administrator": {
@@ -90,6 +90,11 @@ const roleCopy: Record<RoleKind, { grantNote: string | null; revokeBody: string;
     noun: systemRoleText.CLUBS_ADMIN.name,
     grantNote: "Every change is recorded under their name.",
     revokeBody: "They lose access to the club areas on their next page. Nothing they did is undone.",
+  },
+  "youth-administrator": {
+    noun: systemRoleText.YOUTH_ADMIN.name,
+    grantNote: "They sign in with a second step, and every export is recorded under their name.",
+    revokeBody: "They lose the Youth directory and the Area Coordinator view on their next page. Nothing they exported is undone.",
   },
   "site-content-editor": {
     noun: systemRoleText.SITE_CONTENT_EDITOR.name,
@@ -136,6 +141,10 @@ export function RoleToggle({ kind, on, name, userId, accountId }: {
       if (kind === "clubs-administrator") {
         await callJson(`/api/admin/users/${encodeURIComponent(userId ?? "")}/clubs-administrator`, { method: grant ? "PUT" : "DELETE" }, "That role could not be changed.");
         return grant ? `${name} is now a Clubs Administrator.` : `${name} is no longer a Clubs Administrator.`;
+      }
+      if (kind === "youth-administrator") {
+        await callJson(`/api/admin/users/${encodeURIComponent(userId ?? "")}/youth-administrator`, { method: grant ? "PUT" : "DELETE" }, "That role could not be changed.");
+        return grant ? `${name} is now a Youth Admin.` : `${name} is no longer a Youth Admin.`;
       }
       if (kind === "site-content-editor") {
         await callJson(`/api/admin/users/${encodeURIComponent(userId ?? "")}/site-content-editor`, { method: grant ? "PUT" : "DELETE" }, "That role could not be changed.");
