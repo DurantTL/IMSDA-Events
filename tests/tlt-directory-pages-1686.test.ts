@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -60,5 +61,20 @@ describe("the TLT directory pages (#1686)", () => {
     // One audit row per view, with the search text only as a filter key.
     expect(mocks.recordTltDirectoryView).toHaveBeenCalledTimes(1);
     expect(mocks.recordTltDirectoryView.mock.calls[0]![1]).toEqual({ accountId: "account-1" });
+  });
+});
+
+describe("retiring on the lists page (#1686, site rule B9)", () => {
+  const source = readFileSync("components/tlt-lists-editor.tsx", "utf8");
+
+  it("asks in the shared confirm dialog first, and only Confirm sends the retire", () => {
+    expect(source).toContain('import { ConfirmDialog } from "@/components/confirm-dialog"');
+    expect(source).not.toMatch(/window\.(confirm|prompt)/);
+    // The Retire button only opens the dialog; "retire" is sent from the dialog's onConfirm.
+    expect(source).toMatch(/onConfirm=\{\(\) => void run\("retire", \{ action: "retire"/);
+    expect(source.match(/action: "retire"/g)).toHaveLength(1);
+    expect(source).toMatch(/setConfirming\(true\)/);
+    // Restoring is not a loss, so it needs no confirmation.
+    expect(source).toMatch(/action: "restore"/);
   });
 });
