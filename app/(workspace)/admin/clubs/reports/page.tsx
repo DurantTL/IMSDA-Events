@@ -16,6 +16,9 @@ import { listClubReportsForYear } from "@/modules/club-reports/repository";
 import { REVIEW_FILTER, recordsToReview } from "@/modules/club-reports/review-domain";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import { MonthlyRecordReminders } from "@/components/monthly-record-reminders";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { getMonthlyRecordReminderOverview } from "@/modules/club-reports/monthly-reminders";
 
 export const metadata: Metadata = { title: "Review monthly records" };
 export const dynamic = "force-dynamic";
@@ -35,6 +38,7 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
   const toReviewRows = review === REVIEW_FILTER
     ? recordsToReview(await getAreaClubsSummary(clubYear, now, { backgroundChecks: false }), reviewMonth)
     : null;
+  const reminders = await getMonthlyRecordReminderOverview(now);
   // Moving to another year keeps the filter the person is on (#1588); the month follows the chosen year.
   const yearLinkTail = toReviewRows ? `&review=${REVIEW_FILTER}` : "";
   return (
@@ -54,6 +58,12 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
       ) : (
         <ClubReportsConference clubYear={clubYear} initialClubs={await listClubReportsForYear(clubYear)} key={clubYear} now={calendarDateIn(now)} />
       )}
+      <MonthlyRecordReminders
+        clubYear={reminders.clubYear}
+        enabled={reminders.enabled}
+        log={reminders.log}
+        sentAtLabels={reminders.log.map((row) => formatInConferenceTime(row.sentAt, { dateStyle: "medium", timeStyle: "short" }))}
+      />
     </>
   );
 }
