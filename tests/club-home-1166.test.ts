@@ -275,6 +275,17 @@ describe("Home tasks come only from real data", () => {
     expect(rosterRowMissingFields(person("1", { gender: null }))).toEqual(["Gender"]);
   });
 
+  it("puts Continue club work first when a task exists, and after the checklist when it is only the empty note (#1894)", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
+    const empty = await home();
+    expect(empty.indexOf("Your club this year")).toBeLessThan(empty.indexOf("Continue club work"));
+    mocks.listRoster.mockResolvedValue([person("1", { gender: null })]);
+    const withTask = await home();
+    expect(withTask.indexOf("Continue club work")).toBeGreaterThan(-1);
+    expect(withTask.indexOf("Continue club work")).toBeLessThan(withTask.indexOf("Your club this year"));
+    expect(withTask.indexOf("Continue club work")).toBeLessThan(withTask.indexOf("Get your club set up"));
+  });
+
   it("invents nothing for a complete roster: no roster task, no form task, an honest empty note", async () => {
     mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
     const html = await home();

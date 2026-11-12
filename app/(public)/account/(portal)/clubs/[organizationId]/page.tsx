@@ -117,11 +117,22 @@ export default async function ClubHomePage({
       monthsNotSubmitted: reportYear && reportYear !== "ERROR" ? monthsNotSubmitted(reportYear.reports, clubYear, now, reportYear.joinedOn) : null,
       sterlingReminders: null,
     });
+    // The due tasks come first, straight after the back link (#1894); with none, the card is not shown at all.
+    const reporterTasks = (steps.length > 0 || reportsFailed) && (
+      <ClubHomeTasks
+        deadlines={deadlines}
+        emptyNote="Open Monthly Records to see what is due."
+        steps={steps}
+        unavailable={reportsFailed ? ["Monthly Records"] : []}
+      />
+    );
     return (
       <>
         {await allMyClubsLink(null)}
+        {reporterTasks}
         <SetupChecklistPanel
           checklist={reporterChecklist}
+          collapseDone
           eyebrow="Getting started"
           guide={{ href: CLUB_CHECKLIST_GUIDE_HREF, label: "Read the Getting started guide" }}
           headingId="club-getting-started"
@@ -142,14 +153,6 @@ export default async function ClubHomePage({
             Open Monthly Records <ArrowRight size={14} aria-hidden="true" />
           </Link>
         </section>
-        {(steps.length > 0 || reportsFailed) && (
-          <ClubHomeTasks
-            deadlines={deadlines}
-            emptyNote="Open Monthly Records to see what is due."
-            steps={steps}
-            unavailable={reportsFailed ? ["Monthly Records"] : []}
-          />
-        )}
         {reporterDeadlines === "ERROR" ? <ClubHomeDeadlinesUnavailable /> : <UpcomingDeadlines deadlines={reporterDeadlines} />}
       </>
     );
@@ -230,6 +233,18 @@ export default async function ClubHomePage({
         sterlingReminders: compliance === "ERROR" || !compliance ? null : complianceReminders(compliance, `${base}/roster`).length,
       });
 
+  // The next task comes first, straight after the back link and any read-only notice (#1894). With nothing to do or
+  // nothing failed to load, the card is only an empty note, so it stays in its old place after the checklist.
+  const tasksFirst = steps.length > 0 || unavailable.length > 0;
+  const tasksCard = !readOnly && (
+    <ClubHomeTasks
+      deadlines={deadlines}
+      emptyNote={`Nothing is saved or due for this club year. ${waitingFor} will appear here.`}
+      steps={steps}
+      unavailable={unavailable}
+    />
+  );
+
   return (
     <>
       {clubsLink}
@@ -241,10 +256,12 @@ export default async function ClubHomePage({
           currentHref={base}
         />
       )}
+      {tasksFirst && tasksCard}
       <ClubHomeSummary clubYear={clubYear} summary={summary} />
       {checklist && (
         <SetupChecklistPanel
           checklist={checklist}
+          collapseDone
           eyebrow="Getting started"
           guide={{ href: CLUB_CHECKLIST_GUIDE_HREF, label: "Read the Getting started guide" }}
           headingId="club-getting-started"
@@ -253,14 +270,7 @@ export default async function ClubHomePage({
         />
       )}
       {checklist?.hidden && <p className="field-help role-guide-link"><Link className="text-button" href={CLUB_CHECKLIST_GUIDE_HREF}>Getting started guide</Link></p>}
-      {!readOnly && (
-        <ClubHomeTasks
-          deadlines={deadlines}
-          emptyNote={`Nothing is saved or due for this club year. ${waitingFor} will appear here.`}
-          steps={steps}
-          unavailable={unavailable}
-        />
-      )}
+      {!tasksFirst && tasksCard}
       {!readOnly && rosterHealth && rosterHealth !== "ERROR" && <ClubHomeRosterHealth counts={rosterHealth.counts} notChecked={rosterHealth.notChecked.map((item) => item.flag)} href={`${base}/roster-health`} />}
       <ClubHomeRoster setupBase={base} clubYear={clubYear} preview={roster} readOnly={readOnly} rosterHref={rosterHref} unavailable={members === "ERROR"} />
       {events && (
