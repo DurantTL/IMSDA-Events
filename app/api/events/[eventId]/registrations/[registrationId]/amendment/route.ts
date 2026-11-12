@@ -14,6 +14,7 @@ import {
   RegistrationAmendmentError,
 } from "@/modules/registrations/amendments-repository";
 import { registrationAmendmentInputSchema } from "@/modules/registrations/schemas";
+import { previewBaptismFollowUpNotice, sendBaptismFollowUpNoticesForStaffEdit } from "@/modules/baptism-follow-up/notice";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -132,8 +133,10 @@ async function postHandler(
       const preview = groupOptions
         ? await previewRegistrationAmendment(eventId, registrationId, input, groupOptions)
         : await previewRegistrationAmendment(eventId, registrationId, input);
+      // Offered only when this edit adds baptism names not notified before: a count and roles, never an address (#1680).
+      const baptismFollowUp = await previewBaptismFollowUpNotice({ eventId, registrationId, responses: input.responses });
       return Response.json(
-        { preview },
+        { preview: baptismFollowUp ? { ...preview, baptismFollowUp } : preview },
         { status: 200, headers: noStoreHeaders },
       );
     }
@@ -146,6 +149,8 @@ async function postHandler(
     } catch (error) {
       logError("Registration update notice processing failed after commit", error);
     }
+    // Only when staff ticked the box. The club is read from the registration, and a failure never undoes the amendment (#1680).
+    if (input.sendBaptismFollowUp === true) await sendBaptismFollowUpNoticesForStaffEdit({ eventId, registrationId });
     return Response.json(result, {
       status: 200,
       headers: noStoreHeaders,

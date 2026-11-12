@@ -111,6 +111,8 @@ export const registrationAmendmentInputSchema = z.strictObject({
   attendees: z.array(registrationAmendmentAttendeeSchema).min(1).max(50),
   previewOnly: z.boolean().default(true),
   quoteFingerprint: z.string().length(64).optional(),
+  /** Staff choice on the commit (#1680): send the baptism follow-up notice for new baptism names. Absent or false sends nothing. */
+  sendBaptismFollowUp: z.boolean().optional(),
 }).superRefine((input, context) => {
   const clientIds = new Set<string>();
   const attendeeIds = new Set<string>();

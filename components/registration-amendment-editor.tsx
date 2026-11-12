@@ -1,5 +1,6 @@
 "use client";
 
+import { BaptismNoticeOption } from "@/components/baptism-notice-option";
 import { Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -58,6 +59,8 @@ type AmendmentPreview = {
     attendeeLabel?: string;
   }>;
   pricingDate: string;
+  /** Set only when this edit adds baptism names not notified before (#1680). */
+  baptismFollowUp?: { names: number; recipients: Array<"lead" | "pastor"> };
 };
 
 function valueString(value: unknown) {
@@ -395,6 +398,7 @@ export function RegistrationAmendmentEditor({
   // The site was restarting (#1263): the edits stay; Try again re-sends with the same request id, so it applies once.
   const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const [preview, setPreview] = useState<AmendmentPreview | null>(null);
+  const [sendBaptism, setSendBaptism] = useState(false);
   const [issues, setIssues] = useState<Array<{ path?: string; message?: string }>>([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -505,6 +509,8 @@ export function RegistrationAmendmentEditor({
       attendees: attendees.map((attendee) => (differentPeople.has(attendee.clientId) ? { ...attendee, differentPerson: true } : attendee)),
       previewOnly,
       ...(quoteFingerprint ? { quoteFingerprint } : {}),
+      // The staff choice, only on the commit and only when the review offered it.
+      ...(!previewOnly && preview?.baptismFollowUp && sendBaptism ? { sendBaptismFollowUp: true } : {}),
     };
   }
 
@@ -553,6 +559,7 @@ export function RegistrationAmendmentEditor({
         throw new Error(result.message ?? "Unable to review this amendment.");
       }
       setPreview(result.preview as AmendmentPreview);
+      setSendBaptism(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to review this amendment.");
     } finally {
@@ -623,6 +630,7 @@ export function RegistrationAmendmentEditor({
           <div className="total"><span>Total</span><strong><Money cents={preview.totalCents} /></strong></div>
         </section>
         {reason && <p className="quiet-copy"><strong>Staff note:</strong> {reason}</p>}
+        <BaptismNoticeOption checked={sendBaptism} disabled={saving} offer={preview.baptismFollowUp} onChange={setSendBaptism} />
         {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void confirmAmendment()} />}
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="form-actions">

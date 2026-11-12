@@ -18,7 +18,7 @@ import { loadEnvConfig } from "@next/env";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
-import { queueBaptismFollowUpNotices } from "@/modules/baptism-follow-up/notice";
+import { previewBaptismFollowUpNotice, queueBaptismFollowUpNotices } from "@/modules/baptism-follow-up/notice";
 
 loadEnvConfig(process.cwd());
 assertLocalDatabase(process.env, "run this verification");
@@ -149,6 +149,13 @@ async function main() {
   assert((await outbox()).length === before + 3, "no duplicate outbox rows for the raced name");
   const keys = (await outbox()).map((row) => row.idempotencyKey);
   assert(new Set(keys).size === keys.length, "every outbox key is unique");
+
+  // A staff edit's preview (#1680): offered only for a new name, with roles and no address; the club comes from the registration.
+  const staffEdit = (names: string) => previewBaptismFollowUpNotice({ eventId: ids.event, registrationId: registration, responses: { baptism_names: names } });
+  const offer = await staffEdit("Ava Sample, Ben Sample, Cleo Sample, Fay Sample");
+  assert(offer !== null && offer.names === 1 && offer.recipients.join() === "lead,pastor" && !JSON.stringify(offer).includes("@"), "a staff edit adding one new name is offered, by role");
+  assert(await staffEdit("Ava Sample, Ben Sample, Cleo Sample") === null, "a staff edit with no new name is not offered");
+  assert((await ledger(ids.club)).length === 3 && (await outbox()).length === 9, "offering sends and remembers nothing");
 
   // No pastor on file: the event lead only.
   const other = await register(ids.clubNoPastor, "Dan Sample");

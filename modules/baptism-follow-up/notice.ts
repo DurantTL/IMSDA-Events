@@ -177,3 +177,49 @@ export async function sendBaptismFollowUpNotices(input: BaptismNoticeInput): Pro
     return nothing;
   }
 }
+
+export type BaptismNoticePreview = { names: number; recipients: BaptismRecipientRole[] };
+
+/** The club behind a registration, read from the registration itself and never from a request. */
+async function clubOrganizationOf(registrationId: string, eventId: string): Promise<string | null> {
+  const row = await getPrisma().clubEventRegistration.findFirst({ where: { registrationId, eventId }, select: { organizationId: true } });
+  return row?.organizationId ?? null;
+}
+
+/**
+ * For a staff edit's preview (#1680): whether the answers it would save hold baptism names not notified before, so the editor can
+ * offer to send the notice. Null unless the registration is a club's, the module is on and an event lead is saved. Says how many
+ * names and which roles (lead, pastor) would be told, never an address. Never throws.
+ */
+export async function previewBaptismFollowUpNotice(input: { eventId: string; registrationId: string; responses: Record<string, unknown> }): Promise<BaptismNoticePreview | null> {
+  try {
+    const prisma = getPrisma();
+    const organizationId = await clubOrganizationOf(input.registrationId, input.eventId);
+    if (!organizationId) return null;
+    const moduleRow = await prisma.eventModule.findUnique({ where: { eventId_moduleKey: { eventId: input.eventId, moduleKey: BAPTISM_FOLLOW_UP_MODULE_KEY } }, select: { id: true } });
+    if (!moduleRow) return null;
+    const setting = await prisma.baptismFollowUpSetting.findUnique({ where: { eventId: input.eventId }, select: { leadEmails: true } });
+    if (!setting || setting.leadEmails.length === 0) return null;
+    const known = await prisma.baptismFollowUp.findMany({ where: { eventId: input.eventId, organizationId }, select: { normalizedName: true } });
+    const fresh = newBaptismNames(input.responses.baptism_names, new Set(known.map((row) => row.normalizedName)));
+    if (fresh.length === 0) return null;
+    const club = await prisma.organization.findUnique({ where: { id: organizationId }, select: { parentOrganizationId: true } });
+    const pastor = await pastorEmailFor(prisma, club?.parentOrganizationId ?? null);
+    return { names: fresh.length, recipients: pastor ? ["lead", "pastor"] : ["lead"] };
+  } catch (error) {
+    logError("The baptism follow-up preview could not be read.", error, { eventId: input.eventId, registrationId: input.registrationId });
+    return null;
+  }
+}
+
+/** After a staff edit has committed and staff chose to send: the same notice path as a club's own save. Never throws. */
+export async function sendBaptismFollowUpNoticesForStaffEdit(input: { eventId: string; registrationId: string }): Promise<BaptismNoticeResult> {
+  try {
+    const organizationId = await clubOrganizationOf(input.registrationId, input.eventId);
+    if (!organizationId) return nothing;
+    return await sendBaptismFollowUpNotices({ eventId: input.eventId, organizationId, registrationId: input.registrationId });
+  } catch (error) {
+    logError("A baptism follow-up notice could not be sent after a staff edit; the edit was saved.", error, { eventId: input.eventId, registrationId: input.registrationId });
+    return nothing;
+  }
+}
