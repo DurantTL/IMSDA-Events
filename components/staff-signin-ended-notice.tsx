@@ -63,7 +63,7 @@ export function dismissNotice(storage: Pick<Storage, "setItem"> | null, marker: 
 /**
  * The "your staff sign-in ended" notice on /account (#1947), shown once per sign-out. `marker` is an opaque value the
  * server derives from this browser's ended staff session; the browser remembers it so a later visit stays quiet.
- * It reuses the overview's notice look and sits in the same column as the cards.
+ * It reuses the overview's neutral card look (not the coral error notice) and sits in the same column as the cards.
  */
 export function StaffSignInEndedNotice({ marker }: { marker: string }) {
   const [, setTick] = useState(0);
@@ -74,7 +74,7 @@ export function StaffSignInEndedNotice({ marker }: { marker: string }) {
   if (!visible) return null;
   return (
     <div className={styles.wrap}>
-      <div className={`attendee-ov-notice ${styles.notice}`} role="status">
+      <div className={`attendee-ov-empty ${styles.notice}`} role="status">
         <Info size={20} aria-hidden="true" />
         <div>
           <p>
