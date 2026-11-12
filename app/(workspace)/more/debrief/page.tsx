@@ -28,7 +28,7 @@ export default async function EventDebriefPage({ searchParams }: { searchParams:
   const session = await getCurrentSession();
   const canRead = await canReadDebriefAnswers(session, event.id);
   if (!canSwitch && !canRead) {
-    return <AccessRestricted title="The event debrief is restricted" detail="Event administrators, registration managers and the Clubs Administrator can turn on and read an event's debrief." whoToAsk="your event administrator" />;
+    return <AccessRestricted title="The event debrief is restricted" detail="Event administrators and the Clubs Administrator can turn the debrief on, and event administrators and registration managers can read its answers." whoToAsk="your event administrator" />;
   }
   let state: Awaited<ReturnType<typeof loadDebriefToolState>>;
   try {

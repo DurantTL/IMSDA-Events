@@ -216,6 +216,15 @@ export async function buildInformationFormMembersCsv(target: InformationFormTarg
  * same form stores once and returns the stored response, so a retried submit never doubles. Used by the public fill
  * page (part C); the caller has already decided who is allowed to answer, and passes the signed-in account if any.
  */
+/** Whether one stored answer says something: text with a letter in it, a chosen option, a number or a yes. */
+function hasAnswerText(value: unknown): boolean {
+  if (typeof value === "string") return value.trim() !== "";
+  if (Array.isArray(value)) return value.some(hasAnswerText);
+  if (typeof value === "number") return true;
+  if (typeof value === "boolean") return value;
+  return false;
+}
+
 export async function storeInformationFormResponse(input: {
   formId: string;
   idempotencyKey: string;
@@ -259,14 +268,28 @@ export async function storeInformationFormResponse(input: {
   }
   const check = validateTestResponses(definition, answers, {}, undefined, { ignoreAvailability: true });
   if (!check.isValid) throw new InformationFormError("ANSWERS_INVALID", check.issues[0]!.message, check.issues.map((issue) => ({ key: issue.key, message: issue.message })));
+  // An empty send would use up the one answer the debrief takes from each person, so it is refused with a plain reason (#1679).
+  if (form.purpose && !Object.values(answers).some(hasAnswerText)) {
+    throw new InformationFormError("ANSWERS_INVALID", "Answer at least one question before sending.");
+  }
   // Read before the response is written; a failed read counts as on (the settings module's own rule).
   const alertEnabled = await isNotificationEnabled("INFORMATION_FORM_SUBMITTED");
   try {
-    const created = await prisma.informationFormResponse.create({ data: {
+    const data = {
       formId: form.id, versionId: version.id, answers: answers as Prisma.InputJsonValue,
       attendeeAccountId: input.attendeeAccountId ?? null,
       idempotencyKey: input.idempotencyKey,
-    }, select: { id: true, submittedAt: true } });
+    };
+    const select = { id: true, submittedAt: true } as const;
+    const accountId = input.attendeeAccountId;
+    const created = form.purpose && accountId
+      // One answer per person holds under concurrent sends: the check and the write share a lock on this form and person (#1679).
+      ? await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${form.id}), hashtext(${accountId}))`;
+        if (await hasAnsweredDebrief(form.id, accountId, tx)) throw new InformationFormError("ALREADY_ANSWERED", "You have already answered this form. Thank you.");
+        return tx.informationFormResponse.create({ data, select });
+      })
+      : await prisma.informationFormResponse.create({ data, select });
     // After the response is stored, and never throwing: the saved response stands whatever happens to the alert (#1222).
     await sendInformationFormSubmittedAlert({ responseId: created.id, formId: form.id, submittedAt: created.submittedAt }, alertEnabled);
     return { id: created.id, created: true };

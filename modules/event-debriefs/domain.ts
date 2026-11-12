@@ -142,8 +142,8 @@ export function nonResponders(audience: readonly DebriefRecipient[], answeredAcc
   return audience.filter((recipient) => !answeredAccountIds.has(recipient.accountId));
 }
 
-export function debriefFillPath(eventSlug: string, purpose: DebriefFormPurpose) {
-  return `/events/${encodeURIComponent(eventSlug)}/forms/${encodeURIComponent(DEBRIEF_FORM_SLUGS[purpose])}`;
+export function debriefFillPath(eventSlug: string, purpose: DebriefFormPurpose, formSlug?: string) {
+  return `/events/${encodeURIComponent(eventSlug)}/forms/${encodeURIComponent(formSlug ?? DEBRIEF_FORM_SLUGS[purpose])}`;
 }
 
 /**

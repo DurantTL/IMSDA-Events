@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import type { DebriefFormResults, DebriefResults } from "@/modules/event-debriefs/results";
 import styles from "@/components/debrief-results.module.css";
 
 function when(iso: string) {
-  return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Chicago" });
+  return formatInConferenceTime(iso, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function FormBlock({ form, headingId }: { form: DebriefFormResults; headingId: string }) {

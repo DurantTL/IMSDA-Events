@@ -77,8 +77,14 @@ export async function runDebriefBatch(
       "MISSED_WINDOW", "failed", "A debrief email was not sent because its time had passed.",
     );
   }
-  const event = await prisma.event.findUnique({ where: { id: batch.eventId }, select: { name: true, slug: true, timezone: true, endsAt: true, debrief: { select: { evaluationEnabled: true } } } });
+  const event = await prisma.event.findUnique({ where: { id: batch.eventId }, select: { name: true, slug: true, timezone: true, endsAt: true, archivedAt: true, audience: true, isPublished: true, lifecycleState: true, debrief: { select: { evaluationEnabled: true } } } });
   if (!event) return stop({ status: "CANCELLED", cancelledAt: now }, "EVENT_GONE", "skipped", "Did not send the debrief because the event is gone.");
+
+  // An event that is archived, no longer public or not a club event is not asked for a debrief: cancelled with the reason.
+  const notAsked = event.archivedAt || event.lifecycleState === "ARCHIVED" ? "EVENT_ARCHIVED" : event.audience !== "CLUB" ? "NOT_A_CLUB_EVENT" : !event.isPublished ? "EVENT_NOT_PUBLISHED" : null;
+  if (notAsked) {
+    return stop({ status: "CANCELLED", cancelledAt: now }, notAsked, "skipped", "Did not send the debrief because the event is archived, not public or not a club event.");
+  }
 
   // The event's dates moved after this was scheduled: follow them. Released, not sent.
   const projection = debriefSchedule(event)[kind === "INVITE" ? "invite" : "reminder"];
@@ -98,6 +104,8 @@ export async function runDebriefBatch(
     return stop({ status: "FAILED", failedAt: now, failureReason: "Email sending is not set up, so the debrief could not be sent." }, "EMAIL_NOT_CONFIGURED", "failed", "A debrief email could not be sent because email is not set up.");
   }
 
+  // The form's own address: its slug can differ from the usual one when staff already had a form of that name.
+  const slugs = new Map((await prisma.informationForm.findMany({ where: { eventId: batch.eventId, purpose: { not: null } }, select: { purpose: true, slug: true } })).map((form) => [form.purpose, form.slug]));
   const purposes: DebriefFormPurpose[] = event.debrief?.evaluationEnabled ? ["DEBRIEF", "DIRECTOR_EVALUATION"] : ["DEBRIEF"];
   const baseUrl = getServerEnv().APP_BASE_URL;
   const planned: Array<{ purpose: DebriefFormPurpose; recipient: DebriefRecipient }> = [];
@@ -119,7 +127,7 @@ export async function runDebriefBatch(
       for (const { purpose, recipient } of chunk) {
         const key = debriefMessageKey(batch.id, recipient.accountId, purpose);
         if (already.has(key)) continue;
-        const content = debriefEmailContent({ kind, purpose, eventName: event.name, recipientName: recipient.name, url: new URL(debriefFillPath(event.slug, purpose), baseUrl).toString() });
+        const content = debriefEmailContent({ kind, purpose, eventName: event.name, recipientName: recipient.name, url: new URL(debriefFillPath(event.slug, purpose, slugs.get(purpose)), baseUrl).toString() });
         const message = await tx.messageOutbox.create({
           data: {
             eventId: batch.eventId,

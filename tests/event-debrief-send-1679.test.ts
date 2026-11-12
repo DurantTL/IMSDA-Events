@@ -28,7 +28,7 @@ const people = [
 
 type Row = Record<string, unknown>;
 
-function setup(options: { kind?: "INVITE" | "REMINDER"; moduleOn?: boolean; evaluation?: boolean; endsAt?: Date; keys?: string[] } = {}) {
+function setup(options: { kind?: "INVITE" | "REMINDER"; moduleOn?: boolean; evaluation?: boolean; endsAt?: Date; keys?: string[]; event?: Record<string, unknown>; slug?: string } = {}) {
   const kind = options.kind ?? "INVITE";
   const projection = kind === "INVITE" ? schedule.invite : schedule.reminder;
   const batch = {
@@ -47,7 +47,8 @@ function setup(options: { kind?: "INVITE" | "REMINDER"; moduleOn?: boolean; eval
   };
   const prisma = {
     eventModule: { findUnique: vi.fn(async () => (options.moduleOn === false ? null : { id: "row" })) },
-    event: { findUnique: vi.fn(async () => ({ name: "Sample Spring Camporee", slug: "sample-spring-camporee", timezone: "America/Chicago", endsAt: options.endsAt ?? endsAt, debrief: { evaluationEnabled: options.evaluation ?? false } })) },
+    event: { findUnique: vi.fn(async () => ({ name: "Sample Spring Camporee", slug: "sample-spring-camporee", timezone: "America/Chicago", endsAt: options.endsAt ?? endsAt, archivedAt: null, audience: "CLUB", isPublished: true, lifecycleState: "PUBLISHED", debrief: { evaluationEnabled: options.evaluation ?? false }, ...(options.event ?? {}) })) },
+    informationForm: { findMany: vi.fn(async () => [{ purpose: "DEBRIEF", slug: options.slug ?? "debrief" }, { purpose: "DIRECTOR_EVALUATION", slug: "director-evaluation" }]) },
     scheduledEmailBatch: { updateMany: vi.fn(async (args: Row) => { updates.push(args); return { count: 1 }; }) },
     auditLog: { create: vi.fn(async () => ({})) },
     $transaction: async (run: (client: unknown) => unknown) => run(tx),
@@ -137,6 +138,26 @@ describe("when it must not send (#1679)", () => {
     expect(result).toMatchObject({ outcome: "skipped", reason: "MODULE_OFF" });
     expect(created).toHaveLength(0);
     expect(updates[0]).toMatchObject({ data: { status: "CANCELLED" } });
+  });
+
+  it.each([
+    ["an archived event", { archivedAt: new Date("2027-03-10T00:00:00Z") }, "EVENT_ARCHIVED"],
+    ["an event in the archived lifecycle state", { lifecycleState: "ARCHIVED" }, "EVENT_ARCHIVED"],
+    ["an event that is not public", { isPublished: false }, "EVENT_NOT_PUBLISHED"],
+    ["an event that is not a club event", { audience: "GENERAL" }, "NOT_A_CLUB_EVENT"],
+  ])("cancels instead of sending for %s", async (_label, event, reason) => {
+    const { prisma, batch, created, updates } = setup({ event });
+    const result = await runDebriefBatch(prisma, batch, "claim-1", now());
+    expect(result).toMatchObject({ outcome: "skipped", reason });
+    expect(created).toHaveLength(0);
+    expect(updates[0]).toMatchObject({ data: { status: "CANCELLED" } });
+  });
+
+  it("links to the form's own address when its slug is not the usual one", async () => {
+    const { prisma, batch, created } = setup({ slug: "debrief-event" });
+    await runDebriefBatch(prisma, batch, "claim-1", now());
+    expect(String(created[0]!.bodyTextSnapshot)).toContain("/events/sample-spring-camporee/forms/debrief-event");
+    expect(String(created[0]!.bodyTextSnapshot)).not.toMatch(/forms\/debrief\n/);
   });
 
   it("does not send more than six hours late", async () => {

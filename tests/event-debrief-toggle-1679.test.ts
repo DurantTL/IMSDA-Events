@@ -25,10 +25,10 @@ vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.ge
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership }));
 vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: mocks.currentAreaCoordinator, isAreaCoordinator: mocks.isAreaCoordinator }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
-vi.mock("@/modules/event-debriefs/lifecycle", () => ({ onDebriefEnabled: mocks.onEnabled, onDebriefDisabled: mocks.onDisabled, ensureDebriefForm: mocks.ensureForm }));
+vi.mock("@/modules/event-debriefs/lifecycle", () => ({ onDebriefEnabled: mocks.onEnabled, onDebriefDisabled: mocks.onDisabled, ensureDebriefForm: mocks.ensureForm, lockDebriefEvent: vi.fn(async () => undefined) }));
 vi.mock("@/lib/prisma", () => {
   const tx = {
-    eventModule: { createMany: mocks.moduleCreateMany, deleteMany: mocks.moduleDeleteMany },
+    eventModule: { createMany: mocks.moduleCreateMany, deleteMany: mocks.moduleDeleteMany, findUnique: mocks.moduleFindUnique },
     eventDebrief: { upsert: mocks.debriefUpsert, update: mocks.debriefUpdate },
   };
   return {

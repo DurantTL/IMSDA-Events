@@ -315,6 +315,8 @@ const pages: PageSpec[] = [
   area("events", "/account/area-clubs/events"),
   // The coordinator attendee report with its club, role and location filters (#1762).
   area("event-report", `/account/area-clubs/events/${clubEventId}/report`),
+  // The optional Event debrief (#1679): the coordinator's switch page.
+  { ...area("debrief", `/account/area-clubs/events/${clubEventId}/debrief`), expectText: /Event debrief/ },
   area("team-permissions", "/account/area-clubs/team-permissions"),
   area("new-club-applications", "/account/area-clubs/applications"),
   area("points", "/account/area-clubs/points"),
@@ -446,6 +448,8 @@ const pages: PageSpec[] = [
   staff("registration-builder", "/registration-builder"),
   // The event's information forms list (#1572): the titled list page with its description and the form cards.
   { ...staff("information-forms", "/information-forms"), expectText: /Information forms/ },
+  // The optional Event debrief (#1679): the switch, the evaluation switch and the answers.
+  { ...staff("debrief", `/more/debrief?event=${clubEventId}`, "system-admin"), expectText: /Event debrief/ },
   // Home (#1568): the work waiting for this person, and the upcoming events they can open.
   { ...staff("home-needs-you", "/home", "system-admin"), expectText: /Needs you/ },
   { ...staff("home-coming-up", "/home/coming-up", "system-admin"), expectText: /Coming up/ },
@@ -1216,6 +1220,17 @@ async function seedInformationForm(prisma: PrismaClient): Promise<PageSpec[]> {
       await page.getByRole("button", { name: /Add another member/i }).click();
     },
   }];
+}
+
+/** The Event debrief (#1679) switched on for the club weekend, so its fill page exists: the signed-in coordinator's view of the form. */
+async function seedDebriefPages(prisma: PrismaClient): Promise<PageSpec[]> {
+  const { onDebriefEnabled } = await import("../modules/event-debriefs/lifecycle");
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
+  await prisma.$transaction(async (tx) => {
+    await tx.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "debrief" }], skipDuplicates: true });
+    await onDebriefEnabled(tx, { eventId: clubEventId, actor: { kind: "staff", userId: admin.id } });
+  });
+  return [{ name: "area-debrief-fill", path: `/events/${clubEventSlug}/forms/debrief`, role: "area" }];
 }
 
 /** A System deeper page with a back link (#1274): the editor of a seeded event template. Reads only; nothing is created. */
@@ -4795,6 +4810,7 @@ async function main() {
     await seedStationEvent(prisma);
     pages.push(...staffInvitePages(await seedStaffInviteEvent(prisma)));
     pages.push(...await seedInformationForm(prisma));
+    pages.push(...await seedDebriefPages(prisma));
     pages.push(...await seedEventTemplatePages(prisma));
     const cookies = await mintSessions(prisma, tokens);
     console.log(`Auditing ${pages.length} pages at ${widths.join(", ")} px; output in ${outDir}`);

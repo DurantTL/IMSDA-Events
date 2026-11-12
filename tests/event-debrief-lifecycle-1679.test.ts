@@ -30,6 +30,7 @@ function fakeTx(options: { endsAt?: Date; timezone?: string; evaluationEnabled?:
     debriefs.set("event-1", { eventId: "event-1", evaluationEnabled: options.evaluationEnabled ?? false, carriedFromEventId: options.carriedFrom ?? null });
   }
   const tx = {
+    $queryRaw: vi.fn(async () => []),
     event: { findUnique: vi.fn(async () => ({ ...event, debrief: debriefs.has("event-1") ? { carriedFromEventId: debriefs.get("event-1")!.carriedFromEventId } : null })) },
     eventMembership: { findFirst: vi.fn(async () => ({ userId: "user-admin" })) },
     user: { findFirst: vi.fn(async () => ({ id: "user-sysadmin" })) },
@@ -97,6 +98,20 @@ describe("switching the Debrief on (#1679)", () => {
     const definition = (forms[0]!.versions as { create: { definition: { sections: Array<{ fields: Array<{ label: string }> }> }; status: string } }).create;
     expect(definition.status).toBe("PUBLISHED");
     expect(definition.definition.sections[0]!.fields.map((field) => field.label)).toEqual(["What went well?", "What should we do better?", "Ideas for next year?"]);
+  });
+
+  it("takes the form's own slug when staff already had a form called debrief, and the address uses it", async () => {
+    const { tx, forms, raw } = fakeTx();
+    raw.informationForm.findUnique.mockResolvedValue({ id: "staff-made" } as never);
+    await ensureDebriefForm(tx, { eventId: "event-1", purpose: "DEBRIEF", actor: staff });
+    expect(forms[0]!.slug).toBe("debrief-event");
+  });
+
+  it("locks the event first, so two switches at once make one form and one pair of batches", async () => {
+    const { tx, raw } = fakeTx();
+    await onDebriefEnabled(tx, { eventId: "event-1", actor: staff, now });
+    expect(raw.$queryRaw).toHaveBeenCalled();
+    expect(String((raw.$queryRaw.mock.calls[0] as unknown[][])[0]!.join(" "))).toContain("FOR UPDATE");
   });
 
   it("does not make a second form when one exists", async () => {

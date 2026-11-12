@@ -17,7 +17,7 @@ import {
   type ScopedToggleActor,
 } from "@/modules/event-modules/scoped-toggle";
 import { DEBRIEF_MODULE_KEY } from "@/modules/event-debriefs/domain";
-import { ensureDebriefForm, onDebriefDisabled, onDebriefEnabled } from "@/modules/event-debriefs/lifecycle";
+import { ensureDebriefForm, lockDebriefEvent, onDebriefDisabled, onDebriefEnabled } from "@/modules/event-debriefs/lifecycle";
 
 /**
  * Who may switch the optional Debrief on or off (#1679). The switching is the shared scoped helper
@@ -101,10 +101,12 @@ export async function applyDebriefSettings(actor: DebriefActor, eventId: string,
     throw new DebriefError("NOT_PERMITTED", "Only the Clubs Administrator or event staff can turn the director evaluation on or off.");
   }
   const prisma = getPrisma();
-  const wasOn = await scopedModuleIsOn(eventId, DEBRIEF_MODULE_KEY);
   const who = scopedActorAudit(actor);
   const title = eventModuleDefinition(DEBRIEF_MODULE_KEY).title;
   await prisma.$transaction(async (tx) => {
+    // Under the event's lock, so two switches at once cannot both see "off" and both set it up (#1679).
+    await lockDebriefEvent(tx, eventId);
+    const wasOn = (await tx.eventModule.findUnique({ where: { eventId_moduleKey: { eventId, moduleKey: DEBRIEF_MODULE_KEY } }, select: { id: true } })) !== null;
     await writeScopedModuleSwitch(tx, { actor, eventId, moduleKey: DEBRIEF_MODULE_KEY, enabled: input.enabled });
     if (input.enabled === true && !wasOn) await onDebriefEnabled(tx, { eventId, actor, now });
     if (input.enabled === false && wasOn) await onDebriefDisabled(tx, { eventId, actor, now });

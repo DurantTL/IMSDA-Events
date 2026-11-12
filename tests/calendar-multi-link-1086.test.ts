@@ -24,6 +24,7 @@ const state = vi.hoisted(() => ({
   event: null as unknown,
   eventUpdates: [] as unknown[],
   audits: [] as unknown[],
+  reprojected: [] as string[],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -35,6 +36,9 @@ vi.mock("@/modules/audit/audit-service", () => ({
   writeAuditLog: vi.fn(async (entry: unknown) => {
     state.audits.push(entry);
   }),
+}));
+vi.mock("@/modules/event-debriefs/lifecycle", () => ({
+  reprojectDebriefBatches: vi.fn(async (_tx: unknown, eventId: string) => { state.reprojected.push(eventId); return 0; }),
 }));
 vi.mock("@/lib/prisma", () => {
   const rows = () => state.entries as EntryRow[];
@@ -116,6 +120,7 @@ beforeEach(() => {
   state.event = eventRow();
   state.eventUpdates = [];
   state.audits = [];
+  state.reprojected = [];
 });
 
 describe("linking several calendar items to one event (#1086)", () => {
@@ -233,6 +238,8 @@ describe("updating the event's dates from an item only with exactly one link (#1
     expect((state.entries as EntryRow[])[0]).toMatchObject({ baselineStartsOn: moved.startsOn, baselineEndsOn: moved.endsOn });
     await resolveCalendarDateChange("event-1", "update", moved, "admin-1", "mo");
     expect(state.eventUpdates).toHaveLength(2);
+    // The debrief's unsent emails move with the end date, once per change.
+    expect(state.reprojected).toEqual(["event-1", "event-1"]);
   });
 
   it("refuses Update when several items are linked, even if the request names one, and changes nothing", async () => {
@@ -249,6 +256,7 @@ describe("updating the event's dates from an item only with exactly one link (#1
     expect(mo).toMatchObject({ baselineStartsOn: moved.startsOn, baselineEndsOn: moved.endsOn });
     expect(ia.baselineStartsOn).toBeNull();
     expect(state.eventUpdates).toEqual([]);
+    expect(state.reprojected).toEqual([]);
     expect(state.audits).toMatchObject([{ action: "CALENDAR_EVENT_DATES_KEPT", metadata: { calendarEntryId: "mo" } }]);
   });
 

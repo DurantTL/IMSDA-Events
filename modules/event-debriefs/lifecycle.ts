@@ -27,6 +27,11 @@ type Tx = Prisma.TransactionClient;
 
 const batchKinds: readonly DebriefBatchKind[] = ["INVITE", "REMINDER"];
 
+/** Serializes the debrief's setup for one event, so two switches at once make one form and one pair of batches. Held until the transaction ends. */
+export async function lockDebriefEvent(tx: Tx, eventId: string) {
+  await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${eventId} FOR UPDATE`;
+}
+
 /** The audit trail of the debrief's own work: ids and counts, never an answer. */
 function audit(tx: Tx, actor: ScopedToggleActor | null, eventId: string, action: string, summary: string, metadata: Prisma.InputJsonObject = {}) {
   const who = actor ? scopedActorAudit(actor) : { metadata: {} as Prisma.InputJsonObject };
@@ -60,6 +65,7 @@ async function formOwnerUserId(tx: Tx, eventId: string, actor: ScopedToggleActor
  * (staff's edits carry forward), else the starter questions. Safe to repeat.
  */
 export async function ensureDebriefForm(tx: Tx, input: { eventId: string; purpose: DebriefFormPurpose; actor: ScopedToggleActor | null }): Promise<string | null> {
+  await lockDebriefEvent(tx, input.eventId);
   const existing = await tx.informationForm.findFirst({ where: { eventId: input.eventId, purpose: input.purpose }, select: { id: true } });
   if (existing) return existing.id;
   const event = await tx.event.findUnique({ where: { id: input.eventId }, select: { name: true, debrief: { select: { carriedFromEventId: true } } } });
@@ -134,6 +140,7 @@ function batchColumns(kind: DebriefBatchKind, projection: ReturnType<typeof debr
  */
 export async function createDebriefBatches(tx: Tx, input: { eventId: string; actor: ScopedToggleActor | null; now: Date }): Promise<{ created: DebriefBatchKind[]; skipped: DebriefBatchKind[] }> {
   const result = { created: [] as DebriefBatchKind[], skipped: [] as DebriefBatchKind[] };
+  await lockDebriefEvent(tx, input.eventId);
   const event = await loadTiming(tx, input.eventId);
   if (!event) return result;
   let schedule: ReturnType<typeof debriefSchedule>;

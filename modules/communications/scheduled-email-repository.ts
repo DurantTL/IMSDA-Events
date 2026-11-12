@@ -968,7 +968,7 @@ export async function cancelScheduledEmail(eventId: string, actorUserId: string,
       throw stateError(`A ${row.status.toLowerCase()} schedule cannot be cancelled.`);
     }
     const cancelledMessages = await tx.messageOutbox.updateMany({
-      where: { status: "PENDING", OR: [{ scheduledEmailRecipient: { batchId: scheduleId } }, { metadata: { path: ["scheduledEmailBatchId"], equals: scheduleId } }] },
+      where: { status: "PENDING", OR: [{ scheduledEmailRecipient: { batchId: scheduleId } }, { metadata: { path: ["scheduledEmailBatchId"], equals: scheduleId } }, { metadata: { path: ["debriefBatchId"], equals: scheduleId } }] },
       data: { status: "CANCELLED", lockedAt: null, lockToken: null, lastError: "The schedule was cancelled before this was sent." },
     });
     const cancelledRecipients = await tx.scheduledEmailRecipient.updateMany({

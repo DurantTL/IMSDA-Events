@@ -13,14 +13,17 @@ const db = vi.hoisted(() => ({
   carriedFrom: null as string | null,
   membership: vi.fn(),
   where: {} as Record<string, unknown>,
+  locks: 0,
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: db.membership }));
 vi.mock("@/modules/notifications/settings", () => ({ isNotificationEnabled: vi.fn(async () => false) }));
 vi.mock("@/modules/information-forms/submission-alert", () => ({ sendInformationFormSubmittedAlert: vi.fn(async () => undefined) }));
-vi.mock("@/lib/prisma", () => ({
-  getPrisma: () => ({
+vi.mock("@/lib/prisma", () => {
+  const client = {
+    $executeRaw: vi.fn(async () => { db.locks += 1; return 0; }),
+    $transaction: async (run: (tx: unknown) => unknown) => run(client),
     informationForm: { findUnique: vi.fn(async () => db.form), findMany: vi.fn(async () => []) },
     informationFormResponse: {
       findUnique: vi.fn(async () => null),
@@ -34,8 +37,9 @@ vi.mock("@/lib/prisma", () => ({
     eventMembership: { findMany: vi.fn(async (args: { where: Record<string, unknown> }) => { db.where = args.where; return db.members; }) },
     areaCoordinatorGrant: { findMany: vi.fn(async () => db.grants) },
     clubDirectorGrant: { findMany: vi.fn(async () => db.directors) },
-  }),
-}));
+  };
+  return { getPrisma: () => client };
+});
 
 import { debriefFormAccess, hasAnsweredDebrief } from "@/modules/event-debriefs/access";
 import { answeredAccountIds, isDebriefRecipient, resolveDebriefRecipients } from "@/modules/event-debriefs/recipients";
@@ -62,6 +66,7 @@ beforeEach(() => {
   db.responseCount = 0;
   db.created = [];
   db.carriedFrom = null;
+  db.locks = 0;
 });
 
 describe("who is on the debrief list (#1679)", () => {
@@ -126,6 +131,21 @@ describe("who may answer, checked on the server (#1679)", () => {
     db.form = formRow({ fillAccess: "ANYONE_WITH_LINK" });
     await expect(storeInformationFormResponse({ formId: "form-debrief", idempotencyKey: "key-12345681", answers: {}, attendeeAccountId: null, now })).rejects.toMatchObject({ code: "SIGN_IN_REQUIRED" });
     expect(db.created).toHaveLength(0);
+  });
+
+  it("refuses an empty send, so it does not use up the one answer", async () => {
+    for (const answers of [{}, { went_well: "   " }]) {
+      await expect(storeInformationFormResponse({ formId: "form-debrief", idempotencyKey: "key-12345690", answers, attendeeAccountId: "ac-1", now }))
+        .rejects.toMatchObject({ code: "ANSWERS_INVALID", message: "Answer at least one question before sending." });
+    }
+    expect(db.created).toHaveLength(0);
+  });
+
+  it("checks and writes the one answer under a lock on the form and the person, so concurrent sends cannot both pass", async () => {
+    await storeInformationFormResponse({ formId: "form-debrief", idempotencyKey: "key-12345691", answers: { went_well: "Good" }, attendeeAccountId: "ac-1", now });
+    expect(db.locks).toBe(1);
+    db.responseCount = 1;
+    await expect(storeInformationFormResponse({ formId: "form-debrief", idempotencyKey: "key-12345692", answers: { went_well: "Twice" }, attendeeAccountId: "ac-1", now })).rejects.toMatchObject({ code: "ALREADY_ANSWERED" });
   });
 
   it("takes one answer from each person", async () => {
