@@ -1,0 +1,12 @@
+.lead { margin: 0; color: var(--muted); font-size: var(--type-public-label); }
+.product { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.product h4 { margin: 0; font-size: var(--type-public-body); }
+.description { margin: 0; color: var(--muted); font-size: var(--type-public-label); }
+.sizes { display: grid; gap: 8px; }
+.size { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-height: 44px; }
+.sizeName { display: grid; gap: 2px; font-size: var(--type-public-label); font-weight: 700; }
+.sizeName small { color: var(--muted); font-weight: 500; font-size: var(--type-public-label); }
+.select { min-width: 5rem; min-height: 44px; }
+.soldOut { color: var(--muted); font-size: var(--type-public-label); font-weight: 700; }
+.subtotal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 0; padding-top: 12px; border-top: 1px solid var(--line); font-size: var(--type-public-label); font-weight: 700; }
+.error { margin: 0; color: var(--danger, var(--ink)); font-size: var(--type-public-label); font-weight: 700; }

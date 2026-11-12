@@ -121,6 +121,7 @@
     "benchmark:meal-submit-contention": "tsx --require ./scripts/support/allow-server-only.cjs scripts/benchmark-meal-submit-contention.ts",
     "test:lodging-preferences": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-lodging-preferences.ts",
     "test:lodging-assignment": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-lodging-assignment.ts",
+    "test:registration-merchandise": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-registration-merchandise.ts",
     "report:church-share-drift": "tsx --require ./scripts/support/allow-server-only.cjs scripts/report-church-share-drift.ts",
     "test:issued-assets": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-issued-assets.ts",
     "test:issued-assets-returns": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-issued-assets-returns.ts",

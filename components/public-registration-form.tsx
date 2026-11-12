@@ -51,6 +51,14 @@ import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } fro
 import { ResponsibleAdultChoice } from "@/components/responsible-adult-choice";
 import { PublicLodgingStep } from "@/components/public-lodging-step";
 import {
+  merchandiseLines,
+  merchandiseNotChargedNotice,
+  merchandiseSubtotalCents,
+  PublicMerchandiseStep,
+  type MerchandiseSelection,
+} from "@/components/public-merchandise-step";
+import type { PublicMerchandiseOffer } from "@/modules/merchandise/registration-order-schema";
+import {
   chosenNights,
   defaultLodgingChoice,
   lodgingStepInput,
@@ -252,6 +260,9 @@ type Confirmation = {
   capacityDecision: "REGISTER" | "WAITLIST";
   paymentEligible: boolean;
   waitlistPosition: number | null;
+  /** A separate pending merchandise order made with this registration (#146); not part of the totals above. */
+  merchandise?: { lines: Array<{ productName: string; variantLabel: string; quantity: number; lineTotalCents: number }>; totalCents: number };
+  merchandiseNotOrdered?: boolean;
 };
 
 /** What the browser prices a form with. A church-billed event carries the lines only, never a sum (#621). */
@@ -299,6 +310,8 @@ export type PublicRegistrationFormProps = {
    * group registration never shows it, whatever is passed.
    */
   lodging?: LodgingStepOffer | null;
+  /** Optional merchandise (#146): shown only on an individual registration, ordered separately and never charged with it. */
+  merchandise?: PublicMerchandiseOffer | null;
   initialResponses?: FormResponses;
   initialAttendeeResponses?: FormResponses;
   embedded?: boolean;
@@ -514,6 +527,7 @@ export function PublicRegistrationForm({
   pricingDate,
   lifecycle,
   lodging = null,
+  merchandise = null,
   initialResponses = {},
   initialAttendeeResponses = {},
   embedded = false,
@@ -651,6 +665,22 @@ export function PublicRegistrationForm({
   }, [attendees, lodgingChoiceState]);
   const lodgingLine = lodgingActive && !deferredOrganizationBilling && !joiningWaitlist ? lodgingStepLine(lodgingOffer, lodgingChoice) : null;
   const lodgingSubmission = lodgingActive ? lodgingStepInput(lodgingOffer, lodgingChoice) : null;
+  // Merchandise (#146): its own optional section on an individual registration; a quantity per size, priced by the server.
+  const merchandiseActive = Boolean(merchandise) && !club && !group;
+  const [merchandiseSelection, setMerchandiseSelection] = useState<MerchandiseSelection>({});
+  // Prices the server said have changed since this page loaded, by size (#146): shown and sent from then on.
+  const [merchandisePriceUpdates, setMerchandisePriceUpdates] = useState<Record<string, number>>({});
+  const merchandiseOffer = useMemo<PublicMerchandiseOffer | null>(() => (merchandise ? {
+    products: merchandise.products.map((product) => ({
+      ...product,
+      variants: product.variants.map((variant) => (merchandisePriceUpdates[variant.id] === undefined ? variant : { ...variant, priceCents: merchandisePriceUpdates[variant.id]! })),
+    })),
+  } : null), [merchandise, merchandisePriceUpdates]);
+  const merchandiseChosen = useMemo(
+    () => (merchandiseActive && !joiningWaitlist ? merchandiseLines(merchandiseOffer, merchandiseSelection) : []),
+    [joiningWaitlist, merchandiseOffer, merchandiseActive, merchandiseSelection],
+  );
+  const merchandiseSubmission = merchandiseChosen.map((line) => ({ variantId: line.variantId, quantity: line.quantity, shownUnitPriceCents: line.unitPriceCents }));
   const [error, setError] = useState("");
   const [rosterAnnouncement, setRosterAnnouncement] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -2976,6 +3006,19 @@ export function PublicRegistrationForm({
           </section>
         )}
 
+        {merchandiseChosen.length > 0 && (
+          <section className="public-registration-review-card" aria-labelledby="public_merchandise_review_title">
+            <p className="public-registration-eyebrow">Ordered separately</p>
+            <h3 id="public_merchandise_review_title">Merchandise</h3>
+            <ul>
+              {merchandiseChosen.map((line) => (
+                <li key={line.variantId}>{line.quantity} × {line.productName} {line.variantLabel}: <span translate="no">{formatCents(line.lineTotalCents)}</span></li>
+              ))}
+            </ul>
+            <p>Merchandise subtotal <strong translate="no">{formatCents(merchandiseSubtotalCents(merchandiseOffer, merchandiseSelection))}</strong>. {merchandiseNotChargedNotice}</p>
+          </section>
+        )}
+
         {responsibleAdultMinors.length > 0 && (
           <section className="public-registration-review-card" aria-labelledby="public_responsible_adult_title">
             <p className="public-registration-eyebrow">Minors on this registration</p>
@@ -3262,6 +3305,7 @@ export function PublicRegistrationForm({
           } : {}),
           ...(responsibleAdultMinors.length > 0 ? { responsibleAdults: responsibleAdultValues } : {}),
           ...(lodgingSubmission ? { lodging: lodgingSubmission } : {}),
+          ...(merchandiseSubmission.length > 0 ? { merchandise: merchandiseSubmission } : {}),
           ...(club?.locationId ? { locationId: club.locationId } : {}),
           ...(club?.teamName ? { teamName: club.teamName } : {}),
           ...(club?.draftKey ? { draftKey: club.draftKey } : {}),
@@ -3315,6 +3359,12 @@ export function PublicRegistrationForm({
           setPromoCodeQuote(null);
           setPromoCodeNotice(promoIssue.message);
         }
+        // A merchandise price that changed: take the new price so the next submit carries it (#146).
+        const priceChanges = nextIssues.flatMap((issue) => {
+          const detail = (issue as FormIssue & { merchandise?: { variantId?: unknown; currentUnitPriceCents?: unknown } }).merchandise;
+          return typeof detail?.variantId === "string" && Number.isSafeInteger(detail.currentUnitPriceCents) ? [[detail.variantId, detail.currentUnitPriceCents as number] as const] : [];
+        });
+        if (priceChanges.length > 0) setMerchandisePriceUpdates((current) => ({ ...current, ...Object.fromEntries(priceChanges) }));
         setServerIssues(nextIssues);
         showIssues(
           nextIssues,
@@ -3483,6 +3533,16 @@ export function PublicRegistrationForm({
                 )}
                 {(confirmation.processingFeeCents ?? 0) > 0 && <div><span>Card processing</span><strong translate="no">{formatCents(confirmation.processingFeeCents ?? 0)}</strong></div>}
                 <div className="is-total"><span>Total</span><strong translate="no">{formatCents(confirmation.totalCents ?? 0)}</strong></div>
+              </section>
+            )}
+            {confirmation.merchandise && confirmation.merchandise.lines.length > 0 && (
+              <section className="public-registration-confirmation-order" aria-label="Merchandise order">
+                <h2>Merchandise order</h2>
+                {confirmation.merchandise.lines.map((line, index) => (
+                  <div key={`${line.productName}_${line.variantLabel}_${index}`}><span>{line.quantity} × {line.productName} {line.variantLabel}</span><strong translate="no">{formatCents(line.lineTotalCents)}</strong></div>
+                ))}
+                <div className="is-total"><span>Merchandise subtotal</span><strong translate="no">{formatCents(confirmation.merchandise.totalCents)}</strong></div>
+                <p>{merchandiseNotChargedNotice}</p>
               </section>
             )}
             {confirmation.managePath && (
@@ -3703,6 +3763,21 @@ export function PublicRegistrationForm({
                   }}
                 />
               )}
+              {currentStep.isReview && merchandiseActive && merchandiseOffer && (joiningWaitlist ? (
+                <p className="public-registration-review-waitlist">Merchandise cannot be ordered with a waitlist request.</p>
+              ) : (
+                <PublicMerchandiseStep
+                  offer={merchandiseOffer}
+                  selection={merchandiseSelection}
+                  issues={issues.filter((issue) => issue.key === "merchandise")}
+                  onChange={(next) => {
+                    setMerchandiseSelection(next);
+                    setIssues((current) => current.filter((issue) => issue.key !== "merchandise"));
+                    setError("");
+                    setIdempotencyKey(null);
+                  }}
+                />
+              ))}
               {currentStep.isReview && renderReview()}
             </div>
           </section>

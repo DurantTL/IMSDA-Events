@@ -126,6 +126,7 @@ export default async function PublicRegistrationPage({
       pricingDate={experience.pricingDate}
       lifecycle={experience.lifecycle}
       lodging={experience.lodging}
+      merchandise={experience.merchandise}
       initialResponses={scopedPrefill("REGISTRATION")}
       initialAttendeeResponses={scopedPrefill("ATTENDEE")}
       securityCheck={await securityCheckConfigForPage()}
