@@ -352,6 +352,9 @@ export type ClubFormActor =
  *   sees the club's files, including sensitive answers and birth dates.
  * - AREA_COORDINATOR: read-only over every club; every sensitive answer is
  *   "Restricted".
+ * - TLT_DIRECTOR (#1686): the conference TLT director, signed in with her own account. Reads the three TLT forms
+ *   (`TLT_FORM_TEMPLATE_KEYS`) from every club, sensitive answers included, and nothing else; every view is audited.
+ *   Built only by `currentTltFormsViewer` (never a staff act-as). Birth dates stay Restricted.
  * - STAFF: conference staff, which is only system administrators, Clubs
  *   Administrators and Event Admins of a current event (Caleb, 2026-09-29 and
  *   2026-10-26). Read-only. They read the sensitive answers (health, conduct,
@@ -361,14 +364,24 @@ export type ClubFormActor =
 export type ClubFormsViewer =
   | { kind: "CLUB_LEADER"; organizationId: string; actor: ClubFormActor }
   | { kind: "AREA_COORDINATOR"; actor: ClubFormActor }
+  | { kind: "TLT_DIRECTOR"; accountId: string }
   | { kind: "STAFF"; userId: string; systemAdmin: boolean; clubsAdministrator: boolean; sensitiveAnswers: boolean };
+
+/** The only forms the TLT director (#1686) may read: the TLT Application, the recommendations and TLT of the Year. */
+export const TLT_FORM_TEMPLATE_KEYS = ["club_tlt_application", "tlt_program_recommendation", "club_tlt_of_the_year"] as const;
+export type TltFormTemplateKey = typeof TLT_FORM_TEMPLATE_KEYS[number];
+
+export function isTltFormTemplateKey(key: string | undefined | null): key is TltFormTemplateKey {
+  return typeof key === "string" && (TLT_FORM_TEMPLATE_KEYS as readonly string[]).includes(key);
+}
 
 /**
  * A submission with no club (a "Not listed" open application, #1229) is conference staff's alone: `organizationId`
  * is null there, and neither a club leader nor an Area Coordinator may see it.
  */
 export function viewerCanSeeClub(viewer: ClubFormsViewer, organizationId: string | null) {
-  if (organizationId === null) return viewer.kind === "STAFF";
+  // The TLT director also reads a TLT Application from a club that is "Not listed" (#1686); `visibleWhere` limits her to the three TLT forms.
+  if (organizationId === null) return viewer.kind === "STAFF" || viewer.kind === "TLT_DIRECTOR";
   return viewer.kind !== "CLUB_LEADER" || viewer.organizationId === organizationId;
 }
 
@@ -402,8 +415,12 @@ export function clubFormClubLabel(organizationName: string | null | undefined, u
   return typed ? `Not listed: ${typed}` : "Not listed";
 }
 
-/** Health, conduct, physician and emergency-contact answers (not birth dates). */
-export function viewerCanRevealSensitive(viewer: ClubFormsViewer, organizationId: string | null) {
+/**
+ * Health, conduct, physician and emergency-contact answers (not birth dates). The TLT director (#1686) reads them on
+ * the three TLT forms only: `templateKey` must be given for her and be one of them, so a call without it is "no".
+ */
+export function viewerCanRevealSensitive(viewer: ClubFormsViewer, organizationId: string | null, templateKey?: string) {
+  if (viewer.kind === "TLT_DIRECTOR") return isTltFormTemplateKey(templateKey);
   if (viewer.kind === "CLUB_LEADER") return organizationId !== null && viewer.organizationId === organizationId;
   // System administrators, Clubs Administrators and current Event Admins read these (#1225).
   return viewer.kind === "STAFF" && viewer.sensitiveAnswers;
@@ -433,6 +450,8 @@ export function viewerCanSeeSchoolDetails(viewer: ClubFormsViewer, organizationI
   }
   // Never for a "Not listed" submission (no club, #1229), which is conference staff's alone.
   if (viewer.kind === "AREA_COORDINATOR") return organizationId !== null;
+  // The TLT director has Event Admin level here: school type and church membership are not hers (#1686).
+  if (viewer.kind === "TLT_DIRECTOR") return false;
   return viewer.systemAdmin || viewer.clubsAdministrator;
 }
 
@@ -446,7 +465,7 @@ export function restrictedFieldKeys(
   template: Pick<ClubFormTemplateRecord, "sensitiveFieldKeys" | "birthDateFieldKeys" | "key">,
 ) {
   const birth = new Set(template.birthDateFieldKeys);
-  const sensitive = viewerCanRevealSensitive(viewer, organizationId);
+  const sensitive = viewerCanRevealSensitive(viewer, organizationId, template.key);
   const birthDates = viewerCanRevealBirthDates(viewer, organizationId);
   const restricted = template.sensitiveFieldKeys.filter((key) => (birth.has(key) ? !birthDates : !sensitive));
   if (viewerCanSeeSchoolDetails(viewer, organizationId)) return restricted;
@@ -464,6 +483,7 @@ export function viewerAuditFields(viewer: ClubFormsViewer): {
   metadata: { viewerKind: ClubFormsViewer["kind"]; actorAttendeeAccountId?: string; actAsId?: string; actorRole?: "CLUBS_ADMINISTRATOR" | "YOUTH_ADMINISTRATOR" };
 } {
   if (viewer.kind === "STAFF") return { actorUserId: viewer.userId, metadata: { viewerKind: viewer.kind } };
+  if (viewer.kind === "TLT_DIRECTOR") return { metadata: { viewerKind: viewer.kind, actorAttendeeAccountId: viewer.accountId } };
   const { actor } = viewer;
   return actor.kind === "ATTENDEE"
     ? { metadata: { viewerKind: viewer.kind, actorAttendeeAccountId: actor.accountId } }
