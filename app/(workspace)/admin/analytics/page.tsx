@@ -42,8 +42,18 @@ const percentText = (rate: number | null) => (rate === null ? "No data" : `${Mat
 /** A tile's change line: an arrow word plus the sentence. `change` null means there is nothing to compare with. */
 function changeLine(change: Change | RateChange | null, available: boolean, previousLabel: string, previousCount?: number): StatTile["change"] {
   if (!available) return { direction: "none", text: describeChange(null, previousLabel) };
-  if (change === null) return { direction: "none", text: `No comparison: nothing was started in the previous ${previousLabel}.` };
+  if (change === null) return { direction: "none", text: "No comparison." };
   return { direction: change.direction, text: describeChange(change, previousLabel, previousCount) };
+}
+
+/** The rate tile's change line: a rate is unknown when nothing was started, so say which period had no starts. */
+function rateChangeLine(current: number | null, previous: number | null, available: boolean, previousLabel: string): StatTile["change"] {
+  if (!available) return { direction: "none", text: describeChange(null, previousLabel) };
+  const change = rateChangeVersusPrevious(current, previous);
+  if (change) return { direction: change.direction, text: describeChange(change, previousLabel) };
+  if (current === null && previous === null) return { direction: "none", text: `No comparison: nothing was started in this period or in the previous ${previousLabel}.` };
+  if (current === null) return { direction: "none", text: "No comparison: nothing was started in this period." };
+  return { direction: "none", text: `No comparison: nothing was started in the previous ${previousLabel}.` };
 }
 
 const periodLabels: Record<AnalyticsPeriod, string> = { 30: "Last 30 days", 90: "Last 90 days", 365: "Last 12 months" };
@@ -102,7 +112,7 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
     { label: "Event page views", value: number(current.views), change: changeLine(previous ? changeVersusPrevious(current.views, previous.views) : null, previous !== null, previousLabel, previous?.views) },
     { label: "Registrations started", value: number(current.started), change: changeLine(previous ? changeVersusPrevious(current.started, previous.started) : null, previous !== null, previousLabel, previous?.started) },
     { label: "Registrations completed", value: number(current.completed), change: changeLine(previous ? changeVersusPrevious(current.completed, previous.completed) : null, previous !== null, previousLabel, previous?.completed) },
-    { label: "Completed of started", value: percentText(rate), change: changeLine(rateChangeVersusPrevious(rate, previousRate), previous !== null, previousLabel) },
+    { label: "Completed of started", value: percentText(rate), change: rateChangeLine(rate, previousRate, previous !== null, previousLabel) },
   ];
   const buckets = bucketSeries(summary.daily, days);
   const weekly = days === 365;
@@ -149,9 +159,9 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
           <div className="section-heading"><div><h2 id="analytics-glance">At a glance</h2></div></div>
           <StatTiles label={`Headline numbers for the last ${previousLabel}, with the change from the previous ${previousLabel}`} tiles={tiles} />
           <p className={`field-help ${styles.help}`}>
-            Each change compares with the {previousLabel} just before this period.
-            Counts are kept for 400 days, so the previous 12 months can&apos;t be compared: part of that period has already been deleted, and a part-kept period would give a misleading change.
-            Completed of started is a rate, so its change is in percentage points.
+            {previous !== null
+              ? `Each change compares with the ${previousLabel} just before this period. Completed of started is a rate, so its change is in percentage points.`
+              : `Counts are kept for 400 days, so only part of the previous ${previousLabel} is still kept and there is no comparison for this period: a part-kept period would give a misleading change. Pick 30 or 90 days to compare.`}
           </p>
           <div className={styles.charts}>
             <TrendChart endLabel={longDate(summary.to)} points={trendPoints} series={[{ key: "views", label: "Event page views" }, { key: "started", label: "Registrations started" }, { key: "completed", label: "Registrations completed" }]} startLabel={longDate(summary.from)} summary={trendSummary} title={weekly ? "Views, starts and completions by week" : "Views, starts and completions by day"} />

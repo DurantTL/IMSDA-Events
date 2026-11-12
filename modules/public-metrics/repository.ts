@@ -67,7 +67,7 @@ export type AnalyticsSummary = {
 };
 
 /** The last 30, 90 or 365 days, counts only (system administrators' view). `today` is a conference-calendar date. */
-export async function getAnalyticsSummary(today: string, days: AnalyticsPeriod = defaultAnalyticsPeriod, options: { eventNames?: boolean } = {}): Promise<AnalyticsSummary> {
+export async function getAnalyticsSummary(today: string, days: AnalyticsPeriod = defaultAnalyticsPeriod, options: { eventNames?: boolean; /** The previous-period totals and the day-by-day series (#1961); on by default, off for callers that only read totals. */ trends?: boolean } = {}): Promise<AnalyticsSummary> {
   const from = addDays(today, -(days - 1));
   const rows = await getPrisma().publicMetricDaily.groupBy({
     by: ["metric", "dimension"],
@@ -75,14 +75,15 @@ export async function getAnalyticsSummary(today: string, days: AnalyticsPeriod =
     _sum: { count: true },
   });
   const funnelMetrics = ["EVENT_PAGE_VIEW", "REGISTRATION_START", "REGISTRATION_COMPLETE"] as const;
-  const dayRows = await getPrisma().publicMetricDaily.groupBy({
+  const trends = options.trends !== false;
+  const dayRows = trends ? await getPrisma().publicMetricDaily.groupBy({
     by: ["day", "metric"],
     where: { metric: { in: [...funnelMetrics] }, day: { gte: new Date(`${from}T00:00:00Z`), lte: new Date(`${today}T00:00:00Z`) } },
     _sum: { count: true },
-  });
+  }) : [];
   const previousRange = previousPeriodRange(from, days);
   let previousTotals: FunnelCounts | null = null;
-  if (previousPeriodAvailable(today, days)) {
+  if (trends && previousPeriodAvailable(today, days)) {
     const previousRows = await getPrisma().publicMetricDaily.groupBy({
       by: ["metric"],
       where: { metric: { in: [...funnelMetrics] }, day: { gte: new Date(`${previousRange.from}T00:00:00Z`), lte: new Date(`${previousRange.to}T00:00:00Z`) } },
@@ -123,6 +124,6 @@ export async function getAnalyticsSummary(today: string, days: AnalyticsPeriod =
     })),
     directory: [...by("DIRECTORY_SEARCH"), ...by("DIRECTORY_FILTER")],
     previous: { ...previousRange, totals: previousTotals },
-    daily: fillDailySeries(from, today, dayRows.map((row) => ({ day: row.day.toISOString().slice(0, 10), metric: row.metric, count: row._sum.count ?? 0 }))),
+    daily: !trends ? [] : fillDailySeries(from, today, dayRows.map((row) => ({ day: row.day.toISOString().slice(0, 10), metric: row.metric, count: row._sum.count ?? 0 }))),
   };
 }

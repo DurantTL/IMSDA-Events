@@ -9,8 +9,10 @@ import {
   describeChange,
   fillDailySeries,
   funnelRate,
+  isWithinRetention,
   previousPeriodAvailable,
   previousPeriodRange,
+  retentionDays,
   rateChangeVersusPrevious,
   topEventsByCompleted,
 } from "@/modules/public-metrics/domain";
@@ -87,7 +89,7 @@ describe("change versus previous", () => {
     expect(describeChange({ direction: "up", percent: null }, "30 days")).toBe("Up from none counted in the previous 30 days");
     expect(describeChange({ direction: "same", percent: 0 }, "30 days")).toBe("No change from the previous 30 days");
     expect(describeChange({ direction: "down", points: 2.5 }, "30 days")).toBe("Down 2.5 percentage points from the previous 30 days");
-    expect(describeChange(null, "12 months")).toBe("No comparison: the previous 12 months are older than the 400 days of counts kept.");
+    expect(describeChange(null, "12 months")).toBe("No comparison: only part of the previous 12 months is still kept (counts are kept for 400 days).");
   });
 });
 
@@ -119,17 +121,34 @@ describe("daily series", () => {
     }
   });
 
-  it("is weekly for 365 days: whole weeks ending today, the odd day first, no count lost", () => {
+  it("is weekly for 365 days: whole weeks ending today, the odd day folded into the oldest week, no count lost", () => {
     const points = fillDailySeries(fromOf(365), TODAY, []).map((point, index) => ({ ...point, views: 1, started: index % 2, completed: 0 }));
     const buckets = bucketSeries(points, 365);
     expect(points).toHaveLength(365);
-    expect(buckets).toHaveLength(53);
-    expect(buckets[0]).toMatchObject({ start: fromOf(365), end: fromOf(365), days: 1 });
-    expect(buckets[52]).toMatchObject({ end: TODAY, days: 7 });
+    expect(buckets).toHaveLength(52);
+    expect(buckets[0]).toMatchObject({ start: fromOf(365), days: 8, views: 8 });
+    expect(buckets[51]).toMatchObject({ end: TODAY, days: 7, views: 7 });
     expect(buckets.slice(1).every((bucket) => bucket.days === 7)).toBe(true);
+    expect(buckets.every((bucket) => bucket.days >= 7)).toBe(true);
     expect(buckets.reduce((sum, bucket) => sum + bucket.views, 0)).toBe(365);
     expect(buckets.reduce((sum, bucket) => sum + bucket.started, 0)).toBe(points.reduce((sum, point) => sum + point.started, 0));
-    expect(addDays(buckets[1]!.start, -1)).toBe(buckets[0]!.end);
+    expect(addDays(buckets[0]!.end, 1)).toBe(buckets[1]!.start);
+  });
+});
+
+describe("the retention edge", () => {
+  it("keeps the oldest day (today - 400) and drops the day before it", () => {
+    expect(isWithinRetention(addDays(TODAY, -retentionDays), TODAY)).toBe(true);
+    expect(isWithinRetention(addDays(TODAY, -retentionDays + 1), TODAY)).toBe(true);
+    expect(isWithinRetention(addDays(TODAY, -retentionDays - 1), TODAY)).toBe(false);
+  });
+
+  it("compares a previous period that starts inside the window, and not one that starts past it", () => {
+    // The previous period starts 2 * days - 1 days before today: 200 days starts at -399 (inside), 201 days at -401 (one day past).
+    expect(previousPeriodRange(fromOf(200), 200).from).toBe(addDays(TODAY, -399));
+    expect(previousPeriodAvailable(TODAY, 200)).toBe(true);
+    expect(previousPeriodRange(fromOf(201), 201).from).toBe(addDays(TODAY, -401));
+    expect(previousPeriodAvailable(TODAY, 201)).toBe(false);
   });
 });
 
@@ -154,7 +173,7 @@ describe("chart markup", () => {
   const html = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(node);
 
   it("shows tiles with the change as an arrow and words", () => {
-    const markup = html(createElement(StatTiles, { label: "Headline numbers", tiles: [{ label: "Event page views", value: "1,200", change: { direction: "up", text: "Up 12% from the previous 30 days" } }, { label: "Completed of started", value: "40%", change: { direction: "none", text: "No comparison: the previous 12 months are older than the 400 days of counts kept." } }] }));
+    const markup = html(createElement(StatTiles, { label: "Headline numbers", tiles: [{ label: "Event page views", value: "1,200", change: { direction: "up", text: "Up 12% from the previous 30 days" } }, { label: "Completed of started", value: "40%", change: { direction: "none", text: "No comparison: only part of the previous 12 months is still kept (counts are kept for 400 days)." } }] }));
     expect(markup).toContain("Up 12% from the previous 30 days");
     expect(markup).toContain("No comparison");
     expect(markup).toContain('aria-hidden="true"');

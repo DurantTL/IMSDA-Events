@@ -158,7 +158,12 @@ export function previousPeriodRange(from: string, days: number): DateRange {
  */
 export function previousPeriodAvailable(today: string, days: number): boolean {
   const from = addDays(today, -(days - 1));
-  return previousPeriodRange(from, days).from >= addDays(today, -retentionDays);
+  return isWithinRetention(previousPeriodRange(from, days).from, today);
+}
+
+/** Whether a day is still stored: today minus 400 days is the oldest kept day (rows older than that are deleted). */
+export function isWithinRetention(day: string, today: string): boolean {
+  return day >= addDays(today, -retentionDays);
 }
 
 export type ChangeDirection = "up" | "down" | "same";
@@ -192,7 +197,7 @@ const plain = (count: number) => count.toLocaleString("en-US");
 
 /** The words next to a tile's arrow: "Up 12% from the previous 30 days". `previousLabel` is like "30 days" or "12 months". */
 export function describeChange(change: Change | RateChange | null, previousLabel: string, previousCount?: number): string {
-  if (change === null) return `No comparison: the previous ${previousLabel} are older than the ${retentionDays} days of counts kept.`;
+  if (change === null) return `No comparison: only part of the previous ${previousLabel} is still kept (counts are kept for ${retentionDays} days).`;
   const word = change.direction === "up" ? "Up" : change.direction === "down" ? "Down" : "No change";
   if ("points" in change) return change.direction === "same" ? `No change from the previous ${previousLabel}` : `${word} ${change.points} percentage points from the previous ${previousLabel}`;
   if (change.direction === "same") return `No change from the previous ${previousLabel}`;
@@ -222,7 +227,8 @@ export type TrendBucket = { start: string; end: string; days: number } & FunnelC
 
 /**
  * Daily points for 30 and 90 days, weekly sums for 365. Weeks are seven days and end on the last day, so the newest week is
- * always whole; the oldest bucket holds the leftover (365 days is 52 weeks and 1 day, so it is 1 day long).
+ * always whole. 365 days is 52 weeks and 1 day: the leftover day is folded into the oldest week (8 days), never drawn as a
+ * 1-day bucket, which would show a false dip. Every bucket carries its day count.
  */
 export function bucketSeries(points: readonly DailyFunnelPoint[], days: number): TrendBucket[] {
   const size = days >= 365 ? 7 : 1;
@@ -237,6 +243,10 @@ export function bucketSeries(points: readonly DailyFunnelPoint[], days: number):
       started: slice.reduce((sum, point) => sum + point.started, 0),
       completed: slice.reduce((sum, point) => sum + point.completed, 0),
     });
+  }
+  if (buckets.length > 1 && buckets[0]!.days < size) {
+    const [leftover, oldest] = buckets.splice(0, 2) as [TrendBucket, TrendBucket];
+    buckets.unshift({ start: leftover.start, end: oldest.end, days: leftover.days + oldest.days, views: leftover.views + oldest.views, started: leftover.started + oldest.started, completed: leftover.completed + oldest.completed });
   }
   return buckets;
 }

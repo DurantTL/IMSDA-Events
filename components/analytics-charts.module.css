@@ -58,7 +58,7 @@
 /* Fills: solid, diagonal stripes, dots, so a bar is never told apart by colour alone. */
 .fill0 { background: var(--imsda-navy); }
 .fill1 { background: repeating-linear-gradient(45deg, var(--imsda-purple) 0 4px, var(--card) 4px 7px); }
-.fill2 { background: radial-gradient(circle at 3px 3px, var(--green) 0 2px, var(--card) 2.5px); background-size: 6px 6px; background-color: var(--card); }
+.fill2 { background: radial-gradient(circle at 3px 3px, var(--green) 0 2px, transparent 2.5px) 0 0 / 6px 6px, var(--green-soft); box-shadow: inset 0 0 0 1px var(--green); }
 
 .inline { display: grid; gap: 3px; width: min(100%, 14rem); margin-top: 6px; }
 .inlineTrack { display: block; height: 6px; border-radius: var(--radius-sm); background: var(--line); overflow: hidden; }
