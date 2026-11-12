@@ -117,6 +117,12 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | B15 | The public Club forms page (`/clubs/forms`) has no staff tools (such as "Copy link for your website"); staff copy an open application link from the club director forms page or the Clubs administration form settings. What the public page lists is set by Clubs Administrators and system administrators in the "Public club forms page" settings (draft, preview, publish, audited), and hiding or moving a form never adds a link: closed, private and off forms keep having no public link. | `tests/public-club-forms-settings-1562.test.ts`, `tests/public-club-forms-1221.test.ts` | none yet (the main session's browser check at 1280 and 390 px) | #1562; Caleb, Nov 3 |
 | B16 | The public calendar's filter buttons follow the six homepage "Find your place" tiles: Main events first (the default), the six tiles in order (each button has every category its tile lists and a fixed `ministry-N` address), then Schools, Meetings, Office closed & holidays and Everything. Every tile needs at least one category. Staff pick a calendar category from a list (the tiles' categories, Schools, Meetings, Office closure, No category); an unlisted saved value is kept and marked "Not on a public filter", and Calendar admin can list those. | `tests/calendar-tile-filters-1611.test.ts`, `tests/calendar-filter-groups-1249.test.ts`, `tests/homepage-ministries-1251.test.ts` | browser test only: `/calendar` (Month, Upcoming and Year) and Calendar admin at 1280 and 390 px | #1611; Caleb, Nov 5 |
 
+## Directories (#1707)
+
+| ID | Rule | Guard test | Browser test | Issue |
+| --- | --- | --- | --- | --- |
+| D1 | The leader directory is off until a system administrator turns it on, and turning it on or off is audited. When on, a club leader is listed unless they opt out on their profile, and the opt-out takes effect everywhere the directory appears (the page and its search results). The directory shows only a leader's role, club and the contact that leader chose to share, and only a club director, deputy or Area Coordinator can open it. | `tests/leader-directory-1707.test.ts` (who can open it, opt-out, what is shared, the read selects nothing else, the admin switch is audited) | manual: the directory and the profile section at 1280 and 390 px in the #1707 review (no scripted browser test yet) | Caleb, Nov 12 (#1707) |
+
 ## Sign-in
 
 | ID | Rule | Guard test | Browser test | Issue |

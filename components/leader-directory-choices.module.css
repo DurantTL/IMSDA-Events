@@ -1,0 +1,4 @@
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.check input { width: 20px; height: 20px; flex: none; }
+.help { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--muted); }
+.current { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }

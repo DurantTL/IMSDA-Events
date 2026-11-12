@@ -75,6 +75,7 @@ vi.mock("@/modules/organizations/area-coordinators", () => ({
   currentAreaCoordinator: async () => null,
 }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: async () => mocks.clubs }));
+vi.mock("@/modules/leader-directory/repository", () => ({ isLeaderDirectoryEnabled: async () => false }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: async () => mocks.acting }));
 vi.mock("@/components/area-coordinator-card", () => ({
   AreaCoordinatorCardSection: () => null,

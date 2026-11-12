@@ -19,6 +19,7 @@ import {
   type PlatformSettingsDraft,
   type PlatformSettingsField,
 } from "@/components/platform-settings-impact";
+import { LeaderDirectorySwitch, type LeaderDirectorySwitchState } from "@/components/leader-directory-switch";
 import { EnvironmentStatusPanel } from "@/components/environment-status-panel";
 import { classifySettingsSaveFailure, settingsSaveState } from "@/components/settings-save-state";
 import { HomepageMinistriesEditor } from "@/components/homepage-ministries-editor";
@@ -88,11 +89,13 @@ export type SignInSwitchState = {
 export function PlatformSettingsWorkspace({
   initialSettings,
   initialSignIn,
+  initialLeaderDirectory,
   initialMinistries,
   environmentStatus = null,
 }: {
   initialSettings: PlatformSettingsRecord;
   initialSignIn: SignInSwitchState;
+  initialLeaderDirectory: LeaderDirectorySwitchState;
   initialMinistries: { ministries: HomepageMinistry[]; updatedAt: string | null; updatedByName: string | null };
   /** Computed on the server for a system administrator: configured / not configured / unknown, never a value. */
   environmentStatus?: EnvironmentStatus | null;
@@ -414,6 +417,8 @@ export function PlatformSettingsWorkspace({
         </div>
         {confirmDialog}
       </section>
+
+      <LeaderDirectorySwitch initial={initialLeaderDirectory} />
 
       <form className="form-stack" onSubmit={save}>
         <fieldset className="form-stack settings-fields" disabled={saving}>

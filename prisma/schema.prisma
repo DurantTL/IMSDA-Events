@@ -1203,6 +1203,7 @@ model PasswordResetToken {
 model AttendeeAccount {
   id                 String                @id @default(cuid())
   healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]
+  leaderDirectoryPreference LeaderDirectoryPreference?
   teamPermissionDecisions ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedByAccount")
   /// The staff `User` linked to this account (#554), if any. See `User.attendeeAccountId`.
   linkedUser         User?                 @relation("UserAttendeeLink")
@@ -1763,10 +1764,29 @@ model PlatformSettings {
   /// The one-sign-in switch (#554, ADR 0013). OFF by default; nothing reads it yet.
   /// Later slices put the unified sign-in and role-aware landing behind it.
   unifiedSignInEnabled      Boolean            @default(false)
+  /// The leader directory switch (#1707). OFF by default. When on, club directors, deputies and Area Coordinators can see
+  /// other clubs' leaders who have not opted out. Who switched it and when are kept here; each change is also audited.
+  leaderDirectoryEnabled     Boolean            @default(false)
+  leaderDirectorySetAt       DateTime?
+  leaderDirectorySetByUserId String?
   updatedAt                 DateTime           @updatedAt
   updatedByUserId           String?
 
   updatedBy User? @relation("PlatformSettingsUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+}
+
+/// A club leader's own choices about the leader directory (#1707). No row means the defaults: listed, email shared, phone
+/// not shared. Written only by the leader, for their own account.
+model LeaderDirectoryPreference {
+  id                String   @id @default(cuid())
+  attendeeAccountId String   @unique
+  listed            Boolean  @default(true)
+  shareEmail        Boolean  @default(true)
+  sharePhone        Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  attendeeAccount AttendeeAccount @relation(fields: [attendeeAccountId], references: [id], onDelete: Cascade)
 }
 
 /// One on/off switch per automatic staff alert (#1016). The alert's key lives in

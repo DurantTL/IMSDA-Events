@@ -17,6 +17,8 @@ import { attendeeSignInRedirectPath } from "@/modules/attendee-accounts/return-r
 import { accountNeedsSignInStep } from "@/modules/attendee-accounts/sign-in-gate";
 import { isAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
+import { canViewLeaderDirectory } from "@/modules/leader-directory/domain";
+import { isLeaderDirectoryEnabled } from "@/modules/leader-directory/repository";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 
 /**
@@ -63,19 +65,21 @@ export default async function AccountPortalLayout({ children }: { children: Reac
   // attendee account (or a second step still pending) gets none. The banner
   // query starts as soon as the clubs load, alongside the coordinator check.
   const clubsPromise = chromeAccount ? listDirectedClubs(chromeAccount.id) : Promise.resolve([]);
-  const [clubs, areaCoordinator, bannerAnnouncements] = chromeAccount
+  const [clubs, areaCoordinator, bannerAnnouncements, leaderDirectorySwitch] = chromeAccount
     ? await Promise.all([
       clubsPromise,
       isAreaCoordinator(chromeAccount.id),
       clubsPromise.then((directed) => listAccountBannerAnnouncements(chromeAccount, directed)),
+      isLeaderDirectoryEnabled(),
     ])
-    : [[], false, []];
+    : [[], false, [], false];
 
   const items = accountPortalNavItems({
     hasAccount: Boolean(chromeAccount),
     directedClubCount: clubs.length,
     areaCoordinator,
     actingRole: acting?.role ?? null,
+    leaderDirectory: canViewLeaderDirectory({ enabled: leaderDirectorySwitch, directedRoles: clubs.map((club) => club.role), areaCoordinator }),
   });
   const workspaceMenuItems = workspaceMenuNavItems(items, acting?.role ?? null);
 

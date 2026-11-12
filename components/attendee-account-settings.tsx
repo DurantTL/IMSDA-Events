@@ -9,6 +9,8 @@ import { getPasskeySettings } from "@/modules/attendee-accounts/passkeys";
 import { listActiveAttendeeSessions } from "@/modules/attendee-accounts/session-store";
 import { getAttendeeProfile } from "@/modules/attendee-accounts/profile-service";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
+import { LeaderDirectoryChoices } from "@/components/leader-directory-choices";
+import { getLeaderChoices, isLeaderDirectoryEnabled } from "@/modules/leader-directory/repository";
 
 /**
  * The registration (attendee) account's profile and sign-in security, as the
@@ -31,6 +33,10 @@ export async function AttendeeAccountSettings({
     // Only this browser's own attendee session can list or sign out the others.
     sessionId ? listActiveAttendeeSessions(account.id, sessionId) : [],
   ]);
+  // Any active club leader role (not only a director) can opt out, even while the directory is off (#1707).
+  const [leaderChoices, directoryOn] = clubs.length > 0
+    ? await Promise.all([getLeaderChoices(account.id), isLeaderDirectoryEnabled()])
+    : [null, false];
   const hasTwoStepMethod = passkeySettings.hasAuthenticator || passkeySettings.passkeys.length > 0;
 
   return (
@@ -38,6 +44,11 @@ export async function AttendeeAccountSettings({
       <div className="account-page-body">
         <AttendeeProfileForm email={account.verifiedEmail ?? null} initialProfile={profile} />
       </div>
+      {leaderChoices && (
+        <div className="account-page-body">
+          <LeaderDirectoryChoices directoryOn={directoryOn} email={account.verifiedEmail ?? null} hasPhone={Boolean(profile.phone)} initialChoices={leaderChoices} />
+        </div>
+      )}
       <div className={`account-page-body${clubs.length > 0 ? " account-security-grid" : ""}`} id="profile-security">
         <div className="account-security-main">
           <MfaManager
