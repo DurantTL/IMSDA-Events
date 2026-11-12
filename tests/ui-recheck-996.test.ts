@@ -12,10 +12,12 @@ const rule = (selector: string) => css.match(new RegExp(`(?:^|\\n)${selector.rep
 
 describe("registration cards (bug 1)", () => {
   it("keep a name column that is never starved by the badges", () => {
-    expect(rule(".record-card")).toMatch(/grid-template-columns:\s*auto minmax\(0, 1fr\);/);
-    expect(css).toMatch(/@container \(min-width: 36rem\)\s*\{\s*\.record-card \{ grid-template-columns: auto minmax\(0, 1fr\) auto; \}/);
+    // #1574: one full-width card per row; the chips row sits under the name column, so the badges never starve it.
+    const module = read("components/people-list.module.css");
+    expect(module).toMatch(/\.card \{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/);
+    expect(module).toMatch(/\.chips \{[^}]*grid-column: 1;/);
     expect(rule(".record-card-shell")).toMatch(/container-type:\s*inline-size/);
-    expect(read("components/people-workspace.tsx")).toContain('className="record-badges"');
+    expect(read("components/people-workspace.tsx")).toContain("className={listStyles.chips}");
   });
 });
 

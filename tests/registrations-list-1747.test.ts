@@ -29,9 +29,10 @@ describe("Registrations list order (#1747)", () => {
     expect(markup.indexOf("Search people")).toBeLessThan(markup.indexOf("ADVANCED-FILTERS-MARKER"));
   });
 
-  it("keeps Help in the actions row and the expected count on the count line", () => {
+  it("keeps Help in the header's actions and the expected count on the count line", () => {
     const counts = markup.indexOf("expected");
-    expect(markup.indexOf("HELP-MARKER")).toBeGreaterThan(markup.indexOf("intro-actions"));
+    expect(markup.indexOf("HELP-MARKER")).toBeGreaterThan(markup.indexOf("page-header-actions"));
+    expect(markup.indexOf("HELP-MARKER")).toBeLessThan(markup.indexOf("Search people"));
     expect(markup.indexOf("HELP-MARKER")).toBeLessThan(counts);
     expect(markup.slice(markup.lastIndexOf('<div class="', counts), counts)).toContain("countLine");
   });

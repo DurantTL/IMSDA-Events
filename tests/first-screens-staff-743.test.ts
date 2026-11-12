@@ -102,7 +102,7 @@ describe("Check-in opens on Search and Scan", () => {
   });
 });
 
-describe("Registrations: search, then Start registration, then Actions", () => {
+describe("Registrations: header with Start registration and Actions, then search", () => {
   const render = (props: { canEdit: boolean; canEmail: boolean; canReviewPeopleMatches?: boolean }) => renderToStaticMarkup(createElement(PeopleWorkspace, {
     eventId: "event-1",
     eventSlug: "synthetic-retreat",
@@ -112,9 +112,11 @@ describe("Registrations: search, then Start registration, then Actions", () => {
     ...props,
   }));
 
-  it("orders the search box, the one primary button, and the Actions menu", () => {
+  it("orders the title, the one primary button, the Actions menu, and then the search box (#1574)", () => {
     const html = render({ canEdit: true, canEmail: true });
-    expect(before(html, "Search people", "Start registration")).toBe(true);
+    expect(before(html, "<h1", "Start registration")).toBe(true);
+    expect(before(html, "Start registration", "Search people")).toBe(true);
+    expect(before(html, 'class="actions-menu"', "Search people")).toBe(true);
     expect(before(html, "Start registration", 'class="actions-menu"')).toBe(true);
     // Exactly one filled primary button on the screen.
     expect(html.match(/class="primary-button/g)).toHaveLength(1);

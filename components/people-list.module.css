@@ -11,3 +11,66 @@
 /* The Help button sits in the actions row with no row or margin of its own. */
 .helpSlot.helpSlot > * { margin: 0; }
 .countLine > :global(.count-badge) { margin: 0; }
+
+/* One full-width card per registration at every width (#1574), like /admin/people. The shell and the select box keep the
+   global record-card-shell / record-select rules, so the dense-row sizing for a mouse (#1775) still applies. */
+.cardList { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
+.card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 12px 14px;
+  text-align: left;
+}
+.cardCopy { display: grid; grid-column: 1; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.cardTitle { color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); line-height: 1.3; }
+.cardCopy > small { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.4; }
+.chips { display: flex; flex-wrap: wrap; grid-column: 1; align-items: center; gap: 6px; min-width: 0; }
+.chips:empty { display: none; }
+.chevron { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--muted); }
+/* The select box sits at the card's top right; keep the chevron clear of it. */
+:global(.record-card-shell):has(:global(.record-select)) > .card { padding-right: calc(var(--touch-target) + 4px); }
+
+/* The registration dialog head: the X on a desktop, Back to results on a phone. */
+.dialogHead { align-items: center; }
+.dialogTitle { min-width: 0; }
+.backButton.backButton { display: none; }
+.phoneMeta.phoneMeta { display: none; }
+
+@media (max-width: 640px) {
+  /* Full screen: dvh follows the phone's collapsing browser bars, vh is the fallback. */
+  .backdrop.backdrop { align-items: stretch; padding: 0; }
+  .dialog.dialog {
+    width: 100%;
+    max-width: none;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    padding: 0 max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  }
+  @supports (height: 1dvh) {
+    .dialog.dialog { height: 100dvh; max-height: 100dvh; }
+  }
+  /* The head stays at the top while the body scrolls. */
+  .dialogHead.dialogHead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: grid;
+    gap: 6px;
+    margin: 0 -16px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--card);
+    padding: max(10px, env(safe-area-inset-top, 0px)) 16px 10px;
+  }
+  .backButton.backButton { display: inline-flex; align-items: center; gap: 6px; justify-self: start; min-width: 44px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+  .dialog.dialog .closeX { display: none !important; }
+  .phoneMeta.phoneMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+}

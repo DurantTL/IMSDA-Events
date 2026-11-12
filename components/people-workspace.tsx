@@ -4,7 +4,7 @@ import { ExportLink } from "@/components/export-link";
 import { ListPager } from "@/components/list-pager";
 import { ExactValue, Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
-import { ActionsMenu } from "@/components/actions-menu";
+import { PageHeader } from "@/components/page-header";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
 import { PendingTeamsNotice, pendingTeamsLabel } from "@/components/pending-teams-notice";
 import { SortOrderNote } from "@/components/list-sort";
@@ -17,9 +17,11 @@ import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { closeRegistrationUrlAction, followRegistrationParam, withoutRegistrationParam, type ParamOpened } from "@/lib/registration-param";
 import {
+  ArrowLeft,
   ArrowRightLeft,
   Banknote,
   Ban,
+  ChevronRight,
   ClipboardCheck,
   CopyCheck,
   Download,
@@ -108,10 +110,6 @@ const lifecycleCopy: Record<LifecycleAction, { eyebrow: string; title: string; d
   },
 };
 
-function initials(record: RegistrationRecord) {
-  return `${record.accountHolder.firstName[0] ?? ""}${record.accountHolder.lastName[0] ?? ""}`.toUpperCase();
-}
-
 function answerLabel(key: string) {
   return key.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
@@ -140,6 +138,11 @@ function dateTime(value: string | null, timeZone: string) {
 
 function submittedDateTime(value: string | null, timeZone: string) {
   return value ? dateTime(value, timeZone) : "Not yet";
+}
+
+/** The labelled date on a list card: when it was submitted, or that it has not been. */
+export function submittedCardText(value: string | null, timeZone: string) {
+  return value ? `Submitted ${dateTime(value, timeZone)}` : "Not submitted yet";
 }
 
 function paymentMethodLabel(value: string) {
@@ -858,8 +861,25 @@ export function PeopleWorkspace({
 
   return (
     <section className="page-stack">
+      <PageHeader
+        title={staffPageTitles.registrations}
+        description={<>A registration is one sign-up with everyone it covers. For one row per person, open the <a href={`/people/attendees?event=${encodeURIComponent(eventId)}`}>Attendee list</a>.</>}
+        primary={canEdit ? <a className="primary-button" href={`/events/${eventSlug}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" size={17} /> Start registration</a> : undefined}
+        extra={helpSlot ? <div className={listStyles.helpSlot}>{helpSlot}</div> : undefined}
+        actions={<>
+          {/* Attendee list and Imports left the sidebar (#964); this page reaches them. The list needs the same permission as this page. */}
+          <li><a href={`/people/attendees?event=${encodeURIComponent(eventId)}`}><ListChecks aria-hidden="true" size={16} /> Attendee list</a></li>
+          {canImport && <li><a href={`/imports?event=${encodeURIComponent(eventId)}`}><FileUp aria-hidden="true" size={16} /> Imports</a></li>}
+          {/* Find duplicates, Directory review, Teams waiting for a club, Staff invitations and Responsible adults are cards on one page now (#1574). */}
+          <li><a href={`/people/review-queues?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Review queues</a></li>
+          {/* The cross-event identity queue lives beside the event's own review queues, not in the sidebar; the page checks the role again. */}
+          {canReviewPeopleMatches && <li><a href="/people/matches"><CopyCheck aria-hidden="true" size={16} /> Possible duplicate people (all events)</a></li>}
+          <li><ExportLink href={`/api/events/${eventId}/exports/registrations${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink></li>
+          {canEmail && <li><button disabled={selectedIds.size === 0} onClick={() => setEmailingSelection(true)} title={selectedIds.size === 0 ? "Tick registrations in the list first" : undefined} type="button"><MailPlus aria-hidden="true" size={16} /> Email selected{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</button></li>}
+        </>}
+      />
       <PendingTeamsNotice canManage={canEdit} count={pendingTeamCount} eventId={eventId} />
-      {/* Search first, then Start registration, then the maintenance actions in one menu (#743). */}
+      {/* The header (title, Start registration, Actions) comes first, then the search (#1574). */}
       <div className="toolbar panel">
         <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input {...search.inputProps} placeholder={pageScoped ? "Search this page by name, email, or code" : "Search name, email, or confirmation code"} /></label>
         <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid in full</option><option value="DRAFT">Draft</option><option value="WAITING_APPROVAL">Pending approval</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
@@ -867,24 +887,6 @@ export function PeopleWorkspace({
       {showToolbarClear && <div><button className="text-button" onClick={clearFilters} type="button">Clear filters</button></div>}
       {/* Advanced search, the location and the answer filters: filters that come after the simple search (#1747). */}
       {filtersAfterSearch}
-      <div className="page-intro people-intro">
-        <h2 className="duplicate-page-title">{staffPageTitles.registrations}</h2>
-        <div className="intro-actions">
-          {helpSlot ? <div className={listStyles.helpSlot}>{helpSlot}</div> : null}
-          {canEdit && <a className="primary-button" href={`/events/${eventSlug}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" size={17} /> Start registration</a>}
-          <ActionsMenu>
-            {/* Attendee list and Imports left the sidebar (#964); this page reaches them. The list needs the same permission as this page. */}
-            <li><a href={`/people/attendees?event=${encodeURIComponent(eventId)}`}><ListChecks aria-hidden="true" size={16} /> Attendee list</a></li>
-            {canImport && <li><a href={`/imports?event=${encodeURIComponent(eventId)}`}><FileUp aria-hidden="true" size={16} /> Imports</a></li>}
-            {/* Find duplicates, Directory review, Teams waiting for a club, Staff invitations and Responsible adults are cards on one page now (#1574). */}
-            <li><a href={`/people/review-queues?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Review queues</a></li>
-            {/* The cross-event identity queue lives beside the event's own review queues, not in the sidebar; the page checks the role again. */}
-            {canReviewPeopleMatches && <li><a href="/people/matches"><CopyCheck aria-hidden="true" size={16} /> Possible duplicate people (all events)</a></li>}
-            <li><ExportLink href={`/api/events/${eventId}/exports/registrations${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink></li>
-            {canEmail && <li><button disabled={selectedIds.size === 0} onClick={() => setEmailingSelection(true)} title={selectedIds.size === 0 ? "Tick registrations in the list first" : undefined} type="button"><MailPlus aria-hidden="true" size={16} /> Email selected{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</button></li>}
-          </ActionsMenu>
-        </div>
-      </div>
       <div className={listStyles.countLine}>
         <span className="count-badge"><UsersRound aria-hidden="true" size={17} /> {expectedPeople} expected{pageScoped ? " on this page" : ""}{canEdit && pendingTeamCount > 0 && !locationId && !pageScoped ? ` · ${pendingTeamsLabel(pendingTeamCount)}` : ""}</span>
       <ListPager
@@ -918,7 +920,7 @@ export function PeopleWorkspace({
           </div>
         </div>
       )}
-      <div className="record-grid dense-rows">
+      <div className={`dense-rows ${listStyles.cardList}`}>
         {visible.map((registration) => (
           <div className="record-card-shell" key={registration.id}>
           {canEmail && (
@@ -931,10 +933,14 @@ export function PeopleWorkspace({
               <span className="sr-only">Select {registration.confirmationCode} for a bulk email</span>
             </label>
           )}
-          <button className="record-card interactive-record" type="button" onClick={() => openDetail(registration)}>
-            <span className={`person-avatar large ${statusTone(registration)}`}>{initials(registration)}</span>
-            <span className="record-copy"><strong>{registration.accountHolder.firstName} {registration.accountHolder.lastName}</strong><small><ExactValue>{registration.confirmationCode}</ExactValue> · {registration.attendeeCount} {registration.attendeeCount === 1 ? "person" : "people"}{registration.location ? ` · ${registration.location.name}` : ""}</small><small>{registration.attendeeCount > 1 ? registration.attendees.slice(0, 2).map((attendee) => `${attendee.firstName} ${attendee.lastName}`).join(", ") + (registration.attendeeCount > 2 ? ` +${registration.attendeeCount - 2} more` : "") : registration.accountHolder.email || "No email on file"}</small><small className="record-date">{submittedDateTime(registration.submittedAt, eventTimezone)}</small></span>
-            <span className="record-badges">
+          <button className={`interactive-record ${listStyles.card}`} type="button" onClick={() => openDetail(registration)}>
+            <span className={listStyles.cardCopy}>
+              <strong className={listStyles.cardTitle}>{registration.accountHolder.firstName} {registration.accountHolder.lastName}</strong>
+              <small><ExactValue>{registration.confirmationCode}</ExactValue> · {registration.attendeeCount} {registration.attendeeCount === 1 ? "person" : "people"}{registration.location ? ` · ${registration.location.name}` : ""}</small>
+              <small>{registration.attendeeCount > 1 ? registration.attendees.slice(0, 2).map((attendee) => `${attendee.firstName} ${attendee.lastName}`).join(", ") + (registration.attendeeCount > 2 ? ` +${registration.attendeeCount - 2} more` : "") : registration.accountHolder.email || "No email on file"}</small>
+              <small>{submittedCardText(registration.submittedAt, eventTimezone)}</small>
+            </span>
+            <span className={listStyles.chips}>
               {registration.attendees.some((attendee) => backgroundFlaggedAttendeeIds.includes(attendee.id)) && <BackgroundCheckBadge />}
               {emailSuppressions.registrations[registration.id] && (
                 <span className="status-chip coral" title={suppressionExplanation(emailSuppressions.registrations[registration.id]!)}>
@@ -950,6 +956,7 @@ export function PeopleWorkspace({
               <span className={`status-chip ${statusTone(registration)}`}>{statusLabel(registration)}</span>
               {moneyLabel(registration) && <span className="status-chip neutral">{moneyLabel(registration)}</span>}
             </span>
+            <ChevronRight aria-hidden="true" className={listStyles.chevron} size={20} />
           </button>
           </div>
         ))}
@@ -984,11 +991,17 @@ export function PeopleWorkspace({
       )}
 
       {modal && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeModal(); }}>
-          <section className="modal-card" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="registration-modal-title" tabIndex={-1}>
-            <div className="modal-head">
-              <div><p className="eyebrow">Registration</p><h2 id="registration-modal-title">{modal === "edit" ? "Edit contact details" : `${selected?.accountHolder.firstName} ${selected?.accountHolder.lastName}`}</h2></div>
-              <button className="icon-button modal-close-button" type="button" onClick={closeModal} aria-label="Close dialog"><X aria-hidden="true" size={18} /></button>
+        <div className={`modal-backdrop ${listStyles.backdrop}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeModal(); }}>
+          <section className={`modal-card ${listStyles.dialog}`} ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="registration-modal-title" tabIndex={-1}>
+            <div className={`modal-head ${listStyles.dialogHead}`}>
+              {/* Phone only (640px and under): the same close path as the X, so the unsaved-changes guard, the ?registration= cleanup and focus return all apply. */}
+              <button className={`secondary-button ${listStyles.backButton}`} type="button" onClick={closeModal}><ArrowLeft aria-hidden="true" size={18} /> Back to results</button>
+              <div className={listStyles.dialogTitle}>
+                <p className="eyebrow">Registration</p>
+                <h2 id="registration-modal-title">{modal === "edit" ? "Edit contact details" : `${selected?.accountHolder.firstName} ${selected?.accountHolder.lastName}`}</h2>
+                {selected && <p className={listStyles.phoneMeta}><ExactValue>{selected.confirmationCode}</ExactValue> <span className={`status-chip ${statusTone(selected)}`}>{statusLabel(selected)}</span></p>}
+              </div>
+              <button className={`icon-button modal-close-button ${listStyles.closeX}`} type="button" onClick={closeModal} aria-label="Close dialog"><X aria-hidden="true" size={18} /></button>
             </div>
 
             {modal === "detail" && selected ? (
