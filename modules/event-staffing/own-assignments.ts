@@ -66,7 +66,7 @@ export async function listOwnAssignments(account: { id: string; verifiedEmail: s
     }),
     userKeys.length === 0 ? [] : prisma.eventMembership.findMany({ where: { status: "ACTIVE", OR: userKeys }, select: { eventId: true, userId: true } }),
     hasAccountRows
-      ? prisma.areaCoordinatorGrant.findFirst({ where: { attendeeAccountId: account.id, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }, select: { id: true } })
+      ? prisma.areaCoordinatorGrant.findFirst({ where: { attendeeAccountId: account.id, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }], attendeeAccount: { status: "ACTIVE" } }, select: { id: true } })
       : null,
   ]);
   const registeredKeys = new Set(registered.map((row) => `${row.eventId}:${row.personId}`));

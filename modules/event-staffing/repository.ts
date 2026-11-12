@@ -2,7 +2,6 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
-import { isAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   StaffingError,
@@ -77,7 +76,7 @@ async function activeAssignees(client: Client, eventId: string, rows: ReadonlyAr
     }),
     userIds.length === 0 ? [] : client.eventMembership.findMany({ where: { eventId, userId: { in: userIds }, status: "ACTIVE" }, select: { userId: true } }),
     accountIds.length === 0 ? [] : client.areaCoordinatorGrant.findMany({
-      where: { attendeeAccountId: { in: accountIds }, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      where: { attendeeAccountId: { in: accountIds }, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }], attendeeAccount: { status: "ACTIVE" } },
       select: { attendeeAccountId: true },
     }),
   ]);
@@ -246,7 +245,12 @@ async function assertOnEvent(tx: Prisma.TransactionClient, eventId: string, assi
   }
   if (assignee.kind === "account") {
     // Lead only (the request schema says so too): an account holding an active Area Coordinator grant, the same check the access gate uses.
-    if (!(await isAreaCoordinator(assignee.id))) {
+    const now = new Date();
+    const grant = await tx.areaCoordinatorGrant.findFirst({
+      where: { attendeeAccountId: assignee.id, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }], attendeeAccount: { status: "ACTIVE" } },
+      select: { id: true },
+    });
+    if (!grant) {
       throw new StaffingError("NOT_ON_EVENT", "Only an active Area Coordinator can be chosen from the Area Coordinators list.");
     }
     return;

@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   membershipFindFirst: vi.fn(),
   membershipFindMany: vi.fn(),
   grantFindMany: vi.fn(),
+  grantFindFirst: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -39,7 +40,7 @@ vi.mock("@/lib/prisma", () => {
     eventStaffingAssignment: { findFirst: mocks.assignmentFindFirst, create: mocks.assignmentCreate, delete: mocks.assignmentDelete, deleteMany: mocks.assignmentDeleteMany },
     registrationAttendee: { findFirst: mocks.attendeeFindFirst, findMany: mocks.attendeeFindMany },
     eventMembership: { findFirst: mocks.membershipFindFirst, findMany: mocks.membershipFindMany },
-    areaCoordinatorGrant: { findMany: mocks.grantFindMany },
+    areaCoordinatorGrant: { findMany: mocks.grantFindMany, findFirst: mocks.grantFindFirst },
   };
   return {
     getPrisma: () => ({
@@ -120,6 +121,7 @@ beforeEach(() => {
   mocks.membershipFindFirst.mockResolvedValue({ id: "m-1" });
   mocks.membershipFindMany.mockResolvedValue([]);
   mocks.grantFindMany.mockResolvedValue([]);
+  mocks.grantFindFirst.mockResolvedValue({ id: "grant-1" });
   mocks.isAreaCoordinator.mockResolvedValue(true);
 });
 
@@ -239,7 +241,7 @@ describe("only people on the event can be put on an activity (#1678)", () => {
     signIn(who[1]!);
     const lead = { ...assign, assignee: { kind: "account", id: "acct-ac" } };
     expect((await staffAssign(request("POST", lead), ctx)).status).toBe(201);
-    expect(mocks.isAreaCoordinator).toHaveBeenCalledWith("acct-ac");
+    expect(mocks.grantFindFirst.mock.calls[0]![0].where).toMatchObject({ attendeeAccountId: "acct-ac", revokedAt: null, attendeeAccount: { status: "ACTIVE" } });
     expect(mocks.assignmentCreate.mock.calls[0]![0].data).toMatchObject({ role: "LEAD", attendeeAccountId: "acct-ac" });
     expect(mocks.assignmentCreate.mock.calls[0]![0].data).not.toHaveProperty("personId");
     expect(mocks.writeAuditLog.mock.calls[0]![0].metadata).toMatchObject({ assigneeKind: "account", assigneeId: "acct-ac", role: "LEAD" });
@@ -249,11 +251,21 @@ describe("only people on the event can be put on an activity (#1678)", () => {
 
   it("refuses an account whose coordinator grant was revoked or has expired, and an account that never held one", async () => {
     signIn(who[1]!);
-    mocks.isAreaCoordinator.mockResolvedValue(false);
+    mocks.grantFindFirst.mockResolvedValue(null);
     const answer = await staffAssign(request("POST", { ...assign, assignee: { kind: "account", id: "acct-revoked" } }), ctx);
     expect(answer.status).toBe(422);
     expect((await answer.json()).error).toBe("NOT_ON_EVENT");
     expect(mocks.assignmentCreate).not.toHaveBeenCalled();
+  });
+
+  it("treats a coordinator whose account is not active as refused when chosen, and as no longer on the event when shown", async () => {
+    signIn(who[1]!);
+    mocks.grantFindFirst.mockResolvedValue(null);
+    expect((await staffAssign(request("POST", { ...assign, assignee: { kind: "account", id: "acct-inactive" } }), ctx)).status).toBe(422);
+    mocks.activityFindMany.mockResolvedValue([{ ...activityRow, assignments: [{ id: "asg-9", role: "LEAD", personId: null, userId: null, attendeeAccountId: "acct-inactive", person: null, user: null, attendeeAccount: { displayName: "Sample Coordinator" } }] }]);
+    const [sheet] = await loadStaffingSheet("event-1");
+    expect(sheet!.assignments[0]).toMatchObject({ kind: "account", active: false });
+    expect(mocks.grantFindMany.mock.calls[0]![0].where).toMatchObject({ attendeeAccount: { status: "ACTIVE" } });
   });
 
   it("refuses an activity of another event, a TLT in this slice, a person twice, and a bad request", async () => {

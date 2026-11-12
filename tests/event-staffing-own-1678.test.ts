@@ -89,7 +89,7 @@ describe("an assigned person sees their own assignment (#1678)", () => {
   it("shows an Area Coordinator their own lead job by account id, only while their grant is active", async () => {
     mocks.assignmentFindMany.mockResolvedValue([row({ id: "asg-3", personId: null, attendeeAccountId: "acct-sam", role: "LEAD" })]);
     expect((await listOwnAssignments(sam)).map((own) => own.roleLabel)).toEqual(["Lead"]);
-    expect(mocks.grantFindFirst.mock.calls[0]![0].where).toMatchObject({ attendeeAccountId: "acct-sam", revokedAt: null });
+    expect(mocks.grantFindFirst.mock.calls[0]![0].where).toMatchObject({ attendeeAccountId: "acct-sam", revokedAt: null, attendeeAccount: { status: "ACTIVE" } });
     mocks.grantFindFirst.mockResolvedValue(null);
     expect(await listOwnAssignments(sam)).toEqual([]);
   });
