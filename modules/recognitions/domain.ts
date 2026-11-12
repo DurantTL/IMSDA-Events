@@ -32,7 +32,8 @@ export const markInputSchema = z.object({
   recognitionId: z.string().trim().min(1),
 });
 
-export const searchQuerySchema = z.string().trim().min(2).max(60);
+export const searchQuerySchema = z.string().trim().max(60);
+export const RECOGNITION_PAGE_SIZE = 20;
 
 export type RecognitionDefinition = { id: string; name: string; item: RecognitionItemValue; isActive: boolean };
 
@@ -44,6 +45,8 @@ export type RecognitionMark = {
   clubKey: string;
   clubName: string;
 };
+
+export type RecognitionSearchPage = { results: RecognitionSearchResult[]; page: number; pageCount: number; total: number; from: number; to: number };
 
 export type RecognitionSearchResult = { attendeeId: string; name: string; clubName: string; earnedRecognitionIds: string[] };
 

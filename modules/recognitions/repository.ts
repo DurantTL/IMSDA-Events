@@ -3,12 +3,14 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { clampPage, sliceFromCount } from "@/lib/pagination";
 import { isModuleEnabled } from "@/modules/event-modules/service";
 import { formatPersonName } from "@/lib/person-name";
 import { normalizedTagName } from "@/modules/tags/domain";
 import { applyAttendeeTag, removeAttendeeTag, TagConfigurationError } from "@/modules/tags/repository";
 import {
   RECOGNITION_MODULE_KEY,
+  RECOGNITION_PAGE_SIZE,
   clubLabel,
   recognitionColors,
   recognitionInputSchema,
@@ -16,7 +18,7 @@ import {
   type RecognitionDefinition,
   type RecognitionItemValue,
   type RecognitionMark,
-  type RecognitionSearchResult,
+  type RecognitionSearchPage,
 } from "@/modules/recognitions/domain";
 
 export class RecognitionError extends Error {
@@ -116,41 +118,58 @@ function clubOf(row: AttendeeRow) {
   };
 }
 
-/** Attendees of this event's registered clubs whose name contains every word typed. Names and club only, at most 20. */
-export async function searchRecognitionAttendees(eventId: string, query: string): Promise<RecognitionSearchResult[]> {
+/** The attendees of this event's registered clubs: the people recognitions are marked for. */
+function clubAttendeeWhere(eventId: string): Prisma.RegistrationAttendeeWhereInput {
+  return { eventId, registration: { status: { in: [...registeredStatuses] }, clubRegistration: { isNot: null } } };
+}
+
+/**
+ * Attendees of this event's registered clubs, sorted by name, 20 to a page. Typed words narrow the list: each word has to be in
+ * the first or last name as shown (the name the registration holds, or the person's own when it holds none). Names and club only.
+ */
+export async function searchRecognitionAttendees(eventId: string, query: string, requestedPage = 1): Promise<RecognitionSearchPage> {
   const words = query.trim().split(/\s+/).filter(Boolean).slice(0, 4);
-  if (words.length === 0) return [];
-  const rows = await getPrisma().registrationAttendee.findMany({
-    where: {
-      eventId,
-      registration: { status: { in: [...registeredStatuses] }, clubRegistration: { isNot: null } },
-      AND: words.map((word) => ({
-        OR: [
-          { person: { firstName: { contains: word, mode: "insensitive" as const } } },
-          { person: { lastName: { contains: word, mode: "insensitive" as const } } },
-        ],
-      })),
-    },
+  const prisma = getPrisma();
+  const where: Prisma.RegistrationAttendeeWhereInput = {
+    ...clubAttendeeWhere(eventId),
+    AND: words.map((word) => ({
+      OR: [
+        { person: { firstName: { contains: word, mode: "insensitive" as const } } },
+        { person: { lastName: { contains: word, mode: "insensitive" as const } } },
+        { profileSnapshot: { path: ["firstName"], string_contains: word, mode: "insensitive" as const } },
+        { profileSnapshot: { path: ["lastName"], string_contains: word, mode: "insensitive" as const } },
+      ],
+    })),
+  };
+  const total = await prisma.registrationAttendee.count({ where });
+  const page = clampPage(requestedPage, total, RECOGNITION_PAGE_SIZE);
+  const rows = await prisma.registrationAttendee.findMany({
+    where,
     orderBy: [{ person: { lastName: "asc" } }, { person: { firstName: "asc" } }, { id: "asc" }],
-    take: 20,
+    skip: (page - 1) * RECOGNITION_PAGE_SIZE,
+    take: RECOGNITION_PAGE_SIZE,
     select: attendeeSelect,
   });
-  const marks = await getPrisma().attendeeTagAssignment.findMany({
+  const marks = await prisma.attendeeTagAssignment.findMany({
     where: { eventId, attendeeId: { in: rows.map((row) => row.id) }, removedAt: null, tag: { recognitionItem: { not: null } } },
     select: { attendeeId: true, tagId: true },
   });
-  return rows.map((row) => ({
-    attendeeId: row.id,
-    name: attendeeName(row),
-    clubName: clubOf(row).clubName,
-    earnedRecognitionIds: marks.filter((mark) => mark.attendeeId === row.id).map((mark) => mark.tagId),
-  }));
+  const slice = sliceFromCount(rows, page, total, RECOGNITION_PAGE_SIZE);
+  return {
+    results: rows.map((row) => ({
+      attendeeId: row.id,
+      name: attendeeName(row),
+      clubName: clubOf(row).clubName,
+      earnedRecognitionIds: marks.filter((mark) => mark.attendeeId === row.id).map((mark) => mark.tagId),
+    })),
+    page: slice.page, pageCount: slice.pageCount, total: slice.total, from: slice.from, to: slice.to,
+  };
 }
 
 export async function loadRecognitionSummary(eventId: string) {
   const definitions = await listRecognitions(eventId);
   const assignments = await getPrisma().attendeeTagAssignment.findMany({
-    where: { eventId, removedAt: null, tag: { recognitionItem: { not: null }, isActive: true } },
+    where: { eventId, removedAt: null, tag: { recognitionItem: { not: null }, isActive: true }, attendee: clubAttendeeWhere(eventId) },
     select: { tagId: true, attendee: { select: attendeeSelect } },
   });
   const marks: RecognitionMark[] = assignments.map((row) => ({

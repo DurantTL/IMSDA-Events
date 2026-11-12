@@ -165,7 +165,7 @@ describe("another event and large data", () => {
     await searchOperationsRegistrations({ eventId: "event-b", permissions: registrar.permissions }, params("q=Marta&eventId=event-a&event=event-a"));
     expect(transaction.registration.count.mock.calls[0][0].where.eventId).toBe("event-b");
     expect(prisma.event.findUnique.mock.calls[0][0].where).toEqual({ id: "event-b" });
-    expect(prisma.eventTag.findMany.mock.calls[0][0].where).toEqual({ eventId: "event-b" });
+    expect(prisma.eventTag.findMany.mock.calls[0][0].where).toEqual({ eventId: "event-b", recognitionItem: null });
     expect(prisma.publicRegistrationSubmission.groupBy.mock.calls[0][0].where).toEqual({ eventId: "event-b" });
   });
 

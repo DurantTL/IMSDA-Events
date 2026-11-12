@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   tagFindMany: vi.fn(),
   attendeeFindFirst: vi.fn(),
   attendeeFindMany: vi.fn(),
+  attendeeCount: vi.fn(),
   assignmentFindFirst: vi.fn(),
   assignmentFindMany: vi.fn(),
   assignmentCreate: vi.fn(),
@@ -35,7 +36,7 @@ vi.mock("@/lib/prisma", () => {
     event: { findUnique: mocks.eventFindUnique, findFirst: mocks.eventFindFirst },
     eventModule: { findUnique: mocks.moduleFindUnique, createMany: mocks.moduleCreateMany, deleteMany: mocks.moduleDeleteMany },
     eventTag: { findFirst: mocks.tagFindFirst, create: mocks.tagCreate, findMany: mocks.tagFindMany },
-    registrationAttendee: { findFirst: mocks.attendeeFindFirst, findMany: mocks.attendeeFindMany },
+    registrationAttendee: { findFirst: mocks.attendeeFindFirst, findMany: mocks.attendeeFindMany, count: mocks.attendeeCount },
     attendeeTagAssignment: { findFirst: mocks.assignmentFindFirst, findMany: mocks.assignmentFindMany, create: mocks.assignmentCreate, update: mocks.assignmentUpdate, delete: mocks.assignmentDelete, findUniqueOrThrow: mocks.assignmentFindUniqueOrThrow },
     auditLog: { create: mocks.auditCreate },
     $transaction: async (run: (tx: unknown) => unknown) => run(client),
@@ -64,6 +65,7 @@ beforeEach(() => {
   mocks.tagFindMany.mockResolvedValue([]);
   mocks.attendeeFindFirst.mockResolvedValue({ id: "att-1" });
   mocks.attendeeFindMany.mockResolvedValue([]);
+  mocks.attendeeCount.mockResolvedValue(0);
   mocks.assignmentFindMany.mockResolvedValue([]);
   mocks.auditCreate.mockResolvedValue({});
 });
@@ -125,10 +127,43 @@ describe("recognition routes check permission on the server (#1683)", () => {
     expect(mocks.assignmentCreate).not.toHaveBeenCalled();
   });
 
-  it("rejects a search that is too short or a malformed mark", async () => {
+  it("rejects a malformed mark and an over-long search", async () => {
     as("REGISTRATION_MANAGER");
-    expect((await getAttendees(new Request("https://events.imsda.test/x?q=a"), ctx)).status).toBe(400);
     expect((await postMark(json("POST", { attendeeId: "att-1" }), ctx)).status).toBe(400);
+    expect((await getAttendees(new Request(`https://events.imsda.test/x?q=${"a".repeat(61)}`), ctx)).status).toBe(400);
+  });
+
+  it("lists registered club attendees, sorted by name and paged, for an empty or one-letter search", async () => {
+    as("REGISTRATION_MANAGER");
+    mocks.attendeeCount.mockResolvedValue(45);
+    for (const q of ["", "a"]) {
+      mocks.attendeeFindMany.mockClear();
+      const response = await getAttendees(new Request(`https://events.imsda.test/x?q=${q}&page=3`), ctx);
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body).toMatchObject({ page: 3, pageCount: 3, total: 45 });
+      expect(mocks.attendeeFindMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 40, take: 20, orderBy: [{ person: { lastName: "asc" } }, { person: { firstName: "asc" } }, { id: "asc" }] }));
+      const where = mocks.attendeeFindMany.mock.calls[0][0].where;
+      expect(where.registration).toEqual({ status: { in: ["SUBMITTED", "CONFIRMED"] }, clubRegistration: { isNot: null } });
+      expect(where.AND).toHaveLength(q ? 1 : 0);
+    }
+  });
+
+  it("searches the name shown in results as well as the person's own", async () => {
+    as("REGISTRATION_MANAGER");
+    await getAttendees(new Request("https://events.imsda.test/x?q=alex"), ctx);
+    const or = mocks.attendeeFindMany.mock.calls[0][0].where.AND[0].OR;
+    expect(or).toHaveLength(4);
+    expect(or).toContainEqual({ profileSnapshot: { path: ["lastName"], string_contains: "alex", mode: "insensitive" } });
+  });
+
+  it("counts only marks on submitted or confirmed club registrations in the totals", async () => {
+    as("REGISTRATION_MANAGER");
+    mocks.tagFindMany.mockResolvedValue([{ id: "tag-1", name: "Memory verses", isActive: true, recognitionItem: "PIN" }]);
+    await getSummary(new Request("https://events.imsda.test/x"), ctx);
+    const where = mocks.assignmentFindMany.mock.calls[0][0].where;
+    expect(where.attendee).toEqual({ eventId: "event-1", registration: { status: { in: ["SUBMITTED", "CONFIRMED"] }, clubRegistration: { isNot: null } } });
+    expect(where.removedAt).toBeNull();
   });
 
   it("returns names and club only from a search", async () => {

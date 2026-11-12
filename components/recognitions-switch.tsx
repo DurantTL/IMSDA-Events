@@ -29,7 +29,7 @@ export function RecognitionsSwitch({ eventId, enabled }: { eventId: string; enab
   return (
     <div className={styles.form}>
       {enabled && <p className={styles.help}>Turning Recognitions off hides this page. Everything already marked is kept.</p>}
-      <button className={enabled ? "secondary-button" : "primary-button"} disabled={busy} onClick={change} type="button">{enabled ? "Turn Recognitions off" : "Turn Recognitions on"}</button>
+      <button className={enabled ? "secondary-button" : "primary-button"} disabled={busy} onClick={change} type="button">{busy ? "Saving…" : enabled ? "Turn Recognitions off" : "Turn Recognitions on"}</button>
       <FormMessage alwaysMounted message={error} tone="error" />
     </div>
   );
