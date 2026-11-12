@@ -20,6 +20,14 @@ const optionalDateSchema = z.union([
   z.null(),
 ]).optional().transform((value) => value || null);
 
+/**
+ * Attendee-type restriction (#102): `EventAttendeeType.code` values. Trimmed and deduplicated here; the repository checks
+ * each one against the event's own attendee types. An empty list means every attendee type.
+ */
+const attendeeTypeCodesSchema = z.array(z.string().trim().min(1).max(80))
+  .max(50, "Choose at most 50 attendee types.")
+  .transform((codes) => [...new Set(codes)]);
+
 const promoCodeShape = {
   code: z.string().max(80).transform(normalizePromoCode).refine(
     isNormalizedPromoCode,
@@ -39,6 +47,8 @@ const promoCodeShape = {
    * repository checks the organization and the event's audience).
    */
   sponsoringOrganizationId: z.string().trim().min(1).max(100).nullable().optional(),
+  /** Omitted on create means every attendee type; omitted on an update means "leave the restriction as it is". */
+  attendeeTypeCodes: attendeeTypeCodesSchema.optional(),
 };
 
 function validatePromoCodeInput(

@@ -1,0 +1,62 @@
+/* The "Applies to" choice in the promo code editor and the matching line on a code's card (#102). */
+.appliesTo {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  padding: 12px;
+}
+
+.appliesToLegend {
+  padding: 0 4px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.appliesToHelp {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.4;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--target-touch, 44px);
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.choice input {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
+.typeChoices {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.typeChoices .choice {
+  overflow-wrap: anywhere;
+}
+
+.noTypes {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.cardTypes {
+  overflow-wrap: anywhere;
+}

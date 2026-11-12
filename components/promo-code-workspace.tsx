@@ -24,6 +24,7 @@ import {
   savedPromoCodeEditorDraft,
 } from "@/modules/promo-codes/editor-draft";
 import { countLabel } from "@/lib/pluralize";
+import styles from "@/components/promo-code-workspace.module.css";
 import type { PromoCodeRecord } from "@/modules/promo-codes/repository";
 
 const discardEditorMessage =
@@ -70,6 +71,9 @@ function currentPromoCodeEditorDraft(form: HTMLFormElement) {
     maximumUses: String(values.get("maximumUses") ?? ""),
     maximumDiscount: String(values.get("maximumDiscount") ?? ""),
     sponsoringOrganizationId: String(values.get("sponsoringOrganizationId") ?? ""),
+    attendeeTypeCodes: values.get("appliesTo") === "selected"
+      ? values.getAll("attendeeTypeCodes").map(String)
+      : [],
   });
 }
 
@@ -79,6 +83,7 @@ export function PromoCodeWorkspace({
   canSponsorByChurch = false,
   sponsorChurches = [],
   canCreate = false,
+  attendeeTypeOptions = [],
 }: {
   eventId: string;
   initialPromoCodes: PromoCodeRecord[];
@@ -87,12 +92,15 @@ export function PromoCodeWorkspace({
   sponsorChurches?: Array<{ id: string; name: string; type: string }>;
   /** Whether the viewer may create codes; the empty state offers the action only then (#743). The server decides again. */
   canCreate?: boolean;
+  /** The event's active attendee types a code may be restricted to (#102). */
+  attendeeTypeOptions?: Array<{ code: string; label: string }>;
 }) {
   const [promoCodes, setPromoCodes] = useState(initialPromoCodes);
   const [editing, setEditing] = useState<PromoCodeRecord | "new" | null>(null);
   const [discountType, setDiscountType] = useState<
     "FIXED_CENTS" | "PERCENT_BPS"
   >("FIXED_CENTS");
+  const [appliesTo, setAppliesTo] = useState<"all" | "selected">("all");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -119,6 +127,7 @@ export function PromoCodeWorkspace({
 
   function beginCreate() {
     setEditing("new");
+    setAppliesTo("all");
     setDiscountType("FIXED_CENTS");
     setEditorDirty(false);
     setError("");
@@ -127,6 +136,7 @@ export function PromoCodeWorkspace({
 
   function beginEdit(promo: PromoCodeRecord) {
     setEditing(promo);
+    setAppliesTo(promo.attendeeTypeCodes.length > 0 ? "selected" : "all");
     setDiscountType(promo.discountType);
     setEditorDirty(false);
     setError("");
@@ -192,6 +202,10 @@ export function PromoCodeWorkspace({
       ...(canSponsorByChurch && !current?.redeemedCount
         ? { sponsoringOrganizationId: String(form.get("sponsoringOrganizationId") ?? "") || null }
         : {}),
+      // Empty means every attendee type. Sent on every save so an edit never leaves a stale restriction behind (#102).
+      attendeeTypeCodes: form.get("appliesTo") === "selected"
+        ? form.getAll("attendeeTypeCodes").map(String)
+        : [],
       ...(current ? { expectedUpdatedAt: current.updatedAt } : {}),
     };
     const url = current
@@ -281,6 +295,15 @@ export function PromoCodeWorkspace({
       setSaving(false);
     }
   }
+
+  // The active types, plus any type the code already lists that is no longer active or was removed, so staff can see
+  // and untick it.
+  const typeChoices = [
+    ...attendeeTypeOptions,
+    ...(editedPromo?.attendeeTypeCodes ?? [])
+      .filter((code) => !attendeeTypeOptions.some((type) => type.code === code))
+      .map((code) => ({ code, label: `${code} (inactive or removed)` })),
+  ];
 
   const defaultDiscountValue = editedPromo
     ? editedPromo.discountType === "FIXED_CENTS"
@@ -376,6 +399,14 @@ export function PromoCodeWorkspace({
                       <dd>{promo.sponsoringOrganizationName} · billed to the church or company</dd>
                     </div>
                   )}
+                  <div>
+                    <dt>Applies to</dt>
+                    <dd className={styles.cardTypes}>
+                      {promo.attendeeTypeLabels.length === 0
+                        ? "All attendee types"
+                        : promo.attendeeTypeLabels.join(", ")}
+                    </dd>
+                  </div>
                   <div>
                     <dt>Dates</dt>
                     <dd>
@@ -513,6 +544,57 @@ export function PromoCodeWorkspace({
                   <input name="maximumDiscount" type="number" min="0.01" step="0.01" defaultValue={optionalMoneyValue(editedPromo?.maximumDiscountCents ?? null)} />
                 </label>
               )}
+              <fieldset className={styles.appliesTo}>
+                <legend className={styles.appliesToLegend}>Applies to</legend>
+                <label className={styles.choice}>
+                  <input
+                    type="radio"
+                    name="appliesTo"
+                    value="all"
+                    checked={appliesTo === "all"}
+                    onChange={() => setAppliesTo("all")}
+                  />
+                  All attendee types
+                </label>
+                <label className={styles.choice}>
+                  <input
+                    type="radio"
+                    name="appliesTo"
+                    value="selected"
+                    checked={appliesTo === "selected"}
+                    onChange={() => setAppliesTo("selected")}
+                  />
+                  Only the attendee types I choose
+                </label>
+                {appliesTo === "selected" && (
+                  <>
+                    {typeChoices.length === 0 ? (
+                      <p className={styles.noTypes}>This event has no attendee types to choose from.</p>
+                    ) : (
+                      <ul className={styles.typeChoices}>
+                        {typeChoices.map((type) => (
+                          <li key={type.code}>
+                            <label className={styles.choice}>
+                              <input
+                                type="checkbox"
+                                name="attendeeTypeCodes"
+                                value={type.code}
+                                defaultChecked={editedPromo?.attendeeTypeCodes.includes(type.code) ?? false}
+                              />
+                              {type.label}
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <p className={styles.appliesToHelp}>
+                      The code only works for people of the chosen types. Lodging and other charges that are not
+                      for one person are not discounted. Not available with a church sponsor. Pricing changes need
+                      the treasurer&apos;s approval before the code is used.
+                    </p>
+                  </>
+                )}
+              </fieldset>
               {canSponsorByChurch && (
                 <label>
                   Sponsoring church or company <small>Optional · the church or company is billed for the discount on each active registration that uses this code</small>

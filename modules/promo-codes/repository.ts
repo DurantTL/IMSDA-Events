@@ -36,9 +36,11 @@ import {
   type HeldPromoCode,
   type DiscountedFormCalculation,
   type PromoCodeEvaluation,
+  type PromoAttendeeScope,
   type PromoCodeFailureReason,
   type PromoCodeRule,
 } from "@/modules/promo-codes/domain";
+import { pricingAttendeeTypeCode } from "@/modules/attendee-types/pricing-type-code";
 import { SPONSOR_ORGANIZATION_TYPES, canSponsorClub } from "@/modules/organizations/domain";
 import { eventBillsSponsoredPromoCodes } from "@/modules/promo-codes/church-sponsored";
 import { isChurchBilledBillingMode, perPersonPrice, type PerPersonPrice } from "@/modules/club-registrations/per-person-price";
@@ -60,6 +62,7 @@ export type PromoCodeOperationErrorCode =
   | "PROMO_CODE_CLAIM_CONFLICT"
   | "PROMO_CODE_SPONSOR_INVALID"
   | "PROMO_CODE_SPONSOR_LOCKED"
+  | "PROMO_CODE_ATTENDEE_TYPE_INVALID"
   | "PROMO_CODE_BUSY";
 
 export class PromoCodeOperationError extends Error {
@@ -102,6 +105,8 @@ type StoredPromo = {
   maximumDiscountCents: number | null;
   redeemedCount: number;
   sponsoringOrganizationId: string | null;
+  /** Attendee-type restriction (#102): empty means every attendee type. */
+  attendeeTypeCodes: string[];
 };
 
 export type ClaimedPromoCode = {
@@ -131,6 +136,7 @@ function serializePromoCode(
     sponsoringOrganization?: { name: string } | null;
   },
   pricingDate: string,
+  attendeeTypes: ReadonlyArray<{ code: string; label: string }> = [],
 ) {
   const { sponsoringOrganization, ...stored } = promo;
   const remainingUses = promo.maximumUses === null
@@ -148,6 +154,11 @@ function serializePromoCode(
   return {
     ...stored,
     sponsoringOrganizationName: sponsoringOrganization?.name ?? null,
+    /** Labels of the attendee types a restricted code applies to (#102); empty means every attendee type. */
+    attendeeTypeLabels: promo.attendeeTypeCodes.map((code) => {
+      const type = attendeeTypes.find((candidate) => candidate.code === code);
+      return type ? type.label : `${code} (removed)`;
+    }),
     remainingUses,
     availability,
     createdAt: promo.createdAt.toISOString(),
@@ -169,13 +180,63 @@ export async function listPromoCodes(eventId: string, now = new Date()) {
       "The event could not be found.",
     );
   }
-  const promos = await prisma.promoCode.findMany({
-    where: { eventId },
-    orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }],
-    include: { sponsoringOrganization: { select: { name: true } } },
-  });
+  const [promos, attendeeTypes] = await Promise.all([
+    prisma.promoCode.findMany({
+      where: { eventId },
+      orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }],
+      include: { sponsoringOrganization: { select: { name: true } } },
+    }),
+    prisma.eventAttendeeType.findMany({ where: { eventId }, select: { code: true, label: true } }),
+  ]);
   const pricingDate = calendarDateInTimeZone(now, event.timezone);
-  return promos.map((promo) => serializePromoCode(promo, pricingDate));
+  return promos.map((promo) => serializePromoCode(promo, pricingDate, attendeeTypes));
+}
+
+/** The event's attendee types staff may restrict a code to (#102): active ones, in the order the form shows them. */
+export async function listPromoAttendeeTypeOptions(eventId: string) {
+  return getPrisma().eventAttendeeType.findMany({
+    where: { eventId, isActive: true },
+    orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+    select: { code: true, label: true },
+  });
+}
+
+/**
+ * A code's attendee-type restriction (#102), checked on the server whatever the form sent: every code must be one of this
+ * event's attendee types. A type the code already lists may stay even if it has since been deactivated (saving other
+ * changes must not fail), but a newly chosen type must be active. The list is deduplicated; a church-sponsored code is not
+ * restricted (the church's share of a code is worked out on the whole subtotal).
+ */
+async function validatedAttendeeTypeCodes(
+  tx: Prisma.TransactionClient,
+  eventId: string,
+  requested: readonly string[],
+  alreadyListed: readonly string[],
+  sponsoringOrganizationId: string | null,
+) {
+  const codes = [...new Set(requested)];
+  if (codes.length === 0) return codes;
+  if (sponsoringOrganizationId) {
+    throw new PromoCodeOperationError(
+      "PROMO_CODE_ATTENDEE_TYPE_INVALID",
+      "A church-sponsored code can't be limited to attendee types. Remove the sponsor or choose all attendee types.",
+    );
+  }
+  const found = await tx.eventAttendeeType.findMany({
+    where: { eventId, code: { in: codes } },
+    select: { code: true, isActive: true },
+  });
+  const byCode = new Map(found.map((type) => [type.code, type]));
+  for (const code of codes) {
+    const type = byCode.get(code);
+    if (!type || (!type.isActive && !alreadyListed.includes(code))) {
+      throw new PromoCodeOperationError(
+        "PROMO_CODE_ATTENDEE_TYPE_INVALID",
+        "Choose attendee types that are active on this event.",
+      );
+    }
+  }
+  return codes;
 }
 
 /**
@@ -298,6 +359,13 @@ export async function createPromoCode(
       if (sponsoringOrganizationId) {
         await assertSponsorAllowed(tx, eventId, sponsoringOrganizationId);
       }
+      const attendeeTypeCodes = await validatedAttendeeTypeCodes(
+        tx,
+        eventId,
+        input.attendeeTypeCodes ?? [],
+        [],
+        sponsoringOrganizationId,
+      );
       const promo = await tx.promoCode.create({
         data: {
           eventId,
@@ -312,6 +380,7 @@ export async function createPromoCode(
           maximumUses: input.maximumUses,
           maximumDiscountCents: input.maximumDiscountCents,
           sponsoringOrganizationId,
+          attendeeTypeCodes,
         },
       });
       if (sponsoringOrganizationId) {
@@ -337,6 +406,7 @@ export async function createPromoCode(
             discountType: promo.discountType,
             discountValue: promo.discountValue,
             maximumUses: promo.maximumUses,
+            attendeeTypeCodes: promo.attendeeTypeCodes,
           },
         },
       });
@@ -407,6 +477,16 @@ export async function updatePromoCode(
         }
         if (nextSponsor) await assertSponsorAllowed(tx, eventId, nextSponsor);
       }
+      // Omitted means "leave the restriction as it is".
+      const nextAttendeeTypeCodes = input.attendeeTypeCodes === undefined
+        ? existing.attendeeTypeCodes
+        : await validatedAttendeeTypeCodes(tx, eventId, input.attendeeTypeCodes, existing.attendeeTypeCodes, nextSponsor);
+      if (input.attendeeTypeCodes === undefined && nextSponsor && existing.attendeeTypeCodes.length > 0) {
+        throw new PromoCodeOperationError(
+          "PROMO_CODE_ATTENDEE_TYPE_INVALID",
+          "A church-sponsored code can't be limited to attendee types. Remove the sponsor or choose all attendee types.",
+        );
+      }
       const changed = await tx.promoCode.updateMany({
         where: {
           id: promoCodeId,
@@ -428,6 +508,7 @@ export async function updatePromoCode(
           minimumSubtotalCents: input.minimumSubtotalCents,
           maximumUses: input.maximumUses,
           maximumDiscountCents: input.maximumDiscountCents,
+          attendeeTypeCodes: nextAttendeeTypeCodes,
         },
       });
       if (changed.count !== 1) {
@@ -464,6 +545,8 @@ export async function updatePromoCode(
             redeemedCount: existing.redeemedCount,
             discountType: input.discountType,
             discountValue: input.discountValue,
+            previousAttendeeTypeCodes: existing.attendeeTypeCodes,
+            attendeeTypeCodes: nextAttendeeTypeCodes,
           },
         },
       });
@@ -491,6 +574,7 @@ function publicFormQuery(eventSlug: string, formSlug: string) {
       event: {
         select: {
           timezone: true,
+          audience: true,
           endsAt: true,
           isPublished: true,
           archivedAt: true,
@@ -576,6 +660,11 @@ export async function evaluateAttendeePromoCodes(
     eventId: string;
     field: { id: string; key: string };
     attendees: ReadonlyArray<{ responses: Record<string, unknown> }>;
+    /**
+     * Each attendee's attendee-type code (index-matched to `attendees`, null for none), so a code restricted to attendee
+     * types is only valid for the right people (#102). Omitted means no attendee has a type, so a restricted code is refused.
+     */
+    attendeeTypeCodes?: ReadonlyArray<string | null>;
     calculation: FormCalculation;
     pricingDate: string;
     claim: boolean;
@@ -609,6 +698,7 @@ export async function evaluateAttendeePromoCodes(
       continue;
     }
     const eligibleSubtotalCents = attendeeShareCents(input.calculation, attendeeIndex);
+    const attendeeScope: PromoAttendeeScope = { kind: "ATTENDEE", attendeeTypeCode: input.attendeeTypeCodes?.[attendeeIndex] ?? null };
     if (input.claim) {
       try {
         const claimed = await claimPromoCode(client as Prisma.TransactionClient, {
@@ -618,6 +708,7 @@ export async function evaluateAttendeePromoCodes(
           pricingDate: input.pricingDate,
           fieldId: input.field.id,
           hideAmounts: input.hideAmounts,
+          attendeeScope,
         });
         discounts.push({ attendeeIndex, code: claimed.promoCode.code, discountAmountCents: claimed.evaluation.discountAmountCents, promoCodeId: claimed.promoCode.id });
         if (!held.some((code) => code.normalizedCode === claimed.evaluation.normalizedCode)) {
@@ -636,7 +727,7 @@ export async function evaluateAttendeePromoCodes(
     const earlierUses = promo ? usedHere.get(promo.id) ?? 0 : 0;
     const evaluation = evaluatePromoCode(
       promo ? { ...storedPromoRule(promo), redeemedCount: promo.redeemedCount + earlierUses } : null,
-      { submittedCode, eligibleSubtotalCents, pricingDate: input.pricingDate, hideAmounts: input.hideAmounts },
+      { submittedCode, eligibleSubtotalCents, pricingDate: input.pricingDate, hideAmounts: input.hideAmounts, attendeeScope },
     );
     if (!evaluation.valid) {
       issueFor(
@@ -697,6 +788,21 @@ async function quoteCalculation(
   if (!input.lodging || churchBilled) return prepared.calculation;
   const line = await lodgingQuoteLine(client, eventId, input.lodging, prepared.attendees.length);
   return line ? calculationWithLine(definition, prepared.registrationResponses, prepared.calculation, line.key, line) : prepared.calculation;
+}
+
+/** Each previewed attendee's attendee-type code, worked out as the submission will (#102). */
+function quoteAttendeeTypeCodes(
+  definition: RegistrationFormDefinition,
+  prepared: { registrationResponses: Record<string, unknown>; attendees: ReadonlyArray<{ responses: Record<string, unknown> }> },
+  event: { audience: string | null; attendeeTypes: ReadonlyArray<{ code: string; label: string }> },
+) {
+  return prepared.attendees.map((attendee) => pricingAttendeeTypeCode({
+    definition,
+    registrationResponses: prepared.registrationResponses,
+    attendeeResponses: attendee.responses,
+    types: event.attendeeTypes,
+    legacyAnswerAllowed: event.audience === "GENERAL",
+  }));
 }
 
 export type PublicAttendeePromoQuote = DiscountedFormCalculation & {
@@ -763,6 +869,7 @@ export async function getPublicPromoCodeQuote(
       eventId: form.eventId,
       field: attendeeField,
       attendees: prepared.attendees,
+      attendeeTypeCodes: quoteAttendeeTypeCodes(definition, prepared, form.event),
       calculation,
       pricingDate: prepared.pricingDate,
       claim: false,
@@ -811,6 +918,11 @@ export async function getPublicPromoCodeQuote(
       eligibleSubtotalCents: calculation.subtotalCents,
       pricingDate: prepared.pricingDate,
       hideAmounts: churchBilled,
+      attendeeScope: {
+        kind: "REGISTRATION",
+        calculation,
+        attendeeTypeCodes: quoteAttendeeTypeCodes(definition, prepared, form.event),
+      },
     },
   );
   if (!evaluation.valid) publicErrorFromEvaluation(evaluation, field.id);
@@ -840,6 +952,8 @@ export async function claimPromoCode(
     pricingDate: string;
     fieldId: string;
     hideAmounts?: boolean;
+    /** Whom the code is for. A code restricted to attendee types is refused without it (#102). */
+    attendeeScope?: PromoAttendeeScope;
   },
 ): Promise<ClaimedPromoCode> {
   const promo = await findPromoForCode(
@@ -919,6 +1033,7 @@ export async function recordPromoCodeRedemption(
       minimumSubtotalCentsSnapshot: promo.minimumSubtotalCents,
       maximumUsesSnapshot: promo.maximumUses,
       maximumDiscountCentsSnapshot: promo.maximumDiscountCents,
+      attendeeTypeCodesSnapshot: promo.attendeeTypeCodes ?? [],
       eligibleSubtotalCents: evaluation.eligibleSubtotalCents,
       discountAmountCents: evaluation.discountAmountCents,
       pricingDate: input.claimed.pricingDate,
