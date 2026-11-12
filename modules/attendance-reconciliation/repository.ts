@@ -141,6 +141,7 @@ const factsSelect = {
       createdAt: true,
       profileSnapshot: true,
       person: { select: { firstName: true, lastName: true } },
+      attendeeTypeDefinition: { select: { code: true } },
       checkIns: { where: { undoneAt: null }, select: { id: true } },
       attendanceCorrections: {
         where: { supersededAt: null },
@@ -152,7 +153,7 @@ const factsSelect = {
   publicFormSubmission: { select: { responses: true, pricingSnapshot: true, createdAt: true, formVersion: { select: { definition: true } } } },
   operations: { where: { type: "AMENDMENT" }, orderBy: { createdAt: "desc" }, take: 1, select: { afterSnapshot: true, createdAt: true } },
   promoCodeRedemption: {
-    select: { codeSnapshot: true, discountTypeSnapshot: true, discountValueSnapshot: true, maximumDiscountCentsSnapshot: true, discountAmountCents: true },
+    select: { codeSnapshot: true, discountTypeSnapshot: true, discountValueSnapshot: true, maximumDiscountCentsSnapshot: true, discountAmountCents: true, attendeeTypeCodesSnapshot: true },
   },
 } satisfies Prisma.RegistrationSelect;
 
@@ -298,6 +299,7 @@ function sourceFor(row: FactsRow, context: SourceContext, placesFor: (registrati
       chargeCents: own.reduce((total, line) => total + (line.amountCents as number), 0),
       lateRate: own.some((line) => typeof line.pricingLabel === "string"),
       transferredFrom,
+      attendeeTypeCode: attendee.attendeeTypeDefinition?.code ?? null,
       adjustmentCents: row.adjustments
         .filter((adjustment) => adjustment.registrationAttendeeId === attendee.id)
         .reduce((total, adjustment) => total + adjustment.amountCents, 0),
@@ -350,6 +352,7 @@ function sourceFor(row: FactsRow, context: SourceContext, placesFor: (registrati
         value: redemption.discountValueSnapshot,
         maximumDiscountCents: redemption.maximumDiscountCentsSnapshot,
         recordedCents: recordedDiscount,
+        attendeeTypeCodes: redemption.attendeeTypeCodesSnapshot,
       }
     : null;
 

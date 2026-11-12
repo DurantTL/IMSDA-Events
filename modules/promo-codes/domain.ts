@@ -250,7 +250,9 @@ export function evaluatePromoCode(
       reason: "MINIMUM_NOT_MET",
       message: input.hideAmounts
         ? "This promo code's minimum isn't met for this registration."
-        : `That promo code requires a subtotal of at least ${formatCents(rule.minimumSubtotalCents)}. Your current subtotal is ${formatCents(eligibleSubtotalCents)}.`,
+        : isAttendeeTypeRestricted(rule.attendeeTypeCodes) && input.attendeeScope?.kind === "REGISTRATION"
+          ? `That promo code requires at least ${formatCents(rule.minimumSubtotalCents)} for the attendees it applies to. Their subtotal is ${formatCents(eligibleSubtotalCents)}.`
+          : `That promo code requires a subtotal of at least ${formatCents(rule.minimumSubtotalCents)}. Your current subtotal is ${formatCents(eligibleSubtotalCents)}.`,
     };
   }
   if (eligibleSubtotalCents === 0) {

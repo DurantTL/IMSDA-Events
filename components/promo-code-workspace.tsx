@@ -23,6 +23,7 @@ import {
   normalizePromoCodeEditorDraft,
   savedPromoCodeEditorDraft,
 } from "@/modules/promo-codes/editor-draft";
+import Link from "next/link";
 import { countLabel } from "@/lib/pluralize";
 import styles from "@/components/promo-code-workspace.module.css";
 import type { PromoCodeRecord } from "@/modules/promo-codes/repository";
@@ -101,6 +102,7 @@ export function PromoCodeWorkspace({
     "FIXED_CENTS" | "PERCENT_BPS"
   >("FIXED_CENTS");
   const [appliesTo, setAppliesTo] = useState<"all" | "selected">("all");
+  const [typeError, setTypeError] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -127,6 +129,7 @@ export function PromoCodeWorkspace({
 
   function beginCreate() {
     setEditing("new");
+    setTypeError("");
     setAppliesTo("all");
     setDiscountType("FIXED_CENTS");
     setEditorDirty(false);
@@ -136,6 +139,7 @@ export function PromoCodeWorkspace({
 
   function beginEdit(promo: PromoCodeRecord) {
     setEditing(promo);
+    setTypeError("");
     setAppliesTo(promo.attendeeTypeCodes.length > 0 ? "selected" : "all");
     setDiscountType(promo.discountType);
     setEditorDirty(false);
@@ -172,10 +176,16 @@ export function PromoCodeWorkspace({
 
   async function savePromo(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    // Choosing "only these types" with none ticked would save as every type, so it is stopped here and by the server.
+    if (form.get("appliesTo") === "selected" && form.getAll("attendeeTypeCodes").length === 0) {
+      setTypeError("Choose at least one attendee type, or choose all attendee types.");
+      return;
+    }
+    setTypeError("");
     setSaving(true);
     setError("");
     setNotice("");
-    const form = new FormData(event.currentTarget);
     const current = editing === "new" ? null : editing;
     const payload = {
       code: String(form.get("code") ?? ""),
@@ -203,6 +213,7 @@ export function PromoCodeWorkspace({
         ? { sponsoringOrganizationId: String(form.get("sponsoringOrganizationId") ?? "") || null }
         : {}),
       // Empty means every attendee type. Sent on every save so an edit never leaves a stale restriction behind (#102).
+      appliesTo: form.get("appliesTo") === "selected" ? "SELECTED" : "ALL",
       attendeeTypeCodes: form.get("appliesTo") === "selected"
         ? form.getAll("attendeeTypeCodes").map(String)
         : [],
@@ -546,7 +557,7 @@ export function PromoCodeWorkspace({
               )}
               <fieldset className={styles.appliesTo}>
                 <legend className={styles.appliesToLegend}>Applies to</legend>
-                <label className={styles.choice}>
+                <label>
                   <input
                     type="radio"
                     name="appliesTo"
@@ -556,25 +567,31 @@ export function PromoCodeWorkspace({
                   />
                   All attendee types
                 </label>
-                <label className={styles.choice}>
+                <label>
                   <input
                     type="radio"
                     name="appliesTo"
                     value="selected"
                     checked={appliesTo === "selected"}
+                    disabled={typeChoices.length === 0}
                     onChange={() => setAppliesTo("selected")}
                   />
                   Only the attendee types I choose
                 </label>
+                {typeChoices.length === 0 && (
+                  <p className={styles.noTypes}>
+                    This event has no attendee types yet.{" "}
+                    <Link href={`/more/attendee-configuration?event=${encodeURIComponent(eventId)}`}>Set up attendee types</Link>
+                  </p>
+                )}
                 {appliesTo === "selected" && (
                   <>
-                    {typeChoices.length === 0 ? (
-                      <p className={styles.noTypes}>This event has no attendee types to choose from.</p>
-                    ) : (
+                    {typeError && <p className="form-error" role="alert">{typeError}</p>}
+                    {typeChoices.length > 0 && (
                       <ul className={styles.typeChoices}>
                         {typeChoices.map((type) => (
                           <li key={type.code}>
-                            <label className={styles.choice}>
+                            <label>
                               <input
                                 type="checkbox"
                                 name="attendeeTypeCodes"

@@ -206,6 +206,19 @@ describe("staff setting the restriction (#102)", () => {
       .rejects.toBeInstanceOf(PromoCodeOperationError);
   });
 
+  it("refuses an explicit 'only these types' choice with nothing chosen, so it can never widen to every type", async () => {
+    for (const attendeeTypeCodes of [[], undefined]) {
+      await expect(createPromoCode("event-1", { ...create, appliesTo: "SELECTED", attendeeTypeCodes } as never, "user-1"))
+        .rejects.toMatchObject({ code: "PROMO_CODE_ATTENDEE_TYPE_INVALID" });
+    }
+    expect(mocks.promoCreate).not.toHaveBeenCalled();
+  });
+
+  it("clears the restriction on an explicit 'all attendee types'", async () => {
+    await createPromoCode("event-1", { ...create, appliesTo: "ALL", attendeeTypeCodes: [] } as never, "user-1");
+    expect(mocks.promoCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ attendeeTypeCodes: [] }) });
+  });
+
   it("stores no restriction when none is chosen", async () => {
     await createPromoCode("event-1", create as never, "user-1");
     // Only the list's label lookup runs; no restriction is validated.
@@ -223,6 +236,12 @@ describe("staff setting the restriction (#102)", () => {
     it("leaves the restriction as it is when the field is omitted", async () => {
       await updatePromoCode("event-1", "promo-1", edit as never, "user-1");
       expect(mocks.promoUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ attendeeTypeCodes: ["teen"] }) }));
+    });
+
+    it("refuses an edit that chooses 'only these types' with none, leaving the code as it was", async () => {
+      await expect(updatePromoCode("event-1", "promo-1", { ...edit, appliesTo: "SELECTED", attendeeTypeCodes: [] } as never, "user-1"))
+        .rejects.toMatchObject({ code: "PROMO_CODE_ATTENDEE_TYPE_INVALID" });
+      expect(mocks.promoUpdateMany).not.toHaveBeenCalled();
     });
 
     it("clears it with an empty list", async () => {

@@ -49,6 +49,12 @@ const promoCodeShape = {
   sponsoringOrganizationId: z.string().trim().min(1).max(100).nullable().optional(),
   /** Omitted on create means every attendee type; omitted on an update means "leave the restriction as it is". */
   attendeeTypeCodes: attendeeTypeCodesSchema.optional(),
+  /**
+   * What the staff editor chose (#102). "SELECTED" needs at least one attendee type (the server refuses an empty list, so
+   * an unticked choice can never be saved as "all types"); "ALL" clears the restriction. Omitted: only `attendeeTypeCodes`
+   * speaks, as before.
+   */
+  appliesTo: z.enum(["ALL", "SELECTED"]).optional(),
 };
 
 function validatePromoCodeInput(

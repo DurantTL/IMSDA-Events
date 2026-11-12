@@ -202,6 +202,21 @@ export async function listPromoAttendeeTypeOptions(eventId: string) {
 }
 
 /**
+ * The attendee types a save asks for: undefined leaves the restriction as it is (edit) or none (create). An explicit
+ * "SELECTED" with nothing chosen is refused, so an empty choice can never widen a code to every type.
+ */
+function requestedAttendeeTypeCodes(input: { appliesTo?: "ALL" | "SELECTED"; attendeeTypeCodes?: string[] }) {
+  if (input.appliesTo === "ALL") return [];
+  if (input.appliesTo === "SELECTED" && (input.attendeeTypeCodes ?? []).length === 0) {
+    throw new PromoCodeOperationError(
+      "PROMO_CODE_ATTENDEE_TYPE_INVALID",
+      "Choose at least one attendee type, or choose all attendee types.",
+    );
+  }
+  return input.attendeeTypeCodes;
+}
+
+/**
  * A code's attendee-type restriction (#102), checked on the server whatever the form sent: every code must be one of this
  * event's attendee types. A type the code already lists may stay even if it has since been deactivated (saving other
  * changes must not fail), but a newly chosen type must be active. The list is deduplicated; a church-sponsored code is not
@@ -362,7 +377,7 @@ export async function createPromoCode(
       const attendeeTypeCodes = await validatedAttendeeTypeCodes(
         tx,
         eventId,
-        input.attendeeTypeCodes ?? [],
+        requestedAttendeeTypeCodes(input) ?? [],
         [],
         sponsoringOrganizationId,
       );
@@ -478,10 +493,11 @@ export async function updatePromoCode(
         if (nextSponsor) await assertSponsorAllowed(tx, eventId, nextSponsor);
       }
       // Omitted means "leave the restriction as it is".
-      const nextAttendeeTypeCodes = input.attendeeTypeCodes === undefined
+      const requestedCodes = requestedAttendeeTypeCodes(input);
+      const nextAttendeeTypeCodes = requestedCodes === undefined
         ? existing.attendeeTypeCodes
-        : await validatedAttendeeTypeCodes(tx, eventId, input.attendeeTypeCodes, existing.attendeeTypeCodes, nextSponsor);
-      if (input.attendeeTypeCodes === undefined && nextSponsor && existing.attendeeTypeCodes.length > 0) {
+        : await validatedAttendeeTypeCodes(tx, eventId, requestedCodes, existing.attendeeTypeCodes, nextSponsor);
+      if (requestedCodes === undefined && nextSponsor && existing.attendeeTypeCodes.length > 0) {
         throw new PromoCodeOperationError(
           "PROMO_CODE_ATTENDEE_TYPE_INVALID",
           "A church-sponsored code can't be limited to attendee types. Remove the sponsor or choose all attendee types.",

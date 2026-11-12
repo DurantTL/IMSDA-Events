@@ -105,6 +105,12 @@ describe("evaluating a restricted registration-level code", () => {
     });
   });
 
+  it("words the minimum refusal for the eligible attendees' subtotal, not the whole registration's", () => {
+    const evaluation = evaluatePromoCode(rule({ attendeeTypeCodes: ["teen"], minimumSubtotalCents: 20_000 }), { ...base, attendeeScope: scope });
+    expect(evaluation).toMatchObject({ valid: false, message: expect.stringContaining("for the attendees it applies to") });
+    expect(evaluation.valid ? "" : evaluation.message).not.toContain("Your current subtotal");
+  });
+
   it("refuses a restricted code whose type was removed", () => {
     const evaluation = evaluatePromoCode(rule({ attendeeTypeCodes: ["removed-type"] }), { ...base, attendeeScope: scope });
     expect(evaluation).toMatchObject({ valid: false, reason: "ATTENDEE_TYPE_NOT_ELIGIBLE" });

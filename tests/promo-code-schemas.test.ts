@@ -100,4 +100,9 @@ describe("attendee-type restriction inputs (#102)", () => {
     expect(updatePromoCodeInputSchema.parse(edit).attendeeTypeCodes).toBeUndefined();
     expect(updatePromoCodeInputSchema.parse({ ...edit, attendeeTypeCodes: ["teen"] }).attendeeTypeCodes).toEqual(["teen"]);
   });
+
+  it("accepts only ALL or SELECTED for the editor's choice", () => {
+    expect(promoCodeInputSchema.parse({ ...create, appliesTo: "SELECTED", attendeeTypeCodes: ["teen"] }).appliesTo).toBe("SELECTED");
+    expect(promoCodeInputSchema.safeParse({ ...create, appliesTo: "SOME" }).success).toBe(false);
+  });
 });
