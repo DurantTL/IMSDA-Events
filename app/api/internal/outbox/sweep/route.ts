@@ -311,7 +311,7 @@ async function postHandler(request: Request) {
       VISITING_CLUB_ACCESS_END_JOB,
       "visiting club access end",
       visitingAccess !== null,
-      visitingAccess ? { ended: visitingAccess.ended, clubs: visitingAccess.clubs } : undefined,
+      visitingAccess ? { ended: visitingAccess.ended, clubs: visitingAccess.clubs, invitesCancelled: visitingAccess.invitesCancelled } : undefined,
     );
     // Message files (#845): uploads nothing refers to. It only REPORTS what it would delete unless a human set
     // MESSAGE_FILE_SWEEP_DELETE=true, never touches a file inside the grace period (24 hours at the least) or one

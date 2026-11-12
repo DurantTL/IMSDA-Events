@@ -17,6 +17,7 @@ import {
 } from "@/modules/organizations/director-grants-domain";
 import type { CreateClubTeamGrantInput, CreateDirectorGrantInput } from "@/modules/organizations/director-grants-schemas";
 import { OrganizationOperationError } from "@/modules/organizations/repository";
+import { VISITING_CLUB_PAST_WINDOW_MESSAGE, visitingClubPastWindow } from "@/modules/visiting-clubs/domain";
 
 const grantInclude = {
   attendeeAccount: { select: { id: true, displayName: true, email: true } },
@@ -55,7 +56,7 @@ async function requireClub(
 ) {
   const club = await tx.organization.findUnique({
     where: { id: organizationId },
-    select: { id: true, name: true, type: true, isActive: true, clubKind: true },
+    select: { id: true, name: true, type: true, isActive: true, clubKind: true, guestEventId: true, guestEvent: { select: { endsAt: true } } },
   });
   if (!club) {
     throw new OrganizationOperationError("ORGANIZATION_NOT_FOUND", "That club could not be found.");
@@ -123,6 +124,9 @@ export async function createDirectorGrant(
 
   await serializable(async (tx) => {
     const club = await requireClub(tx, organizationId, { mustBeActive: true });
+    if (visitingClubPastWindow(club, now)) {
+      throw new OrganizationOperationError("VISITING_CLUB_PAST_WINDOW", VISITING_CLUB_PAST_WINDOW_MESSAGE);
+    }
     const account = await tx.attendeeAccount.findUnique({
       where: { email: input.email },
       select: { id: true, email: true, displayName: true, status: true, emailVerifiedAt: true, disabledAt: true },

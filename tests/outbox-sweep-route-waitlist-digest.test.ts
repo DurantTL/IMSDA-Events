@@ -82,7 +82,7 @@ beforeEach(() => {
   mocks.sweepHostedCheckouts.mockResolvedValue({ withdrawn: 0, deleted: 0, failed: 0 });
   mocks.runHealthSnapshotSweep.mockResolvedValue(null);
   mocks.expireStalePendingTeams.mockResolvedValue({ expired: 0, events: 0 });
-  mocks.endVisitingClubAccess.mockResolvedValue({ ended: 0, clubs: 0 });
+  mocks.endVisitingClubAccess.mockResolvedValue({ ended: 0, clubs: 0, invitesCancelled: 0 });
   mocks.prunePublicMetrics.mockResolvedValue(0);
   mocks.messageFileSweepDeletes.mockReturnValue(false);
   mocks.sweepMessageFiles.mockImplementation(async (options: { mode: string }) => ({
@@ -246,9 +246,9 @@ describe("the sweep records its steps for the System report (#1357)", () => {
   });
 
   it("records the visiting club access end with counts only, as FAILED when it throws, and never fails the sweep (#835)", async () => {
-    mocks.endVisitingClubAccess.mockResolvedValueOnce({ ended: 4, clubs: 2 });
+    mocks.endVisitingClubAccess.mockResolvedValueOnce({ ended: 4, clubs: 2, invitesCancelled: 1 });
     await POST(request());
-    expect(mocks.recordJobRun).toHaveBeenCalledWith("visiting-club-access-end", "SUCCEEDED", { ended: 4, clubs: 2 });
+    expect(mocks.recordJobRun).toHaveBeenCalledWith("visiting-club-access-end", "SUCCEEDED", { ended: 4, clubs: 2, invitesCancelled: 1 });
 
     mocks.recordJobRun.mockClear();
     mocks.endVisitingClubAccess.mockRejectedValueOnce(new Error("synthetic"));

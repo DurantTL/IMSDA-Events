@@ -35,6 +35,15 @@ export const VISITING_DECLINE_REASON_MAX = 500;
  */
 export const VISITING_CLUB_ACCESS_DAYS_AFTER_EVENT = 30;
 
+/** Shown when someone tries to give or accept a role on a visiting club after its window. */
+export const VISITING_CLUB_PAST_WINDOW_MESSAGE = "This visiting club's event ended more than 30 days ago, so its roles have ended.";
+
+/** Whether a club is a visiting club whose event ended more than 30 days ago. A conference club never is. */
+export function visitingClubPastWindow(club: { guestEventId?: string | null; guestEvent?: { endsAt: Date } | null }, now: Date): boolean {
+  if (!club.guestEventId || !club.guestEvent) return false;
+  return club.guestEvent.endsAt.getTime() < visitingClubAccessCutoff(now).getTime();
+}
+
 /** Events that ended before this moment are past the window. Exactly 30 days after the end is still inside it. */
 export function visitingClubAccessCutoff(now: Date): Date {
   return new Date(now.getTime() - VISITING_CLUB_ACCESS_DAYS_AFTER_EVENT * 24 * 60 * 60 * 1000);

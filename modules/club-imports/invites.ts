@@ -1,5 +1,6 @@
 import "server-only";
 
+import { VISITING_CLUB_PAST_WINDOW_MESSAGE, visitingClubPastWindow } from "@/modules/visiting-clubs/domain";
 import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
@@ -686,7 +687,7 @@ export async function acceptClubInvite(inviteId: string, account: { id: string; 
       select: {
         id: true, email: true, role: true, status: true, source: true, expiresAt: true,
         organizationId: true, createdByUserId: true, createdByAccountId: true,
-        organization: { select: { isActive: true, type: true } },
+        organization: { select: { isActive: true, type: true, guestEventId: true, guestEvent: { select: { endsAt: true } } } },
       },
     });
     // The same answer for an invite that doesn't exist and one addressed to someone else.
@@ -694,6 +695,7 @@ export async function acceptClubInvite(inviteId: string, account: { id: string; 
       throw new ClubInviteError("INVITE_NOT_FOUND", "That invite could not be found for this account.");
     }
     if (invite.status !== "SENT") throw new ClubInviteError("INVITE_NOT_OPEN", "That invite is no longer open.");
+    if (visitingClubPastWindow(invite.organization, now)) throw new ClubInviteError("INVITE_NOT_OPEN", VISITING_CLUB_PAST_WINDOW_MESSAGE);
     if (invite.expiresAt && invite.expiresAt <= now) {
       const message = invite.source === "CLUB"
         ? "That invite has expired. Ask your club director to send a new one."
