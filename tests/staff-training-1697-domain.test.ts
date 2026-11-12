@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLUB_OPTIONAL_FEATURE_KEYS, canSwitchClubFeatures, clubOptionalFeatureDefinitions } from "@/modules/club-features/domain";
+import { CLUB_OPTIONAL_FEATURE_KEYS, canSwitchClubFeatures, clubOptionalFeatureDefinitions, sterlingApplies } from "@/modules/club-features/domain";
 import {
   NAD_CERTIFICATIONS,
   canManageStaffTraining,
@@ -58,6 +58,10 @@ describe("who may manage records, and for whom", () => {
     expect(staffTrainingApplies("STAFF")).toBe(true);
     expect(staffTrainingApplies("YOUTH")).toBe(false);
     expect(staffTrainingApplies("UNDERAGE")).toBe(false);
+  });
+
+  it("covers exactly the people the Sterling check covers", () => {
+    for (const type of ["ADULT", "STAFF", "YOUTH", "UNDERAGE"]) expect(staffTrainingApplies(type)).toBe(sterlingApplies(type));
   });
 });
 
