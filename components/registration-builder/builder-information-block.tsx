@@ -51,12 +51,12 @@ export function BuilderInformationSettings({ field, sectionIndex, fieldIndex }: 
     updateField(sectionIndex, fieldIndex, { information: { text: next.text, ...(note ? { note: next.note } : {}) } });
   };
   return (
-    <section className="field-full" data-testid={`information-settings-${field.key}`}>
+    <section className={`field-full ${styles.settings}`} data-testid={`information-settings-${field.key}`}>
       <label htmlFor={textId}>Text</label>
-      <textarea id={textId} disabled={!canEdit} rows={5} maxLength={INFORMATION_TEXT_MAX} value={config.text} aria-describedby={textHelpId} onChange={(event) => change({ text: event.target.value })} />
+      <textarea id={textId} name="builder-information-text" autoComplete="off" disabled={!canEdit} rows={5} maxLength={INFORMATION_TEXT_MAX} value={config.text} aria-describedby={textHelpId} onChange={(event) => change({ text: event.target.value })} />
       <p className={`field-help ${styles.help}`} id={textHelpId}>{config.text.length.toLocaleString("en-US")} of {INFORMATION_TEXT_MAX.toLocaleString("en-US")} characters. You can use **bold**, *italic*, [links](https://example.org) and lists.</p>
       <label htmlFor={noteId}>Highlighted note (optional)</label>
-      <textarea id={noteId} disabled={!canEdit} rows={3} maxLength={INFORMATION_NOTE_MAX} value={config.note ?? ""} aria-describedby={noteHelpId} onChange={(event) => change({ note: event.target.value })} />
+      <textarea id={noteId} name="builder-information-note" autoComplete="off" disabled={!canEdit} rows={3} maxLength={INFORMATION_NOTE_MAX} value={config.note ?? ""} aria-describedby={noteHelpId} onChange={(event) => change({ note: event.target.value })} />
       <p className={`field-help ${styles.help}`} id={noteHelpId}>Shown in a highlighted box under the text, for the one thing people must not miss.</p>
       <p className={`field-help ${styles.help}`}>An information block is only shown. It is never answered, priced, counted or exported, and it follows the same show-when rules as a question.</p>
     </section>
