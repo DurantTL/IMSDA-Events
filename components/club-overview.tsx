@@ -14,6 +14,7 @@ import { listRoster } from "@/modules/club-rosters/repository";
 import { honorYearSummary } from "@/modules/honors/member-honor-domain";
 import { listClubHonorsPage } from "@/modules/honors/member-honor-repository";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
+import { getClubKind } from "@/modules/organizations/club-profile-repository";
 import { listClubTeam } from "@/modules/organizations/director-grants-repository";
 
 /**
@@ -84,7 +85,7 @@ export async function ClubOverview({
   const clubYear = clubYearFor(now);
   const shownRosterYear = rosterYear ?? clubYear;
   const otherYear = shownRosterYear !== clubYear;
-  const [team, members, events, reportYear, compliance, reminderCounts, honorRows] = await Promise.all([
+  const [team, members, events, reportYear, compliance, reminderCounts, honorRows, clubKind] = await Promise.all([
     listClubTeam(organizationId, now),
     listRoster(organizationId, shownRosterYear, now, { includeSchoolDetails: schoolDetails }),
     listClubEvents(organizationId, now),
@@ -93,6 +94,7 @@ export async function ClubOverview({
     // Counts only, no names (#479): shown even to a viewer who never gets `backgroundChecks`.
     !backgroundChecks && complianceCounts ? clubComplianceReminderCounts(organizationId, shownRosterYear) : null,
     listClubHonorsPage(organizationId, shownRosterYear),
+    getClubKind(organizationId),
   ]);
   const honors = honorYearSummary(honorRows, shownRosterYear);
   // The staff link carries a non-current roster year, so the Honors page opens on the same year (#819), but only one
@@ -179,6 +181,7 @@ export async function ClubOverview({
         {/* Keyed by year: the year links navigate client-side, and the roster's own state must not carry the last year's people over. */}
         <ClubRosterWorkspace
           key={shownRosterYear}
+          clubKind={clubKind}
           birthDatesEndpoint={otherYear ? undefined : birthDatesEndpoint}
           canSeeBirthDates={Boolean(birthDatesEndpoint) && !otherYear}
           clubYear={shownRosterYear}

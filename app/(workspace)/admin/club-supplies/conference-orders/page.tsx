@@ -48,7 +48,7 @@ export default async function ConferenceClubOrdersPage({ searchParams }: { searc
             ))}
           </ul>
         </nav>
-        <ConferenceClubOrdersWorkspace bills={bills} orders={orders} />
+        <ConferenceClubOrdersWorkspace clubKind={clubKind} bills={bills} orders={orders} />
       </ListPage>
     </>
   );

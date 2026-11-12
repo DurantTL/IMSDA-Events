@@ -1,4 +1,3 @@
-import { getClubKind } from "@/modules/organizations/club-profile-repository";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
@@ -7,6 +6,7 @@ import { PrintReportButton } from "@/components/print-report-button";
 import { clubAccessClosed } from "@/components/club-access-closed";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { singleSearchParam } from "@/modules/club-teams/domain";
+import { getClubKind } from "@/modules/organizations/club-profile-repository";
 import { loadDirectorClubPacket } from "@/modules/reporting/director-club-packet";
 
 export const metadata: Metadata = { title: "Club packet" };

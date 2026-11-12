@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { clubMemberNoun, type ClubKindValue } from "@/modules/organizations/club-kind";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { useConfirm } from "@/components/use-confirm";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -22,7 +23,8 @@ const apiBase = "/api/admin/conference-club-orders";
  * optionally join the club's stock) or Cancelled with a reason. Filling never finalizes an invoice: the treasurer does that on the
  * invoice page. The server checks the role and every rule again; hiding a button is never the protection.
  */
-export function ConferenceClubOrdersWorkspace({ orders, bills }: { orders: StaffConferenceOrderRecord[]; bills: ChurchBillRecord[] }) {
+export function ConferenceClubOrdersWorkspace({ orders, bills, clubKind = null }: { orders: StaffConferenceOrderRecord[]; bills: ChurchBillRecord[]; /** The page's club type filter (#1517); null shows every club. */ clubKind?: ClubKindValue | null }) {
+  const kindWord = clubKind ? clubMemberNoun(clubKind) : null;
   const router = useRouter();
   const { ask, confirmDialog } = useConfirm();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -144,14 +146,14 @@ export function ConferenceClubOrdersWorkspace({ orders, bills }: { orders: Staff
           Clubs order the conference patches and pins from their Orders tab. Mark an order filled when it is shipped or handed out. Prices are set in the{" "}
           <Link href="/admin/club-supplies">Club supply catalog</Link>; a price change never alters an order already submitted.
         </p>
-        {waiting.length === 0 ? <p className={styles.muted}>No orders are waiting. A new club order shows here and is emailed to the conference orders address.</p> : <ul className={styles.list}>{waiting.map(renderOrder)}</ul>}
+        {waiting.length === 0 ? <p className={styles.muted}>{kindWord ? <>No {kindWord} club orders are waiting. <Link href="/admin/club-supplies/conference-orders">Show all clubs</Link>.</> : "No orders are waiting. A new club order shows here and is emailed to the conference orders address."}</p> : <ul className={styles.list}>{waiting.map(renderOrder)}</ul>}
         <FormMessage alwaysMounted message={message?.text ?? ""} tone={message?.tone ?? "success"} />
       </section>
 
       <section aria-labelledby="conference-orders-bills" className={styles.block}>
         <h2 id="conference-orders-bills">Church bills</h2>
         <p className={styles.intro}>
-          Filled orders become lines on the sponsoring church&apos;s invoice for the club year. The treasurer finalizes each invoice as usual; nothing is finalized or sent from here.
+          Filled orders become lines on the sponsoring church&apos;s invoice for the club year. The treasurer finalizes each invoice as usual; nothing is finalized or sent from here.{kindWord ? " Church bills cover all of a church's clubs, whatever the club type filter." : ""}
         </p>
         {bills.length === 0 ? <p className={styles.muted}>No bills yet. A church&apos;s bill appears here when one of its clubs&apos; orders is filled.</p> : (
           <ul className={styles.list}>
@@ -167,7 +169,7 @@ export function ConferenceClubOrdersWorkspace({ orders, bills }: { orders: Staff
 
       <section aria-labelledby="conference-orders-history" className={styles.block}>
         <h2 id="conference-orders-history">Filled and cancelled orders</h2>
-        {rest.length === 0 ? <p className={styles.muted}>Nothing filled or cancelled yet.</p> : <ul className={styles.list}>{rest.map(renderOrder)}</ul>}
+        {rest.length === 0 ? <p className={styles.muted}>{kindWord ? <>No {kindWord} club orders are filled or cancelled yet. <Link href="/admin/club-supplies/conference-orders">Show all clubs</Link>.</> : "Nothing filled or cancelled yet."}</p> : <ul className={styles.list}>{rest.map(renderOrder)}</ul>}
       </section>
     </section>
   );

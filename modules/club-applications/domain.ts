@@ -35,7 +35,7 @@ export const newClubApplicationStatusLabels = {
   DECLINED: "Cancelled",
 } as const satisfies Record<NewClubApplicationStatusValue, StatusWord>;
 
-/** The text kept on the new club's organization (`sourceOrgType`), the only place its kind is modeled today. */
+/** The text kept on the new club's organization (`sourceOrgType`), kept for the record; the club's kind is `Organization.clubKind` (#1517). */
 export const newClubSourceOrgType: Record<NewClubTypeValue, string> = {
   PATHFINDER: "Pathfinder Club",
   ADVENTURER: "Adventurer Club",

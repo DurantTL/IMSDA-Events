@@ -177,9 +177,9 @@ export default async function ClubRecordsPage({
       />
 
       <ClubReportForm
-        clubKind={access.club.clubKind}
         allowDraft
         asDialog
+        clubKind={access.club.clubKind}
         dueLabel={formatDueDate(due)}
         endpoint={`${apiBase}/reports/${month}`}
         expectedOnTime={report?.firstSubmittedAt ? onTimePoints(month, new Date(report.firstSubmittedAt)) : locked ? 0 : ON_TIME_POINTS}

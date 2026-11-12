@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   clubYearFor,
   defaultRosterRole,
+  isDefaultYouthRole,
   rosterRoleOrDefault,
   type ClubClassLevel,
 } from "@/modules/club-rosters/domain";
@@ -53,12 +54,12 @@ export function carryForwardOversightOpen(now: Date) {
 export function carriedRole(
   previous: { attendeeType: string; role: string | null },
   next: { attendeeType: string; role?: string },
+  clubKind?: string | null,
 ) {
-  if (next.role !== undefined) return rosterRoleOrDefault(next.role, next.attendeeType);
+  if (next.role !== undefined) return rosterRoleOrDefault(next.role, next.attendeeType, clubKind);
   const oldRole = previous.role ?? "";
-  const oldDefault = defaultRosterRole(previous.attendeeType);
-  if (next.attendeeType !== previous.attendeeType && oldDefault && oldRole === oldDefault) {
-    return defaultRosterRole(next.attendeeType);
+  if (next.attendeeType !== previous.attendeeType && previous.attendeeType === "YOUTH" && isDefaultYouthRole(oldRole)) {
+    return defaultRosterRole(next.attendeeType, clubKind);
   }
   return oldRole;
 }

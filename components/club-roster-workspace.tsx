@@ -40,6 +40,7 @@ import {
   CHURCH_MEMBER_LABEL,
   clubBaptizedLabels,
   defaultRosterRole,
+  displayRosterRole,
   rosterSectionOf,
   schoolGradeOrder,
 } from "@/modules/club-rosters/domain";
@@ -1198,7 +1199,7 @@ function ClubRosterWorkspaceInner({
                                 case "name": return (
                                   <th className="roster-card-name" key={column} role="rowheader" scope="row">
                                     <strong className={styles.rosterMemberName} translate="no">{member.lastName}, {member.firstName}</strong>
-                                    {member.role && <span className={styles.rosterMemberRole}>{`Role: ${member.role}`}</span>}
+                                    {member.role && <span className={styles.rosterMemberRole}>{`Role: ${displayRosterRole(member.role, clubKind)}`}</span>}
                                     {classHistoryBase && member.personId && (
                                       <Link className="text-button roster-class-history-link" href={`${classHistoryBase}/${encodeURIComponent(member.personId)}`}>
                                         Class history<span className="sr-only">{` for ${label}`}</span>
@@ -1434,7 +1435,7 @@ function ClubRosterWorkspaceInner({
           <label>
             Role (optional)
             {/* Left blank, youth save as "Pathfinder" or "Adventurer" by club kind; staff and adults stay blank (#424). */}
-            <input defaultValue={editing?.role ?? ""} maxLength={60} name="role" placeholder={defaultRosterRole(formType, clubKind)} />
+            <input defaultValue={displayRosterRole(editing?.role, clubKind)} maxLength={60} name="role" placeholder={defaultRosterRole(formType, clubKind)} />
           </label>
           <label>
             Gender

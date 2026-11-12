@@ -1,3 +1,4 @@
+import { getClubKind } from "@/modules/organizations/club-profile-repository";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
@@ -47,6 +48,7 @@ export default async function StaffClubYearEndPage({
       </div>
       {report ? (
         <ClubYearEndReportForm
+          clubKind={await getClubKind(organizationId)}
           dueLabel={formatReportYearDueDate(year)}
           endpoint=""
           initialContact={{

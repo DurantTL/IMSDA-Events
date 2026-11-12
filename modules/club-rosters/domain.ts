@@ -423,6 +423,11 @@ export function defaultRosterRole(attendeeType: string | null | undefined, clubK
   return attendeeType === "YOUTH" ? clubMemberNoun(clubKind) : "";
 }
 
+/** A role as shown (#1517): a stored default youth role reads as the club's own member noun. Stored rows are never rewritten. */
+export function displayRosterRole(role: string | null | undefined, clubKind?: string | null) {
+  return role && isDefaultYouthRole(role) ? clubMemberNoun(clubKind) : (role ?? "");
+}
+
 /** Whether a stored role is the youth default of either club kind, so a kind change never leaves a typed role mistaken for one (#1517). */
 export function isDefaultYouthRole(role: string | null | undefined) {
   return role === clubMemberNoun("PATHFINDER") || role === clubMemberNoun("ADVENTURER");

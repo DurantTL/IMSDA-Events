@@ -93,7 +93,7 @@ export default async function StaffOpenClubPage({
             <div><dt>Club year</dt><dd>{view.clubYear}</dd></div>
           </dl>
           {user.globalRole === "SYSTEM_ADMIN" && <ClubKindControl clubKind={club.clubKind} organizationId={organizationId} />}
-          <p>This is what the club&apos;s director sees. Nothing can be changed here; showing birth dates is recorded.</p>
+          <p>This is what the club&apos;s director sees. Apart from the club kind (system administrators only), nothing can be changed here; showing birth dates is recorded.</p>
         </div>
       </div>
 

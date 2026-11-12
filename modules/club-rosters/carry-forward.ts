@@ -186,6 +186,7 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
     // The club's order lock, the same one `removeRosterMember` takes first, so a carry and a removal never take the
     // person and row locks in opposite orders (a deadlock) and a removal that commits first is seen by the carry.
     await lockClubOrders(tx, organizationId);
+    const clubKind = (await tx.organization.findUnique({ where: { id: organizationId }, select: { clubKind: true } }))?.clubKind;
     const done = await tx.clubRosterCarryForward.findUnique({
       where: { organizationId_toClubYear: { organizationId, toClubYear } },
       select: { id: true },
@@ -222,7 +223,7 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
         clubYear: toClubYear,
         personId: source.personId,
         attendeeType: choice.attendeeType,
-        role: carriedRole(source, choice),
+        role: carriedRole(source, choice, clubKind),
         classLevel: carriedClassLevel(source, choice),
         isTlt: carriedIsTlt(source, choice),
         schoolGrade: carriedSchoolValue(source.schoolGrade, choice, choice.schoolGrade),
