@@ -74,8 +74,8 @@ describe("the totals (#1682)", () => {
 describe("the CSV for the conference (#1682)", () => {
   it("holds totals, counts and cost lines in dollars, and hides a figure whose module is off", () => {
     const csv = budgetCsv(sheet(), { kind: "none" });
-    expect(csv).toContain('"Total costs","","","425.5"');
-    expect(csv).toContain('"Income minus costs (billed)","","","5774.5"');
+    expect(csv).toContain('"Total costs","","","425.50"');
+    expect(csv).toContain('"Income minus costs (billed)","","","5774.50"');
     expect(csv).toContain('"Pathfinders","","80",""');
     expect(csv).not.toContain("Rooms");
     expect(csv).not.toContain("Meals ordered");

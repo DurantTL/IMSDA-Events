@@ -3,6 +3,7 @@
 import { Download } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { BudgetCostLineRow, BudgetFiguresBlock, BudgetTotalsBlock } from "@/components/budget-sheet-view";
+import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Money } from "@/components/exact-value";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
@@ -32,6 +33,7 @@ export function BudgetSheetEditor({ endpoint, exportHref, eventName, figures, in
   const [draft, setDraft] = useState<Draft | null>(null);
   const [baseline, setBaseline] = useState("");
   const [confirming, setConfirming] = useState<CostLineView | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ amount?: string; quantity?: string }>({});
   const [deleteError, setDeleteError] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
@@ -41,6 +43,7 @@ export function BudgetSheetEditor({ endpoint, exportHref, eventName, figures, in
 
   function startEdit(line: CostLineView | null) {
     setMessage(null);
+    setFieldErrors({});
     const next: Draft = line ? { id: line.id, label: line.label, description: line.description, quantity: line.quantity === null ? "" : String(line.quantity), amount: (line.amountCents / 100).toFixed(2) } : { ...blankDraft };
     setBaseline(JSON.stringify(next));
     setDraft(next);
@@ -75,14 +78,14 @@ export function BudgetSheetEditor({ endpoint, exportHref, eventName, figures, in
     event.preventDefault();
     if (!draft) return;
     const amountCents = parseDollarsToCents(draft.amount);
-    if (amountCents === null) {
-      setMessage({ tone: "error", text: notSavedMessage("Enter the amount in dollars, like 12.50.") });
-      return;
-    }
     const quantityText = draft.quantity.trim();
     const quantity = quantityText === "" ? null : Number(quantityText);
-    if (quantity !== null && !Number.isInteger(quantity)) {
-      setMessage({ tone: "error", text: notSavedMessage("Quantity must be a whole number, or left blank.") });
+    const found: { amount?: string; quantity?: string } = {};
+    if (amountCents === null) found.amount = "Enter the amount in dollars, like 12.50.";
+    if (quantity !== null && (!Number.isInteger(quantity) || quantity < 1)) found.quantity = "Quantity must be a whole number of at least 1, or left blank.";
+    setFieldErrors(found);
+    if (found.amount || found.quantity || amountCents === null) {
+      setMessage({ tone: "error", text: notSavedMessage(found.amount ?? found.quantity ?? "Review what you entered.") });
       return;
     }
     const body = { label: draft.label, description: draft.description.trim(), quantity, amountCents };
@@ -136,7 +139,7 @@ export function BudgetSheetEditor({ endpoint, exportHref, eventName, figures, in
           </div>
         )}
         {canEdit && draft && (
-          <form className={`${styles.form} ${styles.noPrint}`} onSubmit={(event) => void save(event)} aria-labelledby={`${formId}-title`}>
+          <form noValidate className={`${styles.form} ${styles.noPrint}`} onSubmit={(event) => void save(event)} aria-labelledby={`${formId}-title`}>
             <h4 className={styles.heading} id={`${formId}-title`}>{draft.id ? "Change this cost" : "Add a cost"}</h4>
             <div className={styles.fields}>
               <label className={styles.field}>What is it for?
@@ -148,11 +151,13 @@ export function BudgetSheetEditor({ endpoint, exportHref, eventName, figures, in
                 <input maxLength={MAX_DESCRIPTION_LENGTH} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} />
               </label>
               <label className={styles.field}>Quantity (optional)
-                <input inputMode="numeric" value={draft.quantity} onChange={(event) => setDraft({ ...draft, quantity: event.target.value })} />
+                <input {...fieldErrorProps(`${formId}-quantity-error`, fieldErrors.quantity)} inputMode="numeric" value={draft.quantity} onChange={(event) => { setDraft({ ...draft, quantity: event.target.value }); setFieldErrors((current) => ({ ...current, quantity: undefined })); }} />
+                <FieldError id={`${formId}-quantity-error`}>{fieldErrors.quantity}</FieldError>
               </label>
               <label className={styles.field}>Amount in dollars
-                <input inputMode="decimal" required value={draft.amount} onChange={(event) => setDraft({ ...draft, amount: event.target.value })} />
-                <span className={styles.help}>The total for this line, like 125.00.</span>
+                <input {...fieldErrorProps(`${formId}-amount-error`, fieldErrors.amount, `${formId}-amount-help`)} inputMode="decimal" required value={draft.amount} onChange={(event) => { setDraft({ ...draft, amount: event.target.value }); setFieldErrors((current) => ({ ...current, amount: undefined })); }} />
+                <span className={styles.help} id={`${formId}-amount-help`}>The total for this line, like 125.00.</span>
+                <FieldError id={`${formId}-amount-error`}>{fieldErrors.amount}</FieldError>
               </label>
             </div>
             <div className={styles.toolbar}>

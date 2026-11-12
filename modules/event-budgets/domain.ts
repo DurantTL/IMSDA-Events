@@ -131,7 +131,8 @@ export type CarriedBudget =
   | { kind: "no-sheet"; sourceEventId: string; sourceEventName: string }
   | { kind: "sheet"; sourceEventId: string; sourceEventName: string; sheet: BudgetSheet };
 
-const dollars = (cents: number) => Number((cents / 100).toFixed(2));
+/** Two decimals, as the other finance CSVs write money. A negative stays a number: the CSV formula guard would turn a "-12.00" string into text. */
+const dollars = (cents: number): string | number => (cents < 0 ? Number((cents / 100).toFixed(2)) : (cents / 100).toFixed(2));
 
 function feeText(fee: FeePerPerson): string {
   if (fee.kind === "uniform") return String(dollars(fee.amountCents));
