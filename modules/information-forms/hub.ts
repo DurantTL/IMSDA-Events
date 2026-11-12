@@ -35,6 +35,7 @@ export async function listInformationFormsForHub(): Promise<FormsHubRow[]> {
       kind: event ? "EVENT" as const : "GENERAL" as const,
       name: form.name,
       eventName: event ? form.event?.name ?? null : null,
+      eventId: event ? form.eventId : null,
       status: mapped.status,
       statusLabel: mapped.label,
       responseCount: group?._count._all ?? 0,

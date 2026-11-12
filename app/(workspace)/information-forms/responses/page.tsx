@@ -8,6 +8,7 @@ import { eventInformationConfig, informationListHref } from "@/components/regist
 import { getCurrentSession } from "@/modules/access/current-session";
 import { InformationFormResponsesView } from "@/components/information-form-responses-view";
 import { resolveEventContext } from "@/modules/events/selection";
+import { parseFormsHubReturn } from "@/modules/forms-hub/return";
 import { loadInformationFormResponsesPage } from "@/modules/information-forms/responses-page";
 
 export const metadata: Metadata = { title: staffPageTitles.formResponses };
@@ -15,9 +16,9 @@ export const dynamic = "force-dynamic";
 
 /** The responses of an event's information form (#1150): MANAGE_FORMS on the event, like the event form APIs. */
 export default async function EventInformationFormResponsesPage({ searchParams }: {
-  searchParams: Promise<{ event?: string; form?: string; response?: string; cursor?: string }>;
+  searchParams: Promise<{ event?: string; form?: string; response?: string; cursor?: string; returnTo?: string }>;
 }) {
-  const { event: requested, form: formId, response, cursor } = await searchParams;
+  const { event: requested, form: formId, response, cursor, returnTo } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FORMS")) {
     // The page draws its own title (#1572), so the restricted state keeps the page's one h1 too.
@@ -33,11 +34,13 @@ export default async function EventInformationFormResponsesPage({ searchParams }
   if (!data) notFound();
   const { user } = await getCurrentSession();
   const config = eventInformationConfig(event, user?.globalRole === "SYSTEM_ADMIN");
-  const base = `/information-forms/responses?event=${encodeURIComponent(event.id)}&form=${encodeURIComponent(formId)}`;
+  // "Back to All forms" only when the address came from the All forms list; it grants nothing (#1571).
+  const hubBack = parseFormsHubReturn(returnTo);
+  const base = `/information-forms/responses?event=${encodeURIComponent(event.id)}&form=${encodeURIComponent(formId)}${hubBack ? `&returnTo=${encodeURIComponent(hubBack.href)}` : ""}`;
   return (
     <InformationFormResponsesView
       views={informationFormPageViews(config, formId, "responses")}
-      back={{ href: informationListHref(config), label: "Back to information forms" }}
+      back={hubBack ?? { href: informationListHref(config), label: "Back to information forms" }}
       closeHref={base}
       exportHref={`/api/events/${encodeURIComponent(event.id)}/information-forms/${encodeURIComponent(formId)}/responses/export`}
       membersExportHref={data.hasMemberList ? `/api/events/${encodeURIComponent(event.id)}/information-forms/${encodeURIComponent(formId)}/responses/export?format=members` : undefined}

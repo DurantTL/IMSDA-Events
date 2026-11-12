@@ -12,6 +12,7 @@ import { cardCell } from "@/components/table-card-labels";
 import { SortOrderNote } from "@/components/list-sort";
 import { serverSort, sortOrderText } from "@/lib/list-sort";
 import { parsePageParam } from "@/lib/pagination";
+import { parseFormsHubReturn } from "@/modules/forms-hub/return";
 import { resolveStaffViewer } from "@/modules/club-forms/access";
 import { CLUB_FORM_SORT_COLUMNS, pageSubmissionsForViewer, type ClubFormSortColumn } from "@/modules/club-forms/submissions";
 import { listClubFormTemplateNames } from "@/modules/club-forms/templates";
@@ -38,10 +39,12 @@ const sortLabels: Record<ClubFormSortColumn, string> = { club: "club", form: "fo
 export default async function StaffClubFormsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string; form?: string; club?: string; sort?: string; dir?: string; page?: string }>;
+  searchParams: Promise<{ event?: string; form?: string; club?: string; sort?: string; dir?: string; page?: string; returnTo?: string }>;
 }) {
   const params = await searchParams;
   const { event, form, club } = params;
+  // "Back to All forms" only when the address came from the All forms list; it grants nothing (#1571).
+  const hubBack = parseFormsHubReturn(params.returnTo);
   const viewer = await resolveStaffViewer();
   if (!viewer) {
     // The page draws its own title (#1573), so the restricted state keeps the page's one h1 too.
@@ -62,7 +65,7 @@ export default async function StaffClubFormsPage({
   const rows = list.rows;
   const pageHref = (target: number) => {
     const query = new URLSearchParams();
-    for (const [name, value] of [["event", event], ["form", form], ["club", club]] as const) if (value) query.set(name, value);
+    for (const [name, value] of [["event", event], ["form", form], ["club", club], ["returnTo", hubBack?.href]] as const) if (value) query.set(name, value);
     if (sorting.order.key) { query.set("sort", sorting.order.key); query.set("dir", sorting.order.dir); }
     if (target > 1) query.set("page", String(target));
     const text = query.toString();
@@ -80,6 +83,7 @@ export default async function StaffClubFormsPage({
       header={{
         title: staffPageTitles.clubForms,
         description: "Submitted forms by club.",
+        ...(hubBack ? { back: hubBack } : {}),
         below: <ClubFormsViewsStrip administration={canReadBirthDates} current="submissions" event={event} />,
       }}
       notices={(
@@ -97,6 +101,7 @@ export default async function StaffClubFormsPage({
         <section className="panel">
           <GetFilterForm action="/more/club-forms" className="club-form-filter">
             {event && <input name="event" type="hidden" value={event} />}
+            {hubBack && <input name="returnTo" type="hidden" value={hubBack.href} />}
             {sorting.order.key && <><input name="sort" type="hidden" value={sorting.order.key} /><input name="dir" type="hidden" value={sorting.order.dir} /></>}
             <label>Form
               <select defaultValue={form ?? ""} name="form">
