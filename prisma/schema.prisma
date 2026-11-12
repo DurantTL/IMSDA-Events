@@ -2666,6 +2666,7 @@ model EventMembership {
 model Person {
   id              String   @id @default(cuid())
   tltProfile      TltProfile?
+  masterGuideCandidates MasterGuideCandidate[]
   firstName       String
   lastName        String
   normalizedEmail String?  @unique
@@ -2905,6 +2906,7 @@ model Organization {
   attendancePointsOverrides AttendancePointsOverride[]
   clubEventPointAwards ClubEventPointAward[]
   clubOptionalFeatures ClubOptionalFeature[]
+  masterGuideCandidates MasterGuideCandidate[]
   staffTrainingRecords ClubStaffTrainingRecord[]
   id                   String           @id @default(cuid())
   scholarshipContributions ScholarshipContribution[]
@@ -6447,6 +6449,35 @@ model ClubStaffTrainingRecord {
   person       Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, personId])
+}
+
+/// A Master Guide candidate (#1698), kept only for a club that switched on the optional "Master Guide tracking" feature.
+/// One row per person per club: the director or deputy adds someone from the active roster (16 or older on the start
+/// date), then approves for the club (18 or older on that day), then an Area Coordinator approves. `status` is checked in
+/// code (`modules/master-guide/domain.ts`), so a later conference step needs no migration. Holds no birth date, no
+/// roster details and no requirement answers. The approver columns name an attendee account or a staff user (#442).
+model MasterGuideCandidate {
+  id                      String    @id @default(cuid())
+  organizationId          String
+  personId                String
+  startedOn               DateTime  @db.Date
+  mentorName              String?
+  status                  String    @default("IN_PROGRESS")
+  clubApprovedAt          DateTime?
+  clubApprovedByAccountId String?
+  clubApprovedByUserId    String?
+  areaApprovedAt          DateTime?
+  areaApprovedByAccountId String?
+  createdByAccountId      String?
+  createdByUserId         String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  person       Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, personId])
+  @@index([status])
 }
 
 /// A club-owned, named roster export format (#490): which columns, in what

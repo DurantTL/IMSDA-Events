@@ -876,6 +876,10 @@ told does not change: the removal notice reports a kept name only for ordered
 items (`nameKept`), never because of a sealed copy. Deleting an event deletes
 its copies; a copy under a hold blocks the deletion.
 
+**Master Guide candidate rows (#1698)** hold no birth date, only the person, start date, mentor and approval status. They are
+erased with the roster membership (the club's row, when the person has no other roster row left in that club), like class
+completions, and the removal's audit entry counts them (`masterGuideCandidatesErased`).
+
 **Incident reports for a minor** are kept until the person turns **31** (RSMo
 537.046). Incident records do not exist yet; the rule is recorded here and as a
 constant (`incidentReportMinorKeepUntilAge`, not used by any code today) for

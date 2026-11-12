@@ -33,7 +33,7 @@ const youth = {
 
 function fakeDatabase() {
   let sequence = 0;
-  const db = { guardians: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), snapshotReferences: new Set<string>(), mergeReferences: new Set<string>(), anonymizedReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[], tltProfilesErased: [] as string[] };
+  const db = { guardians: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), snapshotReferences: new Set<string>(), mergeReferences: new Set<string>(), anonymizedReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[], tltProfilesErased: [] as string[], masterGuideErased: [] as Row[] };
   const matches = (row: Row, where: Record<string, unknown> = {}) => Object.entries(where).every(([key, value]) => {
     if (value === undefined) return true;
     if (value && typeof value === "object" && "not" in value) return row[key] !== (value as { not: unknown }).not;
@@ -150,6 +150,9 @@ function fakeDatabase() {
     },
     tltProfile: {
       deleteMany: async ({ where }: { where: { personId: string } }) => { db.tltProfilesErased.push(where.personId); return { count: 1 }; },
+    },
+    masterGuideCandidate: {
+      deleteMany: async ({ where }: { where: Row }) => { db.masterGuideErased.push(where); return { count: 1 }; },
     },
   };
   mocks.getPrisma.mockReturnValue({ ...client, $transaction: async (work: (tx: typeof client) => unknown) => work(client) });
@@ -645,6 +648,30 @@ describe("club roster storage", () => {
 
     expect(db.people.some((person) => person.id === personId)).toBe(true);
     expect(db.tltProfilesErased).toEqual([personId]);
+  });
+
+  it("deletes the club's Master Guide candidate row with the membership and counts it in the audit entry (#1698)", async () => {
+    const { memberId: id } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+    const personId = db.members[0].personId as string;
+    db.classCompletions.push({ id: "c6", organizationId: "club-2", personId });
+
+    await removeRosterMember("club-1", id, actor, now);
+
+    expect(db.masterGuideErased).toEqual([{ organizationId: "club-1", personId }]);
+    const removal = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "CLUB_ROSTER_MEMBER_REMOVED");
+    expect(removal.metadata).toMatchObject({ masterGuideCandidatesErased: 1 });
+  });
+
+  it("keeps the Master Guide candidate while the person has another non-removed row in the same club (#1698)", async () => {
+    const { memberId: id } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+    const personId = db.members[0].personId as string;
+    db.members.push({ id: "old-year-row", organizationId: "club-1", clubYear: "2025-26", personId, attendeeType: "YOUTH", isTlt: false, status: "ACTIVE" });
+
+    await removeRosterMember("club-1", id, actor, now);
+
+    expect(db.masterGuideErased).toEqual([]);
+    const removal = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "CLUB_ROSTER_MEMBER_REMOVED");
+    expect(removal.metadata).toMatchObject({ masterGuideCandidatesErased: 0 });
   });
 
   it("keeps the TLT director's record while the kept person has another active TLT roster row (#1686)", async () => {

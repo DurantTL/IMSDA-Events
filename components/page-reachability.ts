@@ -74,7 +74,7 @@ export function linkedRoutesBySource(): Record<string, Set<string>> {
     ...clubPortalNavItems({ base: clubBase, role: "DIRECTOR", capabilities: leader }),
     ...clubReporterNavItems({ base: clubBase, capabilities: leader }),
     ...areaClubPortalNavItems({ organizationId: "[organizationId]" }),
-    ...coordinatorNavItems({ showWaitlists: true, showTlt: true }),
+    ...coordinatorNavItems({ showWaitlists: true, showTlt: true, showMasterGuide: true }),
     ...accountPortalNavItems({ hasAccount: true, directedClubCount: 2, areaCoordinator: true, actingRole: null }),
   ];
   for (const item of items) portal.add(pathOf(item.href));
@@ -165,6 +165,7 @@ export const reviewedPages: Readonly<Record<string, ReviewedPage>> = {
   [`${club}/roster/[memberId]/health`]: { kind: "linked", parent: `${club}/roster`, linkedIn: "components/club-roster-workspace.tsx", link: "/roster/${encodeURIComponent(member.id)}/health`", why: "One member's health record, from the roster (director and deputy); protected data, so no menu entry." },
   [`${club}/roster/export`]: { kind: "linked", parent: `${club}/roster`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/roster/page.tsx", link: "href={`/account/clubs/${organizationId}/roster/export`}", why: "Build a roster export, on the roster page." },
   [`${club}/roster/next-year`]: { kind: "linked", parent: `${club}/roster`, linkedIn: "components/club-next-year-offer.tsx", link: "/roster/next-year", why: "Start next year's roster, offered on the club home and roster." },
+  [`${club}/master-guide`]: { kind: "linked", parent: club, linkedIn: "components/club-optional-features.tsx", link: "href={`/account/clubs/${organizationId}/master-guide`}", why: "The Open Master Guide tracking button under the switch in Club settings, shown to the director and deputy once the club has switched it on (#1698); the page checks the role and the feature." },
   [`${club}/roster-health`]: { kind: "linked", parent: club, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/page.tsx", link: "href={`${base}/roster-health`}", why: "The Roster health card on the club home and an Open roster health button on the Roster page, shown only to the director and deputy while the club has the feature on (#1731); Club settings links it too." },
   [`${club}/staff-training`]: { kind: "linked", parent: `${club}/roster`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/roster/page.tsx", link: "href={`/account/clubs/${organizationId}/staff-training`}", why: "An Open staff training button on the Roster page, shown only to the director and deputy while the club has the optional feature on (#1697); Club settings links it too." },
 };
