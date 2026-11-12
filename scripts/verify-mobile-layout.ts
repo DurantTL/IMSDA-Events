@@ -324,6 +324,8 @@ const pages: PageSpec[] = [
   { ...area("debrief", `/account/area-clubs/events/${clubEventId}/debrief`), expectText: /Event debrief/ },
   // The optional Budget sheet (#1682): the coordinator's switch, the sheet and its cost lines (switched on in seedBudgetSheet).
   { ...area("budget", `/account/area-clubs/events/${clubEventId}/budget`), expectText: /Budget sheet/ },
+  // The optional Event staffing sheet (#1678): the coordinator's switch, the activities, the gaps and the people (switched on in seedEventStaffing).
+  { ...area("event-staffing", `/account/area-clubs/events/${clubEventId}/staffing`), expectText: /Event staffing/ },
   area("team-permissions", "/account/area-clubs/team-permissions"),
   area("new-club-applications", "/account/area-clubs/applications"),
   area("points", "/account/area-clubs/points"),
@@ -459,6 +461,8 @@ const pages: PageSpec[] = [
   { ...staff("debrief", `/more/debrief?event=${clubEventId}`, "system-admin"), expectText: /Event debrief/ },
   // The optional Budget sheet (#1682): the switch, the figures, the cost lines and the totals.
   { ...staff("budget", `/more/budget?event=${clubEventId}`, "system-admin"), expectText: /Budget sheet/ },
+  // The optional Event staffing sheet (#1678): the switch, the gaps, the activities and the add forms.
+  { ...staff("event-staffing", `/more/event-staffing?event=${clubEventId}`, "system-admin"), expectText: /Event staffing/ },
   // Home (#1568): the work waiting for this person, and the upcoming events they can open.
   { ...staff("home-needs-you", "/home", "system-admin"), expectText: /Needs you/ },
   { ...staff("home-coming-up", "/home/coming-up", "system-admin"), expectText: /Coming up/ },
@@ -1259,6 +1263,21 @@ async function seedBudgetSheet(prisma: PrismaClient): Promise<void> {
       { eventId: clubEventId, label: "Wristbands", description: "", quantity: null, amountCents: 12_550 },
     ] });
   }
+}
+
+/** Event staffing (#1678) switched on for the club weekend, with two synthetic activities (Canoe with a lead, Surprise with nobody), so the audited pages show gaps and people and not only the switch. The lead is one synthetic registered attendee made here, because the seeded club event has no registrations. */
+async function seedEventStaffing(prisma: PrismaClient): Promise<void> {
+  await prisma.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "event-staffing" }], skipDuplicates: true });
+  if (await prisma.eventStaffingActivity.count({ where: { eventId: clubEventId } }) > 0) return;
+  const canoe = await prisma.eventStaffingActivity.create({ data: { eventId: clubEventId, name: "Canoe", description: "Sample paddling activity", location: "Sample Lake", timeText: "Friday 2 p.m.", tltsNeeded: 3, lifeguardsNeeded: 4, helpersNeeded: 1, position: 1 } });
+  await prisma.eventStaffingActivity.create({ data: { eventId: clubEventId, name: "Surprise", position: 2 } });
+  const person = await prisma.person.upsert({ where: { normalizedEmail: "staffing-lead@example.test" }, update: {}, create: { firstName: "Sam", lastName: "Sample", normalizedEmail: "staffing-lead@example.test" } });
+  let attendee = await prisma.registrationAttendee.findFirst({ where: { eventId: clubEventId, personId: person.id, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } }, select: { personId: true } });
+  if (!attendee) {
+    const registration = await prisma.registration.create({ data: { eventId: clubEventId, accountHolderPersonId: person.id, confirmationCode: `STAFFING-${Date.now()}`, status: "CONFIRMED", totalAmount: 0 } });
+    attendee = await prisma.registrationAttendee.create({ data: { eventId: clubEventId, registrationId: registration.id, personId: person.id, attendeeType: "Adult", profileSnapshot: {} }, select: { personId: true } });
+  }
+  await prisma.eventStaffingAssignment.create({ data: { eventId: clubEventId, activityId: canoe.id, role: "LEAD", personId: attendee.personId } });
 }
 
 /** A System deeper page with a back link (#1274): the editor of a seeded event template. Reads only; nothing is created. */
@@ -4840,6 +4859,7 @@ async function main() {
     pages.push(...await seedInformationForm(prisma));
     pages.push(...await seedDebriefPages(prisma));
     await seedBudgetSheet(prisma);
+    await seedEventStaffing(prisma);
     pages.push(...await seedEventTemplatePages(prisma));
     const cookies = await mintSessions(prisma, tokens);
     console.log(`Auditing ${pages.length} pages at ${widths.join(", ")} px; output in ${outDir}`);

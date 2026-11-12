@@ -5,6 +5,7 @@ import { Suspense, type CSSProperties } from "react";
 import { redirect } from "next/navigation";
 import { ArrowRight, CircleAlert, CircleDollarSign, CircleHelp, GraduationCap, Inbox, ShieldAlert, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 import { AccountRegistrationCard } from "@/components/account-registration-card";
+import { MyEventStaffing } from "@/components/my-event-staffing";
 import { AreaCoordinatorCardSection, AreaCoordinatorCardSkeleton } from "@/components/area-coordinator-card";
 import { AreaCoordinatorInviteAccept, ClubInviteAccept } from "@/components/club-invite-accept";
 import { InstructorInviteAccept } from "@/components/instructor-invite-accept";
@@ -16,6 +17,7 @@ import { overviewPrimaryCardId } from "@/modules/attendee-accounts/registration-
 import { listRegistrationsForVerifiedEmail } from "@/modules/attendee-accounts/registrations-repository";
 import { listInvitesForAccount } from "@/modules/club-imports/invites";
 import { accountIsInstructor, listInstructorInvitesForAccount } from "@/modules/honors/instructor-repository";
+import { listOwnAssignments } from "@/modules/event-staffing/own-assignments";
 import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { listAreaCoordinatorInvitesForAccount } from "@/modules/organizations/area-coordinator-invites";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
@@ -53,7 +55,7 @@ export default async function AttendeeAccountOverviewPage() {
   const { account, via } = await getCurrentAttendee();
   if (!account) redirect("/account/sign-in");
 
-  const [registrationsResult, mfaStatus, clubs, invites, areaInvites, areaCoordinator, instructorInvites, isInstructor] = await Promise.all([
+  const [registrationsResult, mfaStatus, clubs, invites, areaInvites, areaCoordinator, instructorInvites, isInstructor, ownStaffing] = await Promise.all([
     // A failed load is its own calm state with a retry: not "no registrations", and not a blank page.
     listRegistrationsForVerifiedEmail(account.verifiedEmail).then(
       (registrations) => ({ ok: true as const, registrations }),
@@ -73,6 +75,11 @@ export default async function AttendeeAccountOverviewPage() {
     // Honors Weekend instructor invites (#833): like club invites, only the person themselves may accept.
     via === "attendee" ? listInstructorInvitesForAccount(account.verifiedEmail) : Promise.resolve([]),
     via === "attendee" ? accountIsInstructor(account.id) : Promise.resolve(false),
+    // The person's own event staffing assignments (#1678), read only; a failed read shows nothing rather than failing the page.
+    listOwnAssignments(account).catch((error: unknown) => {
+      logError("Account overview staffing assignments failed to load", error, { accountId: account.id });
+      return [];
+    }),
   ]);
   const registrations = registrationsResult.registrations;
   const upcoming = upcomingRegistrations(registrations);
@@ -173,6 +180,8 @@ export default async function AttendeeAccountOverviewPage() {
               </p>
             )}
           </section>
+
+          <MyEventStaffing assignments={ownStaffing} />
 
           {hasWorkspaceCards && (
             <section aria-labelledby="attendee-ov-roles">
