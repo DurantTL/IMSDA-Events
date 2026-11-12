@@ -51,6 +51,7 @@ const WRITE_ROUTES: Record<string, { gate: string; actingStaff: "allowed" | "ref
   "tlt-directory/lists/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
   "tlt-directory/export/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
   "tlt-directory/suggestion/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
+  "tlt-directory/move-up/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
 };
 
 function routeFiles(dir: string): string[] {

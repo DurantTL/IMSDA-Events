@@ -139,7 +139,7 @@ describe("who appears in the TLT directory (#1686)", () => {
 
 describe("saving a TLT record (#1686)", () => {
   const actor = { accountId: "account-1" };
-  const input = { personId: "p1", tltYear: 2 as const, positionTypeId: "pos-1", status: "ACTIVE" as const, tagIds: ["tag-1"] };
+  const input = { personId: "p1", tltYear: 2 as const, expectedTltYear: null, positionTypeId: "pos-1", status: "ACTIVE" as const, tagIds: ["tag-1"] };
 
   it("refuses someone who is not a current TLT", async () => {
     state.rosterFindFirst.mockResolvedValue(null);
@@ -168,12 +168,56 @@ describe("saving a TLT record (#1686)", () => {
     state.rosterFindFirst.mockResolvedValue({ id: "m1" });
     await updateTltProfile(input, actor);
     expect(state.profileUpsert).toHaveBeenCalledWith(expect.objectContaining({
-      create: { personId: "p1", tltYear: 2, positionTypeId: "pos-1", status: "ACTIVE", updatedByAccountId: "account-1" },
+      create: { personId: "p1", tltYear: 2, tltYearClubYear: "2026-27", positionTypeId: "pos-1", status: "ACTIVE", updatedByAccountId: "account-1" },
     }));
     const entry = state.audit.mock.calls[0]![0];
     expect(entry).toMatchObject({ action: "TLT_DIRECTORY_PROFILE_UPDATED", entityType: "TltProfile", entityId: "profile-1" });
     expect(entry.metadata).toMatchObject({ actorAttendeeAccountId: "account-1", personId: "p1", changed: ["tltYear", "positionType", "status", "tags"] });
     expect(JSON.stringify(entry)).not.toMatch(/Casey|Sample/);
+  });
+});
+
+describe("the club year a TLT year applies to (#1686 move-up)", () => {
+  const actor = { accountId: "account-1" };
+  const existing = { id: "profile-1", tltYear: 2, positionTypeId: null, status: "ACTIVE", tags: [] };
+  const base = { personId: "p1", expectedTltYear: 2 as const, positionTypeId: null, status: "ACTIVE" as const, tagIds: [] };
+
+  it("records the current club year when the year changes", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    vi.mocked(client.tltProfile.findUnique).mockResolvedValueOnce(existing as never);
+    await updateTltProfile({ ...base, tltYear: 3 }, actor);
+    expect(state.profileUpsert.mock.calls[0]![0].update).toMatchObject({ tltYear: 3, tltYearClubYear: "2026-27" });
+  });
+
+  it("refuses with YEAR_CHANGED when the stored year is not the one the editor loaded, saving nothing", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    vi.mocked(client.tltProfile.findUnique).mockResolvedValueOnce({ ...existing, tltYear: 3 } as never);
+    await expect(updateTltProfile({ ...base, tltYear: 4 }, actor)).rejects.toMatchObject({ code: "YEAR_CHANGED" });
+    expect(state.profileUpsert).not.toHaveBeenCalled();
+    expect(state.audit).not.toHaveBeenCalled();
+  });
+
+  it("locks the TLT's record before it reads the year to compare", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    const order: string[] = [];
+    state.queryRaw.mockImplementationOnce(async (sql: { sql: string }) => { order.push(sql.sql.includes("FOR UPDATE") ? "lock" : "other"); return []; });
+    vi.mocked(client.tltProfile.findUnique).mockImplementationOnce((async () => { order.push("read"); return existing; }) as never);
+    await updateTltProfile({ ...base, tltYear: 3 }, actor);
+    expect(order).toEqual(["lock", "read"]);
+  });
+
+  it("clears it when the year is cleared", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    vi.mocked(client.tltProfile.findUnique).mockResolvedValueOnce(existing as never);
+    await updateTltProfile({ ...base, tltYear: null }, actor);
+    expect(state.profileUpsert.mock.calls[0]![0].update).toMatchObject({ tltYear: null, tltYearClubYear: null });
+  });
+
+  it("leaves it alone when only the status changes", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    vi.mocked(client.tltProfile.findUnique).mockResolvedValueOnce(existing as never);
+    await updateTltProfile({ ...base, tltYear: 2, status: "APPROVED" }, actor);
+    expect(state.profileUpsert.mock.calls[0]![0].update).not.toHaveProperty("tltYearClubYear");
   });
 });
 
