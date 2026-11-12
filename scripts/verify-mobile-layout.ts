@@ -276,6 +276,11 @@ const pages: PageSpec[] = [
   // Walkthrough guides (#1482): each step is an instruction and a picture, so the picture must fit the column at every width.
   { name: "account-help-walkthrough-director", path: "/account/help/walkthrough-director-roster", role: "director", expectText: /Step by step: Add, edit and remove a roster member/ },
   { name: "account-help-walkthrough-area", path: "/account/help/walkthrough-coordinator-clubs", role: "area", expectText: /Step by step: Your clubs and Who's missing what/ },
+  // The family guides (#1883): the written guides and a walkthrough, read by an ordinary attendee account.
+  { name: "account-help-guide-family-pay", path: "/account/help/family-pay-balance", role: "attendee", expectText: /Pay a balance/ },
+  { name: "account-help-guide-family-change", path: "/account/help/family-change-registration", role: "attendee", expectText: /Change a registration/ },
+  { name: "account-help-guide-family-cancel", path: "/account/help/family-cancel-registration", role: "attendee", expectText: /Cancel a registration/ },
+  { name: "account-help-walkthrough-family-cancel", path: "/account/help/walkthrough-family-cancel", role: "attendee", expectText: /Step by step: Ask to cancel a registration/ },
   { ...club("home", ""), flow: "portal-navigation" },
   { ...club("roster", "/roster"), prepare: openRosterSections },
   // A director on a past club year: the read-only banner, with the year carried between Home and Roster (#1112).
