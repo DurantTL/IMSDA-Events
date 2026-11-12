@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   accountNeedsSecondStep: vi.fn(),
   readTltDirectory: vi.fn(),
   listTltLists: vi.fn(),
+  recordTltDirectoryView: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -17,7 +18,7 @@ vi.mock("@/components/tlt-directory", () => ({ TltDirectory: () => null }));
 vi.mock("@/components/tlt-lists-editor", () => ({ TltListsEditor: () => null }));
 vi.mock("@/components/coordinator-section-heading", () => ({ CoordinatorSectionHeading: () => null }));
 vi.mock("@/components/navigation-link", () => ({ NavigationLink: () => null }));
-vi.mock("@/modules/tlt-directory/repository", () => ({ readTltDirectory: mocks.readTltDirectory, listTltLists: mocks.listTltLists }));
+vi.mock("@/modules/tlt-directory/repository", () => ({ readTltDirectory: mocks.readTltDirectory, listTltLists: mocks.listTltLists, recordTltDirectoryView: mocks.recordTltDirectoryView }));
 
 import ListsPage from "@/app/(public)/account/(portal)/area-clubs/tlt/lists/page";
 import DirectoryPage from "@/app/(public)/account/(portal)/area-clubs/tlt/page";
@@ -46,6 +47,7 @@ describe("the TLT directory pages (#1686)", () => {
     await expect(DirectoryPage({ searchParams: Promise.resolve({}) })).rejects.toThrow("NEXT_NOT_FOUND");
     await expect(ListsPage()).rejects.toThrow("NEXT_NOT_FOUND");
     expect(mocks.readTltDirectory).not.toHaveBeenCalled();
+    expect(mocks.recordTltDirectoryView).not.toHaveBeenCalled();
     expect(mocks.listTltLists).not.toHaveBeenCalled();
   });
 
@@ -55,5 +57,8 @@ describe("the TLT directory pages (#1686)", () => {
     await expect(DirectoryPage({ searchParams: Promise.resolve({ q: "casey", page: "2" }) })).resolves.toBeTruthy();
     await expect(ListsPage()).resolves.toBeTruthy();
     expect(mocks.readTltDirectory).toHaveBeenCalledTimes(1);
+    // One audit row per view, with the search text only as a filter key.
+    expect(mocks.recordTltDirectoryView).toHaveBeenCalledTimes(1);
+    expect(mocks.recordTltDirectoryView.mock.calls[0]![1]).toEqual({ accountId: "account-1" });
   });
 });

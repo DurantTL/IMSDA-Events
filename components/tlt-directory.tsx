@@ -127,6 +127,7 @@ export function TltDirectory({ slice, total, clubs, filters, positions, tags }: 
               <h3 className={styles.name}>{row.name}</h3>
               <dl className={styles.facts}>
                 <div><dt>Club</dt><dd>{row.clubName}</dd></div>
+                <div><dt>Sponsoring church</dt><dd>{row.church || "Not on file"}</dd></div>
                 <div><dt>Age</dt><dd>{tltAgeLabel(row).replace(/^Age /, "")}</dd></div>
                 <div><dt>Grade</dt><dd>{row.grade ?? "Not recorded"}</dd></div>
                 <div><dt>TLT year</dt><dd>{tltYearLabel(row.tltYear)}</dd></div>

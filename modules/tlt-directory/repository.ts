@@ -50,7 +50,7 @@ export async function listTltDirectoryRows(now = new Date()): Promise<TltDirecto
       sealedBirthDate: true,
       updatedAt: true,
       person: { select: { firstName: true, lastName: true } },
-      organization: { select: { id: true, name: true } },
+      organization: { select: { id: true, name: true, parentOrganization: { select: { name: true } } } },
     },
   });
   const personIds = [...new Set(members.flatMap((member) => (member.personId ? [member.personId] : [])))];
@@ -84,6 +84,7 @@ export async function listTltDirectoryRows(now = new Date()): Promise<TltDirecto
       name: name || "Unnamed person",
       clubId: member.organization.id,
       clubName: member.organization.name,
+      church: member.organization.parentOrganization?.name ?? "",
       age: ageFrom(member, today),
       reportedAge: member.sealedBirthDate ? null : member.reportedAge,
       grade: member.schoolGrade ? clubSchoolGradeLabels[member.schoolGrade] : null,
@@ -275,4 +276,30 @@ export async function runTltExport(filters: TltFilters, actor: TltDirectorActor,
     },
   });
   return { ...table, rowCount: rows.length, csv: toCsv([table.headers, ...table.rows]) };
+}
+
+/**
+ * One audit row for a page view by the TLT director: counts and filter keys only, never the search text or a name.
+ * A single insert, with the counts the page already has.
+ */
+export async function recordTltDirectoryView(
+  view: { filters: TltFilters; shown: number; matching: number; total: number; page: number },
+  actor: TltDirectorActor,
+  now = new Date(),
+) {
+  await writeAuditLog({
+    action: "TLT_DIRECTORY_VIEWED",
+    entityType: "TltProfile",
+    summary: "Opened the TLT directory.",
+    metadata: {
+      actorAttendeeAccountId: actor.accountId,
+      clubYear: clubYearFor(now),
+      rowsShown: view.shown,
+      rowsMatching: view.matching,
+      totalTlts: view.total,
+      page: view.page,
+      filters: activeFilterKeys(view.filters),
+      sort: view.filters.sort,
+    },
+  });
 }

@@ -96,6 +96,8 @@ export type TltDirectoryRow = {
   name: string;
   clubId: string;
   clubName: string;
+  /** The club's sponsoring church (its parent organization), or "" when none is on file. */
+  church: string;
   /** Whole years, or null when the roster has no birth date. */
   age: number | null;
   reportedAge: number | null;
@@ -169,7 +171,7 @@ export function tltAgeLabel(row: Pick<TltDirectoryRow, "age" | "reportedAge">) {
   return "Age not recorded";
 }
 
-export const TLT_EXPORT_HEADERS = ["Name", "Club", "Age", "Grade", "TLT year", "Position type", "Status", "Help-area tags"] as const;
+export const TLT_EXPORT_HEADERS = ["Name", "Club", "Sponsoring church", "Age", "Grade", "TLT year", "Position type", "Status", "Help-area tags"] as const;
 
 /** The CSV and print columns: exactly what is on screen. No birth date, contact detail, form answer or school detail. */
 export function tltExportTable(rows: readonly TltDirectoryRow[]): { headers: string[]; rows: string[][] } {
@@ -178,6 +180,7 @@ export function tltExportTable(rows: readonly TltDirectoryRow[]): { headers: str
     rows: rows.map((row) => [
       row.name,
       row.clubName,
+      row.church,
       row.age !== null ? String(row.age) : row.reportedAge !== null ? `${row.reportedAge} (reported)` : "",
       row.grade ?? "",
       tltYearLabel(row.tltYear),

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Member = {
   id: string; clubYear: string; attendeeType: string; isTlt: boolean; status: string; personId: string | null; schoolGrade: string | null;
-  reportedAge: number | null; sealedBirthDate: string | null; updatedAt: Date; first: string; last: string; org: { id: string; name: string; type: string; isActive: boolean };
+  reportedAge: number | null; sealedBirthDate: string | null; updatedAt: Date; first: string; last: string; org: { id: string; name: string; type: string; isActive: boolean; church?: string };
 };
 
 const state = vi.hoisted(() => ({
@@ -29,7 +29,7 @@ const client = {
   clubRosterMember: {
     findMany: async ({ where }: { where: Record<string, unknown> }) => (state.members as Member[])
       .filter((member) => matches(member as unknown as Record<string, unknown>, where))
-      .map((member) => ({ ...member, person: { firstName: member.first, lastName: member.last }, organization: { id: member.org.id, name: member.org.name } })),
+      .map((member) => ({ ...member, person: { firstName: member.first, lastName: member.last }, organization: { id: member.org.id, name: member.org.name, parentOrganization: member.org.church ? { name: member.org.church } : null } })),
     findFirst: state.rosterFindFirst,
   },
   tltProfile: {
@@ -54,9 +54,9 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: state.audit }))
 
 import { sealBirthDate } from "@/modules/club-rosters/birth-dates";
 import { TltDirectoryError, parseTltFilters } from "@/modules/tlt-directory/domain";
-import { listTltDirectoryRows, runTltExport, updateTltProfile } from "@/modules/tlt-directory/repository";
+import { listTltDirectoryRows, recordTltDirectoryView, runTltExport, updateTltProfile } from "@/modules/tlt-directory/repository";
 
-const club = { id: "club-1", name: "Test Pathfinders", type: "CLUB", isActive: true };
+const club = { id: "club-1", name: "Test Pathfinders", type: "CLUB", isActive: true, church: "Sample Church" };
 const member = (overrides: Partial<Member>): Member => ({
   id: "m", clubYear: "2026-27", attendeeType: "YOUTH", isTlt: true, status: "ACTIVE", personId: "p", schoolGrade: "GRADE_10", reportedAge: null,
   sealedBirthDate: sealBirthDate("2011-03-04"), updatedAt: new Date("2026-10-01T00:00:00Z"), first: "Casey", last: "Sample", org: club, ...overrides,
@@ -79,7 +79,7 @@ beforeEach(() => {
     member({ id: "m6", personId: "p6", attendeeType: "STAFF", first: "Staff", last: "Flagged" }),
     member({ id: "m7", personId: "p7", clubYear: "2025-26", first: "Last", last: "Year" }),
     member({ id: "m8", personId: "p8", org: { ...club, id: "club-2", isActive: false }, first: "Closed", last: "Club" }),
-    member({ id: "m9", personId: "p9", org: { ...club, id: "club-3", name: "Another Club" }, sealedBirthDate: null, reportedAge: 16, schoolGrade: null, first: "Dana", last: "Example" }),
+    member({ id: "m9", personId: "p9", org: { ...club, id: "club-3", name: "Another Club", church: undefined }, sealedBirthDate: null, reportedAge: 16, schoolGrade: null, first: "Dana", last: "Example" }),
     member({ id: "m10", personId: null, first: "No", last: "Person" }),
   ];
 });
@@ -95,9 +95,9 @@ describe("who appears in the TLT directory (#1686)", () => {
   it("shows an age and grade, never a birth date or anything sealed", async () => {
     const rows = await listTltDirectoryRows();
     const casey = rows.find((row) => row.personId === "p1")!;
-    expect(casey).toMatchObject({ age: 15, grade: "10th grade", clubName: "Test Pathfinders", tltYear: null, status: null, tags: [] });
+    expect(casey).toMatchObject({ age: 15, grade: "10th grade", clubName: "Test Pathfinders", church: "Sample Church", tltYear: null, status: null, tags: [] });
     const dana = rows.find((row) => row.personId === "p9")!;
-    expect(dana).toMatchObject({ age: null, reportedAge: 16, grade: null });
+    expect(dana).toMatchObject({ age: null, reportedAge: 16, grade: null, church: "" });
     const dump = JSON.stringify(rows);
     expect(dump).not.toContain("2011");
     expect(dump).not.toMatch(/sealed|birth|schoolType|churchMember/i);
@@ -165,9 +165,21 @@ describe("the CSV (#1686)", () => {
     const result = await runTltExport(parseTltFilters({ q: "casey", club: "club-1" }), { accountId: "account-1" });
     expect(result.rowCount).toBe(1);
     expect(result.csv).toContain("Casey Sample");
+    expect(result.csv).toContain("Sample Church");
     expect(result.csv).not.toMatch(/2011|birth/i);
     const entry = state.audit.mock.calls[0]![0];
     expect(entry).toMatchObject({ action: "TLT_DIRECTORY_EXPORTED", metadata: { actorAttendeeAccountId: "account-1", clubYear: "2026-27", rowCount: 1, filters: ["q", "club"], sort: "name" } });
     expect(JSON.stringify(entry)).not.toMatch(/casey/i);
+  });
+});
+
+describe("opening the directory (#1686)", () => {
+  it("writes one audit row with counts and filter keys only, never a search text or a name", async () => {
+    const filters = parseTltFilters({ q: "casey", status: "ACTIVE", sort: "club" });
+    await recordTltDirectoryView({ filters, shown: 1, matching: 1, total: 2, page: 1 }, { accountId: "account-1" });
+    expect(state.audit).toHaveBeenCalledTimes(1);
+    const entry = state.audit.mock.calls[0]![0];
+    expect(entry).toMatchObject({ action: "TLT_DIRECTORY_VIEWED", entityType: "TltProfile", metadata: { actorAttendeeAccountId: "account-1", clubYear: "2026-27", rowsShown: 1, rowsMatching: 1, totalTlts: 2, page: 1, filters: ["q", "status"], sort: "club" } });
+    expect(JSON.stringify(entry)).not.toMatch(/casey|sample/i);
   });
 });

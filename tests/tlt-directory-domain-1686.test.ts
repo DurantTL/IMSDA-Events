@@ -15,13 +15,13 @@ import {
 } from "@/modules/tlt-directory/domain";
 
 const row = (overrides: Partial<TltDirectoryRow>): TltDirectoryRow => ({
-  personId: "p1", rosterMemberId: "m1", name: "Casey Sample", clubId: "c1", clubName: "Test Pathfinders", age: 15, reportedAge: null,
+  personId: "p1", rosterMemberId: "m1", name: "Casey Sample", clubId: "c1", clubName: "Test Pathfinders", church: "Sample Church", age: 15, reportedAge: null,
   grade: "10th grade", tltYear: 2, positionTypeId: "pos1", positionName: "Outreach", status: "ACTIVE", tags: [{ id: "t1", name: "Setup" }], ...overrides,
 });
 
 const rows = [
   row({}),
-  row({ personId: "p2", name: "Avery Example", clubId: "c2", clubName: "Alpha Club", tltYear: null, positionTypeId: null, positionName: null, status: null, tags: [] }),
+  row({ personId: "p2", name: "Avery Example", clubId: "c2", clubName: "Alpha Club", church: "", tltYear: null, positionTypeId: null, positionName: null, status: null, tags: [] }),
   row({ personId: "p3", name: "Blake Sample", tltYear: 1, status: "APPLIED", tags: [{ id: "t2", name: "Scoring" }] }),
 ];
 
@@ -106,9 +106,9 @@ describe("TLT directory filters, sort and export (#1686)", () => {
   it("exports exactly the screen columns, with no birth date, contact or id", () => {
     const table = tltExportTable(rows);
     expect(table.headers).toEqual([...TLT_EXPORT_HEADERS]);
-    expect(TLT_EXPORT_HEADERS.join(" ").toLowerCase()).not.toMatch(/birth|email|phone|address|guardian|school type|church/);
-    expect(table.rows[0]).toEqual(["Casey Sample", "Test Pathfinders", "15", "10th grade", "Year 2", "Outreach", "Active", "Setup"]);
-    expect(table.rows[1]).toEqual(["Avery Example", "Alpha Club", "15", "10th grade", "Not set", "", "Not set", ""]);
+    expect(TLT_EXPORT_HEADERS.join(" ").toLowerCase()).not.toMatch(/birth|email|phone|address|guardian|school type|church member/);
+    expect(table.rows[0]).toEqual(["Casey Sample", "Test Pathfinders", "Sample Church", "15", "10th grade", "Year 2", "Outreach", "Active", "Setup"]);
+    expect(table.rows[1]).toEqual(["Avery Example", "Alpha Club", "", "15", "10th grade", "Not set", "", "Not set", ""]);
   });
 
   it("shows a reported age labelled, never a date", () => {
