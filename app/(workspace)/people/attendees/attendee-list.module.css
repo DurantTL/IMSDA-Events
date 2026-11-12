@@ -45,6 +45,7 @@
 
   .list.list:global(.table-cards-max) > tbody > tr > th[scope="row"] {
     order: -3;
+    grid-row: 1;
     grid-column: 1 / -1;
     margin: 0;
     padding: 0 0 2px;
@@ -75,19 +76,22 @@
   .list.list:global(.table-cards-max) > tbody > tr > td[data-col="confirmationCode"],
   .list.list:global(.table-cards-max) > tbody > tr > td[data-col="status"] {
     display: block;
-    grid-column: auto;
+    grid-row: 2;
     order: -2;
     align-self: center;
   }
+  /* The code and the status take the whole second row, so the pairs start on a fresh row. */
+  .list.list:global(.table-cards-max) > tbody > tr > td[data-col="confirmationCode"] { grid-column: 1; }
+  .list.list:global(.table-cards-max) > tbody > tr > td[data-col="status"] { grid-column: 2 / -1; }
   .list.list:global(.table-cards-max) > tbody > tr > td[data-col="confirmationCode"]::before,
   .list.list:global(.table-cards-max) > tbody > tr > td[data-col="status"]::before { display: none; }
-  .list.list:global(.table-cards-max) > tbody > tr > td[data-col="status"] { order: -1; font-weight: 700; }
+  .list.list:global(.table-cards-max) > tbody > tr > td[data-col="status"] { order: -1; color: var(--muted); font-weight: 400; }
 }
 
 /* Phone: one column. The code and status stay on one line under the name; every other pair is label left, value right. */
 @container table-box (max-width: 600px) {
   .list.list:global(.table-cards-max) > tbody > tr { grid-template-columns: max-content minmax(0, 1fr); column-gap: 14px; }
-  .list.list:global(.table-cards-max) > tbody > tr > td[data-label]:not([data-col="confirmationCode"], [data-col="status"]) {
+  .list.list:global(.table-cards-max) > tbody > tr > td[data-label]:not(:empty, [data-col="confirmationCode"], [data-col="status"]) {
     display: flex;
     grid-column: 1 / -1;
     align-items: baseline;
@@ -95,7 +99,7 @@
     gap: 12px;
     text-align: right;
   }
-  .list.list:global(.table-cards-max) > tbody > tr > td[data-label]:not([data-col="confirmationCode"], [data-col="status"])::before {
+  .list.list:global(.table-cards-max) > tbody > tr > td[data-label]:not(:empty, [data-col="confirmationCode"], [data-col="status"])::before {
     flex: 0 0 min(42%, 9rem);
     text-align: left;
   }
