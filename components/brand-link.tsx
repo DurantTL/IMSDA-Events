@@ -12,7 +12,7 @@ export const BRAND_LINK_LABEL = BRAND_CALENDAR_LABEL;
 export const BRAND_HOME_HREF = "/";
 
 type BrandLinkProps = Omit<ComponentProps<typeof GuardedLink>, "href" | "aria-label" | "children"> & {
-  /** Use `GuardedLink` (the staff app shell does). Without it a plain link is still guarded: see the note below. */
+  /** Use `GuardedLink` for the Home destination. A calendar logo is always a plain link (#1212), still guarded: see the note below. */
   guarded?: boolean;
   /** Where the logo goes. Default is the calendar; only public discovery pages that show the public header use "home" (#1561). */
   destination?: "calendar" | "home";
@@ -28,7 +28,8 @@ type BrandLinkProps = Omit<ComponentProps<typeof GuardedLink>, "href" | "aria-la
  *
  * Unsaved-changes guard (#1452): every dirty form goes through `useUnsavedChangesGuard`, whose capture-phase
  * document click listener asks before any plain `a[href]` click leaves the page, so this link is guarded on a page
- * with a dirty form whichever link it renders. `guarded` renders `GuardedLink` as well, as the app shell always has.
+ * with a dirty form whichever link it renders. With `destination="home"`, `guarded` renders `GuardedLink` as well; the
+ * calendar logo is always a plain `<a>`, since only a full page load picks up the calendar's own policy (#1212).
  * It stays off by default because `GuardedLink` needs the app router, which a server-rendered page test lacks.
  * In the `/embed/*` iframe pass `target="_top"` so the calendar opens in the top window.
  */
@@ -36,6 +37,15 @@ export function BrandLink({ wordmark = false, guarded = false, destination = "ca
   const home = destination === "home";
   const classes = [styles.link, className ?? styles.standalone].join(" ");
   const Anchor = guarded ? GuardedLink : NavigationLink;
+  // The calendar has its own Content-Security-Policy (it shows map tiles, #1212), which only a full page load picks up.
+  if (!home) {
+    return (
+      <a {...(rest as ComponentProps<"a">)} className={classes} href={BRAND_LINK_HREF} aria-label={label ?? BRAND_LINK_LABEL}>
+        <Image alt="" aria-hidden="true" className={styles.symbol} height={72} src={BRAND_SYMBOL_PATH} width={72} />
+        {wordmark === true ? <span><strong>{PRODUCT_NAME}</strong><small>{PRODUCT_DESCRIPTOR}</small></span> : wordmark || null}
+      </a>
+    );
+  }
   return (
     <Anchor {...rest} className={classes} href={home ? BRAND_HOME_HREF : BRAND_LINK_HREF} aria-label={label ?? (home ? BRAND_HOME_LABEL : BRAND_LINK_LABEL)}>
       <Image alt="" aria-hidden="true" className={styles.symbol} height={72} src={BRAND_SYMBOL_PATH} width={72} />

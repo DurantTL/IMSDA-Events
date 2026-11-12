@@ -1,0 +1,53 @@
+.section {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.section h2 {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: var(--type-public-title);
+}
+
+.note {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--type-public-body);
+  overflow-wrap: anywhere;
+}
+
+.problem {
+  margin: 0;
+  min-height: 0;
+  color: var(--ink);
+  font-size: var(--type-public-body);
+  overflow-wrap: anywhere;
+}
+
+.retry {
+  min-height: 44px;
+}
+
+.retry:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 380px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-container);
+  background: var(--paper);
+  color: var(--muted);
+  font-size: var(--type-public-body);
+}
+
+@media (max-width: 700px) {
+  .loading {
+    height: 280px;
+  }
+}

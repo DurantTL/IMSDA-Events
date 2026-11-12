@@ -459,8 +459,40 @@ async function main() {
   await prisma.churchLocation.upsert({
     where: { organizationId: seededChurch.id },
     update: {},
-    create: { organizationId: seededChurch.id, city: "Des Moines", state: "IA", zip: "50309", source: "MANUAL" },
+    create: { organizationId: seededChurch.id, city: "Des Moines", state: "IA", zip: "50309", latitude: 41.5868, longitude: -93.625, source: "MANUAL" },
   });
+  // Synthetic map locations (#1212), so the calendar map and Find a club show pins locally. A second fictional church in Missouri
+  // hosts another event. Coordinates are only filled in where none is set, so a hand-set location is never overwritten.
+  await prisma.churchLocation.updateMany({
+    where: { organizationId: seededChurch.id, latitude: null, longitude: null },
+    data: { latitude: 41.5868, longitude: -93.625 },
+  });
+  const seededMissouriChurch = await prisma.organization.upsert({
+    where: { id: "org_seed_church_riverside" },
+    update: {},
+    create: {
+      id: "org_seed_church_riverside",
+      type: "CHURCH",
+      name: "Riverside Seventh-day Adventist Church (synthetic)",
+      normalizedName: normalizeOrganizationName("Riverside Seventh-day Adventist Church (synthetic)"),
+      city: "Columbia",
+      state: "MO",
+      postalCode: "65201",
+    },
+  });
+  await prisma.churchLocation.upsert({
+    where: { organizationId: seededMissouriChurch.id },
+    update: {},
+    create: { organizationId: seededMissouriChurch.id, city: "Columbia", state: "MO", zip: "65201", latitude: 38.9517, longitude: -92.3341, source: "MANUAL" },
+  });
+  // Host sites for the seeded events; an event already pointed somewhere else is left alone.
+  for (const [slug, siteId] of [
+    ["womens-retreat-2026", seededChurch.id],
+    ["camp-meeting-2027", seededMissouriChurch.id],
+    ["mens-convention-2027", seededChurch.id],
+  ] as const) {
+    await prisma.event.updateMany({ where: { slug, mapSiteOrganizationId: null }, data: { mapSiteOrganizationId: siteId } });
+  }
   const seededClub = await prisma.organization.upsert({
     where: { id: "org_seed_club_maple_grove_pathfinders" },
     update: {},

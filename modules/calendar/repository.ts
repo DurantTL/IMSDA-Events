@@ -32,6 +32,7 @@ import {
   type CalendarItem,
 } from "@/modules/calendar/domain";
 import { dismissalKey, entryCanBeLinked, findPossibleMatches } from "@/modules/calendar/event-match";
+import { calendarMapPoint } from "@/modules/calendar/map-point";
 import { entryTypeEditMark } from "@/modules/calendar/deadlines";
 import { reconcileDeadlineReminders } from "@/modules/calendar/deadline-reminders";
 import { feedLockKey } from "@/modules/calendar/feed-plan";
@@ -62,6 +63,8 @@ const publicEventSelect = {
   capacity: true,
   audience: true,
   billingMode: true,
+  // The host site's name and map location, for the calendar map (#1212). Nothing else about it is read.
+  mapSiteOrganization: { select: { id: true, name: true, isActive: true, churchLocation: { select: { latitude: true, longitude: true } } } },
 } as const;
 
 /** A linked item that counts toward "several items share this event" (#1086): shown publicly, as the items below are. */
@@ -181,7 +184,7 @@ export async function listPublicCalendarItems(
     const registration = registrationFor(event);
     return entryItems(entry, from, to, expandRepeats).map((item): CalendarItem => item.isClosure || item.status === "CANCELLED"
       ? item
-      : { ...item, kind: "EVENT", category: item.category || (event.calendarCategory ?? ""), href: `/events/${encodeURIComponent(event.slug)}`, eventTitle: event.name, eventStartsOn: calendarDateIn(event.startsAt, event.timezone), eventEndsOn: calendarDateIn(event.endsAt, event.timezone), ...registration });
+      : { ...item, kind: "EVENT", category: item.category || (event.calendarCategory ?? ""), href: `/events/${encodeURIComponent(event.slug)}`, eventTitle: event.name, eventStartsOn: calendarDateIn(event.startsAt, event.timezone), eventEndsOn: calendarDateIn(event.endsAt, event.timezone), mapPoint: calendarMapPoint(event.mapSiteOrganization), ...registration });
   });
 
   const items: CalendarItem[] = [
@@ -197,6 +200,7 @@ export async function listPublicCalendarItems(
       category: event.calendarCategory ?? "",
       href: `/events/${encodeURIComponent(event.slug)}`,
       status: "SCHEDULED" as const,
+      mapPoint: calendarMapPoint(event.mapSiteOrganization),
       ...registrationFor(event),
     })),
     // The query already leaves Deadlines out; this keeps one that slips through (a changed query) off every public surface.

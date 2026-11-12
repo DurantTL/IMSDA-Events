@@ -9,6 +9,9 @@
 - `tests/`: Vitest permission, domain, route, and regression tests.
 - `scripts/`: database-backed `npm run test:*` checks that CI runs.
 - `docs/`: runbooks, decisions (`docs/decisions/`), and readiness evidence.
+- `docs/SITE-MAP.md`: every page, who it is for and where it is in the menus;
+  a new page needs a row there (or, for a staff page, a rerun of
+  `docs/generate-staff-workspace-map.ts`), or `tests/site-map-1558.test.ts` fails.
 - `docs/SITE-RULES.md`: every approved site rule (look, search, setup help,
   behavior, sign-in, page checks), with its guard test and browser test.
 - `.agents/skills/`: repository-scoped build and review workflows.

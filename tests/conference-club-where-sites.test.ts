@@ -75,7 +75,7 @@ describe("each conference club list leaves visiting clubs out", () => {
     ["required club forms", async () => (await import("@/modules/club-forms/required")).getRequiredFormsStatus("2026-2027")],
     ["open applications", async () => (await import("@/modules/club-forms/open-applications")).listOpenApplicationClubs()],
     ["youth directory", async () => (await import("@/modules/youth-directory/repository")).listYouthDirectoryRows(now)],
-    ["master guide approvals", async () => (await import("@/modules/master-guide/repository")).listAreaApprovalQueue(now)],
+    ["master guide approvals", async () => (await import("@/modules/master-guide/repository")).listAreaApprovalQueue(["PATHFINDER"], now)],
     ["leader directory", async () => (await import("@/modules/leader-directory/repository")).readLeaderDirectory({} as any, now)],
   ];
 

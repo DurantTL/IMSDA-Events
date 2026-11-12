@@ -7,6 +7,7 @@ import { EventSettingsWorkspace } from "@/components/event-settings-workspace";
 import { EventStartChoices } from "@/components/event-start-choices";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { formatDateRange } from "@/modules/calendar/domain";
+import { listMapSiteOptions } from "@/modules/events/map-site";
 import { getCalendarEntryPrefill } from "@/modules/calendar/event-links";
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default async function EventSetupPage({ searchParams }: { searchParams: P
   // is linked when the event is created. Template choice works as usual.
   const { fromCalendarEntry } = await searchParams;
   const prefill = fromCalendarEntry ? await getCalendarEntryPrefill(fromCalendarEntry) : null;
+  const mapSiteOptions = await listMapSiteOptions();
   const carry = fromCalendarEntry && prefill?.ok ? `?fromCalendarEntry=${encodeURIComponent(fromCalendarEntry)}` : "";
 
   return (
@@ -49,6 +51,7 @@ export default async function EventSetupPage({ searchParams }: { searchParams: P
         <EventSettingsWorkspace
           mode="create"
           initialEvent={null}
+          mapSiteOptions={mapSiteOptions}
           calendarPrefill={prefill?.ok
             ? { entryId: prefill.entry.id, title: prefill.entry.title, startsOn: prefill.entry.startsOn, endsOn: prefill.entry.endsOn, location: prefill.entry.location }
             : undefined}

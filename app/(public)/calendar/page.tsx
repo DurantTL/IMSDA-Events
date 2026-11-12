@@ -57,6 +57,8 @@ import { filterByGroup, resolveCalendarFilter } from "@/modules/calendar/filter-
 import { loadCalendarFilterGroups } from "@/modules/calendar/public-filters";
 import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/repository";
 import { buildCalendarYear, parseYearDate, parseYearParam } from "@/modules/calendar/year";
+import { CalendarMapSection } from "@/components/calendar-map-section";
+import { buildCalendarMapData } from "@/components/calendar-map-content";
 import { CalendarYearView } from "@/components/calendar-year-view";
 import { buildSubscribeLinks, siteBaseUrl } from "@/modules/calendar/subscribe";
 import homeStyles from "@/components/public-home-page.module.css";
@@ -133,6 +135,8 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   }));
   const featuredNames = eventTransitionNames(featuredItems, usedTransitionNames);
   const listItems = withoutFeatured(firstPerSeries(items), featuredItems, "item");
+  // The map (#1212) shows the events of the chosen filter and category; entries and events without a mapped site get no pin.
+  const mapData = view === "list" ? buildCalendarMapData(firstPerSeries(items), formatDateRange) : null;
   const panelNames = eventTransitionNames(view === "month" ? sortCalendarItems(selectedItems) : [], usedTransitionNames);
   const agendaNames = eventTransitionNames(view === "month" ? (selectedDate ? [] : monthItems) : view === "list" ? listItems : [], usedTransitionNames);
   // A day (or a bar, or "+N more") shows that day alone in the month list; an adjacent-month day lands on its own month.
@@ -351,6 +355,8 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
             yearItems={yearList}
           />
         )}
+
+        {view === "list" && mapData && mapData.groups.length > 0 && <CalendarMapSection data={mapData} />}
 
         {view === "list" && (
           <section aria-labelledby="calendar-agenda-heading" className="calendar-agenda">

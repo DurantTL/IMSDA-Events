@@ -18,21 +18,24 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/club-forms/public-page` | System management | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/club-forms/public-page/page.tsx` |
 | `/admin/club-forms/public-page/preview` | Page link | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/club-forms/public-page/preview/page.tsx` |
 | `/admin/club-supplies` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/club-supplies/page.tsx` |
+| `/admin/club-supplies/conference-orders` | Page link | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/club-supplies/conference-orders/page.tsx` |
 | `/admin/clubs` | Page link | Clubs | Club administration | Overview | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/page.tsx` |
-| `/admin/clubs/applications` | System management | Clubs | New club applications | Applications | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/applications/page.tsx` |
+| `/admin/clubs/applications` | System management | Clubs | New club applications | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/applications/page.tsx` |
 | `/admin/clubs/health-import` | Page link | Clubs | Club summary | Import health records | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/health-import/page.tsx` |
 | `/admin/clubs/import` | Page link | Clubs | Club summary | Import clubs | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/import/page.tsx` |
-| `/admin/clubs/invites` | System management | Clubs | Club leaders | Invited (redirect, #1589) | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/invites/page.tsx` |
-| `/admin/clubs/leaders` | System management | Clubs | Club leaders | Current, Invited, Draft (`?status=`) | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/leaders/page.tsx` |
-| `/admin/clubs/reports` | System management | Clubs | Monthly Records | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/page.tsx` |
-| `/admin/clubs/reports/[organizationId]/[month]` | System management | Clubs | Monthly Records | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/[organizationId]/[month]/page.tsx` |
-| `/admin/clubs/reports/year-end` | System management | Clubs | Club Year-End Reports | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/year-end/page.tsx` |
+| `/admin/clubs/invites` | System management | Clubs | Club leaders | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/invites/page.tsx` |
+| `/admin/clubs/leaders` | System management | Clubs | Club leaders | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/leaders/page.tsx` |
+| `/admin/clubs/reports` | System management | Clubs | Monthly Records | Review monthly records | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/page.tsx` |
+| `/admin/clubs/reports/[organizationId]/[month]` | System management | Clubs | Monthly Records | Review monthly records | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/[organizationId]/[month]/page.tsx` |
+| `/admin/clubs/reports/year-end` | Page link | Clubs | Monthly Records | Club Year-End Reports | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/year-end/page.tsx` |
+| `/admin/clubs/reports/year-end/[organizationId]/[year]` | Page link | Clubs | Monthly Records | Club Year-End Reports | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/year-end/[organizationId]/[year]/page.tsx` |
 | `/admin/clubs/summary` | System management | Clubs | Club summary | All clubs | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/summary/page.tsx` |
 | `/admin/clubs/transfers` | System management | Clubs | Club member transfers | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/transfers/page.tsx` |
 | `/admin/email` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/email/page.tsx` |
 | `/admin/event-templates` | System management | Events | Event templates | - | bar: Events | Events menu | - | `app/(workspace)/admin/event-templates/page.tsx` |
 | `/admin/event-templates/[templateId]` | System management | Events | Event templates | - | bar: Events | Events menu | - | `app/(workspace)/admin/event-templates/[templateId]/page.tsx` |
 | `/admin/event-templates/from-event` | Page link | Events | Event templates | - | bar: Events | Events menu | - | `app/(workspace)/admin/event-templates/from-event/page.tsx` |
+| `/admin/events` | System management | Events | All events | - | bar: Events | Events menu | - | `app/(workspace)/admin/events/page.tsx` |
 | `/admin/feature-requests` | System management | Admin | Events | - | More, Areas | Admin menu | - | `app/(workspace)/admin/feature-requests/page.tsx` |
 | `/admin/form-templates` | System management | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/form-templates/page.tsx` |
 | `/admin/form-templates/[templateKey]` | System management | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/form-templates/[templateKey]/page.tsx` |
@@ -65,6 +68,8 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/pauses` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/pauses/page.tsx` |
 | `/admin/people` | System management | People | People & access | - | More, Areas | People menu | - | `app/(workspace)/admin/people/page.tsx` |
 | `/admin/people/[kind]/[id]` | System management | People | People & access | - | More, Areas | People menu | - | `app/(workspace)/admin/people/[kind]/[id]/page.tsx` |
+| `/admin/people/invite-lookup` | Page link | People | People & access | - | More, Areas | People menu | - | `app/(workspace)/admin/people/invite-lookup/page.tsx` |
+| `/admin/problem-reports` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/problem-reports/page.tsx` |
 | `/admin/question-library` | System management | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/question-library/page.tsx` |
 | `/admin/readiness` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/readiness/page.tsx` |
 | `/admin/settings` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/settings/page.tsx` |
@@ -72,6 +77,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/site-content/preview` | Page link | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/site-content/preview/page.tsx` |
 | `/admin/system-report` | System management | Reports | System report | - | More, Areas | Reports menu | - | `app/(workspace)/admin/system-report/page.tsx` |
 | `/admin/team` | System management | People | People & access | - | More, Areas | People menu | - | `app/(workspace)/admin/team/page.tsx` |
+| `/admin/youth` | System management | Clubs | youth-directory | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/youth/page.tsx` |
 | `/archived-events` | System management | Events | Archived events | - | bar: Events | Events menu | - | `app/archived-events/page.tsx` |
 | `/check-in` | Event sidebar | Events (inside an event) | Check-in | Arrivals | bar: Check-in | Event menu | - | `app/(workspace)/check-in/page.tsx` |
 | `/check-in-station` | Existing page link | Home | none (Help, Profile and pages no tab lists light Home and no tab) | - | More | Home menu | - | `app/check-in-station/page.tsx` |
@@ -108,20 +114,27 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/information-forms` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/information-forms/page.tsx` |
 | `/information-forms/responses` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/information-forms/responses/page.tsx` |
 | `/more` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/page.tsx` |
+| `/more/attendance-points` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/attendance-points/page.tsx` |
 | `/more/attendee-configuration` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/attendee-configuration/page.tsx` |
+| `/more/baptism-follow-up` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/baptism-follow-up/page.tsx` |
+| `/more/budget` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/budget/page.tsx` |
 | `/more/club-assignments` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/club-assignments/page.tsx` |
-| `/more/club-forms` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/club-forms/page.tsx` |
-| `/more/club-forms/[submissionId]` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/club-forms/[submissionId]/page.tsx` |
+| `/more/club-forms` | More directory | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/more/club-forms/page.tsx` |
+| `/more/club-forms/[submissionId]` | More directory | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/more/club-forms/[submissionId]/page.tsx` |
+| `/more/club-teachers` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/club-teachers/page.tsx` |
 | `/more/clubs` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/clubs/page.tsx` |
 | `/more/clubs/[organizationId]` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/clubs/[organizationId]/page.tsx` |
 | `/more/clubs/reports` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/clubs/reports/page.tsx` |
 | `/more/clubs/reports/[organizationId]/[month]` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/clubs/reports/[organizationId]/[month]/page.tsx` |
+| `/more/debrief` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/debrief/page.tsx` |
 | `/more/emergency-plan` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/emergency-plan/page.tsx` |
 | `/more/emergency-plan/print` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/emergency-plan/print/page.tsx` |
 | `/more/event-content` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/event-content/page.tsx` |
 | `/more/event-health` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/event-health/page.tsx` |
 | `/more/event-patches` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/event-patches/page.tsx` |
+| `/more/event-scoring` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/event-scoring/page.tsx` |
 | `/more/event-settings` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/event-settings/page.tsx` |
+| `/more/event-staffing` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/event-staffing/page.tsx` |
 | `/more/features` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/features/page.tsx` |
 | `/more/health` | Event sidebar | Events (inside an event) | Reports | Operational health | More, This event | Event menu | - | `app/(workspace)/more/health/page.tsx` |
 | `/more/health-records/[organizationId]/[memberId]` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/health-records/[organizationId]/[memberId]/page.tsx` |
@@ -129,11 +142,12 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/more/honors/instructors` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/honors/instructors/page.tsx` |
 | `/more/honors/rosters` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/honors/rosters/page.tsx` |
 | `/more/honors/schedule` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/honors/schedule/page.tsx` |
+| `/more/inspections` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/inspections/page.tsx` |
 | `/more/issued-assets` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/issued-assets/page.tsx` |
 | `/more/issued-assets/closeout` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/issued-assets/closeout/page.tsx` |
 | `/more/kitchen-report` | Page link | Events (inside an event) | Reports | Kitchen report | More, This event | Event menu | - | `app/(workspace)/more/kitchen-report/page.tsx` |
 | `/more/kitchen-report/closeout` | Page link | Events (inside an event) | Reports | Kitchen report | More, This event | Event menu | - | `app/(workspace)/more/kitchen-report/closeout/page.tsx` |
-| `/more/kitchen-report/counts` | Event sidebar | Events (inside an event) | Reports | Kitchen counts | More, This event | Event menu | - | `app/(workspace)/more/kitchen-report/counts/page.tsx` |
+| `/more/kitchen-report/counts` | Event sidebar | Events (inside an event) | Reports | Kitchen report | More, This event | Event menu | - | `app/(workspace)/more/kitchen-report/counts/page.tsx` |
 | `/more/kitchen-report/scanner-import` | Page link | Events (inside an event) | Reports | Kitchen report | More, This event | Event menu | - | `app/(workspace)/more/kitchen-report/scanner-import/page.tsx` |
 | `/more/ledger-health` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/more/ledger-health/page.tsx` |
 | `/more/lodging` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/lodging/page.tsx` |
@@ -155,12 +169,12 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/more/reports/printouts` | Page link | Events (inside an event) | Reports | Printouts | More, This event | Event menu | - | `app/(workspace)/more/reports/printouts/page.tsx` |
 | `/more/tags` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/tags/page.tsx` |
 | `/more/team-results` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/team-results/page.tsx` |
-| `/overview` | Event sidebar | Events (inside an event) | Event home | Dashboard | More, This event | Event menu | - | `app/(workspace)/overview/page.tsx` |
+| `/overview` | Event sidebar | Events (inside an event) | Event home | Event home | More, This event | Event menu | - | `app/(workspace)/overview/page.tsx` |
 | `/people` | Event sidebar | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/page.tsx` |
 | `/people/attendees` | More directory | Events (inside an event) | Registrations | Attendee list | More, This event | Event menu | - | `app/(workspace)/people/attendees/page.tsx` |
 | `/people/directory-review` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/directory-review/page.tsx` |
 | `/people/duplicates` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/duplicates/page.tsx` |
-| `/people/matches` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/matches/page.tsx` |
+| `/people/matches` | Page link | Admin | System administration | - | More, Areas | Admin menu | - | `app/(workspace)/people/matches/page.tsx` |
 | `/people/pending-teams` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/pending-teams/page.tsx` |
 | `/people/responsible-adults` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/responsible-adults/page.tsx` |
 | `/people/review-queues` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/review-queues/page.tsx` |
@@ -170,7 +184,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/select-event` | Existing page link | Home | none (Help, Profile and pages no tab lists light Home and no tab) | - | More | Home menu | - | `app/select-event/page.tsx` |
 | `/staff` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/staff/page.tsx` |
 
-160 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
+175 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
 
 ## Query states that move a page to another tab or view
 
@@ -178,9 +192,8 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | --- | --- | --- | --- |
 | `/admin/clubs/summary` | Clubs | Club summary | All clubs |
 | `/admin/clubs/summary?view=events` | Clubs | Club summary | Club events |
-| `/admin/clubs/summary?view=records` | Clubs | Monthly Records | - |
-| `/admin/clubs/summary?view=points` | Clubs | Monthly records | Points |
-| `/admin/clubs/reports/year-end` | Clubs | Monthly records | Club Year-End Reports |
+| `/admin/clubs/summary?view=records` | Clubs | Monthly Records | Monthly Records |
+| `/admin/clubs/summary?view=points` | Clubs | Monthly Records | Points |
 | `/finance` | Events (inside an event) | Money | Payments |
 | `/finance?filter=BALANCE` | Events (inside an event) | Money | Balances due |
 
@@ -209,7 +222,7 @@ Each Admin tab (Events, Clubs, People, Forms, Catalogs and settings) opens its o
 | Event module requests (`/admin/feature-requests`) | The Event module requests section of the System administration dashboard (`/admin`); it is the page's own title now |
 | Club invites, Sterling Volunteers | Views of the Clubs tabs New club applications and Club administration |
 | Import clubs, Import health records | Views of the Clubs tab Club summary (the Club directory), as steps: Preview, Review, Results (#1589) |
-| Archived events (`/archived-events`) | Events tab for system administrators and Event Administrators, and the event bar's Archived events link beside the switcher (an icon on a phone, #1734), for everyone else |
+| Archived events (`/archived-events`) | Events tab for system administrators and Event Administrators, and the event bar's link for everyone else |
 
 ## Event setup (#1586)
 

@@ -30,6 +30,10 @@ function eventApiError(error: unknown) {
     return Response.json({ error: error.code, message: error.message }, { status: error.code === "ENTRY_NOT_FOUND" ? 404 : 409 });
   }
   if (error instanceof EventOperationError) {
+    // A map pin that points at a missing or inactive organization is a bad request on that field, not a conflict (#1212).
+    if (error.code === "EVENT_MAP_SITE_INVALID") {
+      return Response.json({ error: error.code, message: error.message, issues: [{ path: ["mapSiteOrganizationId"], message: error.message }] }, { status: 400 });
+    }
     return Response.json(
       { error: error.code, message: error.message },
       { status: error.code === "EVENT_NOT_FOUND" ? 404 : 409 }

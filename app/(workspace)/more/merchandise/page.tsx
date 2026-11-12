@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
+import { paginate, parsePageParam } from "@/lib/pagination";
+import { serverSort, sortRows } from "@/lib/list-sort";
+import { MERCHANDISE_ORDERS_SORT_COLUMNS } from "@/lib/staff-sort-columns";
+import { MerchandiseOrdersPanel } from "@/components/merchandise-orders-panel";
+import { canViewMerchandiseOrders, listMerchandiseOrders } from "@/modules/merchandise/order-list";
 import { MerchandiseAdminWorkspace } from "@/components/merchandise-admin-workspace";
 import { PageHeader } from "@/components/page-header";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -10,9 +15,10 @@ export const metadata: Metadata = { title: staffPageTitles.merchandise };
 export default async function MerchandisePage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const requested = (await searchParams).event;
+  const query = await searchParams;
+  const requested = typeof query.event === "string" ? query.event : undefined;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("CONFIGURE_EVENT")) {
     return (
@@ -22,5 +28,29 @@ export default async function MerchandisePage({
       </>
     );
   }
-  return <MerchandiseAdminWorkspace eventId={event.id} />;
+  const orderList = canViewMerchandiseOrders(permissions) ? await listMerchandiseOrders(event.id) : null;
+  const sorting = serverSort("/more/merchandise", query, MERCHANDISE_ORDERS_SORT_COLUMNS, { key: "date", dir: "desc" });
+  const sorted = orderList
+    ? sortRows(orderList.orders, sorting.order.key, sorting.order.dir, {
+        date: (order) => order.createdAt,
+        registration: (order) => order.confirmationCode,
+        purchaser: (order) => order.purchaserName,
+        total: (order) => order.totalCents,
+        status: (order) => order.statusWord,
+      })
+    : [];
+  const slice = paginate(sorted, parsePageParam(typeof query.page === "string" ? query.page : undefined), 25);
+  const pageHref = (page: number) => {
+    const params = new URLSearchParams();
+    for (const [name, value] of Object.entries(query)) if (typeof value === "string" && name !== "page") params.set(name, value);
+    if (page > 1) params.set("page", String(page));
+    const text = params.toString();
+    return `/more/merchandise${text ? `?${text}` : ""}`;
+  };
+  return (
+    <>
+      <MerchandiseAdminWorkspace eventId={event.id} />
+      {orderList && <MerchandiseOrdersPanel pageHref={pageHref} slice={slice} sorting={sorting} totals={orderList.totals} />}
+    </>
+  );
 }

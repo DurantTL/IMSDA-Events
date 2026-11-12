@@ -1,5 +1,6 @@
 import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
+import { isCalendarPagePath } from "@/modules/calendar/calendar-href";
 import { CalendarDays, ChevronRight } from "lucide-react";
 import { BrandLink } from "@/components/brand-link";
 import { PublicExploreNav } from "@/components/public-explore-nav";
@@ -21,6 +22,7 @@ import { listHomepageMinistries } from "@/modules/system-admin/homepage-ministri
 import { getPublicHelpContact } from "@/modules/system-admin/platform-settings";
 import styles from "@/components/public-home-page.module.css";
 
+// Plain anchors lead to /calendar: its map needs the page's own Content-Security-Policy (#1212).
 const fullCalendarHref = "/calendar?view=list";
 const fullYearHref = "/calendar?view=year";
 
@@ -73,7 +75,7 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
           {featured.map((item) => (
             <EventPhotoCard image={eventCardImage(item, cardImages)} item={item} key={item.key} transitionName={featuredNames.get(item.key)} variant="featured" />
           ))}
-        </ul> : <p className={styles.empty}>No events are scheduled yet. <Link href="/calendar">Explore the calendar</Link> for other conference dates.</p>}
+        </ul> : <p className={styles.empty}>No events are scheduled yet. <a href="/calendar">Explore the calendar</a> for other conference dates.</p>}
       </section>
     ),
     announcements: (heading) => announcements.length > 0 && (
@@ -94,7 +96,7 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
       <section aria-labelledby="home-season-heading" className={`home-season home-season-ribbon ${styles.season}`} key="season-ribbon">
         <div className="home-season-head">
           <h2 id="home-season-heading">{heading}</h2>
-          <Link className="event-photo-see-all" href={fullYearHref}>See the full year <ChevronRight size={16} aria-hidden="true" /></Link>
+          <a className="event-photo-see-all" href={fullYearHref}>See the full year <ChevronRight size={16} aria-hidden="true" /></a>
         </div>
         <details className={styles.seasonDetails}><summary>Explore the six-month schedule</summary><div className="season-ribbon">
           <div aria-hidden="true" className="season-months-row">
@@ -141,7 +143,7 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
         <ul className="home-places-list">
           {tiles.map((tile) => (
             <li key={tile.position}>
-              <Link className="home-place" href={tile.href}>
+              <PlaceLink className="home-place" href={tile.href}>
                 <span className="home-place-icon"><HomepageMinistryIconView icon={tile.icon} /></span>
                 <span className="home-place-text">
                   <strong>{tile.name}</strong>
@@ -150,7 +152,7 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
                   {tile.closing && <span className="home-place-flag">{tile.closing.line}</span>}
                 </span>
                 <ChevronRight size={20} aria-hidden="true" />
-              </Link>
+              </PlaceLink>
             </li>
           ))}
         </ul>
@@ -221,9 +223,9 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
               ))}
             </ol>
             <p className="home-more">
-              <Link className="primary-button home-calendar-button" href={fullCalendarHref}>
+              <a className="primary-button home-calendar-button" href={fullCalendarHref}>
                 <CalendarDays size={18} aria-hidden="true" /> See the full calendar
-              </Link>
+              </a>
             </p>
             <p className="home-more">
               <Link className="home-events-link" href="/events">See all events open for registration</Link>
@@ -284,4 +286,9 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
       </div>
     </Wrapper>
   );
+}
+
+/** A ministry tile's link: a full page load into the calendar (its map needs the calendar's own policy, #1212), else next/link. */
+function PlaceLink({ href, className, children }: { href: string; className: string; children: React.ReactNode }) {
+  return isCalendarPagePath(href) ? <a className={className} href={href}>{children}</a> : <Link className={className} href={href}>{children}</Link>;
 }

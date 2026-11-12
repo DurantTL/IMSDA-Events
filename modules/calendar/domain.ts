@@ -7,6 +7,8 @@
 import { publicStatusLine, type PublicCapacityStatus } from "@/modules/events/public-registration-status";
 import { CONFERENCE_TIME_ZONE, formatInTimeZone, shortZoneName } from "@/modules/calendar/conference-format";
 
+import type { CalendarMapPoint } from "@/modules/calendar/map-point";
+
 export { CONFERENCE_TIME_ZONE };
 
 export type CalendarItemStatus = "SCHEDULED" | "POSTPONED" | "CANCELLED";
@@ -37,6 +39,8 @@ export type CalendarItem = {
   /** Only for events (#1251): the last day registration is open (inclusive), which the homepage's closing-soon flags count down to. */
   registrationClosesOn?: string | null;
   clubEvent?: boolean;
+  /** Only for events (#1212): the host church or site's map location, when the event has one with coordinates. Events without it are not on the map. */
+  mapPoint?: CalendarMapPoint;
   /** The event's time zone, so a "opens in N days" count uses the event's own today (#1209). */
   registrationTimeZone?: string;
   /** Only for events (#1217): clubs register through the club portal (club audience with an organization invoice). */

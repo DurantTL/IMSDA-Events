@@ -17,6 +17,7 @@ import {
   type RegistrationFormField,
 } from "@/modules/forms/definition";
 
+import { registrationMerchandiseSchema } from "@/modules/merchandise/registration-order-schema";
 import { registrationLodgingSchema } from "@/modules/lodging/preferences-domain";
 
 const publicAttendeeInputSchema = z.object({
@@ -41,6 +42,8 @@ export const publicRegistrationInputSchema = z.object({
    * where the event collects lodging; decided on the server (full types refused, price added to the total).
    */
   lodging: registrationLodgingSchema.optional(),
+  /** Optional merchandise (#146): variant ids and quantities only. Ordered separately, priced on the server, not charged with the registration. */
+  merchandise: registrationMerchandiseSchema.optional(),
   website: z.literal("", { error: "We couldn't send this form. Clear your browser's autofill and try again." }).optional(),
 }).strict().superRefine((input, context) => {
   const clientIds = new Set<string>();
@@ -78,6 +81,8 @@ export type PublicRegistrationIssue = {
   path: string;
   attendeeIndex: number | null;
   message: string;
+  /** A refused merchandise price: the size and the price it has now (#146). */
+  merchandise?: { variantId: string; currentUnitPriceCents: number };
 };
 
 export type PublicContactIdentity = {

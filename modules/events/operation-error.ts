@@ -1,6 +1,6 @@
 export class EventOperationError extends Error {
   constructor(
-    public readonly code: "EVENT_NOT_FOUND" | "EVENT_NOT_READY" | "EVENT_HAS_SPONSORED_PROMO_CODES" | "EVENT_BUSY" | "EVENT_CHANGED" | "EVENT_LIFECYCLE_REFUSED",
+    public readonly code: "EVENT_NOT_FOUND" | "EVENT_NOT_READY" | "EVENT_HAS_SPONSORED_PROMO_CODES" | "EVENT_BUSY" | "EVENT_CHANGED" | "EVENT_LIFECYCLE_REFUSED" | "EVENT_MAP_SITE_INVALID",
     message: string,
   ) {
     super(message);

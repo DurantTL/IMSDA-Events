@@ -1,7 +1,9 @@
 # Navigation map (#428)
 
 How back links, "reached from more than one place," and the staff nav
-groupings work, so later pages follow the same pattern.
+groupings work, so later pages follow the same pattern. For the list of every
+page, who it is for and where it is in the menus, see the site map
+([SITE-MAP.md](SITE-MAP.md), #1558).
 
 ## Staff workspaces (#1565)
 
