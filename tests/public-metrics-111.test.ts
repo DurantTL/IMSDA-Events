@@ -235,7 +235,9 @@ describe("the summary and who can see it", () => {
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: "SYSTEM_ADMIN" } });
     const html = renderToStaticMarkup(createElement("div", null, await PublicAnalyticsPage({ searchParams: Promise.resolve({ days: "90", funnelSort: "c1", funnelDir: "desc" }) })));
     expect(html).toContain("last 90 days");
-    expect(html).toContain('aria-current="page"');
+    // The section tab is the one "page"; the chosen period is marked "true".
+    expect(html.match(/aria-current="true"/g)).toHaveLength(1);
+    expect(html).not.toContain('aria-current="page"');
     expect(html).toContain("Last 12 months");
     // Period links keep the table sort and change only `days`; 30 days drops it.
     expect(html).toContain('href="/admin/analytics?funnelSort=c1&amp;funnelDir=desc"');

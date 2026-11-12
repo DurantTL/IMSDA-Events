@@ -91,7 +91,7 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
         />
         <section aria-labelledby="analytics-intro" className="panel">
           <div className="section-heading"><div><p className="eyebrow">{formatDateRange(summary.from, summary.to)}</p><h2 id="analytics-intro">What is counted</h2></div></div>
-          <StaffViewStrip label="Time period" views={analyticsPeriods.map((period) => ({ key: String(period), label: periodLabels[period], href: periodHref(search, period), current: period === days }))} />
+          <StaffViewStrip choice label="Time period" views={analyticsPeriods.map((period) => ({ key: String(period), label: periodLabels[period], href: periodHref(search, period), current: period === days }))} />
           <p className={`field-help ${styles.help}`}>
             Daily counts only. Nothing here identifies a person, a device, a search or a private event.
             Visitors who send a Global Privacy Control or Do Not Track signal are not counted, and the staff workspace is never measured. Rows older than 400 days are deleted.
