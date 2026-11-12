@@ -11,6 +11,7 @@ import { HubCardGroup } from "@/components/admin-hub";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { canAdministerClubOrganization } from "@/modules/organizations/access";
 import { clubPageHref, clubRelatedCards, directoryReturnHref } from "@/modules/club-reports/club-page-links";
+import { loadClubCardStatuses } from "@/modules/club-reports/club-card-statuses";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listClubImports } from "@/modules/club-imports/move-year";
 import { staffClubYearView } from "@/modules/club-rosters/domain";
@@ -63,13 +64,17 @@ export default async function StaffOpenClubPage({
     : year === view.currentClubYear ? selfHref : `${selfHref}?year=${encodeURIComponent(year)}`);
   // Directors, profile and report pages go back to this page in this year (and on to the directory view).
   const fromHere = `?from=${encodeURIComponent(clubPageHref(organizationId, view.clubYear, directoryHref))}`;
+  const linksViewer = { canAdministerClub: await canAdministerClubOrganization(user, organizationId), clubsAdministration: true };
+  const counts = await loadClubCardStatuses(organizationId, view.clubYear, { ...linksViewer, clubActive: club.isActive });
   const cards = clubRelatedCards({
     organizationId,
     clubName: club.name,
     clubActive: club.isActive,
+    clubHasChurch: club.parentOrganization !== null,
     clubYear: view.clubYear,
     directoryHref,
-    viewer: { canAdministerClub: await canAdministerClubOrganization(user, organizationId), clubsAdministration: true },
+    counts,
+    viewer: linksViewer,
   });
 
   return (

@@ -1,6 +1,8 @@
+import { rosterYearView } from "@/modules/club-rosters/domain";
 import { safeReturnTo } from "@/lib/return-to";
 import { clubSummaryAnchors, clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
-import type { HubCard } from "@/modules/system-admin/admin-hubs-model";
+import { adminsStatus, honorsStatus, profileStatus, recordsStatus, type ClubCardCounts } from "@/modules/club-reports/club-card-status-domain";
+import { UNAVAILABLE_STATUS, type CardStatus, type HubCard } from "@/modules/system-admin/admin-hubs-model";
 
 /**
  * Links around the selected club page (#1587): pure, no database access, no authorization of its own beyond the gate it
@@ -78,19 +80,24 @@ export type ClubLinksViewer = {
 };
 
 /**
- * The "This club" cards: the destinations the page already linked, in the hub card shape. Plain descriptions, no status
- * (no read on this page supplies one), so nothing here can show a number that was not read. A card the viewer could not
- * open is left out; one to four cards, so the row always fills.
+ * The "This club" cards: the destinations the page already linked, in the hub card shape, still pure. Each carries a status
+ * built from plain numbers handed in (`counts`, from `loadClubCardStatuses`): a count that failed to read (`null`) shows
+ * "Unavailable", one that was not read at all shows no status, so nothing here can show a number that was not read. The
+ * profile status comes from `clubActive` and `clubHasChurch`. A card the viewer could not open is left out; one to four
+ * cards, so the row always fills.
  */
-export function clubRelatedCards(input: { organizationId: string; clubName: string; clubActive?: boolean; clubYear: string; directoryHref?: string | null; viewer: ClubLinksViewer }): HubCard[] {
-  const { organizationId, clubName, clubYear, viewer } = input;
+export function clubRelatedCards(input: { organizationId: string; clubName: string; clubActive?: boolean; clubHasChurch?: boolean; clubYear: string; directoryHref?: string | null; counts?: ClubCardCounts; viewer: ClubLinksViewer }): HubCard[] {
+  const { organizationId, clubName, clubYear, viewer, counts = {} } = input;
+  const statusOf = <T,>(value: T | null | undefined, make: (value: T) => CardStatus): CardStatus | null =>
+    value === undefined ? null : value === null ? UNAVAILABLE_STATUS : make(value);
+  const profile = input.clubActive === undefined || input.clubHasChurch === undefined ? null : profileStatus({ isActive: input.clubActive, hasChurch: input.clubHasChurch });
   const id = encodeURIComponent(organizationId);
   const from = encodeURIComponent(clubPageHref(organizationId, clubYear, input.directoryHref));
   const cards: HubCard[] = [];
   if (viewer.canAdministerClub) {
-    cards.push({ href: `/admin/organizations/${id}/directors?from=${from}`, title: "Club admins", description: "Who can sign in to run this club as its director.", status: null });
-    cards.push({ href: `/admin/organizations/${id}/profile?from=${from}`, title: "Club profile", description: "The club's name, sponsoring church and contact details.", status: null });
-    cards.push({ href: `/admin/organizations/${id}/club/honors?year=${encodeURIComponent(clubYear)}`, title: "Honors", description: "Honors this club's members have earned. View only.", status: null });
+    cards.push({ href: `/admin/organizations/${id}/directors?from=${from}`, title: "Club admins", description: "Who can sign in to run this club as its director.", status: statusOf(counts.admins, adminsStatus) });
+    cards.push({ href: `/admin/organizations/${id}/profile?from=${from}`, title: "Club profile", description: "The club's name, sponsoring church and contact details.", status: profile });
+    cards.push({ href: `/admin/organizations/${id}/club/honors?year=${encodeURIComponent(rosterYearView(clubYear).clubYear)}&from=${from}`, title: "Honors", description: "Honors this club's members have earned. View only.", status: statusOf(counts.honors, honorsStatus) });
   }
   // The records view lists active clubs only, so an inactive club would not be found there: no card.
   if (viewer.clubsAdministration && input.clubActive !== false) {
@@ -99,7 +106,7 @@ export function clubRelatedCards(input: { organizationId: string; clubName: stri
       href: `${clubSummaryHref({ clubYear, view: "records", query: clubName })}&from=${from}#${clubSummaryAnchors.records}`,
       title: "Monthly Records",
       description: "This club's monthly reports for the club year, found by its name.",
-      status: null,
+      status: statusOf(counts.records, recordsStatus),
     });
   }
   return cards;
