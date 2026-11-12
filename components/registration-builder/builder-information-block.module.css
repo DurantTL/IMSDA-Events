@@ -1,11 +1,11 @@
 /*
  * .field-help has a negative top margin, and the shared `.app-shell … + .field-help` rules outrank a single class,
- * so the reset is scoped under the settings section (with the element) to win.
+ * so the reset is scoped under the settings section to win.
  */
-.settings p.help {
+.settings .help:global(.field-help) {
   margin: 4px 0 0;
 }
 
-.settings p.help + label {
+.settings .help:global(.field-help) + label {
   margin-top: 12px;
 }
