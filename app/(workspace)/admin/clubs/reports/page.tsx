@@ -9,7 +9,7 @@ import { ClubReportsConference } from "@/components/club-reports-conference";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { calendarDateIn } from "@/modules/calendar/domain";
-import { chooseReportMonth } from "@/modules/club-reports/clubs-admin-home-model";
+import { chooseReportMonth, clubsAdminHrefs } from "@/modules/club-reports/clubs-admin-home-model";
 import { clubYearMonths } from "@/modules/club-reports/domain";
 import { getAreaClubsSummary } from "@/modules/club-reports/area-summary-repository";
 import { listClubReportsForYear } from "@/modules/club-reports/repository";
@@ -69,7 +69,8 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
   const yearLinkTail = toReviewRows ? `&review=${REVIEW_FILTER}` : "";
   return (
     <>
-      <AdminPageHeader path="/admin/clubs/reports" year={clubYear} />
+      {/* The way back keeps the year in every section, not only the Clubs view (#1588). */}
+      <AdminPageHeader path="/admin/clubs/reports" year={clubYear} back={{ href: clubsAdminHrefs(clubYear).records, label: "Back to Monthly Records" }} />
       <StaffPageHeader
         extra={(
           <>
@@ -77,7 +78,7 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
             {clubYear !== current && <Link className={`secondary-button ${navStyles.target}`} href={`/admin/clubs/reports?year=${label(start + 1)}${yearLinkTail}`}>{label(start + 1)} →</Link>}
           </>
         )}
-        primary={<Link className={`secondary-button ${navStyles.target}`} href="/admin/clubs/reports/year-end">Year-End Reports</Link>}
+        primary={<Link className={`secondary-button ${navStyles.target}`} href={`/admin/clubs/reports/year-end?year=${clubYear}`}>Year-End Reports</Link>}
       />
       {toReviewRows ? (
         <ClubRecordsToReview clubYear={clubYear} month={reviewMonth} rows={toReviewRows} />
