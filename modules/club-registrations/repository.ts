@@ -4,6 +4,7 @@ import { CLUB_EVENT_GATE, clubMayUseEvent } from "@/modules/club-registrations/e
 import { Prisma, RegistrationFormStatus } from "@prisma/client";
 import { closesRegistration, effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { getPrisma } from "@/lib/prisma";
+import { sendBaptismFollowUpNotices } from "@/modules/baptism-follow-up/notice";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { assertTeachersMeetRule, ClubTeacherError } from "@/modules/club-teachers/repository";
 import { openBirthDate } from "@/modules/club-rosters/birth-dates";
@@ -1364,16 +1365,24 @@ export async function submitClubRegistration(
   const team = resolveTeamName(teamSettings, options.teamName);
   if (!team.ok) throw new ClubRegistrationError("TEAM_INVALID", team.message);
   const draftKey = clubDraftKey(teamSettings, options.draftKey);
-  return submitPublicRegistration(event.slug, form.slug, input, now, {
+  const submitted: { registrationId: string | null } = { registrationId: null };
+  const confirmation = await submitPublicRegistration(event.slug, form.slug, input, now, {
     organizationId,
     ...clubSubmissionAttribution(actor),
     ...(team.teamName !== null ? { team: { name: team.teamName, key: team.teamKey, draftKey } } : {}),
     // Picked, locked, and capacity-checked inside the submit transaction (#413).
     locationId: options.locationId ?? null,
     ...(options.report ? { report: options.report } : {}),
-    ...(options.registered ? { registered: options.registered } : {}),
+    registered: (registrationId: string) => {
+      submitted.registrationId = registrationId;
+      options.registered?.(registrationId);
+    },
     prepareAttendees: clubAttendeePreparer(organizationId, actor, draftKey),
   }, options.requestContext);
+  // Baptism follow-up (#1680): after the registration is saved, never on a draft. It does nothing unless the event has the
+  // module on, and it never throws, so a failure here cannot undo the submission.
+  if (submitted.registrationId) await sendBaptismFollowUpNotices({ eventId, organizationId, registrationId: submitted.registrationId });
+  return confirmation;
 }
 
 export function recordFromJson(value: unknown): Record<string, unknown> {
@@ -1848,6 +1857,8 @@ export async function amendClubRegistration(
       engineOptions,
     );
     const edited = clubEditResult(response);
+    // Baptism follow-up (#1680): names new since the last notice, once the edit is saved. Never throws.
+    await sendBaptismFollowUpNotices({ eventId, organizationId, registrationId });
     // Who needs the Area Coordinator's permission after this edit, told to the director on the result (#809).
     return { ...edited, result: { ...edited.result, permissionNotices: await permissionNoticesForRegistration(registrationId) } };
   } catch (error) {

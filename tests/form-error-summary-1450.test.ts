@@ -12,6 +12,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { AttendeeProfileForm } from "@/components/attendee-profile-form";
+import { BaptismFollowUpPanel } from "@/components/baptism-follow-up-panel";
 import { ClubFormRosterAdd } from "@/components/club-form-roster-add";
 import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
 import { InvitePerson } from "@/components/invite-person";
@@ -205,6 +206,56 @@ describe("invite: a server problem with a field", () => {
   });
 });
 
+describe("baptism follow-up: lead addresses (#1680)", () => {
+  async function save(response: { status: number; body: unknown }) {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(response.body), { status: response.status })));
+    mounted = await mount(createElement(BaptismFollowUpPanel, { endpoint: "/api/events/e1/baptism-follow-up", initialEmails: [] }));
+    const form = document.querySelector("form")!;
+    await typeInto(form.querySelector<HTMLTextAreaElement>("#baptism-lead-emails")!, "nope");
+    await submitForm(form);
+    await flush(0);
+    return form;
+  }
+
+  it("puts a problem with the addresses on the field, through the linked summary, and clears it on edit", async () => {
+    try {
+      const form = await save({ status: 422, body: { error: "INVALID_ADDRESSES", message: "Address 1: Enter a valid email address." } });
+      const { links } = expectLinkedSummary(document.body, 1, /^1 thing to fix before saving$/);
+      expect(links[0]!.getAttribute("href")).toBe("#baptism-lead-emails");
+      const field = form.querySelector("#baptism-lead-emails")!;
+      expect(field.getAttribute("aria-invalid")).toBe("true");
+      expect(field.getAttribute("aria-describedby")).toContain("baptism-lead-emails-error");
+      expect(form.querySelector("#baptism-lead-emails-error")?.className).toBe("field-error-message");
+      // One alert only: no second copy under the button.
+      expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1);
+      await typeInto(field as HTMLTextAreaElement, "lead@example.test");
+      expect(summaryOf(document.body)).toBeNull();
+      expect(field.getAttribute("aria-invalid")).toBeNull();
+      expect(form.querySelector("#baptism-lead-emails-error")).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it.each([
+    [403, "PERMISSION_DENIED"],
+    [404, "EVENT_NOT_FOUND"],
+    [422, "MODULE_OFF"],
+    [500, "BAPTISM_FOLLOW_UP_FAILED"],
+  ])("keeps a %i (%s) as a form-level message with no field error", async (status, code) => {
+    try {
+      const form = await save({ status, body: { error: code, message: "Something else is wrong." } });
+      const field = form.querySelector("#baptism-lead-emails")!;
+      expect(field.getAttribute("aria-invalid")).toBeNull();
+      expect(summaryOf(document.body)).toBeNull();
+      expect(form.querySelector("#baptism-lead-emails-error")).toBeNull();
+      expect(document.body.textContent).toContain("Not saved: Something else is wrong.");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe("roster add review (club form)", () => {
   it("uses the same summary pattern", async () => {
     const review = {
@@ -287,6 +338,7 @@ describe("every converted form file", () => {
     "components/event-settings-workspace.tsx",
     "components/club-form-roster-add.tsx",
     "components/club-form-fill-in.tsx",
+    "components/baptism-follow-up-panel.tsx",
   ])("%s has noValidate and the linked summary, and no per-field alert", (file) => {
     const source = read(file);
     expect(source).toMatch(/noValidate/);
