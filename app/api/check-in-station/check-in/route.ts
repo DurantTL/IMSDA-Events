@@ -1,7 +1,7 @@
 import { logError } from "@/lib/logger";
 import { stationCheckInSchema } from "@/modules/checkin-stations/domain";
 import { stationPostHandler } from "@/modules/checkin-stations/http";
-import { checkInStationFamily } from "@/modules/checkin-stations/service";
+import { checkInStationFamily, stationPaymentHistoryAfterWrite } from "@/modules/checkin-stations/service";
 import { sealHealthSnapshotAfterCheckIn } from "@/modules/health-records/snapshot-hooks";
 
 export const POST = stationPostHandler(
@@ -18,6 +18,7 @@ export const POST = stationPostHandler(
         logError("Health snapshot after station check-in failed", error);
       }
     }
-    return { results };
+    // The reason (if one was needed) is now part of the history; a failed read never fails the check-in.
+    return { results, ...(await stationPaymentHistoryAfterWrite(station.station.eventId, input.registrationId)) };
   },
 );
