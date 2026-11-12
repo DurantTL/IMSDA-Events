@@ -314,6 +314,8 @@ const pages: PageSpec[] = [
   club("health", "/health"),
   // Optional roster health flags (#1709): switched on for the club by this script's seed.
   club("roster-health", "/roster-health"),
+  // Optional staff training records (#1697): switched on for the club by this script's seed.
+  club("staff-training", "/staff-training"),
   // Area Coordinator.
   { ...area("overview", "/account/area-clubs/overview"), flow: "portal-navigation" },
   area("clubs", "/account/area-clubs/clubs"),
@@ -1516,6 +1518,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   await prisma.clubFormTemplate.updateMany({ where: { key: "can_collecting_report" }, data: { requirement: "NOT_REQUIRED", requiredRoles: [] } }).catch((error: Error) => console.error(`Could not undo the synthetic Required setting: ${error.message}`));
   const orgs = { organizationId: { in: [clubA, clubB] } };
   await prisma.clubOptionalFeature.deleteMany({ where: orgs });
+  await prisma.clubStaffTrainingRecord.deleteMany({ where: orgs });
   const accountIds = [`${P}_account_director`, `${P}_account_registrar`, `${P}_account_reporter`, `${P}_account_area`, `${P}_account_attendee`, `${P}_account_history`];
   // The message files' bytes (#824) live on disk, outside the database; their keys are read before the rows go.
   const messageFileKeys = (await prisma.messageFile.findMany({ where: { eventId: blocksEventId }, select: { storageKey: true } }))
@@ -1744,6 +1747,12 @@ async function seedSynthetic(prisma: PrismaClient) {
     where: { organizationId_featureKey: { organizationId: clubA, featureKey: "roster-health-flags" } },
     update: {},
     create: { organizationId: clubA, featureKey: "roster-health-flags" },
+  });
+  // #1697: staff training records are switched on for the audit club so its page can be audited (undone in cleanupSynthetic).
+  await prisma.clubOptionalFeature.upsert({
+    where: { organizationId_featureKey: { organizationId: clubA, featureKey: "staff-training-records" } },
+    update: {},
+    create: { organizationId: clubA, featureKey: "staff-training-records" },
   });
   // #1229: the director's Forms page has both groups (a family form and a club form), the TLT Application as an open application, and its public page is open.
   await prisma.clubFormTemplate.updateMany({ where: { key: { in: ["off_premises_permission_slip", "club_tlt_application"] } }, data: { enabled: true } });

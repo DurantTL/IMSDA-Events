@@ -2575,6 +2575,7 @@ model Person {
   mergesAsSecondary         PersonMerge[]                       @relation("PersonMergeSecondary")
   anonymization             PersonAnonymization?
   clubRosterMemberships ClubRosterMember[]
+  staffTrainingRecords  ClubStaffTrainingRecord[]
   healthSnapshots       HealthRecordSnapshot[]
   healthSnapshotHolds   HealthSnapshotHold[]
   healthSnapshotBreakGlass HealthSnapshotBreakGlass[]
@@ -2784,6 +2785,7 @@ model Organization {
   attendancePointsOverrides AttendancePointsOverride[]
   clubEventPointAwards ClubEventPointAward[]
   clubOptionalFeatures ClubOptionalFeature[]
+  staffTrainingRecords ClubStaffTrainingRecord[]
   id                   String           @id @default(cuid())
   scholarshipContributions ScholarshipContribution[]
   scholarshipAwards    ScholarshipAward[]
@@ -6285,6 +6287,33 @@ model ClubOptionalFeature {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, featureKey])
+}
+
+/// One certification or workshop a club's director or deputy recorded for an adult on its roster (#1697, optional
+/// feature `staff-training-records`). `kind` is "CERTIFICATION" or "WORKSHOP", validated in code, like the NAD
+/// certification keys (`modules/staff-training/domain.ts`). A certification names one of the five NAD levels in
+/// `certificationKey`; a workshop is a code and title the club typed. Holds no health, contact or identity data.
+/// Exactly one of the two creator columns is set: the attendee account of a director or deputy, or the staff user
+/// acting as the club's director (#442).
+model ClubStaffTrainingRecord {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  personId           String
+  kind               String
+  certificationKey   String?
+  workshopCode       String?
+  workshopTitle      String?
+  completedOn        DateTime @db.Date
+  signedOffBy        String?
+  createdByAccountId String?
+  createdByUserId    String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  person       Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, personId])
 }
 
 /// A club-owned, named roster export format (#490): which columns, in what

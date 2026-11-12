@@ -9,13 +9,17 @@
 
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
-export const CLUB_OPTIONAL_FEATURE_KEYS = ["roster-health-flags"] as const;
+export const CLUB_OPTIONAL_FEATURE_KEYS = ["roster-health-flags", "staff-training-records"] as const;
 export type ClubOptionalFeatureKey = (typeof CLUB_OPTIONAL_FEATURE_KEYS)[number];
 
 export const clubOptionalFeatureDefinitions: Record<ClubOptionalFeatureKey, { title: string; description: string }> = {
   "roster-health-flags": {
     title: "Roster health flags",
     description: "Lists the people on your roster whose record is over a year old or who are missing an emergency contact, a health record, a photo release or a Sterling Volunteers check, with counts on your club Home. The photo release check covers the Pathfinder Photo and Video Release form linked to the roster. It only says that something is missing; it never shows what is in a record.",
+  },
+  "staff-training-records": {
+    title: "Staff training records",
+    description: "Lets your director and deputy record the NAD certifications (Basic Staff, Instructor, Counselor, Secretary/Treasurer, Director) and workshops each adult on your roster has completed, with the date and who signed off. It adds a Staff training page to your club. It is only a record: nothing is required, and other club roles and people outside your club can't see it.",
   },
 };
 
