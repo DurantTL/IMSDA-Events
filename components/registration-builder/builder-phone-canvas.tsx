@@ -24,7 +24,7 @@ function QuestionMenu({ fieldId, onClose, onAction }: { fieldId: string; onClose
     <PhoneSheet title={`Actions for “${label}”`} variant="menu" onClose={onClose}>
       <ul className="fb-phone-menu">
         <li><button type="button" className="fb-btn" onClick={() => { onClose(); onAction("duplicate", sectionIndex, fieldIndex); }}><Copy size={16} aria-hidden="true" /> Duplicate</button></li>
-        {!information && <li><button type="button" className="fb-btn" onClick={() => { onClose(); setLibraryTarget({ fieldId }); }}><BookmarkPlus size={16} aria-hidden="true" /> Save to library</button></li>}
+        {!information && field.type !== "INFORMATION" && <li><button type="button" className="fb-btn" onClick={() => { onClose(); setLibraryTarget({ fieldId }); }}><BookmarkPlus size={16} aria-hidden="true" /> Save to library</button></li>}
         <li><button type="button" className="fb-btn fb-phone-danger" onClick={() => { onClose(); onAction("remove", sectionIndex, fieldIndex); }}><Trash2 size={16} aria-hidden="true" /> Remove</button></li>
       </ul>
     </PhoneSheet>

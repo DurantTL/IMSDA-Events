@@ -144,7 +144,7 @@ async function buildPopulatedSource(): Promise<Fixture> {
   // A church-sponsored code (#545): the sponsor is a billing agreement for this event only and must never be copied.
   await prisma.organization.create({ data: { id: `${P}-sponsor-church`, type: "CHURCH", name: "Clone Check Sponsor Church", normalizedName: "clone check sponsor church" } });
   const promoA = await prisma.promoCode.create({ data: { eventId, code: "EARLY", normalizedCode: "EARLY", discountType: "FIXED_CENTS", discountValue: 500, startsOn: "2027-01-10", endsOn: "2027-02-10", redeemedCount: 7, maximumUses: 100, sponsoringOrganizationId: `${P}-sponsor-church` } });
-  const promoB = await prisma.promoCode.create({ data: { eventId, code: "OPEN", normalizedCode: "OPEN", discountType: "PERCENT_BPS", discountValue: 1000, redeemedCount: 2 } });
+  const promoB = await prisma.promoCode.create({ data: { eventId, code: "OPEN", normalizedCode: "OPEN", discountType: "PERCENT_BPS", discountValue: 1000, redeemedCount: 2, attendeeTypeCodes: ["TEEN"] } });
 
   const honor = await prisma.honor.create({ data: { code: `${P}-honor-1`, name: "Evtclone Knots", normalizedName: `${P} knots` } });
   const honor2 = await prisma.honor.create({ data: { code: `${P}-honor-2`, name: "Evtclone Birds", normalizedName: `${P} birds` } });
@@ -407,6 +407,7 @@ async function run() {
   const promos = await prisma.promoCode.findMany({ where: { eventId: cloneId }, orderBy: { normalizedCode: "asc" } });
   assert(promos.length === 2 && promos.every((promo) => !promo.isActive && promo.redeemedCount === 0 && promo.startsOn === "2028-02-01" && promo.endsOn === "2028-04-30"), "promo codes are copied inactive, unused, with the reviewed window");
   assert(promos.every((promo) => promo.sponsoringOrganizationId === null), "a church sponsor is never copied to the clone");
+  assert(promos.find((promo) => promo.normalizedCode === "OPEN")?.attendeeTypeCodes.join() === "TEEN" && promos.find((promo) => promo.normalizedCode === "EARLY")?.attendeeTypeCodes.length === 0, "an attendee-type restriction is copied with its code (#102)");
   assert(await prisma.promoCode.count({ where: { eventId: sourceId, sponsoringOrganizationId: `${P}-sponsor-church` } }) === 1, "the source keeps its church sponsor");
   assert(promos[0]!.maximumUses === 100 && await prisma.promoCodeRedemption.count({ where: { eventId: cloneId } }) === 0, "promo rules carry over but redemptions do not");
   const offerings = await prisma.honorOffering.findMany({ where: { eventId: cloneId }, include: { session: true } });

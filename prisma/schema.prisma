@@ -919,6 +919,8 @@ model User {
   notificationSettingUpdates NotificationSetting[]    @relation("NotificationSettingUpdatedBy")
   adminAlertFeedReceipts     AdminAlertFeedReceipt[]
   uploadedEventAssets       EventAsset[]              @relation("EventAssetUploadedBy")
+  createdEventImageLibraryImages EventImageLibraryImage[] @relation("EventImageLibraryCreatedBy")
+  retiredEventImageLibraryImages EventImageLibraryImage[] @relation("EventImageLibraryRetiredBy")
   uploadedMessageFiles      MessageFile[]             @relation("MessageFileUploadedBy")
   appliedProgramAssignments ProgramAssignmentRun[]    @relation("ProgramAssignmentAppliedBy")
   clubAssignmentUpdates     ClubEventAssignment[]     @relation("ClubEventAssignmentUpdatedBy")
@@ -1638,16 +1640,50 @@ model EventAsset {
   checksum         String
   storageKey       String   @unique
   uploadedByUserId String?
+  /// The shared image library entry this file was copied from (#1913); null for an ordinary upload.
+  libraryImageId   String?
   createdAt        DateTime @default(now())
 
   event      Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
   uploadedBy User?              @relation("EventAssetUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  libraryImage EventImageLibraryImage? @relation("EventAssetLibraryImage", fields: [libraryImageId], references: [id], onDelete: SetNull)
   links      EventContentLink[]
   blockRefs  EventContentSectionAsset[]
   merchandiseArtworkProducts MerchandiseProduct[] @relation("MerchandiseProductArtwork")
   badgeBackgroundEvents      Event[]              @relation("EventBadgeBackground")
 
   @@index([eventId, createdAt])
+  @@index([libraryImageId])
+}
+
+/// A header image kept in the shared library (#1913). The library holds its own copy of the file (own `storageKey`), so
+/// deleting an event or one of its uploads never breaks it. The source event's title and start are snapshots, so searching
+/// by event name or date keeps working after the event changes. Retiring hides the image from the picker only.
+model EventImageLibraryImage {
+  id                  String    @id @default(cuid())
+  displayName         String
+  contentType         String
+  byteSize            Int
+  checksum            String    @unique
+  storageKey          String    @unique
+  /// Suggested alt text; may be empty.
+  altText             String    @default("")
+  tags                String[]  @default([])
+  sourceEventId       String?
+  sourceEventTitle    String    @default("")
+  sourceEventStartsAt DateTime?
+  createdByUserId     String?
+  createdAt           DateTime  @default(now())
+  retiredAt           DateTime?
+  retiredByUserId     String?
+
+  sourceEvent Event?        @relation("EventImageLibrarySource", fields: [sourceEventId], references: [id], onDelete: SetNull)
+  createdBy   User?         @relation("EventImageLibraryCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  retiredBy   User?         @relation("EventImageLibraryRetiredBy", fields: [retiredByUserId], references: [id], onDelete: SetNull)
+  copies      EventAsset[]  @relation("EventAssetLibraryImage")
+
+  @@index([createdAt])
+  @@index([sourceEventId])
 }
 
 /// One of the six "Find your place" tiles on the public homepage (#1251). Exactly six rows, one per `position` (1 to 6),
@@ -1907,6 +1943,7 @@ model Event {
   contentSections                     EventContentSection[]
   emergencyPlan                       EmergencyPlan?
   assets                              EventAsset[]
+  imageLibraryImages                  EventImageLibraryImage[] @relation("EventImageLibrarySource")
   messageFiles                        MessageFile[]
   registrations                       Registration[]
   attendees                           RegistrationAttendee[]
@@ -3684,6 +3721,11 @@ model PromoCode {
   /// per redemption — what the church owes is computed on demand from
   /// PromoCodeRedemption, like church-billed club registrations (#409).
   sponsoringOrganizationId String?
+  /// Attendee-type restriction (#102): `EventAttendeeType.code` values of this event the code applies to. Empty means
+  /// every attendee type (all codes made before this existed). Codes, not foreign keys, on purpose: deactivating or
+  /// removing a type never blocks, and a type that no longer exists simply matches nobody, so a restriction can only
+  /// narrow, never silently widen to everyone.
+  attendeeTypeCodes    String[]          @default([])
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
@@ -3716,6 +3758,9 @@ model PromoCodeRedemption {
   /// edits, and never touched by an amendment (which rewrites `discountAmountCents` from the form). The church owes
   /// `discountAmountCents + sponsorLodgingChangeCents`; the registrant's own discount stays `discountAmountCents`.
   sponsorLodgingChangeCents    Int               @default(0)
+  /// The code's attendee-type restriction when it was used (#102); empty means it applied to every attendee type.
+  /// An amendment prices the saved code against this, not against the code's later edits.
+  attendeeTypeCodesSnapshot    String[]          @default([])
   pricingDate                  String
   createdAt                    DateTime          @default(now())
 

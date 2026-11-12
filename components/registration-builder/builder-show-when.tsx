@@ -27,6 +27,8 @@ import {
 export const ruleHeadingId = (fieldId: string) => `fb-rule-heading-${fieldId}`;
 
 export function BuilderShowWhen({ field, sectionIndex, fieldIndex }: { field: RegistrationFormField; sectionIndex: number; fieldIndex: number }) {
+  // An Information block (#284) is a block, not a question: it has no answer to keep, require or price.
+  const isBlock = field.type === "INFORMATION";
   const { allFields, canEdit, updateField } = useLoadedBuilder();
   const rule = fieldVisibilityRule(field);
   const choices = ruleControllerChoices(field, allFields);
@@ -77,9 +79,9 @@ export function BuilderShowWhen({ field, sectionIndex, fieldIndex }: { field: Re
 
   return (
     <section className="fb-rule" aria-labelledby={ruleHeadingId(field.id)} data-testid="show-when">
-      <h3 id={ruleHeadingId(field.id)} tabIndex={-1} className="fb-rule-heading">Show this question when</h3>
+      <h3 id={ruleHeadingId(field.id)} tabIndex={-1} className="fb-rule-heading">{isBlock ? "Show this block when" : "Show this question when"}</h3>
       <label className="required-toggle fb-rule-switch" htmlFor={toggleId}>
-        <input id={toggleId} disabled={!canEdit || (!rule && choices.length === 0)} type="checkbox" checked={Boolean(rule)} onChange={(event) => save(event.target.checked ? startRule(field, allFields) : null)} /> Show this question only when…
+        <input id={toggleId} disabled={!canEdit || (!rule && choices.length === 0)} type="checkbox" checked={Boolean(rule)} onChange={(event) => save(event.target.checked ? startRule(field, allFields) : null)} /> {isBlock ? "Show this block only when…" : "Show this question only when…"}
       </label>
       {!rule && choices.length === 0 && <p className="fb-hint">Add another question first. A rule needs a question to look at.</p>}
       {rule && (
@@ -137,7 +139,7 @@ export function BuilderShowWhen({ field, sectionIndex, fieldIndex }: { field: Re
           {sentence && <p className="fb-rule-reads">{sentence}</p>}
         </>
       )}
-      <p className="fb-hint">When this question is hidden, its answer is not kept, not required and not priced.</p>
+      {!isBlock && <p className="fb-hint">When this question is hidden, its answer is not kept, not required and not priced.</p>}
     </section>
   );
 }

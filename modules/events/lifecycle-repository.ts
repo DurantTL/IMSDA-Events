@@ -1,3 +1,4 @@
+import { keepPublishedHeaderImagesForEvent } from "@/modules/events/image-library";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import type { EventPermission } from "@/modules/access/permissions";
@@ -151,7 +152,7 @@ export async function transitionEventLifecycle(input: TransitionEventLifecycleIn
     throw new EventLifecycleError("REASON_TOO_LONG", `The reason can be at most ${LIFECYCLE_REASON_MAX_LENGTH} characters.`);
   }
   const now = input.now ?? new Date();
-  return getPrisma().$transaction(async (tx) => {
+  const result = await getPrisma().$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${input.eventId} FOR UPDATE`;
     const current = await tx.event.findUnique({
       where: { id: input.eventId },
@@ -262,6 +263,10 @@ export async function transitionEventLifecycle(input: TransitionEventLifecycleIn
     });
     return { changed: true, fromState: effective, toState: input.toState, lifecycleVersion: current.lifecycleVersion + 1 };
   });
+  // A banner saved while the event was a draft joins the shared image library once the event is public (#1913).
+  // After the commit, best effort: it never fails or undoes the transition.
+  if (result.changed && isPublicState(result.toState)) await keepPublishedHeaderImagesForEvent(input.eventId);
+  return result;
 }
 
 /** The event's current effective state, its history (newest first) and the moves this actor may make now. */
