@@ -18,7 +18,7 @@ import { isAccountEmailConfigured } from "@/modules/communications/account-email
 import { deliverStaffActivation, type StaffActivationDelivery } from "@/modules/communications/staff-activation";
 import { clubInviteSignUpUrl, createPeopleClubInvite, findOpenClubInvite } from "@/modules/club-imports/invites";
 import { createAreaCoordinatorInvite, findOpenAreaCoordinatorInvite } from "@/modules/organizations/area-coordinator-invites";
-import { parseMinistriesInput } from "@/modules/organizations/area-coordinator-ministries-domain";
+import { normalizeMinistries, parseMinistriesInput } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { CLUB_KINDS } from "@/modules/organizations/club-kind";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import type { GrantItem } from "@/modules/system-admin/people-directory-model";
@@ -144,9 +144,9 @@ function staffGrantItems(access: StaffAccessInput): GrantItem[] {
     ...access.events.map((event) => ({ type: "event", eventId: event.eventId, role: event.role }) as const),
   ];
 }
-function familyGrantItems(access: Pick<Access, "areaCoordinator" | "clubs">): GrantItem[] {
+function familyGrantItems(access: Pick<Access, "areaCoordinator" | "areaCoordinatorMinistries" | "clubs">): GrantItem[] {
   return [
-    ...(access.areaCoordinator ? [{ type: "ac" } as const] : []),
+    ...(access.areaCoordinator ? [{ type: "ac", ministries: normalizeMinistries(access.areaCoordinatorMinistries ?? ["PATHFINDER"]) } as const] : []),
     ...access.clubs.map((club) => ({ type: "club", organizationId: club.organizationId, role: club.role }) as const),
   ];
 }

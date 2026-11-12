@@ -41,6 +41,9 @@ export function CsvImportDialog({
   variant = "account",
   options,
   extraBody,
+  uploadDisabled = false,
+  summary,
+  onOpen,
 }: {
   eyebrow: string;
   help: React.ReactNode;
@@ -57,6 +60,12 @@ export function CsvImportDialog({
   options?: React.ReactNode;
   /** Extra JSON fields sent with the file, read when the file is sent or saved. */
   extraBody?: Record<string, unknown>;
+  /** Turns the upload box off, for example while a required choice in `options` is missing. */
+  uploadDisabled?: boolean;
+  /** One line above the preview and saved tables, for the choices that apply to the whole file. */
+  summary?: React.ReactNode;
+  /** Called each time the dialog opens, so a choice in `options` can start from its default. */
+  onOpen?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [csv, setCsv] = useState<string | null>(null);
@@ -111,6 +120,7 @@ export function CsvImportDialog({
 
 
   async function openFile(file: File) {
+    if (uploadDisabled) return;
     if (!isCsvFile(file)) {
       setError("Drop a .csv file.");
       return;
@@ -123,14 +133,14 @@ export function CsvImportDialog({
   function onDragEnter(event: React.DragEvent<HTMLLabelElement>) {
     event.preventDefault();
     dragDepth.current += 1;
-    if (!busy) setDragging(true);
+    if (!busy && !uploadDisabled) setDragging(true);
   }
 
   function onDrop(event: React.DragEvent<HTMLLabelElement>) {
     event.preventDefault();
     dragDepth.current = 0;
     setDragging(false);
-    if (busy) return;
+    if (busy || uploadDisabled) return;
     const files = event.dataTransfer.files;
     if (!files || files.length === 0) return;
     if (files.length > 1) {
@@ -158,7 +168,7 @@ export function CsvImportDialog({
   return (
     <>
       <ExportLink className="text-button" href={templateHref}><Download aria-hidden="true" size={14} /> {templateLabel}</ExportLink>
-      <button className="text-button" onClick={() => setOpen(true)} type="button"><Upload aria-hidden="true" size={14} /> {uploadLabel}</button>
+      <button className="text-button" onClick={() => { onOpen?.(); setOpen(true); }} type="button"><Upload aria-hidden="true" size={14} /> {uploadLabel}</button>
       {open && (
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) close(); }} role="presentation">
           <section aria-labelledby="csv-import-title" aria-modal="true" className="modal-card roster-csv-dialog" ref={dialogRef} role="dialog" tabIndex={-1}>
@@ -183,12 +193,13 @@ export function CsvImportDialog({
                 >
                   <FileUp aria-hidden="true" size={24} />
                   <strong>{busy ? "Reading…" : dragging ? "Drop the CSV file" : "Drag the CSV file here, or choose it"}</strong>
-                  <input accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={readFile} type="file" />
+                  <input accept=".csv,text/csv" className="sr-only" disabled={busy || uploadDisabled} onChange={readFile} type="file" />
                 </label>
               </>
             )}
             {steps && (
               <>
+                {summary ? <p className="field-help">{summary}</p> : null}
                 <p className="field-help">
                   {done ? "Done." : "Nothing is saved yet."} {counts.ADD} to add, {counts.UPDATE} to update, {counts.SKIP} skipped.
                 </p>

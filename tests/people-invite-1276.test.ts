@@ -281,7 +281,7 @@ describe("an email that already has an account (no duplicates, no linking)", () 
     accounts.push({ id: "acct-pat", email: "pat@example.test", linkedUser: { id: "u-pat" } });
     const body = await (await invite({ systemAdmin: true, areaCoordinator: true, events: [{ eventId: "evt_1", role: "EVENT_ADMIN" }], clubs: [{ organizationId: "club_1", role: "DIRECTOR" }] })).json();
     expect(body.created).toMatchObject({ staffLogin: false, clubInviteIds: [] });
-    expect(body.deferred.personHref).toBe("/admin/people/staff/u-pat?grant=" + encodeURIComponent("sa,e:evt_1:EVENT_ADMIN,ac,c:club_1:DIRECTOR"));
+    expect(body.deferred.personHref).toBe("/admin/people/staff/u-pat?grant=" + encodeURIComponent("sa,e:evt_1:EVENT_ADMIN,ac:PATHFINDER,c:club_1:DIRECTOR"));
     expect(mocks.userCreate).not.toHaveBeenCalled();
     expect(mocks.clubInviteCreate).not.toHaveBeenCalled();
     expect(mocks.acCreate).not.toHaveBeenCalled();
@@ -292,7 +292,7 @@ describe("an email that already has an account (no duplicates, no linking)", () 
   it("defers family-side items to the account page for an existing website account, with no invite", async () => {
     accounts.push({ id: "acct-pat", email: "pat@example.test", linkedUser: null });
     const body = await (await invite({ areaCoordinator: true, clubs: [{ organizationId: "club_1", role: "REPORTER" }] })).json();
-    expect(body.deferred.personHref).toBe("/admin/people/account/acct-pat?grant=" + encodeURIComponent("ac,c:club_1:REPORTER"));
+    expect(body.deferred.personHref).toBe("/admin/people/account/acct-pat?grant=" + encodeURIComponent("ac:PATHFINDER,c:club_1:REPORTER"));
     expect(mocks.clubInviteCreate).not.toHaveBeenCalled();
     expect(mocks.acCreate).not.toHaveBeenCalled();
   });
@@ -321,7 +321,7 @@ describe("an email that already has an account (no duplicates, no linking)", () 
     accounts.push({ id: "acct-pat", email: "pat@example.test", linkedUser: null });
     const body = await (await invite({ clubsAdministrator: true, areaCoordinator: true })).json();
     expect(body.created.staffLogin).toBe(true);
-    expect(body.deferred.personHref).toBe("/admin/people/account/acct-pat?grant=ac");
+    expect(body.deferred.personHref).toBe("/admin/people/account/acct-pat?grant=" + encodeURIComponent("ac:PATHFINDER"));
     expect(mocks.userCreate).toHaveBeenCalledTimes(1);
     expect(mocks.acCreate).not.toHaveBeenCalled();
   });
@@ -563,7 +563,7 @@ describe("accepting an Area Coordinator invite", () => {
     expect(mocks.areaUpsert.mock.calls[0]![0].create).toMatchObject({ ministries: ["ADVENTURER"] });
     expect(mocks.areaUpsert.mock.calls[0]![0].update).toMatchObject({ ministries: ["ADVENTURER"] });
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_GRANTED", metadata: expect.objectContaining({ ministries: ["ADVENTURER"] }) }), expect.anything());
-    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_INVITE_ACCEPTED", metadata: { actorAttendeeAccountId: "acct-acc", ministries: ["ADVENTURER"] } }), expect.anything());
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_INVITE_ACCEPTED", metadata: { actorAttendeeAccountId: "acct-acc", inviteMinistries: ["ADVENTURER"], appliedMinistries: ["ADVENTURER"] } }), expect.anything());
   });
 
   it("keeps the existing ministries when an already active coordinator accepts an invite for others (#843)", async () => {

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { systemRoleText } from "@/modules/access/role-descriptions";
 import { roleLabel } from "@/modules/access/role-display";
+import { ministriesLabel } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import type { GrantPlanRow, GrantPlanState } from "@/modules/system-admin/people-directory-model";
 import styles from "./people-directory.module.css";
@@ -14,7 +15,7 @@ function itemLabel(row: GrantPlanRow, eventNames: Names, clubNames: Names) {
   const { item } = row;
   if (item.type === "sa") return systemRoleText.SYSTEM_ADMIN.name;
   if (item.type === "ca") return systemRoleText.CLUBS_ADMIN.name;
-  if (item.type === "ac") return systemRoleText.AREA_COORDINATOR.name;
+  if (item.type === "ac") return item.ministries ? `${systemRoleText.AREA_COORDINATOR.name} (${ministriesLabel(item.ministries)})` : systemRoleText.AREA_COORDINATOR.name;
   if (item.type === "event") return `${eventNames[item.eventId] ?? "An event"}: ${roleLabel(item.role)}`;
   return `${clubNames[item.organizationId] ?? "A club"}: ${clubDirectorRoleLabels[item.role]}`;
 }
@@ -61,7 +62,7 @@ export function PersonGrantPanel({ rows, person, eventNames, clubNames, cleanHre
     const { item } = row;
     if (item.type === "sa") await call(`/api/users/${encodeURIComponent(person.staffId!)}/global-role`, "PATCH", { globalRole: "SYSTEM_ADMIN" });
     else if (item.type === "ca") await call(`/api/admin/users/${encodeURIComponent(person.staffId!)}/clubs-administrator`, "PUT");
-    else if (item.type === "ac") await call(`/api/admin/accounts/${encodeURIComponent(person.accountId!)}`, "POST", { action: "area-coordinator", on: true });
+    else if (item.type === "ac") await call(`/api/admin/accounts/${encodeURIComponent(person.accountId!)}`, "POST", { action: "area-coordinator", on: true, ...(item.ministries ? { ministries: item.ministries } : {}) });
     else if (item.type === "event") await call(`/api/events/${encodeURIComponent(item.eventId)}/memberships`, "POST", { email: person.staffEmail, displayName: person.displayName, role: item.role });
     else await call(`/api/admin/organizations/${encodeURIComponent(item.organizationId)}/director-grants`, "POST", { email: person.accountEmail, role: item.role, reason: "Invited from People & access." });
   }

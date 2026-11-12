@@ -23,6 +23,16 @@ describe("the ?grant= link (#1276)", () => {
     expect(parseGrantParam(formatGrantParam(items))).toEqual(items);
   });
 
+  it("carries the Area Coordinator ministries and drops a bad list (#843)", () => {
+    const withMinistries: GrantItem[] = [{ type: "ac", ministries: ["ADVENTURER"] }, { type: "club", organizationId: "org-9", role: "REGISTRAR" }];
+    expect(formatGrantParam(withMinistries)).toBe("ac:ADVENTURER,c:org-9:REGISTRAR");
+    expect(parseGrantParam(formatGrantParam(withMinistries))).toEqual(withMinistries);
+    expect(parseGrantParam("ac:ADVENTURER+PATHFINDER")).toEqual([{ type: "ac", ministries: ["PATHFINDER", "ADVENTURER"] }]);
+    expect(parseGrantParam("ac:DISTRICT")).toEqual([]);
+    expect(parseGrantParam("ac:ADVENTURER+ADVENTURER")).toEqual([]);
+    expect(parseGrantParam("ac:ADVENTURER:extra")).toEqual([]);
+  });
+
   it("ignores unknown kinds, bad roles, bad ids, extra parts and repeats", () => {
     expect(parseGrantParam("sa,sa,nope,e:evt_1:NOT_A_ROLE,e:bad id:EVENT_ADMIN,c:org-1:DIRECTOR:extra,c::DIRECTOR,ac:1,<script>,,")).toEqual([{ type: "sa" }]);
     expect(parseGrantParam("e:evt_1:EVENT_ADMIN,c:org-1:DIRECTOR")).toEqual([

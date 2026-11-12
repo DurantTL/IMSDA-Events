@@ -141,6 +141,13 @@ describe("Area Coordinator import and send routes (#1608)", () => {
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
+  it("refuses a bad ministry choice on the preview too (#843)", async () => {
+    for (const ministries of [[], ["DISTRICT"], ["ADVENTURER", "ADVENTURER"]]) {
+      expect((await importRoute(post("/api/admin/area-coordinator-invites/import", { csv, confirm: false, ministries }))).status).toBe(400);
+    }
+    expect((await importRoute(post("/api/admin/area-coordinator-invites/import", { csv, confirm: false, ministries: ["ADVENTURER"] }))).status).toBe(200);
+  });
+
   it("skips active coordinators and open invites in the preview", async () => {
     mocks.accountFindMany.mockResolvedValue([{ id: "a-1", email: "pat@example.test", areaCoordinatorGrant: { revokedAt: null, expiresAt: null } }]);
     mocks.inviteFindMany.mockResolvedValue([{ email: "sam@example.test" }]);

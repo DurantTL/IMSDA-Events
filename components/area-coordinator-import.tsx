@@ -66,6 +66,9 @@ export function AreaCoordinatorImport({ pendingCount }: { pendingCount: number }
           </p>
         )}
         extraBody={{ ministries }}
+        onOpen={() => setChosen(["PATHFINDER"])}
+        summary={ministries.length > 0 ? `These invites see: ${ministries.map((kind) => (kind === "ADVENTURER" ? "Adventurer clubs" : "Pathfinder clubs")).join(" and ")}.` : null}
+        uploadDisabled={ministries.length === 0}
         importUrl={`${BASE}/import`}
         options={(
           <div className={styles.inviteForm}>

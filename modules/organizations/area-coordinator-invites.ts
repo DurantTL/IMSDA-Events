@@ -295,7 +295,7 @@ export async function acceptAreaCoordinatorInvite(inviteId: string, account: { i
 
     // An already active coordinator keeps their own ministries (applyAreaCoordinatorChange); a new grant takes the invite's.
     const ministries = grantMinistries(invite.ministries);
-    await applyAreaCoordinatorChange(tx, account.id, true, invite.createdByUserId, now, {
+    const applied = await applyAreaCoordinatorChange(tx, account.id, true, invite.createdByUserId, now, {
       viaClubsAdministrator: inviter.viaClubsAdministrator,
       viaInviteId: invite.id,
       ministries,
@@ -305,7 +305,7 @@ export async function acceptAreaCoordinatorInvite(inviteId: string, account: { i
       entityType: "AreaCoordinatorInvite",
       entityId: invite.id,
       summary: "Accepted an Area Coordinator invite.",
-      metadata: { actorAttendeeAccountId: account.id, ministries },
+      metadata: { actorAttendeeAccountId: account.id, inviteMinistries: ministries, appliedMinistries: applied.ministries },
     }, tx);
   });
 }

@@ -1,3 +1,4 @@
+import { inviteMinistries } from "@/modules/organizations/area-coordinator-invites";
 import { z } from "zod";
 import { CLUB_KINDS } from "@/modules/organizations/club-kind";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
@@ -24,6 +25,8 @@ async function postHandler(request: Request) {
   try {
     const actor = await requireSystemAdministrator("System administrator access is required to import Area Coordinators.");
     const { csv, confirm, ministries } = importSchema.parse(await request.json());
+    // The same check for the preview and the save (#843): a bad choice is refused before the file is read.
+    inviteMinistries(ministries);
     if (!confirm) return Response.json(await previewAreaCoordinatorImport(csv), { headers: { "Cache-Control": "no-store" } });
     const { steps, added } = await confirmAreaCoordinatorImport(csv, actor.id, new Date(), ministries);
     return Response.json({ steps, added }, { headers: { "Cache-Control": "no-store" } });

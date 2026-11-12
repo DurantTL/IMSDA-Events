@@ -225,6 +225,8 @@ export async function applyAreaCoordinatorChange(
       ...(options.viaInviteId ? { viaInviteId: options.viaInviteId } : {}),
     },
   }, tx);
+  /** The ministries the account now has (a grant), or none after a removal. */
+  return { ministries: on ? ministries : [] };
 }
 
 /**
@@ -232,10 +234,10 @@ export async function applyAreaCoordinatorChange(
  * A): a system administrator or an active Clubs Administrator, read from the database by `actorUserId`; anyone else
  * is refused with a 403. The audit entry notes when a Clubs Administrator acted.
  */
-export async function setAreaCoordinator(attendeeAccountId: string, on: boolean, actorUserId: string, now = new Date()) {
+export async function setAreaCoordinator(attendeeAccountId: string, on: boolean, actorUserId: string, now = new Date(), ministries?: readonly ClubKindValue[]) {
   const prisma = getPrisma();
   const actor = await requireAreaCoordinatorActor(actorUserId, prisma);
-  await prisma.$transaction((tx) => applyAreaCoordinatorChange(tx, attendeeAccountId, on, actorUserId, now, { viaClubsAdministrator: actor.viaClubsAdministrator }));
+  await prisma.$transaction((tx) => applyAreaCoordinatorChange(tx, attendeeAccountId, on, actorUserId, now, { viaClubsAdministrator: actor.viaClubsAdministrator, ...(ministries ? { ministries } : {}) }));
 }
 
 /**
