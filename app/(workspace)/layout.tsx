@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
  */
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
-  // The staff saved app (#1567): the manifest is linked only from here, so public pages do not offer it.
+  // The staff saved app (#1567): staff pages link this manifest instead of the site one (#1713), so a staff install keeps its own identity.
   manifest: STAFF_MANIFEST_PATH,
   appleWebApp: { capable: true, title: PRODUCT_NAME, statusBarStyle: "default" },
 };

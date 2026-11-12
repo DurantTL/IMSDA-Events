@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { installCardVariant, isIosDevice, type InstallCardInput } from "@/lib/staff-install-card";
+import { installCardVariant, isIosDevice, type InstallCardInput } from "@/lib/install-card";
 
 const IPHONE_SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 const IPAD_DESKTOP_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
@@ -65,7 +65,7 @@ describe("staff install card variant (#1836)", () => {
     const layout = readFileSync(path.join(process.cwd(), "app/(workspace)/layout.tsx"), "utf8");
     expect(layout).toContain('import { StaffInstallPromptCapture } from "@/components/staff-install-card";');
     expect(layout).toContain("<StaffInstallPromptCapture />");
-    const card = readFileSync(path.join(process.cwd(), "components/staff-install-card.tsx"), "utf8");
+    const card = readFileSync(path.join(process.cwd(), "components/install-card.tsx"), "utf8");
     expect(card).toMatch(/if \(typeof window !== "undefined"\) \{\n  window\.addEventListener\("beforeinstallprompt"/);
   });
 });

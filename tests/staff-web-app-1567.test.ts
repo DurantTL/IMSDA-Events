@@ -24,7 +24,7 @@ describe("staff saved app (#1567)", () => {
 
   it("lists icons that exist on disk with matching sizes", () => {
     for (const icon of manifest.icons) {
-      expect(icon.purpose).toBe("any");
+      expect(["any", "maskable"]).toContain(icon.purpose);
       expect(existsSync(path.join(root, "public", icon.src))).toBe(true);
     }
     expect(manifest.icons.map((icon) => icon.sizes)).toEqual(expect.arrayContaining(["192x192", "512x512"]));
@@ -41,8 +41,15 @@ describe("staff saved app (#1567)", () => {
     expect(workspaceMetadata.manifest).toBe(STAFF_MANIFEST_PATH);
     expect(workspaceMetadata.appleWebApp).toMatchObject({ capable: true, title: "IMAdventist" });
     expect(workspaceViewport.themeColor).toBeTruthy();
-    expect(rootMetadata.manifest).toBeUndefined();
-    expect(rootMetadata.appleWebApp).toBeUndefined();
+    // Public and account pages link the site manifest instead (#1713); the staff layout's own value wins for staff pages.
+    expect(rootMetadata.manifest).toBe("/site.webmanifest");
+    expect(rootMetadata.manifest).not.toBe(STAFF_MANIFEST_PATH);
+  });
+
+  it("lists a maskable icon that exists on disk", () => {
+    const maskable = manifest.icons.find((icon) => icon.purpose === "maskable");
+    expect(maskable?.sizes).toBe("512x512");
+    expect(existsSync(path.join(root, "public", maskable!.src))).toBe(true);
   });
 
   it("adds no service worker, cache headers or storage to the route", () => {

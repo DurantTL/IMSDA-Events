@@ -1,7 +1,8 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import styles from "./staff-saved-app-guide.module.css";
+import type { InstallCardAudience } from "@/lib/install-card";
+import styles from "./saved-app-guide.module.css";
 
 const QUERY = "(display-mode: standalone)";
 
@@ -28,23 +29,38 @@ export function useStandalone(): boolean {
   return useSyncExternalStore(subscribe, isStandalone, () => false);
 }
 
+const GUIDE_COPY: Record<InstallCardAudience, { standalone: string; lead: string; open: string }> = {
+  staff: {
+    standalone: "You are using the saved app. It opens your staff Home each time.",
+    lead: "The website works fine in your browser. Saving it just gives you an icon that opens your staff Home.",
+    open: "Open the staff Home in Safari, not in a preview inside another app.",
+  },
+  account: {
+    standalone: "You are using the saved app. It opens your account each time you are signed in.",
+    lead: "The website works fine in your browser. Saving it just gives you an icon that opens your account.",
+    open: "Open your account in Safari, not in a preview inside another app.",
+  },
+};
+
 /**
- * Staff Help: how to save IMAdventist to the Home Screen (#1567). In the saved app it says so instead.
+ * Help: how to save IMAdventist to the Home Screen (#1567, #1713). In the saved app it says so instead.
  * There is no install button: Safari does not offer one to a page, and an embedded preview may not offer the menu at all.
+ * The card on Home (staff) or the account overview offers the button where the browser supports it.
  */
-export function StaffSavedAppGuide() {
+export function SavedAppGuide({ audience }: { audience: InstallCardAudience }) {
   const standalone = useStandalone();
+  const copy = GUIDE_COPY[audience];
   return (
     <section className={styles.card} aria-labelledby="saved-app-heading">
       <h2 id="saved-app-heading" className={styles.heading}>Save IMAdventist to your Home Screen</h2>
       {standalone ? (
-        <p className={styles.status} role="status">You are using the saved app. It opens your staff Home each time.</p>
+        <p className={styles.status} role="status">{copy.standalone}</p>
       ) : (
         <>
-          <p className={styles.lead}>The website works fine in your browser. Saving it just gives you an icon that opens your staff Home.</p>
+          <p className={styles.lead}>{copy.lead}</p>
           <h3 className={styles.sub}>iPhone or iPad (Safari)</h3>
           <ol className={styles.steps}>
-            <li>Open the staff Home in Safari, not in a preview inside another app.</li>
+            <li>{copy.open}</li>
             <li>Tap Share.</li>
             <li>Choose Add to Home Screen. On newer iOS, make sure Open as Web App is on.</li>
             <li>Tap Add.</li>

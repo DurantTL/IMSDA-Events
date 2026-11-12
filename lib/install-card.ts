@@ -1,8 +1,15 @@
 /**
- * Which "Add to Home Screen" card staff Home shows, if any (#1836). Pure: the browser facts go in, a variant comes out.
- * Nothing here reads the device; the component passes what it saw, and nothing about the device is stored or sent.
+ * Which "Add to Home Screen" card to show, if any (#1836, #1713). Shared by the staff Home card and the account card. Pure: the
+ * browser facts go in, a variant comes out. Nothing here reads the device; the component passes what it saw, and nothing about
+ * the device is stored or sent.
  */
-export const INSTALL_CARD_DISMISSED_KEY = "imsda-staff-install-card-dismissed";
+export type InstallCardAudience = "staff" | "account";
+
+/** "Not now" is stored per audience, so hiding one card never hides the other. */
+export const INSTALL_CARD_DISMISSED_KEYS: Record<InstallCardAudience, string> = {
+  staff: "imsda-staff-install-card-dismissed",
+  account: "imsda-account-install-card-dismissed",
+};
 
 export type InstallCardVariant = "install" | "ios-safari" | "ios-other-browser" | "none";
 
@@ -14,6 +21,8 @@ export type InstallCardInput = {
   standalone: boolean;
   /** The browser fired `beforeinstallprompt` and it is still usable. */
   installPromptAvailable: boolean;
+  /** The browser has the Web Install API (`navigator.install()`), which is preferred over the older prompt event. */
+  webInstallAvailable?: boolean;
   /** "Not now" was chosen on this device. */
   dismissed: boolean;
   /** The browser reported `appinstalled`. */
@@ -34,5 +43,5 @@ function isIosNonSafari(userAgent: string): boolean {
 export function installCardVariant(input: InstallCardInput): InstallCardVariant {
   if (input.standalone || input.installed || input.dismissed) return "none";
   if (isIosDevice(input)) return isIosNonSafari(input.userAgent) ? "ios-other-browser" : "ios-safari";
-  return input.installPromptAvailable ? "install" : "none";
+  return input.webInstallAvailable || input.installPromptAvailable ? "install" : "none";
 }
