@@ -197,6 +197,15 @@ describe("the club year a TLT year applies to (#1686 move-up)", () => {
     expect(state.audit).not.toHaveBeenCalled();
   });
 
+  it("locks the TLT's record before it reads the year to compare", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    const order: string[] = [];
+    state.queryRaw.mockImplementationOnce(async (sql: { sql: string }) => { order.push(sql.sql.includes("FOR UPDATE") ? "lock" : "other"); return []; });
+    vi.mocked(client.tltProfile.findUnique).mockImplementationOnce((async () => { order.push("read"); return existing; }) as never);
+    await updateTltProfile({ ...base, tltYear: 3 }, actor);
+    expect(order).toEqual(["lock", "read"]);
+  });
+
   it("clears it when the year is cleared", async () => {
     state.rosterFindFirst.mockResolvedValue({ id: "m1" });
     vi.mocked(client.tltProfile.findUnique).mockResolvedValueOnce(existing as never);

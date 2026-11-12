@@ -125,6 +125,9 @@ describe("the move-up page (#1686, site rules B9 and B10)", () => {
     expect(source).toMatch(/onConfirm=\{\(\) => void confirm\(\)\}/);
     expect(source).toContain("and keep ${kept.length} at their current year");
     expect(source).toContain("yearLabel(plan.clubYear)");
+    // With nothing ticked (only holds), the title and busy label are neutral.
+    expect(source).toContain('title={chosen.length > 0 ? "Move TLTs up a year?" : "Confirm your choices?"}');
+    expect(source).toContain('busyLabel={chosen.length > 0 ? "Moving…" : "Saving…"}');
     expect(source).toContain("keepIds: kept.map");
   });
 

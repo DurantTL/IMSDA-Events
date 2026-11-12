@@ -204,6 +204,9 @@ export async function updateTltProfile(input: TltProfileUpdate, actor: TltDirect
     });
     if (!isTlt) throw new TltDirectoryError("NOT_A_TLT", "That person isn't a TLT on a current club roster.");
 
+    // Lock this TLT's record before comparing the year, so a move-up that commits first is seen (and refused here) and
+    // one that starts after waits for this save: neither can be overwritten by the other.
+    await tx.$queryRaw(Prisma.sql`SELECT 1 FROM "TltProfile" WHERE "personId" = ${input.personId} FOR UPDATE`);
     const existing = await tx.tltProfile.findUnique({
       where: { personId: input.personId },
       select: { id: true, tltYear: true, positionTypeId: true, status: true, tags: { select: { tagId: true } } },

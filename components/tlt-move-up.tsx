@@ -105,13 +105,13 @@ export function TltMoveUp({ plan }: { plan: TltMoveUpPlan }) {
 
       <ConfirmDialog
         busy={busy}
-        busyLabel="Moving…"
+        busyLabel={chosen.length > 0 ? "Moving…" : "Saving…"}
         confirmLabel="Confirm"
         error={error}
         onCancel={() => setConfirming(false)}
         onConfirm={() => void confirm()}
         open={confirming}
-        title="Move TLTs up a year?"
+        title={chosen.length > 0 ? "Move TLTs up a year?" : "Confirm your choices?"}
       >
         <p>
           {chosen.length > 0 ? `Move ${chosen.length} up a year` : "Move no one up"}

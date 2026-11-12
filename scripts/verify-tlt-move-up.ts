@@ -60,7 +60,7 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 async function profile(key: string) {
-  return prisma.tltProfile.findUniqueOrThrow({ where: { personId: pid(key) }, select: { tltYear: true, tltYearClubYear: true } });
+  return prisma.tltProfile.findUniqueOrThrow({ where: { personId: pid(key) }, select: { tltYear: true, tltYearClubYear: true, updatedAt: true } });
 }
 
 async function reset() {
@@ -99,6 +99,10 @@ async function audits() {
 async function main() {
   await setup();
 
+  const stamp = async (key: string) => (await profile(key)).updatedAt.getTime();
+  const before = { y1: await stamp("y1"), y4: await stamp("y4"), hold1: await stamp("hold1") };
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
   // Move: ticked proposed TLTs move; every ineligible one is skipped and unchanged.
   const keys = ["y1", "y2", "y3", "y4", "none", "done", "left", "already", "gone"];
   const first = await confirmTltMoveUp({ clubYear, moveIds: keys.map(pid), keepIds: [] }, actor);
@@ -111,6 +115,8 @@ async function main() {
     assert(row.tltYear === spec.year && row.tltYearClubYear === spec.yearClub, `${key} is unchanged`);
   }
 
+  assert((await stamp("y1")) > before.y1 && (await stamp("y4")) === before.y4, "a moved row's updatedAt changes and an unmoved row's does not");
+
   // Double submit, sequential and at once.
   const again = await confirmTltMoveUp({ clubYear, moveIds: ["y1", "y2", "y3"].map(pid), keepIds: [] }, actor);
   assert(again.moved === 0 && again.skipped === 3 && (await profile("y1")).tltYear === 2, "sending the same request again moves nobody");
@@ -121,6 +127,7 @@ async function main() {
   const hold = await confirmTltMoveUp({ clubYear, moveIds: [], keepIds: [pid("hold1"), pid("hold2")] }, actor);
   assert(hold.moved === 0 && hold.kept === 2 && hold.skipped === 0, "a confirm with only kept TLTs works");
   assert((await profile("hold1")).tltYear === 1 && (await profile("hold1")).tltYearClubYear === clubYear, "a kept TLT keeps the year and is marked for this club year");
+  assert((await stamp("hold1")) > before.hold1, "a held row's updatedAt changes");
   const afterHold = await confirmTltMoveUp({ clubYear, moveIds: [pid("hold1")], keepIds: [] }, actor);
   assert(afterHold.moved === 0 && (await profile("hold1")).tltYear === 1, "a kept TLT is not moved by a later request");
 
@@ -136,6 +143,23 @@ async function main() {
   let refusedEdit = false;
   try { await updateTltProfile({ personId: pid("edit"), tltYear: 4, expectedTltYear: 2, positionTypeId: null, status: null, tagIds: [] }, actor); } catch (error) { refusedEdit = (error as { code?: string }).code === "YEAR_CHANGED"; }
   assert(refusedEdit && (await profile("edit")).tltYear === 3, "a save with an out-of-date year is refused and saves nothing");
+  // A save racing a move-up: the move-up commits first, so the save (which loaded Year 3 for this person) is refused.
+  await reset();
+  await confirmTltMoveUp({ clubYear, moveIds: [pid("y1")], keepIds: [] }, actor);
+  let refusedRace = false;
+  try { await updateTltProfile({ personId: pid("y1"), tltYear: 1, expectedTltYear: 1, positionTypeId: null, status: "ACTIVE", tagIds: [] }, actor); } catch (error) { refusedRace = (error as { code?: string }).code === "YEAR_CHANGED"; }
+  assert(refusedRace && (await profile("y1")).tltYear === 2, "a save made from before a move-up is refused and does not undo it");
+  // And at once: whichever order they land in, the year ends consistent (never a lost move).
+  await reset();
+  const results = await Promise.allSettled([
+    confirmTltMoveUp({ clubYear, moveIds: [pid("y1")], keepIds: [] }, actor),
+    updateTltProfile({ personId: pid("y1"), tltYear: 1, expectedTltYear: 1, positionTypeId: null, status: "ACTIVE", tagIds: [] }, actor),
+  ]);
+  const final = await profile("y1");
+  const saveRefused = results[1].status === "rejected";
+  assert(final.tltYear === (saveRefused ? 2 : 1) && results[0].status === "fulfilled", "a move-up and a save at once never overwrite each other");
+  await reset();
+  await updateTltProfile({ personId: pid("edit"), tltYear: 3, expectedTltYear: 2, positionTypeId: null, status: null, tagIds: [] }, actor);
   await updateTltProfile({ personId: pid("edit"), tltYear: null, expectedTltYear: 3, positionTypeId: null, status: null, tagIds: [] }, actor);
   assert((await profile("edit")).tltYearClubYear === null, "clearing the year clears the club year");
 
