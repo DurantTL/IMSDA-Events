@@ -228,7 +228,7 @@ export function buildRouteMapping(): RouteMappingRow[] {
   rows.push({ route: "/admin/clubs", kind: "shell", oldPlace: "Page link", scope: "System", destinationPath: "/admin/clubs", label: "Clubs Administrator dashboard", group: "Club administration", note: "The Clubs Administrator's home, opened from the role switcher and the Clubs sidebar. Clubs Administrators and system administrators only." });
   rows.push({
     route: "/people/matches", kind: "reached", oldPlace: "Page link", scope: "System", destinationPath: "/people", label: "Possible duplicate people", group: "/people",
-    reachedFrom: { parent: "/people", linkedIn: "components/people-workspace.tsx" },
+    reachedFrom: { parent: "/people", linkedIn: "app/(workspace)/people/page.tsx" },
     note: "System administrators only, from the People page's Actions menu; not in the sidebar. Identity merging stays a human decision.",
   });
   return rows;

@@ -126,8 +126,10 @@ describe("People page with a choice-answer filter", () => {
     const query = { event: "evt", answerQuestion: "ATTENDEE:meal_preference", answerValue: "Vegan" };
     dependencies.resolveEventContext.mockResolvedValue({ event: { id: "evt", slug: "wr", timezone: "UTC", waitlistEnabled: false }, permissions: ["VIEW_SENSITIVE_DATA"] });
     const workspaceFor = async (extra: Record<string, string>) => {
-      const tree = await PeoplePage({ searchParams: Promise.resolve({ ...query, ...extra }) }) as { props: { children: Array<{ key: string | null; props: Record<string, unknown> }> } };
-      return tree.props.children.at(-1)!;
+      // The page is a fragment: the section header, then a stack holding the titled header and the workspace (#1574).
+      type Node = { key: string | null; props: Record<string, unknown> & { children?: Node[] } };
+      const tree = await PeoplePage({ searchParams: Promise.resolve({ ...query, ...extra }) }) as unknown as Node;
+      return tree.props.children!.at(-1)!.props.children!.at(-1)!;
     };
     const closed = await workspaceFor({});
     const opened = await workspaceFor({ registration: "R1" });

@@ -326,7 +326,7 @@ describe("old to new route mapping", () => {
     expect(routeOf("/people/matches")).toMatchObject({ kind: "reached", scope: "System", destinationPath: "/people" });
     expect(read("app/(workspace)/people/matches/page.tsx")).toContain('if (!isDisclosureAllowed("MATCH_CANDIDATE_EVIDENCE", staffIdentityAudience(user), "READ")) redirect("/no-access");');
     expect(read("app/(workspace)/people/page.tsx")).toContain('const canReviewPeopleMatches = user?.globalRole === "SYSTEM_ADMIN";');
-    expect(read("components/people-workspace.tsx")).toContain('{canReviewPeopleMatches && <li><a href="/people/matches">');
+    expect(read("app/(workspace)/people/page.tsx")).toContain('{canReviewPeopleMatches && <li><a href="/people/matches">');
   });
 });
 
