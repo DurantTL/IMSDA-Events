@@ -3,7 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
+import { isActiveClubsAdministrator, isActiveYouthAdministrator } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { isSessionIdle } from "@/modules/access/session-store";
 
@@ -27,6 +27,7 @@ import { isSessionIdle } from "@/modules/access/session-store";
  * Caleb, 2026-10-26 (#1232): an active Clubs Administrator may also act as a club's DIRECTOR, with the same powers and attribution.
  * Caleb, 2026-11-06: an active Clubs Administrator may also act as an Area Coordinator (the same access as above, same two-hour limit). Such an act-as is valid only while the grant is active: every
  * read re-checks the grant in the database, so a revoke ends it on the next request.
+ * Caleb, 2026-11-08 (#1685): an active Youth Admin may act as an Area Coordinator only, never as a club director, with the same re-check.
  */
 
 export const ACT_AS_MINUTES = 120;
@@ -49,6 +50,8 @@ export type ActiveStaffActAs = {
   expiresAt: Date;
   /** Set when the acting user is an active Clubs Administrator, not a system administrator (#1232), so audit rows say so. */
   viaClubsAdministrator?: true;
+  /** Set when the acting user is an active Youth Admin (#1685), so audit rows say so. Never set together with `viaClubsAdministrator`. */
+  viaYouthAdministrator?: true;
 };
 
 /**
@@ -62,7 +65,8 @@ async function staffSessionIsValid(
   staffSessionId: string,
   actingUserId: string,
   now: Date,
-): Promise<{ viaClubsAdministrator: boolean } | null> {
+  role: StaffActAsRole,
+): Promise<{ viaClubsAdministrator: boolean; viaYouthAdministrator: boolean } | null> {
   const session = await getPrisma().userSession.findUnique({
     where: { id: staffSessionId },
     select: {
@@ -76,14 +80,18 @@ async function staffSessionIsValid(
   // The act-as belongs to this session's own user, who is still a system administrator, or an active Clubs Administrator
   // (as a club director or, since 2026-11-06, as an Area Coordinator).
   if (session.user.id !== actingUserId) return null;
-  const viaClubsAdministrator = session.user.globalRole !== "SYSTEM_ADMIN";
-  if (viaClubsAdministrator) {
-    if (!(await isActiveClubsAdministrator(session.user.id))) return null;
+  // Everyone else is a Clubs Administrator, or a Youth Admin for an Area Coordinator act-as only (#1685). Each is read from the database now.
+  let viaClubsAdministrator = false;
+  let viaYouthAdministrator = false;
+  if (session.user.globalRole !== "SYSTEM_ADMIN") {
+    if (await isActiveClubsAdministrator(session.user.id)) viaClubsAdministrator = true;
+    else if (role === "AREA_COORDINATOR" && (await isActiveYouthAdministrator(session.user.id))) viaYouthAdministrator = true;
+    else return null;
   }
   if (!session.user.credential || session.user.credential.disabledAt) return null;
   if (session.user.accountStatus !== "ACTIVE") return null;
   if (isSessionIdle(session.lastSeenAt, now)) return null;
-  return { viaClubsAdministrator };
+  return { viaClubsAdministrator, viaYouthAdministrator };
 }
 
 /**
@@ -106,9 +114,10 @@ export async function resolveActiveActAs(staffSessionId: string, now = new Date(
     }).catch(() => {});
     return null;
   }
-  const valid = await staffSessionIsValid(staffSessionId, row.userId, now);
+  const valid = await staffSessionIsValid(staffSessionId, row.userId, now, row.role);
   if (!valid) return null;
-  return valid.viaClubsAdministrator ? { ...row, viaClubsAdministrator: true } : row;
+  if (valid.viaClubsAdministrator) return { ...row, viaClubsAdministrator: true };
+  return valid.viaYouthAdministrator ? { ...row, viaYouthAdministrator: true } : row;
 }
 
 export type StaffActingContext = {
@@ -120,6 +129,8 @@ export type StaffActingContext = {
   expiresAt: Date;
   /** Set when the acting user is an active Clubs Administrator, not a system administrator (#1232), so audit rows say so. */
   viaClubsAdministrator?: true;
+  /** Set when the acting user is an active Youth Admin (#1685), so audit rows say so. */
+  viaYouthAdministrator?: true;
 };
 
 /**
@@ -140,6 +151,7 @@ export async function currentStaffActingContext(): Promise<StaffActingContext | 
     organizationId: active.organizationId,
     expiresAt: active.expiresAt,
     ...(active.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}),
+    ...(active.viaYouthAdministrator ? { viaYouthAdministrator: true as const } : {}),
   };
 }
 
@@ -178,8 +190,20 @@ async function startWithRetry<T>(start: () => Promise<T>): Promise<T> {
   }
 }
 
+type ActAsStaff = { id: string; viaClubsAdministrator?: true; viaYouthAdministrator?: true };
+
+function actorLabel(staff: ActAsStaff) {
+  if (staff.viaYouthAdministrator) return "A Youth Admin";
+  return staff.viaClubsAdministrator ? "A Clubs Administrator" : "A system administrator";
+}
+
+function actorRoleMetadata(staff: ActAsStaff) {
+  if (staff.viaYouthAdministrator) return { actorRole: "YOUTH_ADMINISTRATOR" };
+  return staff.viaClubsAdministrator ? { actorRole: "CLUBS_ADMINISTRATOR" } : {};
+}
+
 /** Starts (or restarts) acting as an Area Coordinator for the staff session (#442). Ends any active act-as first. */
-export async function actAsAreaCoordinator(staff: { id: string; viaClubsAdministrator?: true }, staffSessionId: string, now = new Date()) {
+export async function actAsAreaCoordinator(staff: { id: string; viaClubsAdministrator?: true; viaYouthAdministrator?: true }, staffSessionId: string, now = new Date()) {
   const expiresAt = new Date(now.getTime() + ACT_AS_MINUTES * 60_000);
   return startWithRetry(() => getPrisma().$transaction(async (tx) => {
     await endActiveActAs(tx, staffSessionId, "REPLACED", now);
@@ -192,8 +216,8 @@ export async function actAsAreaCoordinator(staff: { id: string; viaClubsAdminist
       action: "ACT_AS_AREA_COORDINATOR",
       entityType: "StaffActAs",
       entityId: row.id,
-      summary: `${staff.viaClubsAdministrator ? "A Clubs Administrator" : "A system administrator"} is acting as an Area Coordinator for a limited time.`,
-      metadata: { actAsId: row.id, expiresAt: expiresAt.toISOString(), ...(staff.viaClubsAdministrator ? { actorRole: "CLUBS_ADMINISTRATOR" } : {}) },
+      summary: `${actorLabel(staff)} is acting as an Area Coordinator for a limited time.`,
+      metadata: { actAsId: row.id, expiresAt: expiresAt.toISOString(), ...actorRoleMetadata(staff) },
     }, tx);
     return { expiresAt, actAsId: row.id };
   }));
@@ -241,7 +265,7 @@ export function stopActingHref(stopped: { role: StaffActAsRole; organizationId: 
 }
 
 /** Ends the staff session's active act-as right away ("Stop acting"). Returns null when nothing was active. */
-export async function stopActingAs(staff: { id: string; viaClubsAdministrator?: true }, staffSessionId: string, now = new Date()) {
+export async function stopActingAs(staff: { id: string; viaClubsAdministrator?: true; viaYouthAdministrator?: true }, staffSessionId: string, now = new Date()) {
   return getPrisma().$transaction(async (tx) => {
     const active = await tx.staffActAs.findFirst({
       where: { staffSessionId, endedAt: null },
@@ -255,8 +279,8 @@ export async function stopActingAs(staff: { id: string; viaClubsAdministrator?: 
       action: "ACT_AS_STOPPED",
       entityType: "StaffActAs",
       entityId: active.id,
-      summary: `${staff.viaClubsAdministrator ? "A Clubs Administrator" : "A system administrator"} stopped acting as a club role.`,
-      metadata: { actAsId: active.id, role: active.role, organizationId: active.organizationId, ...(staff.viaClubsAdministrator ? { actorRole: "CLUBS_ADMINISTRATOR" } : {}) },
+      summary: `${actorLabel(staff)} stopped acting as a club role.`,
+      metadata: { actAsId: active.id, role: active.role, organizationId: active.organizationId, ...actorRoleMetadata(staff) },
     }, tx);
     return active;
   });

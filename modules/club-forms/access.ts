@@ -9,6 +9,7 @@ import { requireRosterAccess, type ClubActor } from "@/modules/club-rosters/acce
 import { isClubFormsRole, type ClubFormActor, type ClubFormsViewer } from "@/modules/club-forms/domain";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { actAsRoleMarks } from "@/modules/audit/act-as-actor-role";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 
 /**
@@ -54,7 +55,7 @@ export async function resolveAreaCoordinatorViewer(): Promise<Extract<ClubFormsV
   if (account) return { kind: "AREA_COORDINATOR", actor: { kind: "ATTENDEE", accountId: account.id } };
   const acting = await currentStaffActingContext();
   if (acting?.role === "AREA_COORDINATOR") {
-    return { kind: "AREA_COORDINATOR", actor: { kind: "STAFF_ACTING", userId: acting.userId, actAsId: acting.actAsId, ...(acting.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) } };
+    return { kind: "AREA_COORDINATOR", actor: { kind: "STAFF_ACTING", userId: acting.userId, actAsId: acting.actAsId, ...actAsRoleMarks(acting) } };
   }
   return null;
 }

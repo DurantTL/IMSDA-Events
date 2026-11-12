@@ -71,9 +71,20 @@ export async function currentAreaCoordinator() {
  * account at all.
  */
 export async function currentAreaCoordinatorViewerActive() {
-  if (await currentAreaCoordinator()) return true;
+  return (await currentAreaCoordinatorViewer()) !== null;
+}
+
+/**
+ * Who the Area Coordinator viewer is, by the same checks as `currentAreaCoordinatorViewerActive` (one rule for the pages
+ * and the coordinator search, #1854): the coordinator's own attendee account, or the staff act-as, or null.
+ */
+export type AreaCoordinatorViewer = { kind: "ATTENDEE"; accountId: string } | { kind: "ACTING"; actAsId: string };
+
+export async function currentAreaCoordinatorViewer(): Promise<AreaCoordinatorViewer | null> {
+  const coordinator = await currentAreaCoordinator();
+  if (coordinator) return { kind: "ATTENDEE", accountId: coordinator.id };
   const acting = await currentStaffActingContext();
-  return acting?.role === "AREA_COORDINATOR";
+  return acting?.role === "AREA_COORDINATOR" ? { kind: "ACTING", actAsId: acting.actAsId } : null;
 }
 
 /** Every active club, for the Area Coordinator's Clubs list. */
@@ -119,13 +130,29 @@ export async function applyAreaCoordinatorChange(
     await tx.areaCoordinatorGrant.upsert({
       where: { attendeeAccountId },
       create: { attendeeAccountId, grantedByUserId: actorUserId, grantedAt: now },
-      update: { revokedAt: null, revokedByUserId: null, expiresAt: null, grantedByUserId: actorUserId, grantedAt: now },
+      // A new grant never brings back the TLT director setting (#1686): a system administrator switches it again.
+      update: { revokedAt: null, revokedByUserId: null, expiresAt: null, grantedByUserId: actorUserId, grantedAt: now, tltDirector: false, tltDirectorSetAt: null, tltDirectorSetByUserId: null },
     });
   } else {
+    // Removing the role removes the TLT director setting with it (#1686), and says so in the audit trail.
+    const switchedOff = await tx.areaCoordinatorGrant.updateMany({
+      where: { attendeeAccountId, revokedAt: null, tltDirector: true },
+      data: { tltDirector: false, tltDirectorSetAt: null, tltDirectorSetByUserId: null },
+    });
     await tx.areaCoordinatorGrant.updateMany({
       where: { attendeeAccountId, revokedAt: null },
-      data: { revokedAt: now, revokedByUserId: actorUserId },
+      data: { revokedAt: now, revokedByUserId: actorUserId, tltDirector: false, tltDirectorSetAt: null, tltDirectorSetByUserId: null },
     });
+    if ((switchedOff?.count ?? 0) > 0) {
+      await writeAuditLog({
+        actorUserId,
+        action: "TLT_DIRECTOR_SETTING_CHANGED",
+        entityType: "AttendeeAccount",
+        entityId: attendeeAccountId,
+        summary: "Switched off the TLT director setting because the Area Coordinator role was removed.",
+        metadata: { attendeeAccountId, on: false, becauseRoleRemoved: true },
+      }, tx);
+    }
   }
   await writeAuditLog({
     actorUserId,

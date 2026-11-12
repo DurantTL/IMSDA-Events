@@ -1,0 +1,40 @@
+/* The TLT directory (#1686): one card per TLT, so it reads at 390px; print drops the controls and keeps the facts. */
+.filters { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); align-items: end; margin: 0 0 12px; }
+.field { display: grid; gap: 4px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; color: var(--imsda-navy); }
+.field input, .field select { min-height: 44px; width: 100%; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--field-border); border-radius: var(--radius-element); background: var(--card); font: inherit; font-weight: 400; color: inherit; }
+.field .searchBox input { min-height: 42px; border: 0; padding: 0; background: transparent; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; }
+.sortRow { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin: 0 0 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.sortLink { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); }
+.sortLink[aria-current="true"] { font-weight: 700; text-decoration: underline; }
+.count { margin: 0 0 8px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--muted); }
+.list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
+.card { display: grid; gap: 6px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); align-content: start; }
+.name { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); font-weight: 700; overflow-wrap: anywhere; }
+.facts { display: grid; gap: 2px; margin: 0; }
+.facts div { display: flex; flex-wrap: wrap; gap: 0 6px; }
+.facts dt { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.facts dt::after { content: ":"; }
+.facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.tag { padding: 2px 8px; border-radius: var(--radius-pill); background: var(--imsda-purple-soft); color: var(--imsda-purple); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.edit summary { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--imsda-purple); font-weight: 600; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.form { display: grid; gap: 10px; padding-top: 6px; }
+.tagFieldset { display: grid; gap: 0; margin: 0; padding: 0; border: 0; min-width: 0; }
+.tagFieldset legend { padding: 0; font-weight: 600; font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--imsda-navy); }
+.check { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.check input { width: 20px; height: 20px; flex: none; }
+.status { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.error { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--danger, #9b1c1c); }
+.listsGrid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
+.entry { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+.entryRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.entryRow input { flex: 1 1 10rem; min-height: 44px; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--field-border); border-radius: var(--radius-element); background: var(--card); font: inherit; }
+.entryNote { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--muted); }
+.suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 0; padding: 0; list-style: none; }
+.plain { margin: 0; padding: 0; list-style: none; }
+@media print {
+  .noPrint { display: none !important; }
+  .list { display: block; }
+  .card { break-inside: avoid; border-color: var(--line); margin-bottom: 8px; }
+}

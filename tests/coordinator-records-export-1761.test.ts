@@ -135,6 +135,18 @@ describe("who may export (#1761)", () => {
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: "staff-1", metadata: expect.objectContaining({ actAsId: "actas-1" }) }));
   });
 
+  it.each([
+    ["a Youth Admin", { viaYouthAdministrator: true }, "YOUTH_ADMINISTRATOR"],
+    ["a Clubs Administrator", { viaClubsAdministrator: true }, "CLUBS_ADMINISTRATOR"],
+    ["a system administrator", {}, undefined],
+  ])("labels the audit entry of an export made by %s (#1685)", async (_label, marks, role) => {
+    mocks.currentStaffActingContext.mockResolvedValue({ role: "AREA_COORDINATOR", userId: "staff-1", actAsId: "actas-1", ...marks });
+    expect((await post({ columns: ["club"], clubs: "all" })).status).toBe(200);
+    const metadata = mocks.writeAuditLog.mock.calls[0]![0].metadata;
+    if (role) expect(metadata).toMatchObject({ actAsId: "actas-1", actorRole: role });
+    else expect(metadata).not.toHaveProperty("actorRole");
+  });
+
   it("refuses signed out, a plain attendee or director without a grant, a revoked and an expired grant with 404 and reads nothing", async () => {
     expect((await post({ columns: ["club"], clubs: "all" })).status).toBe(404);
     mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "plain" }, via: "attendee", sessionId: "s-2" });

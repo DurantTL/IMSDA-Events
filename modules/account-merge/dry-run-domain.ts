@@ -18,6 +18,8 @@ export type StaffAccountRow = {
   globalRole: "SYSTEM_ADMIN" | null;
   /** An active Clubs Administrator grant: a staff role that needs a second factor (Nov 6, 2026). */
   clubsAdministrator: boolean;
+  /** An active Youth Admin grant (#1685): a staff role that needs a second factor. */
+  youthAdministrator: boolean;
   credential: { disabledAt: Date | null; lockedUntil: Date | null } | null;
   mfa: MfaState;
   mfaLockedUntil: Date | null;
@@ -282,7 +284,7 @@ export function detectConflicts(
       detail: "An authenticator lockout is active on at least one side. Wait for it to clear or reset it deliberately.",
     });
   }
-  const hasStaffRole = staff.globalRole !== null || staff.counts.activeMemberships > 0 || staff.clubsAdministrator;
+  const hasStaffRole = staff.globalRole !== null || staff.counts.activeMemberships > 0 || staff.clubsAdministrator || staff.youthAdministrator;
   if (hasStaffRole && staff.mfa !== "ACTIVE" && staff.counts.passkeys === 0) {
     conflicts.push({
       code: "STAFF_NO_SECOND_FACTOR",

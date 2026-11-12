@@ -1,7 +1,7 @@
 # Inspection scoring (#1896)
 
 An optional per-event tool for Spring Camporee campsite and uniform inspections. Off by default. It sits on
-Camporee scoring (#1676; rule B19 in `docs/SITE-RULES.md`, inspections are B23).
+Camporee scoring (#1676; rule B19 in `docs/SITE-RULES.md`, inspections are B24).
 
 ## What it does
 

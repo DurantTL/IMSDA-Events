@@ -5,6 +5,7 @@ import { HAND_LINK_NOTE_MAX, HAND_LINK_REASON_CODES } from "@/modules/account-me
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { requireClubsAdministration, requireSystemAdministrator } from "@/modules/organizations/access";
 import { setAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { setTltDirector } from "@/modules/tlt-directory/access";
 import {
   findStaffUserIdByEmail,
   linkStaffAndAttendeeByHand,
@@ -25,6 +26,8 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reset-two-step") }).strict(),
   z.object({ action: z.literal("sign-out") }).strict(),
   z.object({ action: z.literal("area-coordinator"), on: z.boolean() }).strict(),
+  // The TLT director setting on an Area Coordinator's role (#1686): system administrators only.
+  z.object({ action: z.literal("tlt-director"), on: z.boolean() }).strict(),
   // Hand-linking a person's team sign-in and this account when their emails differ (#554).
   z.object({ action: z.literal("link-staff"), staffEmail: z.string().trim().toLowerCase().pipe(z.email("Enter the team account's email.")), reason: handLinkReason }).strict(),
   z.object({ action: z.literal("unlink-staff"), reason: handLinkReason }).strict(),
@@ -35,7 +38,7 @@ const actionSchema = z.discriminatedUnion("action", [
 /**
  * Actions on an attendee account (#386). Audited. Every action is for system administrators only, except
  * "area-coordinator" (#1275, decision A), which an active Clubs Administrator may also do. Order: cross-origin check,
- * then the role gate that admits both roles, then the body, then the system administrator gate for every other action.
+ * then the role gate that admits both roles, then the body, then the system administrator gate for every other action (the TLT director setting too, #1686).
  */
 async function postHandler(request: Request, context: { params: Promise<{ accountId: string }> }) {
   const originError = rejectCrossOriginRequest(request);
@@ -56,6 +59,14 @@ async function postHandler(request: Request, context: { params: Promise<{ accoun
         message: input.on
           ? `Now an ${systemRoleText.AREA_COORDINATOR.name}. ${systemRoleText.AREA_COORDINATOR.summary}`
           : "No longer an Area Coordinator.",
+      });
+    }
+    if (input.action === "tlt-director") {
+      await setTltDirector(accountId, input.on, actor.id);
+      return Response.json({
+        message: input.on
+          ? "Now the TLT director. They see every TLT in the Club coordination area after their second sign-in step."
+          : "No longer the TLT director.",
       });
     }
     if (input.action === "link-staff") {

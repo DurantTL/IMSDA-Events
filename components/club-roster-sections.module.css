@@ -40,6 +40,7 @@
 .rosterMemberRole { display: block; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8rem); font-weight: 500; overflow-wrap: anywhere; }
 /* The TLT chip (#1851) keeps a gap after a class name; alone, it sits flush. */
 .rosterTltChip { margin-inline-start: 8px; }
+.rosterTltDetail { display: block; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 500; overflow-wrap: anywhere; }
 .rosterNeedsDetails { white-space: normal; }
 .rosterRowActionSet { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .rosterRowActionSet :global(.actions-menu) { display: inline-block; width: auto; }

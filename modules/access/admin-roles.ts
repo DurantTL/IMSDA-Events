@@ -3,7 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
-import { hasActiveClubsAdministratorGrant } from "@/modules/access/club-event-access";
+import { hasActiveClubsAdministratorGrant, hasActiveYouthAdministratorGrant } from "@/modules/access/club-event-access";
 import type { AuthenticatedUser } from "@/modules/access/authorization";
 import {
   ADMIN_ROLE_COOKIE_NAME,
@@ -24,6 +24,14 @@ type RolesClient = Prisma.TransactionClient | PrismaClient;
  */
 export async function isActiveClubsAdministrator(userId: string, client: RolesClient = getPrisma()): Promise<boolean> {
   return hasActiveClubsAdministratorGrant(userId, client);
+}
+
+/**
+ * Whether this staff user holds an active Youth Admin grant (#1685). Reads the database on every call, with no
+ * caching, so a revoke takes effect on the next request.
+ */
+export async function isActiveYouthAdministrator(userId: string, client: RolesClient = getPrisma()): Promise<boolean> {
+  return hasActiveYouthAdministratorGrant(userId, client);
 }
 
 /**

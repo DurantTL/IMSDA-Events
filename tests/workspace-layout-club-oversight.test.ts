@@ -33,6 +33,7 @@ vi.mock("@/modules/event-modules/service", () => ({ moduleStatesByEvent: mocks.m
 // The shell reads the admin roles (#1225) and the pill counts; none of that is under test here.
 vi.mock("@/modules/access/admin-roles", () => ({
   isActiveClubsAdministrator: async () => mocks.clubsAdmin.current,
+  isActiveYouthAdministrator: async () => false,
   resolveAdminRoleView: async (user: { globalRole?: string | null }) => ({
     roles: { systemAdmin: user.globalRole === "SYSTEM_ADMIN", clubsAdministrator: mocks.clubsAdmin.current, eventAdminEventIds: [] },
     held: user.globalRole === "SYSTEM_ADMIN" ? ["SYSTEM_ADMIN"] : mocks.clubsAdmin.current ? ["CLUBS_ADMIN"] : [],

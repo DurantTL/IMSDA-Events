@@ -4,6 +4,7 @@ import {
   EVENT_PICKER_PATH,
   NO_EVENTS_PATH,
   SYSTEM_ADMIN_PATH,
+  YOUTH_DIRECTORY_PATH,
   resolveLoginDestination,
 } from "@/modules/access/login-routing";
 
@@ -74,6 +75,14 @@ describe("resolveLoginDestination", () => {
     expect(resolveLoginDestination({ isSystemAdmin: false, events: [], isClubsAdmin: true })).toBe(CLUBS_ADMIN_HOME_PATH);
     expect(CLUBS_ADMIN_HOME_PATH).toBe("/admin/clubs");
     expect(resolveLoginDestination({ isSystemAdmin: false, events: [{ id: "event_1" }], isClubsAdmin: true })).toBe("/overview?event=event_1");
+  });
+
+  it("sends a Youth Admin with no event assignment to the Youth directory (#1685), after Club administration when they are both", () => {
+    expect(resolveLoginDestination({ isSystemAdmin: false, events: [], isYouthAdmin: true })).toBe(YOUTH_DIRECTORY_PATH);
+    expect(YOUTH_DIRECTORY_PATH).toBe("/admin/youth");
+    expect(resolveLoginDestination({ isSystemAdmin: false, events: [], isYouthAdmin: true, isClubsAdmin: true })).toBe(CLUBS_ADMIN_HOME_PATH);
+    expect(resolveLoginDestination({ isSystemAdmin: false, events: [{ id: "event_1" }], isYouthAdmin: true })).toBe("/overview?event=event_1");
+    expect(resolveLoginDestination({ isSystemAdmin: false, events: [], isYouthAdmin: false })).toBe(NO_EVENTS_PATH);
   });
 
   it("routes an account with no active event memberships the same way whether it is unassigned staff or, hypothetically, a club leader/attendee id — this page is never reached by the real attendee/club portal login, which is a separate flow entirely (#108 queue 1)", () => {

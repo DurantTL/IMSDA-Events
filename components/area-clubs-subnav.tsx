@@ -7,9 +7,10 @@ import { ClubPortalNav } from "@/components/club-portal-nav";
  * no "All clubs" tab (#1551): Overview's Clubs at a glance is the one club list
  * and stays lit for the coordinator's club pages (`/account/area/...`).
  * Waitlists is added only for a real Area Coordinator (#599), never for a staff
- * act-as; the page itself still checks on the server, so a link only mirrors that.
+ * act-as; the page itself still checks on the server, so a link only mirrors that. TLT directory (#1686) is the same
+ * kind of link, for the TLT director only.
  */
-export function coordinatorNavItems({ showWaitlists = false }: { showWaitlists?: boolean } = {}): AccountNavItem[] {
+export function coordinatorNavItems({ showWaitlists = false, showTlt = false }: { showWaitlists?: boolean; showTlt?: boolean } = {}): AccountNavItem[] {
   return [
     { href: "/account/area-clubs/overview", label: "Overview" },
     // The club list owns the view-only club pages, so Clubs stays lit on them (#1759).
@@ -20,6 +21,8 @@ export function coordinatorNavItems({ showWaitlists = false }: { showWaitlists?:
     { href: "/account/area-clubs/team-permissions", label: "Team approvals" },
     { href: "/account/area-clubs/applications", label: "New clubs" },
     ...(showWaitlists ? [{ href: "/account/waitlists", label: "Waitlists" }] : []),
+    // The TLT directory (#1686): only the Area Coordinator the TLT director setting is on for; the pages and routes check on the server.
+    ...(showTlt ? [{ href: "/account/area-clubs/tlt", label: "TLT directory", alsoMatchPrefix: "/account/area-clubs/tlt/" }] : []),
   ];
 }
 

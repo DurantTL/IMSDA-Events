@@ -19,7 +19,7 @@ export type RoleText = {
 };
 
 /** Roles that span the whole system rather than one event or club. */
-export type SystemRoleKey = "SYSTEM_ADMIN" | "CLUBS_ADMIN" | "AREA_COORDINATOR" | "EVENTS_ADMIN" | "SITE_CONTENT_EDITOR";
+export type SystemRoleKey = "SYSTEM_ADMIN" | "CLUBS_ADMIN" | "YOUTH_ADMIN" | "AREA_COORDINATOR" | "EVENTS_ADMIN" | "SITE_CONTENT_EDITOR";
 
 export const systemRoleText: Record<SystemRoleKey, RoleText> = {
   SYSTEM_ADMIN: {
@@ -47,6 +47,20 @@ export const systemRoleText: Record<SystemRoleKey, RoleText> = {
     cannot: [
       "Work on events that are not club events, unless added to them as staff.",
       "Change churches, the conference, settings or accounts.",
+    ],
+  },
+  YOUTH_ADMIN: {
+    name: "Youth Admin",
+    summary: "The conference youth director: sees every club like an Area Coordinator, plus a directory of every youth by grade and school type.",
+    can: [
+      "Do everything an Area Coordinator can, view only, by acting as one for two hours.",
+      "Open the Youth directory: every active Pathfinder with their club, age, grade, school type, church membership and class level.",
+      "Filter, sort, count and export the directory as a CSV file; every export is recorded.",
+    ],
+    cannot: [
+      "See birth dates, guardians, contact details or health information.",
+      "Act as a club director or change anything in a club.",
+      "Give or remove roles.",
     ],
   },
   AREA_COORDINATOR: {

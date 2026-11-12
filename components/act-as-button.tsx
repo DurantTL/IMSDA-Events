@@ -34,7 +34,7 @@ export function ActAsButton({
   endpoint: string;
   label: string;
   /** Which page this button is on, so "Stop acting" can return there (Area Coordinator only). A fixed key, not a path. */
-  origin?: "clubs" | "people";
+  origin?: "clubs" | "people" | "youth";
   /** The call to action shown once acting has started, e.g. "Open the club portal". */
   resultAction: string;
   role: string;

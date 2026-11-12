@@ -241,6 +241,7 @@ async function countPasskeyOnlyStaff(tx: Pick<ReturnType<typeof getPrisma>, "use
         { globalRole: "SYSTEM_ADMIN" },
         { memberships: { some: { status: "ACTIVE" } } },
         { clubsAdministratorGrant: { is: { revokedAt: null } } },
+        { youthAdministratorGrant: { is: { revokedAt: null } } },
       ],
     },
   });

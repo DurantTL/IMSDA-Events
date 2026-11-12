@@ -24,7 +24,7 @@ describe("attendance points access (#1677)", () => {
     expect(service).toContain("assertScopedToggleAllowed");
     expect(service).not.toContain("eventModule.create");
     expect(service).not.toContain("eventModule.delete");
-    expect(read("modules/event-modules/catalog.ts")).toContain('["club-teachers", "event-scoring", "inspection-scoring", "attendance-points", "debrief", "event-budget"]');
+    expect(read("modules/event-modules/catalog.ts")).toContain('["club-teachers", "event-scoring", "inspection-scoring", "attendance-points", "debrief", "event-budget", "event-staffing"]');
   });
 
   it("checks the request origin and a real coordinator grant on the coordinator route", () => {

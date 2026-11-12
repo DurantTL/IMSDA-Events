@@ -9,6 +9,7 @@ export const ACT_AS_ORIGIN_COOKIE = "imsda_act_as_origin";
 const originPaths = {
   clubs: "/admin/clubs",
   people: "/admin/people",
+  youth: "/admin/youth",
 } as const;
 
 export type ActAsOrigin = keyof typeof originPaths;

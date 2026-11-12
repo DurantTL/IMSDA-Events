@@ -12,6 +12,7 @@ import { prunePublicMetrics } from "@/modules/public-metrics/repository";
 import { sweepClassWaitlists } from "@/modules/honors/waitlist-repository";
 import { sendDueClassChangeEmails } from "@/modules/honors/class-change-emails";
 import { sendDueHonorWatchSummaries } from "@/modules/honors/watch-emails";
+import { sendDueMonthlyRecordReminders } from "@/modules/club-reports/monthly-reminders";
 import { runHealthSnapshotSweep, sealedCopiesEnabled } from "@/modules/health-records/snapshot-hooks";
 import { expireStalePendingTeams } from "@/modules/general-link-registrations/repository";
 import { runAlertScan } from "@/modules/operations/alert-scan";
@@ -28,6 +29,7 @@ import {
   INSTRUCTOR_CLASS_EMAILS_JOB,
   LOCATION_WAITLIST_DIGEST_JOB,
   MESSAGE_FILE_CLEANUP_JOB,
+  MONTHLY_RECORD_REMINDERS_JOB,
   PAY_ON_SQUARE_LINK_SWEEP_JOB,
   RETENTION_CLEANUP_JOB,
 } from "@/modules/operations/sweep-heartbeat";
@@ -237,6 +239,29 @@ async function postHandler(request: Request) {
           }
         : undefined,
     );
+    // Monthly Record reminders (#1895): from the 11th (Central) the previous month's unsubmitted records, one email per club
+    // to its director and deputy and one counts-only summary per Area Coordinator. Sent automatically (Caleb, Nov 11, 2026).
+    // At most one per club per month (a unique log row is claimed with the emails), so running it on every sweep is safe.
+    // Its failure must not make a successful sweep look failed.
+    const monthlyRecordReminders = await sendDueMonthlyRecordReminders().catch((error) => {
+      logError("The Monthly Record reminder step failed after a successful outbox sweep", error);
+      return null;
+    });
+    await recordStep(
+      MONTHLY_RECORD_REMINDERS_JOB,
+      "Monthly Record reminder",
+      monthlyRecordReminders !== null && monthlyRecordReminders.failed === 0,
+      monthlyRecordReminders
+        ? {
+            status: monthlyRecordReminders.status,
+            reminded: monthlyRecordReminders.reminded,
+            noRecipient: monthlyRecordReminders.noRecipient,
+            failed: monthlyRecordReminders.failed,
+            summaries: monthlyRecordReminders.summaries,
+            delivered: monthlyRecordReminders.delivered,
+          }
+        : undefined,
+    );
     // Sealed health copies (#924): the event-start copies that are due, and the daily deletion of copies whose
     // keep-until date has passed (never one under a legal hold). A no-op with HEALTH_RECORDS_ENABLED off, safe on
     // every sweep, and it reports counts only. Its failure must not make a successful sweep look failed.
@@ -329,6 +354,7 @@ async function postHandler(request: Request) {
       classWaitlists,
       instructorClassEmails,
       honorWatchSummaries,
+      monthlyRecordReminders,
       healthSnapshots,
       generalLinkRetention,
       messageFiles,

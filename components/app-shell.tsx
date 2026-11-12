@@ -30,7 +30,7 @@ import { StaffKeyboardWatch } from "@/components/staff-keyboard-watch";
 import { buildStaffNavigation } from "@/components/staff-navigation-model";
 import { pageOwnsHeader } from "@/components/page-header-routes";
 import { showsWorkContextChip } from "@/components/work-context-model";
-import { staffAreaMeta } from "@/components/staff-areas";
+import { showsClubYearSelector, staffAreaMeta } from "@/components/staff-areas";
 import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
 import { staffWorkspaceOptions } from "@/modules/access/workspace-contexts";
 import { adminRoleLanding, type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
@@ -87,6 +87,7 @@ export function AppShell({
   user,
   adminRoleView = null,
   siteContentEditor = false,
+  youthDirectory = false,
 }: {
   attendeeAccountAvailable?: boolean;
   /** The default event was chosen automatically (#465): show the notice on pages without `?event=`. */
@@ -107,6 +108,8 @@ export function AppShell({
   adminRoleView?: { held: AdminRole[]; active: AdminRole | null; counts: AdminRoleCounts; healthImport?: boolean } | null;
   /** An active Site content editor who is not a system administrator (#111): adds Homepage & site content to the Admin area. */
   siteContentEditor?: boolean;
+  /** An active Youth Admin who is not a system administrator (#1685): adds the Youth directory to the Clubs area and to Find a page. */
+  youthDirectory?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -151,6 +154,7 @@ export function AppShell({
     isSystemAdmin,
     adminRoleView,
     siteContentEditor,
+    youthDirectory,
     hasEvents: events.length > 0,
     selectedEvent: selectedEvent ? { ...selectedEvent, clubFormsAccess: selectedEvent.clubFormsAccess } : undefined,
     eventlessProfile,
@@ -185,6 +189,7 @@ export function AppShell({
     hiddenCardKeys: selectedHiddenCardKeys,
     clubsAdmin: held.includes("CLUBS_ADMIN") ? { healthImport: viewer.healthImport } : undefined,
     siteContentEditor,
+    youthDirectory,
   });
   const attendeePreviewHref = selectedEvent
     ? `/account/events/${encodeURIComponent(selectedEvent.slug)}?preview=staff`
@@ -350,7 +355,7 @@ export function AppShell({
             menuLabel={place.inEvent ? "Event menu" : staffAreaMeta[place.area].menuLabel}
             title={place.inEvent ? "Event menu" : staffAreaMeta[place.area].menuLabel}
             tabs={rowTabs}
-            trailing={place.area === "clubs" && !place.inEvent ? <ClubsYearSelector /> : openPicker}
+            trailing={showsClubYearSelector(place) ? <ClubsYearSelector /> : place.area === "clubs" && !place.inEvent ? null : openPicker}
           />
           {currentTab?.views && currentTab.views.length > 1 && <StaffViewStrip label={`${currentTab.label} views`} views={currentTab.views} />}
           {!pageDrawsOwnHeader && (

@@ -30,6 +30,7 @@ const client = {
   staffActAs: { findFirst: mocks.actAsFindFirst, updateMany: vi.fn() },
   userSession: { findUnique: mocks.sessionFindUnique },
   clubsAdministratorGrant: { findFirst: mocks.grantFindFirst },
+  youthAdministratorGrant: { findFirst: async () => null },
   organization: { findUnique: mocks.orgFindUnique },
   attendeeMfaEnrollment: { findUnique: async () => ({ status: "ACTIVE" }) },
   attendeePasskey: { count: async () => 0 },

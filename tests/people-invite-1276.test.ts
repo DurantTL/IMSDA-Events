@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   issueAccountToken: vi.fn(),
   clubsGrantFindFirst: vi.fn(),
   clubsGrantUpsert: vi.fn(),
+  youthGrantFindUnique: vi.fn(),
+  youthGrantUpdate: vi.fn(),
   userCreate: vi.fn(),
   userUpdate: vi.fn(),
   userFindMany: vi.fn(),
@@ -59,6 +61,7 @@ const client = {
   passwordResetToken: { updateMany: mocks.tokenUpdateMany },
   userSession: { updateMany: mocks.sessionUpdateMany },
   clubsAdministratorGrant: { findFirst: mocks.clubsGrantFindFirst, findUnique: vi.fn(async () => null), upsert: mocks.clubsGrantUpsert },
+  youthAdministratorGrant: { findUnique: mocks.youthGrantFindUnique, update: mocks.youthGrantUpdate },
   attendeeAccount: { findUnique: mocks.accountFindUnique },
   event: { findMany: mocks.eventFindMany },
   organization: { findMany: mocks.orgFindMany },
@@ -635,6 +638,13 @@ describe("resending and cancelling a staff invite", () => {
     expect(mocks.userCount).toHaveBeenCalledWith({ where: expect.objectContaining({ globalRole: "SYSTEM_ADMIN", id: { not: "u-pend-admin" }, NOT: { credential: { is: { disabledAt: { not: null } } } } }) });
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "SYSTEM_ADMIN_REVOKED" }), expect.anything());
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "STAFF_INVITE_CANCELLED" }), expect.anything());
+  });
+
+  it("removes a Youth Admin role that came with the invite, audited (#1685)", async () => {
+    mocks.youthGrantFindUnique.mockResolvedValue({ revokedAt: null });
+    await cancelStaffInvite("u-pend", "u-sys", now);
+    expect(mocks.youthGrantUpdate).toHaveBeenCalledWith({ where: { userId: "u-pend" }, data: { revokedAt: now, revokedByUserId: "u-sys" } });
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "YOUTH_ADMINISTRATOR_REVOKED", entityId: "u-pend" }), expect.anything());
   });
 
   it("refuses to cancel when it would leave no working system administrator", async () => {

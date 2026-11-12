@@ -2,7 +2,7 @@ import "server-only";
 
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { redirect } from "next/navigation";
-import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
+import { isActiveClubsAdministrator, isActiveYouthAdministrator } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { eventPermissions, isKitchenWithoutEventView, kitchenCountsPath, rolePermissions } from "@/modules/access/permissions";
 import { withoutArchivedEvents } from "@/modules/events/archive";
@@ -95,10 +95,10 @@ async function loadSignedInEvents(options: { allowNoEvents?: boolean; anyStaffWi
   if (
     events.length === 0
     && !options.anyStaffWithoutEvents
-    && !(options.allowNoEvents && (user.globalRole === "SYSTEM_ADMIN" || await isActiveClubsAdministrator(user.id)))
+    && !(options.allowNoEvents && (user.globalRole === "SYSTEM_ADMIN" || await isActiveClubsAdministrator(user.id) || await isActiveYouthAdministrator(user.id)))
   ) {
     // A Clubs Administrator with no event assignment has no event page to land on: their home is the Club administration dashboard (#1226).
-    redirect(await isActiveClubsAdministrator(user.id) ? "/admin/clubs" : "/no-access");
+    redirect(await isActiveClubsAdministrator(user.id) ? "/admin/clubs" : (await isActiveYouthAdministrator(user.id)) ? "/admin/youth" : "/no-access");
   }
   return { user, events };
 }

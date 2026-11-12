@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 const client = {
   staffActAs: { findFirst: mocks.findFirst, updateMany: mocks.updateMany, create: mocks.create },
   clubsAdministratorGrant: { findFirst: mocks.grantFindFirst },
+  youthAdministratorGrant: { findFirst: async () => null },
   $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(client),
 };
 

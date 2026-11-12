@@ -166,6 +166,7 @@ export const staffPageTitles = {
   attendancePoints: "Attendance points",
   eventDebrief: "Event debrief",
   eventBudget: "Budget sheet",
+  eventStaffing: "Event staffing",
   teamResults: "Team results",
   teamForm: "Team form",
   eventContent: "Public content",
@@ -241,6 +242,7 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/attendance-points", "prefix", staffPageTitles.attendancePoints],
   ["/more/debrief", "prefix", staffPageTitles.eventDebrief],
   ["/more/budget", "prefix", staffPageTitles.eventBudget],
+  ["/more/event-staffing", "prefix", staffPageTitles.eventStaffing],
   ["/more/team-results", "prefix", staffPageTitles.teamResults],
   ["/more/event-health", "prefix", staffPageTitles.eventHealth],
   ["/more/event-content", "prefix", staffPageTitles.eventContent],
@@ -807,6 +809,7 @@ export function buildMoreDirectoryCards({
     { key: "attendance-points", group: "people-access", allowed: clubEvent && clubOversight, href: `/more/attendance-points${eventQuery}`, icon: Trophy, title: "Attendance points", description: "Work out club points for attending this event, review who counted for each club and why, and apply the points to the points board.", cta: "Open attendance points" },
     { key: "debrief", group: "people-access", allowed: clubEvent && (clubOversight || has("MANAGE_FORMS")), href: `/more/debrief${eventQuery}`, icon: ClipboardCheck, title: "Event debrief", description: "Ask the event's staff and the Area Coordinators a few questions the morning after the event, and keep the answers for next year.", cta: "Open event debrief" },
     { key: "event-budget", group: "reports", allowed: clubEvent && (clubOversight || has("MANAGE_FINANCE") || has("VIEW_REPORTS")), href: `/more/budget${eventQuery}`, icon: WalletCards, title: "Budget sheet", description: "A one-page planning budget: income and head counts fill in from registrations, add the costs, and compare with last year.", cta: "Open budget sheet" },
+    { key: "event-staffing", group: "people-access", allowed: clubEvent && (clubOversight || has("VIEW_EVENT")), href: `/more/event-staffing${eventQuery}`, icon: UsersRound, title: "Event staffing", description: "List the event's activities, who leads each one, which adults help and how many lifeguards and TLTs each still needs, then print or download it.", cta: "Open event staffing" },
     { key: "event-patches", group: "setup", allowed: clubEvent && has("CONFIGURE_EVENT"), href: `/more/event-patches${eventQuery}`, icon: Trophy, title: "Event patches", description: "Link the patch or pin a club event gives, so directors are suggested it for every member who attended.", cta: "Link patches" },
     { key: "emergency-plans", group: "setup", allowed: has("VIEW_EVENT"), href: `/more/emergency-plan${eventQuery}`, icon: Siren, title: "Emergency plan", description: "Assembly locations, shelters, procedures, and escalation contacts, published in numbered versions and printable for paper.", cta: "Open emergency plan" },
     // Club forms (#610) belong to no event: system administrators, Clubs Administrators and Event Admins of a current event only.

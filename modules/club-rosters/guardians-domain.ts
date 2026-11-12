@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { actAsActorRoleFields } from "@/modules/audit/act-as-actor-role";
 import { EMAIL_FIELD_MESSAGE, isUnchangedEmail, isUnchangedPhone, normalizePhoneAnswer, PHONE_FIELD_MESSAGE, isEmail, validatePhone } from "@/lib/field-validation";
 
 
@@ -163,7 +164,7 @@ export function guardianSlotValues(records: readonly GuardianRecord[] | undefine
 
 export type GuardianActor =
   | { kind: "ATTENDEE"; accountId: string }
-  | { kind: "STAFF_ACTING"; userId: string; actAsId: string; viaClubsAdministrator?: true };
+  | { kind: "STAFF_ACTING"; userId: string; actAsId: string; viaClubsAdministrator?: true; viaYouthAdministrator?: true };
 
 export type GuardianViewer =
   /** The club's own director or deputy (or staff acting as the director): that club only, read and edit. */
@@ -205,5 +206,5 @@ export function guardianAuditActor(viewer: GuardianViewer): { actorUserId?: stri
   if (viewer.kind === "STAFF") return { actorUserId: viewer.userId, metadata: { viewerKind: viewer.kind } };
   return viewer.actor.kind === "ATTENDEE"
     ? { metadata: { viewerKind: viewer.kind, actorAttendeeAccountId: viewer.actor.accountId } }
-    : { actorUserId: viewer.actor.userId, metadata: { viewerKind: viewer.kind, actAsId: viewer.actor.actAsId, ...(viewer.actor.viaClubsAdministrator ? { actorRole: "CLUBS_ADMINISTRATOR" } : {}) } };
+    : { actorUserId: viewer.actor.userId, metadata: { viewerKind: viewer.kind, actAsId: viewer.actor.actAsId, ...actAsActorRoleFields(viewer.actor) } };
 }

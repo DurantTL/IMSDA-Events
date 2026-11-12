@@ -75,6 +75,7 @@ async function subjectFor(userId: string) {
       globalRole: true,
       memberships: { where: { status: "ACTIVE" }, select: { role: true } },
       clubsAdministratorGrant: { select: { revokedAt: true } },
+      youthAdministratorGrant: { select: { revokedAt: true } },
       mfaEnrollment: { select: { id: true, status: true } },
     },
   });
