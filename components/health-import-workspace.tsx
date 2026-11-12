@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ImportSteps } from "@/components/import-steps";
 import { CheckCircle2, CircleAlert, FileUp } from "lucide-react";
 import { cardCell } from "@/components/table-card-labels";
 import type { ImportApplyResult, ImportPreview, ImportPreviewRow } from "@/modules/health-records/import-repository";
@@ -111,6 +112,8 @@ export function HealthImportWorkspace() {
           </p>
         </div>
       </div>
+
+      <ImportSteps current={result ? "Results" : preview ? "Review" : "Preview"} />
 
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 

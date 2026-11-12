@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle2, CircleAlert, FileUp, Upload } from "lucide-react";
+import { ImportSteps } from "@/components/import-steps";
 import { confirmPayload } from "@/modules/club-imports/confirm-payload";
 import { churchStem, earlierImportNotice, inFileDuplicateKeys, skipReasonLabel, submissionYearNote } from "@/modules/club-imports/domain";
 import type { AnnotatedImportDraft, ClubImportResult } from "@/modules/club-imports/repository";
@@ -159,6 +160,8 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
           </p>
         </div>
       </div>
+
+      <ImportSteps current={results ? "Results" : drafts ? "Review" : "Preview"} />
 
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 
