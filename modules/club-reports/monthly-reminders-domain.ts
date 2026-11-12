@@ -192,7 +192,7 @@ export const REMINDER_LOG_PREFIX = "reminders";
 export function turnOnNote(today: string) {
   const window = reminderWindow(today);
   if (window) {
-    return `If you turn reminders on now, clubs that have not submitted the ${reportMonthLabel(window.reportMonth)} record (due ${formatDueDate(reportDueDate(window.reportMonth))}) are emailed on the next scheduled run.`;
+    return `If you turn reminders on now, clubs that have not submitted the ${reportMonthLabel(window.reportMonth)} record (due ${formatDueDate(reportDueDate(window.reportMonth))}) and haven't been reminded yet are emailed on the next scheduled run.`;
   }
   const month = /^\d{4}-\d{2}-\d{2}$/.test(today) ? previousMonth(today.slice(0, 7)) : null;
   return month

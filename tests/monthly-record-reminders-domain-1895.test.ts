@@ -130,7 +130,7 @@ describe("what the emails say", () => {
 
 describe("turnOnNote", () => {
   it("from the 11th, says last month's clubs are emailed on the next scheduled run, with the real dates", () => {
-    expect(turnOnNote("2026-11-12")).toBe("If you turn reminders on now, clubs that have not submitted the October 2026 record (due November 10) are emailed on the next scheduled run.");
+    expect(turnOnNote("2026-11-12")).toBe("If you turn reminders on now, clubs that have not submitted the October 2026 record (due November 10) and haven't been reminded yet are emailed on the next scheduled run.");
   });
   it("before the 11th, says nothing goes out until then", () => {
     expect(turnOnNote("2026-11-05")).toBe("Nothing is sent until the 11th. Then clubs that have not submitted the October 2026 record are emailed on the next scheduled run.");

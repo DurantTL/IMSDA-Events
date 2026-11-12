@@ -47,6 +47,7 @@ export function MonthlyRecordReminderSwitch({ clubYear, enabled, started, turnOn
         </button>
       </div>
       {!enabled && turnOnNote && <p className={styles.note}>{turnOnNote}</p>}
+      {enabled && <p className={styles.note}>Turning off applies to {clubYear} only. Once started, each new club year starts on.</p>}
       <FormMessage alwaysMounted message={message?.text ?? ""} tone={message?.tone ?? "success"} />
     </div>
   );
