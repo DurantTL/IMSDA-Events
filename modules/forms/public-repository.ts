@@ -231,9 +231,9 @@ function lodgingStepError(error: LodgingError, eventId: string) {
   );
 }
 
-function merchandiseStepError(message: string) {
+function merchandiseStepError(message: string, detail?: { variantId: string; currentUnitPriceCents: number }) {
   return new PublicRegistrationError("INVALID_SUBMISSION", message, [
-    { kind: "validation", code: "INVALID_RESPONSE", fieldId: null, key: "merchandise", path: "merchandise", attendeeIndex: null, message },
+    { kind: "validation", code: "INVALID_RESPONSE", fieldId: null, key: "merchandise", path: "merchandise", attendeeIndex: null, message, ...(detail ? { merchandise: detail } : {}) },
   ]);
 }
 
@@ -1555,7 +1555,7 @@ async function createPublicRegistrationTransaction(
       });
     } catch (error) {
       if (!(error instanceof RegistrationMerchandiseError)) throw error;
-      throw merchandiseStepError(merchandiseIssueMessage(error));
+      throw merchandiseStepError(merchandiseIssueMessage(error), error.detail);
     }
   }
   const registrationAttendeeType = createdAttendees.length > 0

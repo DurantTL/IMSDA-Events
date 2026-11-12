@@ -81,6 +81,8 @@ export type PublicRegistrationIssue = {
   path: string;
   attendeeIndex: number | null;
   message: string;
+  /** A refused merchandise price: the size and the price it has now (#146). */
+  merchandise?: { variantId: string; currentUnitPriceCents: number };
 };
 
 export type PublicContactIdentity = {

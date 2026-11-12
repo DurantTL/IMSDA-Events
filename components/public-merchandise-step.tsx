@@ -34,7 +34,7 @@ export function PublicMerchandiseStep({ offer, selection, issues = [], onChange 
   return (
     <section className="public-registration-review-card" data-testid="merchandise-step" aria-labelledby="public_merchandise_title">
       <p className="public-registration-eyebrow">Optional</p>
-      <h3 id="public_merchandise_title">Merchandise</h3>
+      <h3 id="public_merchandise_title">Add merchandise</h3>
       <p className={styles.lead}>{merchandiseNotChargedNotice}</p>
       {issues.length > 0 ? <div role="alert">{issues.map((issue) => <p className={styles.error} key={issue.message}>{issue.message}</p>)}</div> : null}
       {offer.products.map((product) => (

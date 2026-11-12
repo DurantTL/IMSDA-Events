@@ -54,7 +54,9 @@ export function staffOrderFromRecord(order: {
     purchaserName: snapshotText(order.purchaserSnapshot, "name") ?? "Unknown",
     status: order.status,
     statusWord: merchandiseOrderStatusWords[order.status],
-    // No registration link (a staff order) counts; a deleted or cancelled registration does not.
+    // An order with no registration link counts. That covers a staff order and also an order whose registration was
+    // deleted (the link is cleared on delete), so a deleted registration's order still counts for now (follow-up).
+    // A cancelled registration's order does not count.
     registrationActive: order.registrationId === null ? order.registration === null : order.registration !== null && order.registration.status !== "CANCELLED",
     totalCents: order.totalCents,
     lines: order.lines.map((line) => ({ productName: line.productNameSnapshot, variantLabel: line.variantLabelSnapshot, quantity: line.quantity, lineTotalCents: line.lineTotalCents })),

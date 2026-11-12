@@ -156,7 +156,7 @@ async function main() {
   assert(cancelledList.orders.some((o) => o.id === order.id && !o.registrationActive), "the order stays listed, marked as having a cancelled registration");
   assert(!cancelledList.totals.some((row) => row.variantLabel === "Large" && row.quantity >= 2), "its units are left out of the totals");
   const stale = await caught(submitPublicRegistration(main.slug, formSlug, input(main, "stale", [{ variantId: main.variants.large, quantity: 1, shownUnitPriceCents: 100 }])));
-  assert(stale instanceof PublicRegistrationError && stale.message.includes("price of Camp Shirt Large changed"), "a stale shown price is refused");
+  assert(stale instanceof PublicRegistrationError && stale.message.includes("price of Camp Shirt Large changed to $30.00") && stale.issues[0]?.merchandise?.currentUnitPriceCents === 3000 && stale.issues[0].merchandise.variantId === main.variants.large, "a stale shown price is refused");
   assert((await caught(submitPublicRegistration(main.slug, formSlug, input(main, "toomany", [{ variantId: main.variants.large, quantity: 6 }])))) instanceof PublicRegistrationError, "a quantity over the maximum is refused");
 
   // A waitlisted registration orders nothing, and says so.

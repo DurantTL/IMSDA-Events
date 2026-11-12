@@ -96,6 +96,29 @@ describe("individual registration form with merchandise", () => {
     expect(container.textContent).toContain("$50.00");
   });
 
+  it("takes the new price after a price-changed refusal so the next submit carries it", async () => {
+    const message = "Merchandise: The price of Camp Shirt Medium changed to $30.00. Check the new merchandise total and submit again.";
+    fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify({
+      error: "INVALID_SUBMISSION", message,
+      issues: [{ kind: "validation", code: "INVALID_RESPONSE", fieldId: null, key: "merchandise", path: "merchandise", attendeeIndex: null, message, merchandise: { variantId: "v_m", currentUnitPriceCents: 3000 } }],
+    }), { status: 400 }));
+    mounted = await mount(createElement(PublicRegistrationForm, { ...props, merchandise: offer } as never));
+    const { container } = mounted;
+    await fillAndReachReview(container);
+    await choose(container.querySelector<HTMLSelectElement>('select[aria-label="Camp Shirt Medium quantity"]')!, "2");
+    await act(async () => { container.querySelector("form")!.requestSubmit(); });
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { await Promise.resolve(); });
+    const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>;
+    expect(JSON.parse(String(calls[0]![1].body)).merchandise).toEqual([{ variantId: "v_m", quantity: 2, shownUnitPriceCents: 2500 }]);
+    expect(container.textContent).toContain("changed to $30.00");
+    expect(container.textContent).toContain("$60.00");
+    await act(async () => { container.querySelector("form")!.requestSubmit(); });
+    await act(async () => { await Promise.resolve(); });
+    expect(calls).toHaveLength(2);
+    expect(JSON.parse(String(calls[1]![1].body)).merchandise).toEqual([{ variantId: "v_m", quantity: 2, shownUnitPriceCents: 3000 }]);
+  });
+
   it("shows no merchandise section for a club registration or when there is no offer", async () => {
     mounted = await mount(createElement(PublicRegistrationForm, props as never));
     expect(mounted.container.querySelector('[data-testid="merchandise-step"]')).toBeNull();

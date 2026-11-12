@@ -123,7 +123,8 @@ describe("planning a registration merchandise order", () => {
   it("refuses a stale shown price with its own code, and accepts a matching one", () => {
     const c = catalog([variant("v1", "Medium")]);
     expect(codeOf(() => plan(c, [{ variantId: "v1", quantity: 1, shownUnitPriceCents: 2000 }]))).toBe("PRICE_CHANGED");
-    expect(() => plan(c, [{ variantId: "v1", quantity: 1, shownUnitPriceCents: 2000 }])).toThrow("the price of Camp Shirt Medium changed. Review it and submit again.");
+    expect(() => plan(c, [{ variantId: "v1", quantity: 1, shownUnitPriceCents: 2000 }])).toThrow("The price of Camp Shirt Medium changed to $25.00. Check the new merchandise total and submit again.");
+    try { plan(c, [{ variantId: "v1", quantity: 1, shownUnitPriceCents: 2000 }]); } catch (error) { expect((error as RegistrationMerchandiseError).detail).toEqual({ variantId: "v1", currentUnitPriceCents: 2500 }); }
     expect(plan(c, [{ variantId: "v1", quantity: 1, shownUnitPriceCents: 2500 }]).totalCents).toBe(2500);
   });
 

@@ -668,9 +668,17 @@ export function PublicRegistrationForm({
   // Merchandise (#146): its own optional section on an individual registration; a quantity per size, priced by the server.
   const merchandiseActive = Boolean(merchandise) && !club && !group;
   const [merchandiseSelection, setMerchandiseSelection] = useState<MerchandiseSelection>({});
+  // Prices the server said have changed since this page loaded, by size (#146): shown and sent from then on.
+  const [merchandisePriceUpdates, setMerchandisePriceUpdates] = useState<Record<string, number>>({});
+  const merchandiseOffer = useMemo<PublicMerchandiseOffer | null>(() => (merchandise ? {
+    products: merchandise.products.map((product) => ({
+      ...product,
+      variants: product.variants.map((variant) => (merchandisePriceUpdates[variant.id] === undefined ? variant : { ...variant, priceCents: merchandisePriceUpdates[variant.id]! })),
+    })),
+  } : null), [merchandise, merchandisePriceUpdates]);
   const merchandiseChosen = useMemo(
-    () => (merchandiseActive && !joiningWaitlist ? merchandiseLines(merchandise, merchandiseSelection) : []),
-    [joiningWaitlist, merchandise, merchandiseActive, merchandiseSelection],
+    () => (merchandiseActive && !joiningWaitlist ? merchandiseLines(merchandiseOffer, merchandiseSelection) : []),
+    [joiningWaitlist, merchandiseOffer, merchandiseActive, merchandiseSelection],
   );
   const merchandiseSubmission = merchandiseChosen.map((line) => ({ variantId: line.variantId, quantity: line.quantity, shownUnitPriceCents: line.unitPriceCents }));
   const [error, setError] = useState("");
@@ -3007,7 +3015,7 @@ export function PublicRegistrationForm({
                 <li key={line.variantId}>{line.quantity} × {line.productName} {line.variantLabel}: <span translate="no">{formatCents(line.lineTotalCents)}</span></li>
               ))}
             </ul>
-            <p>Merchandise subtotal <strong translate="no">{formatCents(merchandiseSubtotalCents(merchandise, merchandiseSelection))}</strong>. {merchandiseNotChargedNotice}</p>
+            <p>Merchandise subtotal <strong translate="no">{formatCents(merchandiseSubtotalCents(merchandiseOffer, merchandiseSelection))}</strong>. {merchandiseNotChargedNotice}</p>
           </section>
         )}
 
@@ -3351,6 +3359,12 @@ export function PublicRegistrationForm({
           setPromoCodeQuote(null);
           setPromoCodeNotice(promoIssue.message);
         }
+        // A merchandise price that changed: take the new price so the next submit carries it (#146).
+        const priceChanges = nextIssues.flatMap((issue) => {
+          const detail = (issue as FormIssue & { merchandise?: { variantId?: unknown; currentUnitPriceCents?: unknown } }).merchandise;
+          return typeof detail?.variantId === "string" && Number.isSafeInteger(detail.currentUnitPriceCents) ? [[detail.variantId, detail.currentUnitPriceCents as number] as const] : [];
+        });
+        if (priceChanges.length > 0) setMerchandisePriceUpdates((current) => ({ ...current, ...Object.fromEntries(priceChanges) }));
         setServerIssues(nextIssues);
         showIssues(
           nextIssues,
@@ -3749,11 +3763,11 @@ export function PublicRegistrationForm({
                   }}
                 />
               )}
-              {currentStep.isReview && merchandiseActive && merchandise && (joiningWaitlist ? (
+              {currentStep.isReview && merchandiseActive && merchandiseOffer && (joiningWaitlist ? (
                 <p className="public-registration-review-waitlist">Merchandise cannot be ordered with a waitlist request.</p>
               ) : (
                 <PublicMerchandiseStep
-                  offer={merchandise}
+                  offer={merchandiseOffer}
                   selection={merchandiseSelection}
                   issues={issues.filter((issue) => issue.key === "merchandise")}
                   onChange={(next) => {

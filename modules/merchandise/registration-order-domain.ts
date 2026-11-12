@@ -2,6 +2,7 @@ import {
   projectMerchandiseCatalog,
   type MerchandiseProjectionInput,
 } from "@/modules/merchandise/catalog-domain";
+import { formatCents } from "@/modules/payments/format-cents";
 import {
   defaultMerchandiseMaxQuantity,
   type PublicMerchandiseOffer,
@@ -17,7 +18,12 @@ import {
 export type RegistrationMerchandiseErrorCode = "VARIANT_UNAVAILABLE" | "SOLD_OUT" | "INVALID_QUANTITY" | "DUPLICATE_VARIANT" | "PRICE_CHANGED";
 
 export class RegistrationMerchandiseError extends Error {
-  constructor(public readonly code: RegistrationMerchandiseErrorCode, message: string) {
+  constructor(
+    public readonly code: RegistrationMerchandiseErrorCode,
+    message: string,
+    /** For PRICE_CHANGED: the size and its current price, so the form can show the new price. */
+    public readonly detail?: { variantId: string; currentUnitPriceCents: number },
+  ) {
     super(message);
     this.name = "RegistrationMerchandiseError";
   }
@@ -108,7 +114,11 @@ export function planRegistrationMerchandiseOrder(
     const name = `${entry.product.name} ${entry.variant.label}`;
     const availability = entry.variant.availability;
     if (line.shownUnitPriceCents !== undefined && line.shownUnitPriceCents !== availability.priceCents) {
-      throw new RegistrationMerchandiseError("PRICE_CHANGED", `the price of ${name} changed. Review it and submit again.`);
+      throw new RegistrationMerchandiseError(
+        "PRICE_CHANGED",
+        `The price of ${name} changed to ${formatCents(availability.priceCents)}. Check the new merchandise total and submit again.`,
+        { variantId: line.variantId, currentUnitPriceCents: availability.priceCents },
+      );
     }
     // The picker and the server agree: with no staff maximum, the default maximum applies.
     const maxQuantity = availability.maxQuantity ?? defaultMerchandiseMaxQuantity;
