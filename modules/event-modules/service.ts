@@ -5,6 +5,7 @@ import { getPrisma } from "@/lib/prisma";
 import { AccessDeniedError, type AuthenticatedUser } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { onDebriefDisabled, onDebriefEnabled } from "@/modules/event-debriefs/lifecycle";
+import { ensureInspectionEventsIfOn } from "@/modules/event-inspections/setup";
 import { approvePendingRequestsForEnabledModule } from "@/modules/event-modules/request-approval";
 import { deliverRequestEmails } from "@/modules/event-modules/request-email";
 import {
@@ -249,6 +250,8 @@ export async function enableModuleInTransaction(
   }, tx);
   // The Debrief (#1679) makes its questions and schedules its emails the moment it is switched on, however it is switched on.
   if (key === "debrief") await onDebriefEnabled(tx, { eventId, actor: { kind: "staff", userId: actor!.id } });
+  // Inspections (#1896) makes its two scored events the same way, however it is switched on.
+  if (key === "inspection-scoring") await ensureInspectionEventsIfOn(tx, eventId, actor!.id);
   return { changed: true, messageIds };
 }
 

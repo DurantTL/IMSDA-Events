@@ -13,6 +13,7 @@ export type PromoCodeEditorRecord = {
   maximumUses: number | null;
   maximumDiscountCents: number | null;
   sponsoringOrganizationId?: string | null;
+  attendeeTypeCodes?: readonly string[];
 };
 
 export type RawPromoCodeEditorDraft = {
@@ -26,6 +27,8 @@ export type RawPromoCodeEditorDraft = {
   maximumUses: string;
   maximumDiscount: string;
   sponsoringOrganizationId?: string;
+  /** Checked attendee types; empty means the code applies to every attendee type (#102). */
+  attendeeTypeCodes?: readonly string[];
 };
 
 export type NormalizedPromoCodeEditorDraft = {
@@ -39,7 +42,13 @@ export type NormalizedPromoCodeEditorDraft = {
   maximumUses: number | null;
   maximumDiscountCents: number | null;
   sponsoringOrganizationId: string | null;
+  /** Sorted and deduplicated so the order people tick them in is never a "change". */
+  attendeeTypeCodes: string[];
 };
+
+function normalizedAttendeeTypeCodes(codes: readonly string[] | undefined) {
+  return [...new Set((codes ?? []).map((code) => code.trim()).filter(Boolean))].sort();
+}
 
 function normalizedScaledNumber(value: string, multiplier = 1) {
   const trimmed = value.trim();
@@ -68,6 +77,7 @@ export function emptyPromoCodeEditorDraft(): NormalizedPromoCodeEditorDraft {
     maximumUses: null,
     maximumDiscountCents: null,
     sponsoringOrganizationId: null,
+    attendeeTypeCodes: [],
   };
 }
 
@@ -88,6 +98,7 @@ export function savedPromoCodeEditorDraft(
       ? promo.maximumDiscountCents
       : null,
     sponsoringOrganizationId: promo.sponsoringOrganizationId ?? null,
+    attendeeTypeCodes: normalizedAttendeeTypeCodes(promo.attendeeTypeCodes),
   };
 }
 
@@ -111,6 +122,7 @@ export function normalizePromoCodeEditorDraft(
       ? normalizedScaledNumber(draft.maximumDiscount, 100)
       : null,
     sponsoringOrganizationId: draft.sponsoringOrganizationId?.trim() || null,
+    attendeeTypeCodes: normalizedAttendeeTypeCodes(draft.attendeeTypeCodes),
   };
 }
 
@@ -127,5 +139,6 @@ export function isPromoCodeEditorDraftDirty(
     || saved.minimumSubtotalCents !== current.minimumSubtotalCents
     || saved.maximumUses !== current.maximumUses
     || saved.maximumDiscountCents !== current.maximumDiscountCents
-    || saved.sponsoringOrganizationId !== current.sponsoringOrganizationId;
+    || saved.sponsoringOrganizationId !== current.sponsoringOrganizationId
+    || saved.attendeeTypeCodes.join("\u0000") !== current.attendeeTypeCodes.join("\u0000");
 }

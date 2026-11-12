@@ -1,0 +1,48 @@
+/* Church club summary (#1711): staff read-only, and it prints on one letter page. */
+.sheet { display: grid; gap: 12px; }
+.printOnly { display: none; }
+.clubs { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.club { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); padding: 14px 16px; break-inside: avoid; }
+.clubName { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); font-weight: 800; overflow-wrap: anywhere; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 8px 20px; margin: 0; }
+.facts div { min-width: 0; }
+.facts dt { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.facts dd { margin: 0; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.plain { margin: 0; padding: 0; list-style: none; }
+.none { color: var(--muted); }
+/* Three across on a phone, six on a tablet, all twelve in one row on a wide screen: August never wraps alone. */
+.months { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 0; list-style: none; }
+.month { display: grid; gap: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.3; }
+.monthName { color: var(--muted); }
+.monthStatus { color: var(--ink); font-weight: 700; }
+.missing { border-color: var(--danger-line); background: var(--danger-soft); }
+.missing .monthStatus { color: var(--danger); }
+.due { background: var(--imsda-gold-soft); }
+.future .monthStatus { color: var(--muted); font-weight: 400; }
+.empty { margin: 0; border: 1px dashed var(--line); border-radius: var(--radius-card); padding: 14px 16px; color: var(--muted); }
+
+@media (min-width: 640px) {
+  .months { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1180px) {
+  .months { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+}
+
+/* No @page rule: an unnamed one would apply to every page once loaded, and naming the page on this nested sheet forces a blank first sheet. The default portrait page fits five clubs. */
+@media print {
+  .noPrint { display: none !important; }
+  /* Print sizes are set once here, in points, so the sheet fits one page. */
+  .sheet { --print-title: 9pt; --print-text: 7.5pt; gap: 3pt; }
+  .printOnly { display: block; margin: 0; font-size: var(--print-title); font-weight: 700; }
+  .clubs { gap: 3pt; }
+  .club { gap: 2pt; padding: 3pt 5pt; border-radius: 0; border-color: var(--muted); }
+  .clubName { font-size: var(--print-title); line-height: 1.2; }
+  .facts { grid-template-columns: 1.2fr 0.8fr 1.4fr 0.9fr; gap: 0 8pt; }
+  .facts dt, .facts dd, .month { font-size: var(--print-text); line-height: 1.2; }
+  .inlineList li { display: inline; }
+  .inlineList li:not(:last-child)::after { content: "; "; }
+  .eventList { columns: 2; column-gap: 8pt; }
+  .months { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 1pt; }
+  .month { padding: 0 2pt; border-radius: 0; }
+}

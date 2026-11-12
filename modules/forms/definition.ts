@@ -13,8 +13,12 @@ export const formFieldTypes = ["TEXT", "LONG_TEXT", "EMAIL", "PHONE", "SELECT", 
  * The types an information form may use: the shared ones plus MEMBER_LIST (#1222). `formFieldTypes` stays without it, so the
  * club form builder, the question library and the registration builder never offer or accept a member list; the registration
  * definition schema refuses it explicitly (see `registrationFormDefinitionSchema`).
+ *
+ * INFORMATION (#284) is the display-only Information block: a heading, text and an optional note shown on a registration
+ * form where it is placed. It is never answered, so it lives with the types that are not offered by the club form builder
+ * or the question library; information forms refuse it (`modules/information-forms/definition.ts`).
  */
-export const informationFormFieldTypes = [...formFieldTypes, "MEMBER_LIST"] as const;
+export const informationFormFieldTypes = [...formFieldTypes, "MEMBER_LIST", "INFORMATION"] as const;
 export const formFieldScopes = ["REGISTRATION", "ATTENDEE"] as const;
 export const choiceFieldTypes = ["SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE"] as const;
 export const conditionOperators = ["EQUALS", "NOT_EQUALS", "INCLUDES", "NOT_EMPTY"] as const;
@@ -169,6 +173,29 @@ export const signatureConfigSchema = z.object({
 });
 export type SignatureConfig = z.infer<typeof signatureConfigSchema>;
 
+/** The longest text an Information block carries (#284): safe Markdown, never HTML, images or video. */
+export const INFORMATION_TEXT_MAX = 3000;
+/** The longest highlighted note an Information block carries (#284). */
+export const INFORMATION_NOTE_MAX = 500;
+
+/**
+ * What an INFORMATION field shows (#284). The field's `label` is the block's heading. `text` and `note` are written in the
+ * constrained Markdown of `modules/events/content-markdown.ts` and rendered by React, so there is no raw HTML anywhere.
+ */
+export const informationConfigSchema = z.object({
+  text: z.string().trim().min(1, "Enter the text this block shows.").max(INFORMATION_TEXT_MAX),
+  note: z.string().trim().min(1).max(INFORMATION_NOTE_MAX).optional(),
+}).strict();
+export type InformationConfig = z.infer<typeof informationConfigSchema>;
+
+/** The text a new Information block starts with, so it is a valid field the moment it is added. */
+export const INFORMATION_PLACEHOLDER_TEXT = "Write the text people should read here.";
+
+/** True for the display-only Information block: it is shown, never answered, priced, counted or exported (#284). */
+export function isInformationField(field: { type: string }) {
+  return field.type === "INFORMATION";
+}
+
 export const memberColumnTypes = ["TEXT", "NUMBER", "SELECT"] as const;
 export const memberColumnSchema = z.object({
   key: z.string().trim().min(2).max(40).regex(/^[a-z][a-z0-9_]*$/, "Member list column keys use lowercase letters, numbers, and underscores."),
@@ -320,7 +347,22 @@ export const formFieldSchema = z.object({
    * typed name; the signed text, timestamp and IP live in the append-only signature evidence table.
    */
   signature: signatureConfigSchema.optional(),
+  /**
+   * What an INFORMATION field shows (#284). Required on that type and refused on every other. The block is display only:
+   * it has no answer, so nothing under its key is ever saved, validated, priced, counted or exported.
+   */
+  information: informationConfigSchema.optional(),
 }).superRefine((field, context) => {
+  if (field.type === "INFORMATION") {
+    if (!field.information) {
+      context.addIssue({ code: "custom", path: ["information"], message: "An information block needs its text." });
+    }
+    if (field.required || field.scope !== "REGISTRATION" || field.options.length > 0 || field.optionSource || field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.creditCentsPerUnit !== undefined || field.capUnitsAtAttendeeCount || field.ageBounds || field.autoDate || field.optionalWhen || field.availabilityMode || field.choiceLimits || field.memberColumns || field.acknowledgment || field.signature) {
+      context.addIssue({ code: "custom", path: ["type"], message: "An information block is shown once for the whole registration and carries no answer, choices, price, credit or requirement." });
+    }
+  } else if (field.information) {
+    context.addIssue({ code: "custom", path: ["information"], message: "Only an information block carries information text." });
+  }
   if (field.type === "SIGNATURE") {
     if (!field.signature) {
       context.addIssue({ code: "custom", path: ["signature"], message: "A signature needs the statement to be signed." });
@@ -1765,6 +1807,8 @@ function pricedLineItem(
   attendee?: { index: number; label: string },
   registrationContext?: { attendeeCount: number },
 ): FormCalculation["lineItems"][number] | null {
+  // An Information block (#284) is never priced.
+  if (isInformationField(field)) return null;
   if (!isFieldVisible(field, responses)) return null;
   const value = responses[field.key];
   if (field.creditCentsPerUnit !== undefined) {
@@ -2094,6 +2138,8 @@ export function validateTestResponses(
     for (const field of section.fields) {
       if (scope && field.scope !== scope) continue;
       if (ignoredFieldKeys.has(field.key)) continue;
+      // An Information block (#284) is shown, never answered: nothing under its key is validated or required.
+      if (isInformationField(field)) continue;
       if (!isFieldVisible(field, responses)) continue;
       const value = responses[field.key];
       const requiredHere = isFieldRequired(field, responses);
