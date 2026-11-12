@@ -19,6 +19,7 @@ import { isPublicState, type EventLifecycleStateName } from "@/modules/events/li
 import { collectEventReadinessWarnings } from "@/modules/events/readiness-warnings";
 import type { EventSettingsInput } from "@/modules/events/schemas";
 import { writeCreationModules, writeDefaultModules } from "@/modules/event-modules/defaults";
+import { afterCreationModules, reprojectDebriefBatches } from "@/modules/event-debriefs/lifecycle";
 import { eventInstant, keepClockTime } from "@/modules/events/event-times";
 import { creationModuleKeys, type EventModuleKey } from "@/modules/event-modules/catalog";
 import { linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
@@ -353,6 +354,7 @@ export async function createEvent(
     });
     // The chosen modules are written in the creating transaction (#965), so the event and its switches exist together or not at all.
     await writeCreationModules(tx, event.id, audience, options.modules);
+    await afterCreationModules(tx, { eventId: event.id, moduleKeys: creationModuleKeys(audience, options.modules), actorUserId });
     // In the same transaction: an item that can't be linked any more fails the whole creation, leaving no event behind.
     if (options.calendarEntryId) {
       await linkNewEventToCalendarEntry(tx, { entryId: options.calendarEntryId, eventId: event.id, actorUserId });
@@ -560,6 +562,10 @@ export async function updateEventSettings(
     // modules, even one a system administrator had switched off. Switching away
     // from CLUB removes nothing.
     if (audience === "CLUB" && current.audience !== "CLUB") await writeDefaultModules(tx, eventId, "CLUB");
+    // The debrief's emails follow the event's end date and zone (#1679); nothing is read unless one of them moved.
+    if (input.timezone !== current.timezone || keepClockTime(current.endsAt, current.timezone, input.endsOn, input.timezone).getTime() !== current.endsAt.getTime()) {
+      await reprojectDebriefBatches(tx, eventId);
+    }
     const requestedInstructions = input.approvedPaymentInstructions;
     const previousInstructions = currentPaymentInstructions?.instructions ?? null;
     if (requestedInstructions !== undefined && requestedInstructions !== previousInstructions) {

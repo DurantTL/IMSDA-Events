@@ -1652,6 +1652,10 @@ async function prepareAccountEmailBody(
   if (input.templateKey === "INFORMATION_FORM_SUBMITTED") {
     return { bodyText: input.bodyText };
   }
+  // Event debrief invitation and reminder (#1679): a link to the form and no sentinel; never rewrite anything in it.
+  if (input.templateKey === "EVENT_DEBRIEF_INVITE" || input.templateKey === "EVENT_DEBRIEF_REMINDER") {
+    return { bodyText: input.bodyText };
+  }
   if (input.templateKey?.startsWith("NEW_CLUB_APPLICATION_")) {
     return { bodyText: input.bodyText };
   }

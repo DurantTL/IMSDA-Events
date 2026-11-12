@@ -1,0 +1,7 @@
+.panel { display: grid; gap: 14px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.state { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.check input { width: 24px; height: 24px; flex: none; }
+.help { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; }
+.panel button, .panel a { min-height: 44px; }

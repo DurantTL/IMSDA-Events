@@ -37,6 +37,7 @@ import { parseEventContentItems } from "@/modules/events/content-schemas";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { getEventSettings } from "@/modules/events/repository";
 import { writeCloneModules } from "@/modules/event-modules/defaults";
+import { copyDebriefSetup } from "@/modules/event-debriefs/lifecycle";
 import { createRegistrationFormFromDefinitionInTransaction } from "@/modules/forms/repository";
 
 export class EventCloneOperationError extends Error {
@@ -376,6 +377,8 @@ export async function cloneEvent(actorUserId: string, rawInput: unknown) {
       await tx.eventMembership.create({ data: { eventId: event.id, userId: actorUserId, role: "EVENT_ADMIN", status: "ACTIVE" } });
       // Module switches follow the event details (#741): see `writeCloneModules`.
       await writeCloneModules(tx, { sourceEventId: input.sourceEventId, targetEventId: event.id, audience: event.audience, detailsCopied: include.eventDetails });
+      // The Debrief (#1679): the copy shows the source's answers read only, and its own schedule follows its own dates.
+      await copyDebriefSetup(tx, { sourceEventId: input.sourceEventId, targetEventId: event.id, actorUserId });
 
       const copied: Record<string, number> = Object.fromEntries(cloneDomainKeys.map((key) => [key, 0]));
       const sourceVersions: { forms: Array<{ sourceFormId: string; versionId: string; versionNumber: number; newFormId: string }>; messageTemplates: Array<{ key: string; versionId: string; versionNumber: number }> } = { forms: [], messageTemplates: [] };

@@ -4,6 +4,7 @@ import { InformationFormScope, InformationFormStatus, InformationFormVersionStat
 import { getPrisma } from "@/lib/prisma";
 import { parseStoredInformationFormDefinition, type InformationFormDefinition } from "@/modules/information-forms/definition";
 import { getPublicEventLanding } from "@/modules/events/public-repository";
+import { DEBRIEF_MODULE_KEY } from "@/modules/event-debriefs/domain";
 
 /**
  * What a visitor to an information form's public address sees (#1150). Only OPEN and CLOSED forms with a published
@@ -19,7 +20,7 @@ export type PublicInformationFormView =
   | { state: "CLOSED"; id: string; name: string; eventName: string | null }
   | {
     state: "OPEN";
-    form: { id: string; name: string; fillAccess: "ANYONE_WITH_LINK" | "SIGNED_IN"; closesAt: Date | null; definition: InformationFormDefinition };
+    form: { id: string; name: string; fillAccess: "ANYONE_WITH_LINK" | "SIGNED_IN"; closesAt: Date | null; definition: InformationFormDefinition; /** Set for the Debrief's own forms (#1679), which only their audience may answer. */ purpose: "DEBRIEF" | "DIRECTOR_EVALUATION" | null };
     eventName: string | null;
   };
 
@@ -54,11 +55,18 @@ export async function resolvePublicInformationForm(target: PublicInformationForm
   });
   const version = form?.versions[0];
   if (!form || !version) return { state: "NOT_FOUND" };
+  if (form.purpose) {
+    // A debrief form of an event whose Debrief is switched off does not exist for anyone.
+    const switchedOn = form.eventId
+      ? await getPrisma().eventModule.findUnique({ where: { eventId_moduleKey: { eventId: form.eventId, moduleKey: DEBRIEF_MODULE_KEY } }, select: { id: true } })
+      : null;
+    if (!switchedOn) return { state: "NOT_FOUND" };
+  }
   if (form.status === InformationFormStatus.CLOSED || (form.closesAt && form.closesAt <= now)) return { state: "CLOSED", id: form.id, name: form.name, eventName };
   if (form.opensAt && form.opensAt > now) return { state: "NOT_YET_OPEN", id: form.id, name: form.name, opensAt: form.opensAt, eventName };
   return {
     state: "OPEN",
     eventName,
-    form: { id: form.id, name: form.name, fillAccess: form.fillAccess, closesAt: form.closesAt, definition: parseStoredInformationFormDefinition(version.definition) },
+    form: { id: form.id, name: form.name, fillAccess: form.fillAccess, closesAt: form.closesAt, definition: parseStoredInformationFormDefinition(version.definition), purpose: form.purpose },
   };
 }

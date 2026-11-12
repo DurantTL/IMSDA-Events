@@ -9,6 +9,7 @@ import { InformationFormError } from "@/modules/information-forms/errors";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { sendInformationFormSubmittedAlert } from "@/modules/information-forms/submission-alert";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { debriefFormAccess, hasAnsweredDebrief } from "@/modules/event-debriefs/access";
 import { toCsv } from "@/modules/reporting/csv";
 
 /** One member row with its text trimmed and a typed-in age as a number; anything unexpected is left for the validator to refuse. */
@@ -235,6 +236,16 @@ export async function storeInformationFormResponse(input: {
   const isOpen = form.status === InformationFormStatus.OPEN && version && (!form.opensAt || form.opensAt <= now) && (!form.closesAt || form.closesAt > now);
   if (!isOpen || !version) throw new InformationFormError("FORM_NOT_OPEN", "This form is not taking answers right now.");
   if (form.fillAccess === "SIGNED_IN" && !input.attendeeAccountId) throw new InformationFormError("SIGN_IN_REQUIRED", "Sign in to answer this form.");
+  // The debrief and the director evaluation (#1679) take an answer only from the people they were sent to, one each. Decided
+  // here, on the server, whatever page or request got this far.
+  const debrief = form.purpose ? await debriefFormAccess(form.id, input.attendeeAccountId, now) : { kind: "NOT_DEBRIEF" as const };
+  if (debrief.kind === "DENIED") {
+    if (debrief.reason === "SIGN_IN_REQUIRED") throw new InformationFormError("SIGN_IN_REQUIRED", "Sign in to answer this form.");
+    throw new InformationFormError("NOT_ALLOWED", "This form is not available to your account.");
+  }
+  if (debrief.kind === "ALLOWED" && input.attendeeAccountId && await hasAnsweredDebrief(form.id, input.attendeeAccountId)) {
+    throw new InformationFormError("ALREADY_ANSWERED", "You have already answered this form. Thank you.");
+  }
   const definition = parseInformationFormDefinition(version.definition);
   // Only keys the version asks (and shows) are kept, so a stray key can never be stored.
   const answers: Record<string, unknown> = {};
