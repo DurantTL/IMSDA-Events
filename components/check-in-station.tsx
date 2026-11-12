@@ -83,7 +83,7 @@ type CheckInAnswer = {
   handOutParts?: { keyTypes: string[]; rooms: Array<{ attendeeId: string; label: string }> };
 };
 
-type AttentionEntry = { id: string; text: string };
+type AttentionEntry = { id: string; name: string; text: string };
 
 type ApiFailure = { error?: string; message?: string };
 
@@ -170,7 +170,13 @@ export function CheckInStationScreen({
   const [queue, setQueue] = useState<StationQueuedBatch[]>([]);
   const queueRef = useRef<StationQueuedBatch[]>([]);
   const [storageFailed, setStorageFailed] = useState(false);
-  const [attention, setAttention] = useState<AttentionEntry[]>([]);
+  const [attention, setAttentionState] = useState<AttentionEntry[]>([]);
+  // Kept in a ref too, so a stop that happens inside the sync loop sees entries added a moment earlier.
+  const attentionRef = useRef<AttentionEntry[]>([]);
+  function setAttention(update: (current: AttentionEntry[]) => AttentionEntry[]) {
+    attentionRef.current = update(attentionRef.current);
+    setAttentionState(attentionRef.current);
+  }
   const syncingRef = useRef(false);
   const stoppedRef = useRef(false);
   const familyRef = useRef<StationFamily | null>(null);
@@ -303,7 +309,7 @@ export function CheckInStationScreen({
     if (outcome.attention.length > 0) {
       setAttention((current) => [
         ...current,
-        ...outcome.attention.map((entry) => ({ id: `${batch.id}:${entry.attendeeId}`, text: stationAttentionLine(nameOf(entry.attendeeId), entry) })),
+        ...outcome.attention.map((entry) => ({ id: `${batch.id}:${entry.attendeeId}`, name: nameOf(entry.attendeeId), text: stationAttentionLine(nameOf(entry.attendeeId), entry) })),
       ]);
     }
     // The hand-out box and the on-screen ticks only matter while that registration is the one in front of staff.
@@ -369,9 +375,12 @@ export function CheckInStationScreen({
   function markStopped() {
     stoppedRef.current = true;
     // Only names are kept, so staff can send these people to the desk; the saved batches themselves are cleared.
-    setUnsyncedNames(queueRef.current.flatMap((batch) => batch.items.map((item) => item.name)));
+    setUnsyncedNames([...new Set([
+      ...queueRef.current.flatMap((batch) => batch.items.map((item) => item.name)),
+      ...attentionRef.current.map((entry) => entry.name),
+    ])]);
     persist([]);
-    setAttention([]);
+    setAttention(() => []);
     setJustIn([]);
     writeJustIn(stationId, []);
     setStopped(true);

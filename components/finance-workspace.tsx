@@ -4,7 +4,7 @@ import { Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { RegistrationMealsHistory } from "@/components/registration-meals-history";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { formHasEdits } from "@/components/form-has-edits";
@@ -68,6 +68,9 @@ export function FinanceWorkspace({
   const router = useRouter();
   const [sync, setSync] = useState<RegistrationsSync<RegistrationRecord>>({ seen: initialRegistrations, rows: initialRegistrations });
   const registrations = sync.rows;
+  // The newest props, so a save marks as seen whatever a refresh delivered while the save request was running.
+  const latestProps = useRef(initialRegistrations);
+  useEffect(() => { latestProps.current = initialRegistrations; });
   const search = useClientSearch();
   const query = search.term;
   const [filter, setFilter] = useState(initialFilter);
@@ -122,7 +125,7 @@ export function FinanceWorkspace({
   function openDetail(registration: RegistrationRecord) { setSelected(registration); setSelectedPayment(null); setError(""); setModal("detail"); }
   function closeModal() { if (!saving) { setModal(null); setError(""); setPendingRefund(null); setRefundReviewError(""); } }
   function applyRegistration(registration: RegistrationRecord) {
-    setSync((current) => syncAfterLocalSave(current, initialRegistrations, registration));
+    setSync((current) => syncAfterLocalSave(current, latestProps.current, registration));
     setSelected(registration);
     // Ask for a list newer than this save, so the next one the page takes in already includes it.
     router.refresh();
