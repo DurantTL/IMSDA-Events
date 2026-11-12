@@ -112,9 +112,10 @@ describe("keep the reader's place (B17, #1557)", () => {
     const css = read("app/globals.css");
     // The year box is wide enough for "CURRENT CLUB YEAR" in either font, so its width does not change at the swap.
     expect(css).toMatch(/\.club-banner-year \{[^}]*min-width: 11\.5rem/);
-    // On a phone the role is its own line under the name, so where the name ends cannot move it (the 0.05 load shift on
-    // the coordinator Monthly Records page came from the role re-wrapping after the name, depending on the name's letters).
-    expect(css).toMatch(/@media \(max-width: 640px\) \{\s*\.club-masthead-role \{ display: block; \}\s*\.club-masthead-sep \{ display: none; \}/);
+    // On a phone the name and role share one line that never wraps (it ends in an ellipsis, #1894), so where the name
+    // ends cannot re-wrap the role (the 0.05 load shift on the coordinator Monthly Records page came from the role
+    // re-wrapping after the name, depending on the name's letters).
+    expect(css).toMatch(/@media \(max-width: 640px\) \{\s*\.club-masthead-inner \{[\s\S]*?\.club-masthead-identity \{[^}]*white-space: nowrap;[^}]*text-overflow: ellipsis;/);
     for (const file of ["components/coordinator-masthead-view.tsx", "components/club-portal-masthead-view.tsx"]) {
       expect(read(file), file).toMatch(/className="club-masthead-role"><span className="club-masthead-sep"> · <\/span>/);
     }

@@ -47,16 +47,30 @@
   flex: 0 0 auto;
 }
 
+/* The words of a button; a phone shows the icon alone (each button is named with aria-label), #1894. */
+.label {
+  min-width: 0;
+}
+
 @media (max-width: 640px) {
-  /* The full-width row is also what the account drop-down's panel hangs from (account-workspace-menu.module.css). */
+  /* On a phone the actions join the masthead row itself (#1894): the brand and the 44 px icon buttons share the first
+     line, and the name has its own line under them (rule B17), which is where the "Your account" panel hangs from. */
   .account {
-    justify-content: flex-start;
-    width: 100%;
+    display: contents;
   }
 
-  /* The name (and role) has its own line and the buttons always start on the next one, so the name getting a little
-     wider as the web font loads never pushes a button onto a new row (#1557, rule B17). */
   .account > :global(.club-masthead-identity) {
+    order: 1;
     flex-basis: 100%;
+  }
+
+  .action {
+    width: 44px;
+    padding: 0;
+    gap: 0;
+  }
+
+  .label {
+    display: none;
   }
 }

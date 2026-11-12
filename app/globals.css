@@ -10247,10 +10247,18 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-masthead-brand small { color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .club-masthead-brand strong { font-size: 1.05rem; }
 .club-masthead-identity { min-width: 0; max-width: 100%; overflow-wrap: anywhere; color: var(--muted); font-size: 0.9rem; }
-/* On a phone the role sits on its own line under the name, so the web font swapping in cannot move where the name ends and the role starts (#1557). */
+/* On a phone (#1894) the brand and the icon buttons share one row and the name and role sit on one line under them that
+   never wraps (it ends in an ellipsis instead), so the web font swapping in cannot re-wrap it (#1557). The row is what the
+   "Your account" panel hangs from. */
 @media (max-width: 640px) {
-  .club-masthead-role { display: block; }
-  .club-masthead-sep { display: none; }
+  .club-masthead-inner { position: relative; justify-content: flex-start; gap: 2px 4px; padding: 6px 0 4px; }
+  /* The brand takes only the space the buttons leave (a zero flex basis, so the row never breaks to fit it): its
+     wordmark ends in an ellipsis before a button wraps, which leaves room for one more icon button. */
+  .club-masthead-brand { flex: 1 1 0; gap: 8px; min-width: 44px; overflow: hidden; }
+  .club-masthead-brand > span:not([data-navigation-pending]) { min-width: 0; }
+  .club-masthead-brand small, .club-masthead-brand strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .club-masthead-brand strong { font-size: var(--type-public-body); }
+  .club-masthead-identity { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 }
 .account-portal .account-nav a { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
 .club-banner { background: var(--imsda-navy); color: #fff; }
@@ -10258,14 +10266,16 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-banner-identity { min-width: 0; flex: 1 1 16rem; }
 .club-banner h1 { margin: 0; color: #fff; font-size: 1.7rem; line-height: 1.2; overflow-wrap: anywhere; }
 .club-banner-identity p { margin: 6px 0 0; color: #dbe9ef; font-size: 0.95rem; overflow-wrap: anywhere; }
-.club-banner-year { display: grid; gap: 2px; margin: 0; border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 12px; padding: 8px 14px; text-align: right; /* Wide enough for "CURRENT CLUB YEAR" in the web font and in its fallback, so the swap does not resize the box and re-wrap the banner (#1557). */ min-width: 11.5rem; box-sizing: border-box; }
+.club-banner-year { display: grid; gap: 2px; margin: 0; border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 12px; padding: 8px 14px; text-align: right; /* Wide enough for "CURRENT CLUB YEAR" in the web font and in its fallback, so the swap does not resize the box and re-wrap the banner (#1557); on a phone it is a one-line chip of the same fixed width. */ min-width: 11.5rem; box-sizing: border-box; }
 .club-banner-year span { color: #dbe9ef; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .club-banner-year strong { font-size: 1.05rem; }
 @media (max-width: 640px) {
   .club-masthead-inner, .club-banner-inner { width: calc(100% - 24px); }
-  .club-banner-inner { padding: 14px 0; }
-  .club-banner h1 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font-size: 1.25rem; }
-  .club-banner-year { flex: 0 0 auto; padding: 6px 10px; }
+  /* A slim band on a phone (#1894): the title, one subtitle line and the club year as a one-line chip under them. */
+  .club-banner-inner { gap: 6px 12px; padding: 10px 0; }
+  .club-banner h1 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font-size: 1.2rem; }
+  .club-banner-identity p { margin-top: 2px; }
+  .club-banner-year { display: flex; flex: 0 0 auto; align-items: baseline; gap: 8px; padding: 3px 10px; border-radius: var(--radius-pill); text-align: left; }
 }
 @media print {
   .club-masthead, .club-banner { display: none !important; }
