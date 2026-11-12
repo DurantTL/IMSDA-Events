@@ -6,6 +6,8 @@ import { loadPortalHelpViewer } from "@/modules/help/portal-viewer";
 import { visiblePortalGuides } from "@/modules/help/portal-visibility";
 import styles from "@/app/(workspace)/help/help.module.css";
 import { PortalHelpSearch } from "./portal-help-search";
+import { AccountInstallCardRestore } from "@/components/account-install-card";
+import { SavedAppGuide } from "@/components/saved-app-guide";
 import { AccountPageBanner } from "@/components/account-page-banner";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +44,8 @@ export default async function PortalHelpPage({ searchParams }: { searchParams: P
           ) : (
             <PortalHelpSearch guides={guides.map(({ id, title, summary, audience, keywords }) => ({ id, title, summary, audience, keywords }))} />
           )}
+          <SavedAppGuide audience="account" />
+          <AccountInstallCardRestore />
         </div>
       </div>
     </>

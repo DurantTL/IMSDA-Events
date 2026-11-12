@@ -23,6 +23,7 @@ import { listAreaCoordinatorInvitesForAccount } from "@/modules/organizations/ar
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import { logError } from "@/lib/logger";
+import { AccountInstallCard } from "@/components/account-install-card";
 import { AccountPageBanner } from "@/components/account-page-banner";
 import { PortalSectionHeading } from "@/components/portal-section-heading";
 import styles from "./overview.module.css";
@@ -254,6 +255,9 @@ export default async function AttendeeAccountOverviewPage() {
               {helpSlug ? "Get event help" : "Find my registration"} <ArrowRight size={14} aria-hidden="true" />
             </Link>
           </section>
+
+          {/* Save to the Home Screen (#1713): only for the person's own sign-in; renders nothing where the browser cannot install. */}
+          {via === "attendee" && <AccountInstallCard />}
         </aside>
       </div>
     </>

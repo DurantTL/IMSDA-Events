@@ -169,6 +169,13 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | D3 | The header shows the page's one filled main action, and at most two buttons beside the title (one filled, one outlined); other actions go in the Actions menu. | `tests/page-header-1772.test.ts`, `tests/one-primary-action-1733.test.ts` | browser test only | #1772; Caleb, Nov 9 |
 | D4 | Below 640px the header's actions drop under the title, full width, with the main action first, and each is at least 44px tall. | `tests/page-header-1772.test.ts` | `npm run test:mobile-layout` (staff pages) | #1772; Caleb, Nov 9 |
 
+## Saved app (#1713)
+
+| ID | Rule | Guard test | Browser test | Issue |
+| --- | --- | --- | --- | --- |
+| W1 | The saved (installed) web app never stores personal data on the device. It has no service worker and no Cache API use, so no account, health-record or payment page is kept offline, and it says it needs an internet connection. A future service worker (push alerts) must exclude account, health-record and payment pages from every cache, and is added to the allowlist in the guard test in the same change, with that review. | `tests/no-service-worker-1713.test.ts` (no source file under `app/`, `components/`, `lib/`, `modules/` or `public/` registers a service worker or uses `caches.`, unless it is on the allowlist, which is empty) | browser test only | #1713; Caleb, Nov 12 |
+| W2 | Each page links exactly one manifest: the site manifest on public and account pages, the staff manifest in the staff workspace, and none on embed pages. The saved app opens at `/launch`, which sends a staff session to Home, a signed-in account to `/account` and everyone else to the home page, from three fixed paths and never from the request. | `tests/site-web-app-1713.test.ts` | browser test only | #1713; Caleb, Nov 12 |
+
 ## Page checks (AGENTS.md → Checks)
 
 | ID | Rule | Guard test | Browser test | Issue |

@@ -18,6 +18,7 @@ export default function robots(): MetadataRoute.Robots {
         "/health-records/",
         "/imports",
         "/information-forms",
+        "/launch",
         "/login",
         "/more",
         "/no-access",
