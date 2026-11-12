@@ -11,6 +11,7 @@ import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-me
 import { SubmitButton } from "@/components/submit-button";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { formatPersonName } from "@/lib/person-name";
+import { conferenceDateFormat } from "@/modules/calendar/conference-format";
 import {
   CLUB_LETTER_KINDS,
   LETTERS_PER_CLUB_MAX,
@@ -32,7 +33,7 @@ import styles from "./club-letters.module.css";
  * routes check the role and the feature again and record every change.
  */
 
-const dateText = (iso: string) => new Date(iso).toLocaleDateString("en-US", { timeZone: "America/Chicago", dateStyle: "medium" });
+const dateText = (iso: string) => conferenceDateFormat({ dateStyle: "medium" }).format(new Date(iso));
 
 class RequestError extends Error {
   constructor(message: string, readonly issues: Array<{ path?: unknown[]; message?: string }> = []) {

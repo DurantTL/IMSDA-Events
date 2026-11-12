@@ -7,6 +7,7 @@
  * placeholders listed here exist; no birth date, contact, health or any other roster field is ever offered.
  */
 
+import { conferenceDateFormat } from "@/modules/calendar/conference-format";
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
 export const CLUB_LETTERS_FEATURE_KEY = "fill-in-letters";
@@ -62,7 +63,7 @@ export function placeholderProblem(body: string): string | null {
 
 /** The date as a long US date, such as "November 12, 2026", in the conference's time zone. */
 export function formatLetterDate(date: Date): string {
-  return date.toLocaleDateString("en-US", { timeZone: "America/Chicago", dateStyle: "long" });
+  return conferenceDateFormat({ dateStyle: "long" }).format(date);
 }
 
 export type LetterFill = { firstName: string; lastName: string; clubName: string; clubYear: string; date: Date };
