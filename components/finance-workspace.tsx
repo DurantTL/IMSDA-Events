@@ -5,6 +5,7 @@ import { formatCents } from "@/modules/payments/format-cents";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { RegistrationMealsHistory } from "@/components/registration-meals-history";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { formHasEdits } from "@/components/form-has-edits";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -14,12 +15,15 @@ import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { RefundReviewFacts, refundReasonError } from "@/components/refund-review-summary";
 import { ScholarshipFundAwardFields } from "@/components/scholarship-fund-award-fields";
+import type { RegistrationsSync } from "@/modules/registrations/finance-view";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import {
   activeFinancialStatuses,
   adjustmentWording,
   attendeeBalanceCents,
   canApplyRefreshedRegistrations,
+  syncAfterLocalSave,
+  syncRefreshedRegistrations,
   churchBillingFinalNote,
   groupBillingFinalNote,
   financeDetailFacts,
@@ -61,7 +65,9 @@ export function FinanceWorkspace({
   initialRegistrationId?: string;
 }) {
   const initialSelected = initialRegistrations.find((row) => row.id === initialRegistrationId) ?? null;
-  const [registrations, setRegistrations] = useState(initialRegistrations);
+  const router = useRouter();
+  const [sync, setSync] = useState<RegistrationsSync<RegistrationRecord>>({ seen: initialRegistrations, rows: initialRegistrations });
+  const registrations = sync.rows;
   const search = useClientSearch();
   const query = search.term;
   const [filter, setFilter] = useState(initialFilter);
@@ -91,18 +97,15 @@ export function FinanceWorkspace({
   // The page refreshes itself every 30 seconds (#1577), so a payment taken at a check-in station shows here. New rows
   // replace the list only while nothing is open or being typed; otherwise they wait until it closes. The selected
   // registration, filter and search are separate state and stay as they are.
-  const [seenRegistrations, setSeenRegistrations] = useState(initialRegistrations);
-  if (
-    seenRegistrations !== initialRegistrations
-    && canApplyRefreshedRegistrations({
-      dialogOpen: modal !== null,
-      typedWork: formEdited || fundEdited || (modal === "adjust" && adjustKind !== "SCHOLARSHIP"),
-      saving,
-      reviewingRefund: pendingRefund !== null,
-    })
-  ) {
-    setSeenRegistrations(initialRegistrations);
-    setRegistrations(initialRegistrations);
+  const canApplyRefresh = canApplyRefreshedRegistrations({
+    dialogOpen: modal !== null,
+    typedWork: formEdited || fundEdited || (modal === "adjust" && adjustKind !== "SCHOLARSHIP"),
+    saving,
+    reviewingRefund: pendingRefund !== null,
+  });
+  const synced = syncRefreshedRegistrations(sync, initialRegistrations, canApplyRefresh);
+  if (synced !== sync) {
+    setSync(synced);
     setSelected((current) => (current ? initialRegistrations.find((row) => row.id === current.id) ?? current : current));
   }
 
@@ -119,8 +122,10 @@ export function FinanceWorkspace({
   function openDetail(registration: RegistrationRecord) { setSelected(registration); setSelectedPayment(null); setError(""); setModal("detail"); }
   function closeModal() { if (!saving) { setModal(null); setError(""); setPendingRefund(null); setRefundReviewError(""); } }
   function applyRegistration(registration: RegistrationRecord) {
-    setRegistrations((current) => current.map((row) => row.id === registration.id ? registration : row));
+    setSync((current) => syncAfterLocalSave(current, initialRegistrations, registration));
     setSelected(registration);
+    // Ask for a list newer than this save, so the next one the page takes in already includes it.
+    router.refresh();
   }
 
   async function recordPayment(event: React.FormEvent<HTMLFormElement>) {

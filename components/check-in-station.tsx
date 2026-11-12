@@ -14,12 +14,14 @@ import {
   STATION_PAYMENTS_OFFLINE_NOTE,
   STATION_QUEUED_LABEL,
   mapStationSyncResponse,
+  purgeOtherStationQueues,
   readStationQueue,
   stationAttentionLine,
   stationQueueBanner,
   stationQueuedAttendeeIds,
   stationQueuedPeopleCount,
   stationStopQueueWarning,
+  stationUnsyncedNotice,
   writeStationQueue,
   type StationQueuedBatch,
   type StationSyncOutcome,
@@ -150,11 +152,13 @@ export function CheckInStationScreen({
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState("");
   const [stopped, setStopped] = useState(false);
+  const [unsyncedNames, setUnsyncedNames] = useState<string[]>([]);
+  const queuedHeading = useRef<HTMLHeadingElement>(null);
   const noHandOut: HandOut = { keyTypes: [], rooms: [], attendeeIds: [] };
   const [handOut, setHandOut] = useState<HandOut>(noHandOut);
   const [justIn, setJustIn] = useState<JustCheckedIn[]>([]);
   const [undoMessage, setUndoMessage] = useState<{ text: string; name?: string } | null>(null);
-  const [focusTarget, setFocusTarget] = useState<{ kind: "undo" | "checkin" | "status"; id?: string; n: number } | null>(null);
+  const [focusTarget, setFocusTarget] = useState<{ kind: "undo" | "checkin" | "status" | "queued"; id?: string; n: number } | null>(null);
   const undoButtons = useRef<Map<string, HTMLButtonElement>>(new Map());
   const checkInButton = useRef<HTMLButtonElement>(null);
   const undoStatus = useRef<HTMLDivElement>(null);
@@ -216,13 +220,16 @@ export function CheckInStationScreen({
       ? undoButtons.current.get(focusTarget.id)
       : focusTarget.kind === "checkin"
         ? checkInButton.current
-        : undoStatus.current;
+        : focusTarget.kind === "queued"
+          ? queuedHeading.current
+          : undoStatus.current;
     (element ?? undoStatus.current)?.focus();
   }, [focusTarget]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setOnline(navigator.onLine);
+      purgeOtherStationQueues(deviceStorage(), stationId);
       const saved = readStationQueue(deviceStorage(), stationId);
       if (saved === null) {
         setStorageFailed(true);
@@ -233,6 +240,7 @@ export function CheckInStationScreen({
       }
     }, 0);
     const goOnline = () => {
+      setMessage((current) => (current === STATION_LOOKUP_OFFLINE_MESSAGE ? "" : current));
       setOnline(true);
       setUnreachable(false);
       void syncRef.current();
@@ -341,6 +349,8 @@ export function CheckInStationScreen({
     };
     persist([...queueRef.current, batch]);
     setSelected(new Set());
+    // The Check in button is about to stop applying to these people: move focus to where they now are.
+    setFocusTarget((previous) => ({ kind: "queued", n: (previous?.n ?? 0) + 1 }));
   }
 
   useEffect(() => {
@@ -358,6 +368,8 @@ export function CheckInStationScreen({
 
   function markStopped() {
     stoppedRef.current = true;
+    // Only names are kept, so staff can send these people to the desk; the saved batches themselves are cleared.
+    setUnsyncedNames(queueRef.current.flatMap((batch) => batch.items.map((item) => item.name)));
     persist([]);
     setAttention([]);
     setJustIn([]);
@@ -406,7 +418,9 @@ export function CheckInStationScreen({
     setReasonCode("");
     setReasonNote("");
     setFamily(response.data.family);
-    setSelected(new Set(response.data.family.attendees.filter((person) => !person.checkedIn && !person.needsDeskReview).map((person) => person.id)));
+    // People still waiting to sync on this device are not ticked: they are already on their way.
+    const waitingIds = stationQueuedAttendeeIds(queueRef.current);
+    setSelected(new Set(response.data.family.attendees.filter((person) => !person.checkedIn && !person.needsDeskReview && !waitingIds.has(person.id)).map((person) => person.id)));
     setEntry("");
   }
 
@@ -420,12 +434,12 @@ export function CheckInStationScreen({
   }
 
   async function confirmCheckIn() {
-    if (!family || busy || selected.size === 0) return;
+    const ticked = family?.attendees.filter((person) => selected.has(person.id) && !person.checkedIn && !person.needsDeskReview && !queuedIds.has(person.id)) ?? [];
+    if (!family || busy || ticked.length === 0) return;
     setBusy("confirm");
     setMessage("");
     setUndoMessage(null);
-    const items = family.attendees
-      .filter((person) => selected.has(person.id))
+    const items = ticked
       .map((person) => ({ attendeeId: person.id, idempotencyKey: keyFor(person.id) }));
     if (!navigator.onLine) {
       setOnline(false);
@@ -558,6 +572,12 @@ export function CheckInStationScreen({
         <section className={styles.cisCard}>
           <h1>Check-in station</h1>
           <p>This station is not active. Ask a staff member to start it again from Check-in.</p>
+          {unsyncedNames.length > 0 && (
+            <p role="status" className={styles.cisDeskNotice}>
+              <ShieldAlert aria-hidden="true" size={18} />
+              <span>{stationUnsyncedNotice(unsyncedNames.length)} <span translate="no">{unsyncedNames.join(", ")}</span></span>
+            </p>
+          )}
           <p className={styles.cisActions}>
             <Link href="/check-in" className={`secondary-button ${styles.large}`}>Go to Check-in</Link>
           </p>
@@ -567,6 +587,7 @@ export function CheckInStationScreen({
   }
 
   const selectable = family?.attendees.filter((person) => !person.checkedIn && !person.needsDeskReview && !queuedIds.has(person.id)) ?? [];
+  const tickedCount = selectable.filter((person) => selected.has(person.id)).length;
   const banner = stationQueueBanner({ offline, waiting, storageFailed });
   const balanceDue = family?.payment.state === "DUE";
   const reasonMissing = balanceDue && (reasonCode === "" || (reasonCode === "OTHER" && reasonNote.trim() === ""));
@@ -734,10 +755,10 @@ export function CheckInStationScreen({
                 ref={checkInButton}
                 type="button"
                 className={`primary-button ${styles.large}`}
-                disabled={busy !== "" || selected.size === 0 || (reasonMissing && selectable.length > 0)}
+                disabled={busy !== "" || tickedCount === 0 || (reasonMissing && selectable.length > 0)}
                 onClick={confirmCheckIn}
               >
-                {busy === "confirm" ? "Checking in..." : `Check in${selected.size ? ` (${selected.size})` : ""}`}
+                {busy === "confirm" ? "Checking in..." : `Check in${tickedCount ? ` (${tickedCount})` : ""}`}
               </button>
               <button type="button" className={`secondary-button ${styles.large}`} onClick={reset} disabled={busy !== ""}>Next person</button>
             </div>
@@ -755,7 +776,7 @@ export function CheckInStationScreen({
       </div>
       {queue.length > 0 && (
         <section className={styles.cisCard} aria-labelledby="cis-queued-title">
-          <h2 id="cis-queued-title">Saved on this device</h2>
+          <h2 id="cis-queued-title" ref={queuedHeading} tabIndex={-1}>Saved on this device</h2>
           <ul className={styles.cisPeople}>
             {queue.flatMap((batch) => batch.items.map((item) => (
               <li key={`${batch.id}:${item.attendeeId}`} className={`${styles.cisPerson} ${styles.cisQueuedRow}`}>

@@ -80,6 +80,30 @@ export function writeStationQueue(
   }
 }
 
+/** Removes queues other stations left on this device, so a saved batch is never kept for a station that is not this one. */
+export function purgeOtherStationQueues(
+  storage: Pick<Storage, "length" | "key" | "removeItem"> | null,
+  stationId: string,
+): number {
+  if (!storage) return 0;
+  try {
+    const own = stationQueueStorageKey(stationId);
+    const stale: string[] = [];
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (key && key.startsWith(STATION_QUEUE_KEY_PREFIX) && key !== own) stale.push(key);
+    }
+    for (const key of stale) storage.removeItem(key);
+    return stale.length;
+  } catch {
+    return 0;
+  }
+}
+
+export function stationUnsyncedNotice(count: number) {
+  return `${count} ${count === 1 ? "person was" : "people were"} not checked in. Send them to the check-in desk:`;
+}
+
 /** People waiting, not batches. */
 export function stationQueuedPeopleCount(batches: readonly StationQueuedBatch[]) {
   return batches.reduce((total, batch) => total + batch.items.length, 0);

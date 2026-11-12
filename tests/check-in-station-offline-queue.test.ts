@@ -3,7 +3,9 @@ import {
   STATION_OFFLINE_BANNER,
   STATION_STORAGE_UNAVAILABLE_MESSAGE,
   mapStationSyncResponse,
+  purgeOtherStationQueues,
   readStationQueue,
+  stationUnsyncedNotice,
   stationAttentionLine,
   stationQueueBanner,
   stationQueueStorageKey,
@@ -150,5 +152,30 @@ describe("station sync outcome mapping", () => {
     expect(mapStationSyncResponse(batch, { ok: false, status: 0, message: "x" })).toEqual({ kind: "RETRY_LATER", noAnswer: true });
     expect(mapStationSyncResponse(batch, { ok: false, status: 503, message: "x" })).toEqual({ kind: "RETRY_LATER", noAnswer: false });
     expect(mapStationSyncResponse(batch, { ok: false, status: 500, message: "x" })).toEqual({ kind: "RETRY_LATER", noAnswer: false });
+  });
+});
+
+describe("other stations' saved queues and the unsynced notice", () => {
+  it("removes only other stations' queue keys", () => {
+    const data = new Map<string, string>([
+      [stationQueueStorageKey("st-1"), "[]"],
+      [stationQueueStorageKey("st-2"), "[]"],
+      ["imsda-check-in-station-just-in", "{}"],
+      ["unrelated", "x"],
+    ]);
+    const storage = {
+      get length() { return data.size; },
+      key: (index: number) => [...data.keys()][index] ?? null,
+      removeItem: (key: string) => void data.delete(key),
+    };
+    expect(purgeOtherStationQueues(storage, "st-1")).toBe(1);
+    expect([...data.keys()].sort()).toEqual(["imsda-check-in-station-just-in", stationQueueStorageKey("st-1"), "unrelated"].sort());
+    expect(purgeOtherStationQueues(null, "st-1")).toBe(0);
+    expect(purgeOtherStationQueues({ length: 1, key: () => { throw new Error("blocked"); }, removeItem: () => {} }, "st-1")).toBe(0);
+  });
+
+  it("words the unsynced notice", () => {
+    expect(stationUnsyncedNotice(2)).toBe("2 people were not checked in. Send them to the check-in desk:");
+    expect(stationUnsyncedNotice(1)).toBe("1 person was not checked in. Send them to the check-in desk:");
   });
 });
