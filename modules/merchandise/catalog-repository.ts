@@ -134,8 +134,8 @@ export async function getMerchandiseCatalog(eventId: string, client: Prisma.Tran
  * before human approval. Every other caller (any real public/attendee
  * consumer) omits it, so this function's default behavior — and therefore
  * the live projection gate — is unchanged. */
-export async function getMerchandiseCatalogForProjection(eventId: string, options: { includeUnpublishedEvent?: boolean } = {}): Promise<MerchandiseProjectionInput> {
-  const prisma = getPrisma();
+export async function getMerchandiseCatalogForProjection(eventId: string, options: { includeUnpublishedEvent?: boolean } = {}, client: Prisma.TransactionClient = getPrisma()): Promise<MerchandiseProjectionInput> {
+  const prisma = client;
   const [catalog, event, products] = await Promise.all([
     prisma.merchandiseCatalog.findUnique({ where: { eventId } }),
     prisma.event.findUnique({ where: { id: eventId }, select: { isPublished: true, archivedAt: true } }),

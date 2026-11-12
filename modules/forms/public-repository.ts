@@ -84,6 +84,8 @@ import type { AcknowledgmentDisplay } from "@/modules/acknowledgments/domain";
 import { hashUserAgent } from "@/modules/access/tokens";
 import { LodgingError } from "@/modules/lodging/errors";
 import { lodgingTransactionTimeoutMs } from "@/modules/lodging/service";
+import { getPublicMerchandiseOffer, getRegistrationMerchandiseSummary, recordRegistrationMerchandiseOrder } from "@/modules/merchandise/registration-orders";
+import { merchandiseIssueMessage, RegistrationMerchandiseError, type PublicMerchandiseOffer, type RegistrationMerchandiseSummary } from "@/modules/merchandise/registration-order-domain";
 import { getPublicLodgingOffer, planRegistrationLodging, recordRegistrationLodging, type LodgingPlan, type PublicLodgingOffer } from "@/modules/lodging/registration-form";
 import { syncFormMealSelections } from "@/modules/meals/selection-repository";
 import { eventStartDate, planPublicResponsibleAdults } from "@/modules/guardian-authority/domain";
@@ -228,6 +230,12 @@ function lodgingStepError(error: LodgingError, eventId: string) {
   );
 }
 
+function merchandiseStepError(message: string) {
+  return new PublicRegistrationError("INVALID_SUBMISSION", message, [
+    { kind: "validation", code: "INVALID_RESPONSE", fieldId: null, key: "merchandise", path: "merchandise", attendeeIndex: null, message },
+  ]);
+}
+
 export class PublicRegistrationError extends Error {
   constructor(
     public readonly code: PublicRegistrationErrorCode,
@@ -274,6 +282,10 @@ type PricingSnapshot = {
   waitlistPosition?: number | null;
   /** The lodging choice was kept as an unpriced request on a waitlisted registration (#199). */
   lodgingChoiceSaved?: boolean;
+  /** Merchandise was chosen on a registration that joined the waitlist, so no order was made. */
+  merchandiseNotOrdered?: boolean;
+  /** A merchandise order was made with this registration, so a replayed confirmation reads it back. */
+  merchandiseOrdered?: boolean;
   /**
    * A registration-level promo code was decided on a subtotal that includes the lodging line (#803). Absent on a registration
    * submitted before that, whose amendments keep the old math (the code on the form's own lines, lodging undiscounted).
@@ -317,6 +329,10 @@ export type PublicRegistrationConfirmation = {
   capacityDecision: Exclude<CapacityDecision, "FULL">;
   paymentEligible: boolean;
   waitlistPosition: number | null;
+  /** A separate pending merchandise order made with this registration. Not part of any total above. */
+  merchandise?: RegistrationMerchandiseSummary;
+  /** Merchandise was chosen but not ordered because the registration joined the waitlist. */
+  merchandiseNotOrdered?: boolean;
 };
 
 export type PublicRegistrationExperience = {
@@ -356,6 +372,8 @@ export type PublicRegistrationExperience = {
   onlineCardPayment: boolean;
   /** The lodging step (#199): null when the event collects no lodging. Never offered to club or group registrations. */
   lodging: PublicLodgingOffer | null;
+  /** Optional merchandise for an individual registration: null when the event sells none. Ordered separately, never charged with the registration. */
+  merchandise: PublicMerchandiseOffer | null;
   lifecycle: {
     phase: EventRegistrationPhase;
     capacityDecision: CapacityDecision | null;
@@ -462,7 +480,11 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value) ?? "null";
 }
 
-function submissionHash(input: PublicRegistrationInput) {
+export function submissionHash(input: PublicRegistrationInput) {
+  // Only present when merchandise was chosen, so a hash stored before it existed still matches.
+  const merchandise = input.merchandise && input.merchandise.length > 0
+    ? { merchandise: [...input.merchandise].sort((a, b) => a.variantId.localeCompare(b.variantId)) }
+    : {};
   const semanticInput = input.attendees
     ? {
         versionId: input.versionId,
@@ -471,8 +493,9 @@ function submissionHash(input: PublicRegistrationInput) {
         // Only present when the form asked for it (#131), so a hash stored before it existed still matches.
         ...(input.responsibleAdults && Object.keys(input.responsibleAdults).length > 0 ? { responsibleAdults: input.responsibleAdults } : {}),
         ...(input.lodging ? { lodging: input.lodging } : {}),
+        ...merchandise,
       }
-    : { versionId: input.versionId, responses: input.responses };
+    : { versionId: input.versionId, responses: input.responses, ...merchandise };
   return createHash("sha256").update(stableJson(semanticInput)).digest("hex");
 }
 
@@ -596,8 +619,9 @@ function confirmationFromSnapshot(
   return {
     confirmationCode,
     message: isWaitlisted
-      ? `You have joined the event waitlist. This is not a confirmed registration, and no payment was collected.${snapshot.lodgingChoiceSaved ? " Your lodging choice is saved; the event team will confirm it if a place opens." : ""}`
+      ? `You have joined the event waitlist. This is not a confirmed registration, and no payment was collected.${snapshot.lodgingChoiceSaved ? " Your lodging choice is saved; the event team will confirm it if a place opens." : ""}${snapshot.merchandiseNotOrdered ? " Your merchandise was not ordered because you joined the waitlist." : ""}`
       : definition.confirmationMessage,
+    ...(snapshot.merchandiseNotOrdered ? { merchandiseNotOrdered: true } : {}),
     email,
     ...totals,
     promoCode: snapshot.promoCode ?? null,
@@ -659,6 +683,7 @@ export async function getPublicRegistrationExperience(eventSlug: string, formSlu
     now
   );
   const lodging = await getPublicLodgingOffer(form.eventId, prisma);
+  const merchandise = await getPublicMerchandiseOffer(form.eventId, prisma);
   const onlineCardPayment = onlineCardPaymentPossible({
     paymentEnabled: Boolean(definition.payment?.enabled),
     squareConfigured: getSquareConfiguration().paymentConfigured,
@@ -695,6 +720,7 @@ export async function getPublicRegistrationExperience(eventSlug: string, formSlu
     choiceUsage: usageFromReservations(definition, reservations),
     pricingDate,
     lodging,
+    merchandise,
     lifecycle: {
       ...admission,
       waitingRegistrations,
@@ -743,17 +769,22 @@ async function findExistingConfirmation(
     : messages.some((message) => message.status === "PENDING")
       ? "PENDING"
       : "DISABLED";
+  const storedSnapshot = pricingSnapshotFromJson(existing.pricingSnapshot);
+  const merchandise = storedSnapshot.merchandiseOrdered ? await getRegistrationMerchandiseSummary(tx, existing.registrationId) : null;
   return {
-    confirmation: confirmationFromSnapshot(
-      definition,
-      existing.registration.confirmationCode,
-      identity?.email ?? "",
-      pricingSnapshotFromJson(existing.pricingSnapshot),
-      notificationStatus,
-      existing.registration.status === "WAITLISTED" ? "WAITLISTED" : "SUBMITTED",
-      existing.registration.waitlistEntry?.position ?? null,
-      churchBilled,
-    ),
+    confirmation: {
+      ...confirmationFromSnapshot(
+        definition,
+        existing.registration.confirmationCode,
+        identity?.email ?? "",
+        pricingSnapshotFromJson(existing.pricingSnapshot),
+        notificationStatus,
+        existing.registration.status === "WAITLISTED" ? "WAITLISTED" : "SUBMITTED",
+        existing.registration.waitlistEntry?.position ?? null,
+        churchBilled,
+      ),
+      ...(merchandise ? { merchandise } : {}),
+    },
     pendingMessageIds: messages.filter((message) => message.status === "PENDING").map((message) => message.id),
     registrantMessageIds: messages.map((message) => message.id),
     // A replay queues nothing new, so nothing waits for a PDF (#1082).
@@ -1110,6 +1141,9 @@ async function createPublicRegistrationTransaction(
     throw new PublicRegistrationError("INVALID_SUBMISSION", "Lodging step: Lodging is not chosen on this kind of registration.", [
       { kind: "validation", code: "INVALID_RESPONSE", fieldId: null, key: "lodging", path: "lodging", attendeeIndex: null, message: "Lodging step: Lodging is not chosen on this kind of registration." },
     ]);
+  }
+  if (input.merchandise && input.merchandise.length > 0 && bulk) {
+    throw merchandiseStepError("Merchandise: Merchandise is not ordered on this kind of registration.");
   }
   let lodgingPlan: LodgingPlan | null = null;
   if (input.lodging && !bulk) {
@@ -1505,6 +1539,24 @@ async function createPublicRegistrationTransaction(
       throw lodgingStepError(error, form.eventId);
     }
   }
+  // Merchandise is its own pending order, linked to this registration and never part of its total. A waitlisted
+  // registration orders nothing.
+  let merchandiseSummary: RegistrationMerchandiseSummary | null = null;
+  if (input.merchandise && input.merchandise.length > 0 && !bulk && !isWaitlisted) {
+    try {
+      merchandiseSummary = await recordRegistrationMerchandiseOrder(tx, {
+        eventId: form.eventId,
+        registrationId: registration.id,
+        confirmationCode,
+        purchaser: { name: formatPersonName(identity), email: identity.email },
+        lines: input.merchandise,
+        now,
+      });
+    } catch (error) {
+      if (!(error instanceof RegistrationMerchandiseError)) throw error;
+      throw merchandiseStepError(merchandiseIssueMessage(error));
+    }
+  }
   const registrationAttendeeType = createdAttendees.length > 0
     && createdAttendees.every((attendee) => attendee.attendeeType === "WORKER")
     ? "WORKER"
@@ -1581,6 +1633,8 @@ async function createPublicRegistrationTransaction(
     waitlistPosition,
     ...(lodgingPlan && isWaitlisted ? { lodgingChoiceSaved: true } : {}),
     promoCoversLodging: true,
+    ...(input.merchandise && input.merchandise.length > 0 && !bulk && isWaitlisted ? { merchandiseNotOrdered: true } : {}),
+    ...(merchandiseSummary ? { merchandiseOrdered: true } : {}),
   };
   const attendeeResponseSnapshot = prepared.rosterEnabled
     ? prepared.attendees.map((attendee, position) => ({
@@ -1789,6 +1843,7 @@ async function createPublicRegistrationTransaction(
         waitlistPosition,
         churchBilledDisplay,
       ),
+      ...(merchandiseSummary ? { merchandise: merchandiseSummary } : {}),
       managePath: access.managePath,
       manageLinkExpiresAt: access.expiresAt.toISOString(),
     },

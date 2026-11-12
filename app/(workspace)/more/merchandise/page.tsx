@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
+import { MerchandiseOrdersPanel } from "@/components/merchandise-orders-panel";
+import { canViewMerchandiseOrders, listMerchandiseOrders } from "@/modules/merchandise/order-list";
 import { MerchandiseAdminWorkspace } from "@/components/merchandise-admin-workspace";
 import { PageHeader } from "@/components/page-header";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -22,5 +24,11 @@ export default async function MerchandisePage({
       </>
     );
   }
-  return <MerchandiseAdminWorkspace eventId={event.id} />;
+  const orderList = canViewMerchandiseOrders(permissions) ? await listMerchandiseOrders(event.id) : null;
+  return (
+    <>
+      <MerchandiseAdminWorkspace eventId={event.id} />
+      {orderList && <MerchandiseOrdersPanel orders={orderList.orders} totals={orderList.totals} truncated={orderList.truncated} />}
+    </>
+  );
 }

@@ -51,6 +51,14 @@ import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } fro
 import { ResponsibleAdultChoice } from "@/components/responsible-adult-choice";
 import { PublicLodgingStep } from "@/components/public-lodging-step";
 import {
+  merchandiseLines,
+  merchandiseNotChargedNotice,
+  merchandiseSubtotalCents,
+  PublicMerchandiseStep,
+  type MerchandiseSelection,
+} from "@/components/public-merchandise-step";
+import type { PublicMerchandiseOffer } from "@/modules/merchandise/registration-order-domain";
+import {
   chosenNights,
   defaultLodgingChoice,
   lodgingStepInput,
@@ -252,6 +260,9 @@ type Confirmation = {
   capacityDecision: "REGISTER" | "WAITLIST";
   paymentEligible: boolean;
   waitlistPosition: number | null;
+  /** A separate pending merchandise order made with this registration (#146); not part of the totals above. */
+  merchandise?: { lines: Array<{ productName: string; variantLabel: string; quantity: number; lineTotalCents: number }>; totalCents: number };
+  merchandiseNotOrdered?: boolean;
 };
 
 /** What the browser prices a form with. A church-billed event carries the lines only, never a sum (#621). */
@@ -299,6 +310,8 @@ export type PublicRegistrationFormProps = {
    * group registration never shows it, whatever is passed.
    */
   lodging?: LodgingStepOffer | null;
+  /** Optional merchandise (#146): shown only on an individual registration, ordered separately and never charged with it. */
+  merchandise?: PublicMerchandiseOffer | null;
   initialResponses?: FormResponses;
   initialAttendeeResponses?: FormResponses;
   embedded?: boolean;
@@ -514,6 +527,7 @@ export function PublicRegistrationForm({
   pricingDate,
   lifecycle,
   lodging = null,
+  merchandise = null,
   initialResponses = {},
   initialAttendeeResponses = {},
   embedded = false,
@@ -651,6 +665,14 @@ export function PublicRegistrationForm({
   }, [attendees, lodgingChoiceState]);
   const lodgingLine = lodgingActive && !deferredOrganizationBilling && !joiningWaitlist ? lodgingStepLine(lodgingOffer, lodgingChoice) : null;
   const lodgingSubmission = lodgingActive ? lodgingStepInput(lodgingOffer, lodgingChoice) : null;
+  // Merchandise (#146): its own optional section on an individual registration; a quantity per size, priced by the server.
+  const merchandiseActive = Boolean(merchandise) && !club && !group;
+  const [merchandiseSelection, setMerchandiseSelection] = useState<MerchandiseSelection>({});
+  const merchandiseChosen = useMemo(
+    () => (merchandiseActive && !joiningWaitlist ? merchandiseLines(merchandise, merchandiseSelection) : []),
+    [joiningWaitlist, merchandise, merchandiseActive, merchandiseSelection],
+  );
+  const merchandiseSubmission = merchandiseChosen.map((line) => ({ variantId: line.variantId, quantity: line.quantity }));
   const [error, setError] = useState("");
   const [rosterAnnouncement, setRosterAnnouncement] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -2976,6 +2998,19 @@ export function PublicRegistrationForm({
           </section>
         )}
 
+        {merchandiseChosen.length > 0 && (
+          <section className="public-registration-review-card" aria-labelledby="public_merchandise_review_title">
+            <p className="public-registration-eyebrow">Ordered separately</p>
+            <h3 id="public_merchandise_review_title">Merchandise</h3>
+            <ul>
+              {merchandiseChosen.map((line) => (
+                <li key={line.variantId}>{line.quantity} × {line.productName} {line.variantLabel}: <span translate="no">{formatCents(line.lineTotalCents)}</span></li>
+              ))}
+            </ul>
+            <p>Merchandise subtotal <strong translate="no">{formatCents(merchandiseSubtotalCents(merchandise, merchandiseSelection))}</strong>. {merchandiseNotChargedNotice}</p>
+          </section>
+        )}
+
         {responsibleAdultMinors.length > 0 && (
           <section className="public-registration-review-card" aria-labelledby="public_responsible_adult_title">
             <p className="public-registration-eyebrow">Minors on this registration</p>
@@ -3262,6 +3297,7 @@ export function PublicRegistrationForm({
           } : {}),
           ...(responsibleAdultMinors.length > 0 ? { responsibleAdults: responsibleAdultValues } : {}),
           ...(lodgingSubmission ? { lodging: lodgingSubmission } : {}),
+          ...(merchandiseSubmission.length > 0 ? { merchandise: merchandiseSubmission } : {}),
           ...(club?.locationId ? { locationId: club.locationId } : {}),
           ...(club?.teamName ? { teamName: club.teamName } : {}),
           ...(club?.draftKey ? { draftKey: club.draftKey } : {}),
@@ -3485,6 +3521,16 @@ export function PublicRegistrationForm({
                 <div className="is-total"><span>Total</span><strong translate="no">{formatCents(confirmation.totalCents ?? 0)}</strong></div>
               </section>
             )}
+            {confirmation.merchandise && confirmation.merchandise.lines.length > 0 && (
+              <section className="public-registration-confirmation-order" aria-label="Merchandise order">
+                <h2>Merchandise order</h2>
+                {confirmation.merchandise.lines.map((line, index) => (
+                  <div key={`${line.productName}_${line.variantLabel}_${index}`}><span>{line.quantity} × {line.productName} {line.variantLabel}</span><strong translate="no">{formatCents(line.lineTotalCents)}</strong></div>
+                ))}
+                <div className="is-total"><span>Merchandise subtotal</span><strong translate="no">{formatCents(confirmation.merchandise.totalCents)}</strong></div>
+                <p>{merchandiseNotChargedNotice}</p>
+              </section>
+            )}
             {confirmation.managePath && (
               <div className="public-registration-manage-link">
                 <a {...eventsSiteNavigation} href={confirmation.managePath}>
@@ -3703,6 +3749,21 @@ export function PublicRegistrationForm({
                   }}
                 />
               )}
+              {currentStep.isReview && merchandiseActive && merchandise && (joiningWaitlist ? (
+                <p className="public-registration-review-waitlist">Merchandise cannot be ordered with a waitlist request.</p>
+              ) : (
+                <PublicMerchandiseStep
+                  offer={merchandise}
+                  selection={merchandiseSelection}
+                  issues={issues.filter((issue) => issue.key === "merchandise")}
+                  onChange={(next) => {
+                    setMerchandiseSelection(next);
+                    setIssues((current) => current.filter((issue) => issue.key !== "merchandise"));
+                    setError("");
+                    setIdempotencyKey(null);
+                  }}
+                />
+              ))}
               {currentStep.isReview && renderReview()}
             </div>
           </section>
