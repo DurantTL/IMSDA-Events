@@ -8,7 +8,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { getPrisma } from "@/lib/prisma";
 import { rosterYearView } from "@/modules/club-rosters/domain";
 import { listActiveHonorOptions, listClubHonorsPage } from "@/modules/honors/member-honor-repository";
-import { clubPageHref } from "@/modules/club-reports/club-page-links";
+import { clubPageHref, clubPageReturnHref } from "@/modules/club-reports/club-page-links";
 import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Club honors" };
@@ -24,7 +24,7 @@ export default async function StaffClubHonorsPage({
   searchParams,
 }: {
   params: Promise<{ organizationId: string }>;
-  searchParams?: Promise<{ year?: string | string[] }>;
+  searchParams?: Promise<{ year?: string | string[]; from?: string | string[] }>;
 }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
@@ -36,14 +36,17 @@ export default async function StaffClubHonorsPage({
   });
   if (!club || club.type !== "CLUB") notFound();
   // The roster's year, carried by its Honors link (#819); an unlisted year falls back to the current one.
-  const clubYear = rosterYearView((await searchParams)?.year).clubYear;
+  const query = await searchParams;
+  const clubYear = rosterYearView(query?.year).clubYear;
+  // Opened from the club page, the way back keeps its directory view; anything else falls back to the club's page (#1587).
+  const backHref = clubPageReturnHref(typeof query?.from === "string" ? query.from : undefined, organizationId) ?? clubPageHref(organizationId, clubYear);
   const [rows, honors] = await Promise.all([
     listClubHonorsPage(organizationId, clubYear),
     listActiveHonorOptions(),
   ]);
   return (
     <section className="page-stack">
-      <AdminPageHeader path={`/admin/organizations/${organizationId}/club/honors`} parentName={club.name} back={{ href: clubPageHref(organizationId, clubYear), label: `Back to ${club.name}` }} />
+      <AdminPageHeader path={`/admin/organizations/${organizationId}/club/honors`} parentName={club.name} back={{ href: backHref, label: `Back to ${club.name}` }} />
       <div className="page-intro">
         <div>
           <p className="eyebrow">Club honors · staff</p>

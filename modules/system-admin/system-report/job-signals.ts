@@ -2,6 +2,7 @@ import type { JobRun } from "@/modules/operations/sweep-heartbeat-repository";
 import { REACHABILITY_STALE_AFTER_MS } from "@/modules/operations/reachability";
 import type { DiskSpace } from "@/modules/operations/disk-space";
 import type { Signal } from "./model";
+import { MONTHLY_RECORD_REMINDER_DAY_TEXT } from "@/modules/club-reports/monthly-reminders-domain";
 
 /**
  * Pure mappers from a stored job run, a disk reading or a stored connection test to report signals (#1357). They hold
@@ -194,6 +195,20 @@ export function honorWatchSummaryFields(key: string, run: JobRun, readAt: Date):
   if (!c) return ranFields(key, run, "watch", COUNTS_MISSING);
   const text = `${c.watches} watches, ${c.queued} queued, ${c.delivered} delivered, ${c.failed} failed.`;
   return ranFields(key, run, c.failed > 0 ? "watch" : "ok", c.failed > 0 ? `${text} A failed summary is tried again on the next sweep.` : text);
+}
+
+export function monthlyRecordReminderFields(key: string, run: JobRun, readAt: Date): Fields {
+  const problem = runProblem(key, run, readAt, "the Monthly Record reminders");
+  if (problem) return problem;
+  const status = run.summary?.status;
+  if (status === "NOT_STARTED") return ranFields(key, run, "info", "Off: not started yet. Nothing is sent until a Clubs Administrator turns the reminders on.");
+  if (status === "SWITCHED_OFF") return ranFields(key, run, "info", "Switched off by a Clubs Administrator for this club year. Clubs are not being reminded.");
+  if (status === "NOT_DUE") return ranFields(key, run, "ok", `Not due yet. Reminders go out from the ${MONTHLY_RECORD_REMINDER_DAY_TEXT} of each month.`);
+  if (status === "EMAIL_NOT_CONFIGURED") return { ...ranFields(key, run, "attention", "Email isn't set up, so reminders can't go out. Ask a system administrator."), needsSetup: true };
+  const c = counts(run, ["reminded", "noRecipient", "failed", "summaries", "delivered"]);
+  if (status !== "RAN" || !c) return ranFields(key, run, "watch", COUNTS_MISSING);
+  const text = `${c.reminded} clubs reminded, ${c.noRecipient} with nobody to email, ${c.summaries} coordinator summaries, ${c.delivered} delivered, ${c.failed} failed.`;
+  return ranFields(key, run, c.failed > 0 ? "watch" : "ok", c.failed > 0 ? `${text} A club that failed is tried again on the next sweep.` : text);
 }
 
 /**

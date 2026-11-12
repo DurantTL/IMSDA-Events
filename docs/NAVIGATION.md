@@ -159,6 +159,10 @@ follows the same pattern: `area/[organizationId]` → "All clubs";
 - `admin/organizations/[organizationId]/club` (a club as its director sees
   it) → "Back to Clubs and churches"; its own links to Club admins, Club
   profile, and each monthly report pass `from` back to itself
+- `admin/organizations/[organizationId]/church-clubs` (Church club summary, #1711: a church's clubs for a club year, read
+  only, printable on one page; names, counts, events and Monthly Record statuses, never birth dates, health, guardian or
+  contact details; system administrators and Clubs Administrators only) → "Back to Clubs and churches" (Club summary in
+  the Clubs view). Opened from the church row in the directory and from the sponsoring-church link on a club page
 - `admin/clubs/reports` (back link: the Monthly Records tab),
   `admin/organizations/background-checks` → "Back to Clubs and churches"
 - `admin/clubs/import` and `admin/clubs/health-import` (the health one only while the Health Record feature is on) are

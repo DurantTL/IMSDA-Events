@@ -1,4 +1,3 @@
-import { Fragment, type ReactNode } from "react";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { EventCountdown } from "@/components/event-countdown";
 import { EventGallery } from "@/components/event-gallery";
@@ -7,10 +6,7 @@ import type { SanitizedHtml } from "@/modules/events/content-html";
 import { formatCountdownTarget, zonedLocalToDate } from "@/modules/events/content-countdown";
 import { variantWidths } from "@/modules/events/asset-variant-widths";
 import { embedSrc } from "@/modules/events/content-embeds";
-import {
-  parseMarkdown,
-  type MarkdownInline,
-} from "@/modules/events/content-markdown";
+import { SafeMarkdown } from "@/components/safe-markdown";
 import {
   canPlaceOnRegistrationForm,
   contentBlocks,
@@ -51,44 +47,9 @@ export function publicEventAssetUrl(eventSlug: string, assetId: string) {
 
 export type EventBlockEvent = { startsAt: string; endsAt: string; timezone: string };
 
-function renderInline(nodes: MarkdownInline[]): ReactNode {
-  return nodes.map((node, index) => {
-    if (node.type === "text") return <Fragment key={index}>{node.text}</Fragment>;
-    if (node.type === "strong") return <strong key={index}>{renderInline(node.children)}</strong>;
-    if (node.type === "em") return <em key={index}>{renderInline(node.children)}</em>;
-    const isMail = node.href.toLowerCase().startsWith("mailto:");
-    return (
-      <a
-        key={index}
-        href={node.href}
-        {...(isMail ? {} : { target: "_blank", rel: "noopener noreferrer" })}
-      >
-        {renderInline(node.children)}
-      </a>
-    );
-  });
-}
-
 /** Formatted text. Headings sit under the section's own h2, so `##` is an h3. */
 export function FormattedText({ source }: { source: string }) {
-  return (
-    <div className="event-block-body event-formatted-text">
-      {parseMarkdown(source).map((block, index) => {
-        if (block.type === "heading") {
-          return block.level === 2
-            ? <h3 key={index}>{renderInline(block.children)}</h3>
-            : <h4 key={index}>{renderInline(block.children)}</h4>;
-        }
-        if (block.type === "ul") {
-          return <ul key={index}>{block.items.map((item, itemIndex) => <li key={itemIndex}>{renderInline(item)}</li>)}</ul>;
-        }
-        if (block.type === "ol") {
-          return <ol key={index} start={block.start}>{block.items.map((item, itemIndex) => <li key={itemIndex}>{renderInline(item)}</li>)}</ol>;
-        }
-        return <p key={index}>{renderInline(block.children)}</p>;
-      })}
-    </div>
-  );
+  return <SafeMarkdown source={source} className="event-block-body event-formatted-text" headingTags={["h3", "h4"]} />;
 }
 
 function PlainText({ text }: { text: string }) {

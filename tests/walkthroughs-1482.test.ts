@@ -7,11 +7,12 @@ import { describe, expect, it } from "vitest";
 import { WalkthroughSteps } from "@/components/walkthrough-steps";
 import { checkHelpGuides } from "@/modules/help/guide-check";
 import { docFileExists, listPageRoutes, publicFileExists } from "@/modules/help/guide-check-files";
+import { helpGuides } from "@/modules/help/guides";
 import { portalGuides } from "@/modules/help/portal-guides";
 import { checkWalkthroughManifest, walkthroughCapturedFor } from "@/modules/help/walkthrough-check";
 import { readWalkthroughManifest, walkthroughSourceHash } from "@/modules/help/walkthrough-files";
 import { walkthroughDesktopMinWidth, walkthroughImage, walkthroughImageBudgets, walkthroughImageFileSize, type WalkthroughImageKind } from "@/modules/help/walkthrough-images";
-import { coordinatorWalkthroughs, directorWalkthroughs, familyWalkthroughs, walkthroughGuides, walkthroughs, walkthroughsForGuide } from "@/modules/help/walkthroughs";
+import { clubsAdminWalkthroughGuides, clubsAdminWalkthroughs, coordinatorWalkthroughs, directorWalkthroughs, familyWalkthroughs, walkthroughGuides, walkthroughs, walkthroughsForGuide } from "@/modules/help/walkthroughs";
 import { assertWalkthroughSafety, signInRateLimitPolicies } from "@/scripts/support/help-walkthrough-fixtures";
 import { buildClubChecklist, type ClubChecklistFacts } from "@/modules/setup-help/club-checklist";
 import { buildCoordinatorChecklist } from "@/modules/setup-help/coordinator-checklist";
@@ -26,14 +27,16 @@ const root = process.cwd();
 const kinds: WalkthroughImageKind[] = ["phone", "desktop"];
 
 describe("walkthrough data and browser actions", () => {
-  it("has the 10 club director, the 6 area coordinator and the 3 family walkthroughs", () => {
+  it("has the 10 club director, the 6 area coordinator, the 3 family and the 2 Clubs Administrator walkthroughs", () => {
     expect(directorWalkthroughs).toHaveLength(10);
     expect(coordinatorWalkthroughs).toHaveLength(6);
     expect(familyWalkthroughs).toHaveLength(3);
+    expect(clubsAdminWalkthroughs).toHaveLength(2);
+    expect(clubsAdminWalkthroughs.every((walkthrough) => walkthrough.audience === "clubs")).toBe(true);
     expect(coordinatorWalkthroughs.every((walkthrough) => walkthrough.audience === "coordinator")).toBe(true);
     expect(familyWalkthroughs.every((walkthrough) => walkthrough.audience === "attendee")).toBe(true);
     expect(new Set(walkthroughs.map((walkthrough) => walkthrough.id)).size).toBe(walkthroughs.length);
-    for (const walkthrough of walkthroughs) expect(walkthrough.id, walkthrough.id).toMatch(/^walkthrough-(director|coordinator|family)-[a-z0-9-]+$/);
+    for (const walkthrough of walkthroughs) expect(walkthrough.id, walkthrough.id).toMatch(/^walkthrough-(director|coordinator|family|clubs)-[a-z0-9-]+$/);
   });
 
   it("gives every data step exactly one browser action, and every browser action a data step", () => {
@@ -43,10 +46,11 @@ describe("walkthrough data and browser actions", () => {
       const ids = walkthrough.steps.map((step) => step.id);
       expect(new Set(ids).size, `${walkthrough.id} step ids are unique`).toBe(ids.length);
       expect(Object.keys(actions.steps).sort(), walkthrough.id).toEqual([...ids].sort());
-      expect(["signed-out", "signed-in", "signed-in-coordinator", "signed-in-family"]).toContain(actions.start);
+      expect(["signed-out", "signed-in", "signed-in-coordinator", "signed-in-family", "signed-in-clubs-admin"]).toContain(actions.start);
       // Each audience starts as its own sample account: a coordinator is never the club director, a family is never either, and the reverse.
-      if (walkthrough.audience === "coordinator") expect(actions.start, walkthrough.id).not.toMatch(/^signed-in(-family)?$/);
-      if (walkthrough.audience === "director") expect(actions.start, walkthrough.id).not.toMatch(/^signed-in-(coordinator|family)$/);
+      if (walkthrough.audience === "coordinator") expect(actions.start, walkthrough.id).not.toMatch(/^signed-in(-family|-clubs-admin)?$/);
+      if (walkthrough.audience === "clubs") expect(actions.start, walkthrough.id).toBe("signed-in-clubs-admin");
+      if (walkthrough.audience === "director") expect(actions.start, walkthrough.id).not.toMatch(/^signed-in-(coordinator|family|clubs-admin)$/);
       if (walkthrough.audience === "attendee") expect(["signed-out", "signed-in-family"], walkthrough.id).toContain(actions.start);
     }
   });
@@ -85,7 +89,8 @@ describe("walkthrough data and browser actions", () => {
 
 describe("walkthrough guides", () => {
   it("are portal guides for the right audience, with steps that carry the same sentences", () => {
-    for (const walkthrough of walkthroughs) {
+    const portalWalkthroughs = walkthroughs.filter((walkthrough) => walkthrough.audience !== "clubs");
+    for (const walkthrough of portalWalkthroughs) {
       const guide = portalGuides.find((candidate) => candidate.id === walkthrough.id)!;
       expect(guide, walkthrough.id).toBeDefined();
       expect(guide.audience).toBe(walkthrough.audience);
@@ -94,14 +99,36 @@ describe("walkthrough guides", () => {
       expect(guide.walkthrough?.steps).toEqual(walkthrough.steps);
       expect(guide.keywords).toContain("step by step");
     }
-    expect(walkthroughGuides).toHaveLength(walkthroughs.length);
+    expect(walkthroughGuides).toHaveLength(portalWalkthroughs.length);
+  });
+
+  it("keeps the Clubs Administrator walkthroughs out of the portal and makes them staff guides (#1882)", () => {
+    for (const walkthrough of clubsAdminWalkthroughs) {
+      expect(portalGuides.some((guide) => guide.id === walkthrough.id), walkthrough.id).toBe(false);
+      const guide = helpGuides.find((candidate) => candidate.id === walkthrough.id)!;
+      expect(guide, walkthrough.id).toBeDefined();
+      expect(guide.workspace).toBe("Clubs");
+      expect(guide.audience).toEqual({ kind: "clubs" });
+      expect(guide.title).toMatch(/^Step by step: /);
+      expect(guide.steps).toEqual(walkthrough.steps.map((step) => step.text));
+      expect(guide.walkthrough?.steps).toEqual(walkthrough.steps);
+      expect(guide.keywords).toContain("step by step");
+    }
+    expect(clubsAdminWalkthroughGuides).toHaveLength(clubsAdminWalkthroughs.length);
   });
 
   it("are linked from the written guides they match", () => {
     for (const [guideId, ids] of Object.entries(walkthroughsForGuide)) {
-      const guide = portalGuides.find((candidate) => candidate.id === guideId)!;
-      expect(guide.walkthroughIds, guideId).toEqual(ids);
-      for (const id of ids) expect(portalGuides.find((candidate) => candidate.id === id)?.audience, `${guideId} -> ${id}`).toBe(guide.audience);
+      const portal = portalGuides.find((candidate) => candidate.id === guideId);
+      if (!portal) {
+        // A Clubs Administrator staff guide (#1882): it and its walkthroughs are in the staff registry, in the Clubs workspace.
+        const staff = helpGuides.find((candidate) => candidate.id === guideId)!;
+        expect(staff.walkthroughIds, guideId).toEqual(ids);
+        for (const id of ids) expect(helpGuides.find((candidate) => candidate.id === id)?.workspace, `${guideId} -> ${id}`).toBe("Clubs");
+        continue;
+      }
+      expect(portal.walkthroughIds, guideId).toEqual(ids);
+      for (const id of ids) expect(portalGuides.find((candidate) => candidate.id === id)?.audience, `${guideId} -> ${id}`).toBe(portal.audience);
     }
   });
 
@@ -181,7 +208,7 @@ describe("walkthrough pictures", () => {
       }
     }
     if (overTarget.length > 0) console.warn(`Over the target size:\n${overTarget.join("\n")}`);
-    // About 8 MB for all 19 walkthroughs (#1883 added the three family walkthroughs and raised the budget from 6 MB).
+    // About 8 MB for all 21 walkthroughs (#1883 added the three family walkthroughs and raised the budget from 6 MB).
     expect(total).toBeLessThanOrEqual(8 * 1024 * 1024);
   });
 

@@ -670,6 +670,7 @@ export function EventContentWorkspace({
                 assets={assets}
                 isSystemAdmin={isSystemAdmin}
                 updateSection={updateSection}
+                onAssetsChange={setAssets}
               />
             ) : section.kind === "RESOURCE_LINKS" ? (
               <LinksEditor section={section} index={index} assets={assets} updateSection={updateSection} />

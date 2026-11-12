@@ -18,6 +18,7 @@
  */
 
 import { CHURCH_BILLED_STATUSES, type ClubRegistrationStatus } from "@/modules/club-registrations/church-owed";
+import { isAttendeeTypeRestricted, promoAppliesToAttendeeType } from "@/modules/promo-codes/domain";
 
 /** Bump when the rules below change, so a version made under the old rules is never mistaken for a current one. */
 export const RECONCILIATION_RULE_VERSION = "attended-v1";
@@ -70,6 +71,8 @@ export type PersonSource = {
   transferredFrom?: string | null;
   /** Staff adjustments (scholarship, discount) recorded for this person alone. */
   adjustmentCents: number;
+  /** The person's attendee type code (#102), used only for a promo code restricted to attendee types. Null or absent: no type. */
+  attendeeTypeCode?: string | null;
 };
 
 export type CreditSource = {
@@ -92,6 +95,11 @@ export type PromoSource = {
   maximumDiscountCents: number | null;
   /** The discount recorded in the estimate (positive cents). */
   recordedCents: number;
+  /**
+   * The code's attendee-type restriction when it was used (#102). Absent or empty means every attendee type (the
+   * code discounts everything the attended people owe, as before).
+   */
+  attendeeTypeCodes?: readonly string[];
 };
 
 export type RosterReviewReason = "LINE_BEYOND_ROSTER" | "ROSTER_POSITIONS" | "TRANSFER_AFTER_PRICING" | "ARRIVAL_PRICE_UNMATCHED";
@@ -358,10 +366,18 @@ export function reconcileRegistration(source: RegistrationSource): RegistrationR
     // fixed code in full, both limited to that subtotal and never above the discount the estimate recorded.
     const eligible = Math.max(0, gross + out.components.creditCents);
     if (source.promo && source.promo.recordedCents > 0) {
+      // A code restricted to attendee types (#102) discounts only the attended people of a listed type; an empty
+      // restriction is the whole subtotal, exactly as before.
+      const restricted = isAttendeeTypeRestricted(source.promo.attendeeTypeCodes) ? source.promo.attendeeTypeCodes : null;
+      const promoBase = restricted
+        ? Math.max(0, sum(attendedSources
+          .filter((person) => promoAppliesToAttendeeType(restricted, person.attendeeTypeCode))
+          .map((person) => person.chargeCents)))
+        : eligible;
       const raw = source.promo.type === "PERCENT_BPS"
-        ? Math.min(Math.floor((eligible * source.promo.value) / 10_000), source.promo.maximumDiscountCents ?? Number.MAX_SAFE_INTEGER)
+        ? Math.min(Math.floor((promoBase * source.promo.value) / 10_000), source.promo.maximumDiscountCents ?? Number.MAX_SAFE_INTEGER)
         : source.promo.value;
-      const discount = Math.max(0, Math.min(raw, eligible, source.promo.recordedCents));
+      const discount = Math.max(0, Math.min(raw, promoBase, eligible, source.promo.recordedCents));
       out.components.promoCents = -discount;
       out.promo = { code: source.promo.code, appliedCents: -discount };
     }

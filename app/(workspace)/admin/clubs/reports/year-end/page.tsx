@@ -25,7 +25,8 @@ export default async function ClubYearEndReportsAdminPage({ searchParams }: { se
   const clubs = await listYearEndReportsForYear(reportYear);
   return (
     <>
-      <AdminPageHeader path="/admin/clubs/reports/year-end" />
+      {/* The way back keeps the year in every section, not only the Clubs view (#1588). */}
+      <AdminPageHeader path="/admin/clubs/reports/year-end" year={reportYear} back={{ href: `/admin/clubs/reports?year=${reportYear}`, label: "Back to Review monthly records" }} />
       <div className="intro-actions club-admin-links">
         <Link className={`secondary-button ${navStyles.target}`} href={`/admin/clubs/reports/year-end?year=${reportYearLabel(start - 1)}`}>← {reportYearLabel(start - 1)}</Link>
         {reportYear !== current && <Link className={`secondary-button ${navStyles.target}`} href={`/admin/clubs/reports/year-end?year=${reportYearLabel(start + 1)}`}>{reportYearLabel(start + 1)} →</Link>}

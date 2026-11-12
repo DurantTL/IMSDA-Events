@@ -11,6 +11,7 @@ import type { ClubYearSummary } from "@/modules/club-reports/repository";
 import { useRecordFrom } from "@/components/use-record-from";
 import { withRecordFrom } from "@/modules/club-reports/record-return-domain";
 import { cardCell } from "@/components/table-card-labels";
+import styles from "@/components/club-reports-conference.module.css";
 
 const shortMonth = (month: string) => new Date(`${month}-15T12:00:00Z`).toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
 
@@ -84,7 +85,7 @@ export function ClubReportsConference({
         </div>
         {!viewOnly && (
           <div className="intro-actions">
-            <ExportLink className="secondary-button" href={`/api/admin/club-reports/export?year=${encodeURIComponent(clubYear)}`}>
+            <ExportLink className={`secondary-button ${styles.target}`} href={`/api/admin/club-reports/export?year=${encodeURIComponent(clubYear)}`}>
               <Download aria-hidden="true" size={15} /> Download CSV
             </ExportLink>
           </div>
@@ -119,7 +120,7 @@ export function ClubReportsConference({
                       ? `${viewOnlyReportHref.base}/${encodeURIComponent(club.id)}/${month}${viewOnlyReportHref.query}`
                       : withRecordFrom(`/admin/clubs/reports/${encodeURIComponent(club.id)}/${month}`, from);
                     if (report) {
-                      return <td key={month} {...cardCell(shortMonth(month))}><Link href={href}>{report.totalPoints}</Link>{!report.onTime && <small> late</small>}{report.reviewed && <small> reviewed</small>}</td>;
+                      return <td key={month} {...cardCell(shortMonth(month))}><Link className={styles.cellLink} href={href}>{report.totalPoints}</Link>{!report.onTime && <small> late</small>}{report.reviewed && <small> reviewed</small>}</td>;
                     }
                     if (future) return <td key={month} {...cardCell(shortMonth(month))} className="club-reports-future">—</td>;
                     if (viewOnly) {
@@ -128,8 +129,8 @@ export function ClubReportsConference({
                     return (
                       <td key={month} {...cardCell(shortMonth(month))}>
                         {isLockedForClub(month, today)
-                          ? <Link className="club-reports-missing" href={href}>Missing</Link>
-                          : <Link className="club-reports-due" href={href}>Due</Link>}
+                          ? <Link className={`club-reports-missing ${styles.cellLink}`} href={href}>Missing</Link>
+                          : <Link className={`club-reports-due ${styles.cellLink}`} href={href}>Due</Link>}
                       </td>
                     );
                   })}
@@ -137,7 +138,7 @@ export function ClubReportsConference({
                     {viewOnly
                       ? (club.registrationOnTime ? "On time" : "—")
                       : (
-                        <label className="checkbox-hit">
+                        <label className={`checkbox-hit ${styles.target}`}>
                           <input
                             aria-label={`${club.name} yearly registration on time`}
                             checked={club.registrationOnTime}

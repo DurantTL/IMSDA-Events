@@ -5,6 +5,8 @@ import {
   shouldTouchStation,
   stationEndsAt,
   stationCapabilities,
+  stationCheckInSchema,
+  stationPaymentMethodLabel,
   stationCookieOptions,
   stationInvalidReason,
   stationPaymentSchema,
@@ -127,5 +129,29 @@ describe("check-in station entry and money helpers (#892)", () => {
     expect(stationPaymentSchema.safeParse({ ...base, ...key, method: "CHECK", checkNumber: "1042" }).success).toBe(true);
     expect(stationPaymentSchema.safeParse({ ...base, ...key, method: "CASH" }).success).toBe(true);
     expect(stationPaymentSchema.safeParse({ ...base, ...key, method: "MANUAL" }).success).toBe(false);
+  });
+});
+
+describe("station balance reason and history wording (#1577)", () => {
+  const base = { registrationId: "r1", items: [{ attendeeId: "a1", idempotencyKey: "d67776d0-f79d-4e8f-bec2-ee61abb7337c" }] };
+
+  it("accepts a check-in with no reason, a listed reason, and trims the note", () => {
+    expect(stationCheckInSchema.safeParse(base).success).toBe(true);
+    const parsed = stationCheckInSchema.parse({ ...base, balanceReason: { code: "SCHOLARSHIP_PENDING", note: "  pending  " } });
+    expect(parsed.balanceReason).toEqual({ code: "SCHOLARSHIP_PENDING", note: "pending" });
+  });
+
+  it("needs a note for Other and caps notes at 300 characters", () => {
+    expect(stationCheckInSchema.safeParse({ ...base, balanceReason: { code: "OTHER" } }).success).toBe(false);
+    expect(stationCheckInSchema.safeParse({ ...base, balanceReason: { code: "OTHER", note: "Left a deposit" } }).success).toBe(true);
+    expect(stationCheckInSchema.safeParse({ ...base, balanceReason: { code: "GROUP_WILL_PAY", note: "x".repeat(301) } }).success).toBe(false);
+    expect(stationCheckInSchema.safeParse({ ...base, balanceReason: { code: "GROUP_WILL_PAY", note: "x".repeat(300) } }).success).toBe(true);
+  });
+
+  it("names payment methods in plain words and never shows a card reference", () => {
+    expect(stationPaymentMethodLabel("CASH", null)).toBe("Cash");
+    expect(stationPaymentMethodLabel("CHECK", " 1042 ")).toBe("Check #1042");
+    expect(stationPaymentMethodLabel("CHECK", null)).toBe("Check");
+    expect(stationPaymentMethodLabel("CARD_REFERENCE", "sq_ref")).toBe("Card");
   });
 });

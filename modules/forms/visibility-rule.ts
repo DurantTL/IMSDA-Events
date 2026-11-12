@@ -156,6 +156,10 @@ export function visibilityRuleProblems(field: RuleField, ordered: readonly RuleF
       problems.push({ kind: "missing", fieldKey: condition.fieldKey, index, message: "Conditional logic must reference another configured field." });
       continue;
     }
+    if (controller.type === "INFORMATION") {
+      problems.push({ kind: "missing", fieldKey: condition.fieldKey, index, message: "An information block has no answer, so nothing can depend on it." });
+      continue;
+    }
     if (field.scope === "REGISTRATION" && controller.scope === "ATTENDEE") {
       problems.push({ kind: "scope", fieldKey: condition.fieldKey, index, message: "A registration-level field cannot depend on an attendee answer." });
     }
