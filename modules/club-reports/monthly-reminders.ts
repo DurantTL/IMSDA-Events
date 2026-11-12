@@ -1,3 +1,4 @@
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -103,7 +104,7 @@ export async function sendDueMonthlyRecordReminders(options: { now?: Date } = {}
   const baseUrl = getServerEnv().APP_BASE_URL;
 
   const orgs = await prisma.organization.findMany({
-    where: { type: "CLUB", isActive: true },
+    where: conferenceClubWhere(),
     select: { id: true, name: true, ...clubJoinSelect },
   });
   const clubIds = orgs.map((club) => club.id);

@@ -15,6 +15,7 @@ import { sendDueHonorWatchSummaries } from "@/modules/honors/watch-emails";
 import { sendDueMonthlyRecordReminders } from "@/modules/club-reports/monthly-reminders";
 import { runHealthSnapshotSweep, sealedCopiesEnabled } from "@/modules/health-records/snapshot-hooks";
 import { expireStalePendingTeams } from "@/modules/general-link-registrations/repository";
+import { endVisitingClubAccess } from "@/modules/visiting-clubs/access-end";
 import { runAlertScan } from "@/modules/operations/alert-scan";
 import { sweepHostedCheckouts } from "@/modules/payments/square-hosted-invalidation";
 import { recordJobRun, recordSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
@@ -24,6 +25,7 @@ import {
   CLASS_WAITLIST_SWEEP_JOB,
   DEADLINE_REMINDER_PREPARATION_JOB,
   GENERAL_LINK_EXPIRY_JOB,
+  VISITING_CLUB_ACCESS_END_JOB,
   HEALTH_SNAPSHOT_SWEEP_JOB,
   HONOR_WATCH_SUMMARIES_JOB,
   INSTRUCTOR_CLASS_EMAILS_JOB,
@@ -298,6 +300,18 @@ async function postHandler(request: Request) {
       "pending-team expiry",
       generalLinkRetention !== null,
       generalLinkRetention ? { expired: generalLinkRetention.expired, events: generalLinkRetention.events } : undefined,
+    );
+    // Visiting clubs (#835): their roles end 30 days after their event ends. Safe on every sweep; it reports counts only.
+    // Its failure must not make a successful sweep look failed.
+    const visitingAccess = await endVisitingClubAccess().catch((error) => {
+      logError("The visiting club access step failed after a successful outbox sweep", error);
+      return null;
+    });
+    await recordStep(
+      VISITING_CLUB_ACCESS_END_JOB,
+      "visiting club access end",
+      visitingAccess !== null,
+      visitingAccess ? { ended: visitingAccess.ended, clubs: visitingAccess.clubs } : undefined,
     );
     // Message files (#845): uploads nothing refers to. It only REPORTS what it would delete unless a human set
     // MESSAGE_FILE_SWEEP_DELETE=true, never touches a file inside the grace period (24 hours at the least) or one

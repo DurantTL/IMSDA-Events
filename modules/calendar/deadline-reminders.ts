@@ -1,3 +1,4 @@
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
@@ -99,7 +100,7 @@ export async function loadReminderRecipients(client: Db, now: Date): Promise<Rem
         revokedAt: null,
         effectiveFrom: { lte: now },
         OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
-        organization: { type: "CLUB", isActive: true },
+        organization: conferenceClubWhere(),
         attendeeAccount: activeAccount,
       },
       select: { attendeeAccount: { select: { email: true, displayName: true } } },

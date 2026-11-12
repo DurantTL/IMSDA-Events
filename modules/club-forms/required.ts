@@ -1,3 +1,4 @@
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
@@ -21,7 +22,7 @@ export async function getRequiredFormsStatus(clubYear: string, organizationIds?:
   });
   const templates: RequiredTemplate[] = templateRows.flatMap((row) => (isRequirement(row.requirement) ? [{ key: row.key, name: row.name, requirement: row.requirement, requiredRoles: row.requiredRoles }] : []));
   const clubRows = await prisma.organization.findMany({
-    where: { type: "CLUB", isActive: true, ...(organizationIds ? { id: { in: [...organizationIds] } } : {}) },
+    where: { ...conferenceClubWhere(), ...(organizationIds ? { id: { in: [...organizationIds] } } : {}) },
     orderBy: { name: "asc" },
     select: { id: true, name: true, parentOrganization: { select: { name: true } } },
   });

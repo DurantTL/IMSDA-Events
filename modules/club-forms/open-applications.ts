@@ -1,3 +1,4 @@
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -51,7 +52,7 @@ async function isClosed(client: Client, templateId: string, clubYear: string) {
 /** Active clubs as `{ id, name }` and nothing else about them. */
 export async function listOpenApplicationClubs(client: Client = getPrisma()) {
   return client.organization.findMany({
-    where: { type: "CLUB", isActive: true },
+    where: conferenceClubWhere(),
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });
@@ -138,7 +139,7 @@ export async function submitOpenApplication(key: string, input: OpenApplicationS
     unlistedClubName = (input.unlistedClubName ?? "").trim().slice(0, 120);
     if (!unlistedClubName) throw new ClubFormError("VALIDATION_FAILED", "Type your club's name.", [{ key: "unlistedClubName", message: "Type your club's name." }]);
   } else {
-    const club = await prisma.organization.findFirst({ where: { id: input.organizationId, type: "CLUB", isActive: true }, select: { id: true, name: true, normalizedName: true } });
+    const club = await prisma.organization.findFirst({ where: { ...conferenceClubWhere(), id: input.organizationId }, select: { id: true, name: true, normalizedName: true } });
     if (!club) throw new ClubFormError("VALIDATION_FAILED", "Choose your club from the list.", [{ key: "organizationId", message: "Choose your club from the list." }]);
     organizationId = club.id;
     // The form's hidden club field takes the directory's own entry for this club (trimmed, one per normalized name), so it

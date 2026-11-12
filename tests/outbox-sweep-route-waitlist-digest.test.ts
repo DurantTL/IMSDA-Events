@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   sweepHostedCheckouts: vi.fn(),
   runHealthSnapshotSweep: vi.fn(),
   expireStalePendingTeams: vi.fn(),
+  endVisitingClubAccess: vi.fn(),
   prunePublicMetrics: vi.fn(),
   sweepMessageFiles: vi.fn(),
   messageFileSweepDeletes: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock("@/modules/operations/sweep-heartbeat-repository", () => ({ recordSweepH
 vi.mock("@/modules/payments/square-hosted-invalidation", () => ({ sweepHostedCheckouts: mocks.sweepHostedCheckouts }));
 vi.mock("@/modules/health-records/snapshot-hooks", () => ({ runHealthSnapshotSweep: mocks.runHealthSnapshotSweep, sealedCopiesEnabled: mocks.healthRecordsEnabled }));
 vi.mock("@/modules/general-link-registrations/repository", () => ({ expireStalePendingTeams: mocks.expireStalePendingTeams }));
+vi.mock("@/modules/visiting-clubs/access-end", () => ({ endVisitingClubAccess: mocks.endVisitingClubAccess }));
 vi.mock("@/modules/public-metrics/repository", () => ({ prunePublicMetrics: mocks.prunePublicMetrics }));
 vi.mock("@/modules/calendar/feeds", () => ({ refreshDueCalendarFeeds: mocks.refreshDueCalendarFeeds }));
 vi.mock("@/modules/event-locations/waitlist-digest", () => ({ sendDueLocationWaitlistDigests: mocks.sendDueLocationWaitlistDigests }));
@@ -80,6 +82,7 @@ beforeEach(() => {
   mocks.sweepHostedCheckouts.mockResolvedValue({ withdrawn: 0, deleted: 0, failed: 0 });
   mocks.runHealthSnapshotSweep.mockResolvedValue(null);
   mocks.expireStalePendingTeams.mockResolvedValue({ expired: 0, events: 0 });
+  mocks.endVisitingClubAccess.mockResolvedValue({ ended: 0, clubs: 0 });
   mocks.prunePublicMetrics.mockResolvedValue(0);
   mocks.messageFileSweepDeletes.mockReturnValue(false);
   mocks.sweepMessageFiles.mockImplementation(async (options: { mode: string }) => ({
@@ -240,6 +243,18 @@ describe("the sweep records its steps for the System report (#1357)", () => {
     const failed = await POST(request());
     expect(failed.status).toBe(200);
     expect(mocks.recordJobRun).toHaveBeenCalledWith("general-link-expiry", "FAILED", undefined);
+  });
+
+  it("records the visiting club access end with counts only, as FAILED when it throws, and never fails the sweep (#835)", async () => {
+    mocks.endVisitingClubAccess.mockResolvedValueOnce({ ended: 4, clubs: 2 });
+    await POST(request());
+    expect(mocks.recordJobRun).toHaveBeenCalledWith("visiting-club-access-end", "SUCCEEDED", { ended: 4, clubs: 2 });
+
+    mocks.recordJobRun.mockClear();
+    mocks.endVisitingClubAccess.mockRejectedValueOnce(new Error("synthetic"));
+    const failed = await POST(request());
+    expect(failed.status).toBe(200);
+    expect(mocks.recordJobRun).toHaveBeenCalledWith("visiting-club-access-end", "FAILED", undefined);
   });
 
   it("records the Pay on Square link sweep with counts only (#1374), and as FAILED when it throws", async () => {

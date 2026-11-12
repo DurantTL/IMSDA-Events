@@ -16,6 +16,7 @@ export const OUTBOX_SWEEP_JOB = "outbox-sweep";
 export const CALENDAR_FEED_REFRESH_JOB = "calendar-feed-refresh";
 export const MESSAGE_FILE_CLEANUP_JOB = "message-file-cleanup";
 export const GENERAL_LINK_EXPIRY_JOB = "general-link-expiry";
+export const VISITING_CLUB_ACCESS_END_JOB = "visiting-club-access-end";
 export const EMAIL_REACHABILITY_JOB = "email-reachability";
 export const SQUARE_REACHABILITY_JOB = "square-reachability";
 export const PAY_ON_SQUARE_LINK_SWEEP_JOB = "pay-on-square-link-sweep";

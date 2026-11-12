@@ -1,3 +1,4 @@
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import "server-only";
 
 import { Prisma, type OrganizationType } from "@prisma/client";
@@ -285,7 +286,7 @@ export async function setDirectoryOrganizationActive(organizationId: string, isA
     }
     if (existing.isActive === isActive) return;
     if (!isActive && isSponsorOrganizationType(existing.type)) {
-      const activeClub = await tx.organization.findFirst({ where: { parentOrganizationId: organizationId, type: "CLUB", isActive: true }, select: { id: true } });
+      const activeClub = await tx.organization.findFirst({ where: { ...conferenceClubWhere(), parentOrganizationId: organizationId }, select: { id: true } });
       if (activeClub) {
         throw new OrganizationOperationError("ORGANIZATION_HAS_ACTIVE_CLUBS", "Move or deactivate its active clubs before deactivating it.");
       }

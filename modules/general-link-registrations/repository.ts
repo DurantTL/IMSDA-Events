@@ -1,3 +1,4 @@
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import "server-only";
 
 import { suppressionNote } from "@/modules/communications/delivery-hold";
@@ -194,7 +195,7 @@ export function typedInAttendeePreparer(options: {
 /** The directory club a name picks: the one `listClubDirectoryNames` shows for it (active, first by name then id). */
 async function directoryClub(client: Pick<Tx, "organization">, name: string) {
   return client.organization.findFirst({
-    where: { type: "CLUB", isActive: true, normalizedName: normalizeOrganizationName(name) },
+    where: { ...conferenceClubWhere(), normalizedName: normalizeOrganizationName(name) },
     orderBy: [{ name: "asc" }, { id: "asc" }],
     select: { id: true, name: true },
   });
@@ -233,7 +234,7 @@ async function clubsDirectedBy(email: string, now: Date) {
       effectiveFrom: { lte: now },
       OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
       attendeeAccount: { email: { equals: normalizeDirectorEmail(email), mode: "insensitive" }, disabledAt: null },
-      organization: { type: "CLUB", isActive: true },
+      organization: conferenceClubWhere(),
     },
     select: { organization: { select: { id: true, name: true } } },
   });
@@ -1043,7 +1044,7 @@ export async function countPendingTeams(eventId: string) {
 /** The active clubs staff can attach a team to. Names only. */
 export async function listAttachableClubs() {
   return getPrisma().organization.findMany({
-    where: { type: "CLUB", isActive: true },
+    where: conferenceClubWhere(),
     orderBy: [{ name: "asc" }, { id: "asc" }],
     select: { id: true, name: true },
   });
@@ -1212,7 +1213,7 @@ export async function resolvePendingTeam(
   const adding = action.action === "ADD_CLUB";
   const club = adding
     ? { id: addedClubId(row.id), name: cleanNewClubName(action.clubName) }
-    : await prisma.organization.findFirst({ where: { id: action.organizationId, type: "CLUB", isActive: true }, select: { id: true, name: true } });
+    : await prisma.organization.findFirst({ where: { ...conferenceClubWhere(), id: action.organizationId }, select: { id: true, name: true } });
   if (!club) throw new GeneralLinkError("CLUB_INVALID", "Choose an active club from the list.");
   if (row.status === "CONFIRMED") {
     if (row.organizationId === club.id) return { status: "CONFIRMED", alreadyDone: true, registrationId: row.registrationId, clubName: row.organization?.name ?? club.name };

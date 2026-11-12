@@ -1,3 +1,4 @@
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
@@ -16,7 +17,7 @@ export async function listYouthDirectoryRows(now = new Date()): Promise<{ clubYe
   const clubYear = clubYearFor(now);
   const today = calendarDateOf(now);
   const members = await getPrisma().clubRosterMember.findMany({
-    where: { clubYear, status: "ACTIVE", attendeeType: "YOUTH", organization: { type: "CLUB", isActive: true } },
+    where: { clubYear, status: "ACTIVE", attendeeType: "YOUTH", organization: conferenceClubWhere() },
     select: {
       id: true,
       attendeeType: true,

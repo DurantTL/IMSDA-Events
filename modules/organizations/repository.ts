@@ -1,3 +1,4 @@
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import "server-only";
 
 import {
@@ -209,7 +210,7 @@ export async function getOrganizationSummary() {
   const inScope = { type: { in: ["CHURCH", "CLUB"] } } satisfies Prisma.OrganizationWhereInput;
   const [churches, clubs, identities, unlinked] = await Promise.all([
     prisma.organization.count({ where: { type: "CHURCH", isActive: true } }),
-    prisma.organization.count({ where: { type: "CLUB", isActive: true } }),
+    prisma.organization.count({ where: conferenceClubWhere() }),
     prisma.externalIdentity.count({ where: { organization: inScope } }),
     prisma.organization.count({ where: { ...inScope, isActive: true, externalIdentities: { none: {} } } }),
   ]);
@@ -351,9 +352,8 @@ export async function updateOrganization(
     if (isSponsorOrganizationType(existing.type) && existing.isActive && !input.isActive) {
       const activeClub = await tx.organization.findFirst({
         where: {
+          ...conferenceClubWhere(),
           parentOrganizationId: organizationId,
-          type: "CLUB",
-          isActive: true,
         },
         select: { id: true },
       });

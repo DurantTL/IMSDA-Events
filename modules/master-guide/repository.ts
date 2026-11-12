@@ -1,3 +1,4 @@
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import "server-only";
 
 import { Prisma } from "@prisma/client";
@@ -388,7 +389,7 @@ export async function listAreaApprovalQueue(now = new Date()): Promise<AreaAppro
   const candidates = await getPrisma().masterGuideCandidate.findMany({
     where: {
       status: "CLUB_APPROVED",
-      organization: { type: "CLUB", isActive: true, clubOptionalFeatures: { some: { featureKey: MASTER_GUIDE_FEATURE_KEY } } },
+      organization: { ...conferenceClubWhere(), clubOptionalFeatures: { some: { featureKey: MASTER_GUIDE_FEATURE_KEY } } },
     },
     select: {
       id: true, organizationId: true, startedOn: true, mentorName: true, clubApprovedAt: true,

@@ -321,7 +321,7 @@ describe("the Area Coordinator's approval", () => {
     const rows = await listAreaApprovalQueue(now);
     expect(mocks.prisma.masterGuideCandidate.findMany.mock.calls[0]![0].where).toEqual({
       status: "CLUB_APPROVED",
-      organization: { type: "CLUB", isActive: true, clubOptionalFeatures: { some: { featureKey: "master-guide-tracking" } } },
+      organization: { type: "CLUB", isActive: true, guestEventId: null, clubOptionalFeatures: { some: { featureKey: "master-guide-tracking" } } },
     });
     expect(rows).toEqual([expect.objectContaining({ id: "cand-1", clubName: "Test Pathfinders", name: "Casey Sample", clubApprovedOn: "2026-11-01" })]);
     // No birth date or age ever reaches the coordinator's rows.
