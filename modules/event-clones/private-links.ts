@@ -1,3 +1,5 @@
+import { tokenRoutePrefixes } from "@/lib/token-routes";
+
 /**
  * Private links inside copied free text (#157). A clone copies configuration
  * text verbatim, and that text can hold links that only make sense for the
@@ -40,28 +42,8 @@ export const privateLinkReasonLabels: Record<PrivateLinkReason, string> = {
   sourceReference: "the source event's own address or id",
 };
 
-/**
- * Routes whose last path segment is a secret token (a `[token]` folder under `app/`), as the segments before the
- * token. A link on the app's own origin, or a relative one, that has a segment after one of these is private.
- * `tests/private-link-token-routes.test.ts` fails when a new `[token]` route exists that this list does not cover.
- */
-export const tokenRoutePrefixes: readonly (readonly string[])[] = [
-  ["manage"],
-  ["club-forms"],
-  ["health-records"],
-  ["staff-invite"],
-  ["unsubscribe"],
-  ["clubs", "register"],
-  ["account", "visiting-club"],
-  ["api", "public", "manage"],
-  ["api", "public", "club-forms"],
-  ["api", "public", "health-records"],
-  ["api", "public", "staff-invitations"],
-  ["api", "public", "unsubscribe"],
-  // The Pay on Square return id is an opaque bearer id for a status view (`/pay/square/return/<returnId>`).
-  ["pay", "square", "return"],
-  ["api", "public", "square-return"],
-];
+/** Routes whose last path segment is a secret token: one list, shared with log redaction (`lib/token-path.ts`). */
+export { tokenRoutePrefixes } from "@/lib/token-routes";
 
 /** The route names a stored link may keep as its first path segment: the app's fixed route names, never a slug, id or token. */
 export const fixedRouteNames: ReadonlySet<string> = new Set(tokenRoutePrefixes.map((prefix) => prefix[0]!));
