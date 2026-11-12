@@ -13,13 +13,14 @@ const mocks = vi.hoisted(() => {
     clubRosterMember: { findFirst: vi.fn(), findMany: vi.fn() },
     masterGuideCandidate: { create: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
   };
-  return { prisma, writeAuditLog: vi.fn(), logError: vi.fn() };
+  return { prisma, writeAuditLog: vi.fn(), logError: vi.fn(), coordinatorMinistriesForAccount: vi.fn() };
 });
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => mocks.prisma }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/lib/logger", () => ({ logError: mocks.logError }));
+vi.mock("@/modules/organizations/area-coordinators", () => ({ coordinatorMinistriesForAccount: mocks.coordinatorMinistriesForAccount }));
 vi.mock("@/modules/club-rosters/birth-dates", () => ({
   openBirthDate: (sealed: string) => {
     if (!sealed.startsWith("sealed:")) throw new Error("cannot open");
@@ -50,7 +51,10 @@ function rosterBirthDate(birthDate: string | null) {
 }
 
 function candidate(status: string, extra: Record<string, unknown> = {}) {
-  return { id: "cand-1", organizationId: "club-1", personId: "person-1", startedOn: new Date("2025-11-01T00:00:00.000Z"), mentorName: "Sam Sample", status, ...extra };
+  return {
+    id: "cand-1", organizationId: "club-1", personId: "person-1", startedOn: new Date("2025-11-01T00:00:00.000Z"), mentorName: "Sam Sample", status,
+    organization: { clubKind: "PATHFINDER", guestEventId: null }, ...extra,
+  };
 }
 
 async function thrown(work: Promise<unknown>): Promise<MasterGuideError> {
@@ -65,6 +69,7 @@ beforeEach(() => {
   vi.setSystemTime(now);
   mocks.prisma.$transaction.mockImplementation(async (work: (tx: typeof mocks.prisma) => unknown) => work(mocks.prisma));
   mocks.prisma.organization.findUnique.mockResolvedValue({ type: "CLUB", isActive: true });
+  mocks.coordinatorMinistriesForAccount.mockResolvedValue(["PATHFINDER"]);
   mocks.prisma.clubOptionalFeature.findUnique.mockResolvedValue({ id: "feature-1" });
   mocks.prisma.clubRosterMember.findFirst.mockResolvedValue({ id: "member-1" });
   mocks.prisma.masterGuideCandidate.create.mockResolvedValue({ id: "cand-1" });
@@ -313,15 +318,44 @@ describe("the Area Coordinator's approval", () => {
     expect((await thrown(approveForArea("cand-1", area, now))).code).toBe("NOT_FOUND");
   });
 
-  it("lists only candidates the club approved, in active clubs with the feature on", async () => {
+  it("refuses a club outside the coordinator's ministries like a missing candidate, and writes nothing", async () => {
+    mocks.coordinatorMinistriesForAccount.mockResolvedValue(["ADVENTURER"]);
+    mocks.prisma.masterGuideCandidate.findUnique.mockResolvedValue(candidate("CLUB_APPROVED"));
+    expect((await thrown(approveForArea("cand-1", area, now))).code).toBe("NOT_FOUND");
+    expect(mocks.coordinatorMinistriesForAccount).toHaveBeenCalledWith("account-area", now, mocks.prisma);
+    mocks.coordinatorMinistriesForAccount.mockResolvedValue([]);
+    expect((await thrown(approveForArea("cand-1", area, now))).code).toBe("NOT_FOUND");
+    expect(mocks.prisma.masterGuideCandidate.updateMany).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("approves for an Adventurer club when the coordinator's ministries include Adventurer", async () => {
+    mocks.coordinatorMinistriesForAccount.mockResolvedValue(["PATHFINDER", "ADVENTURER"]);
+    mocks.prisma.masterGuideCandidate.findUnique.mockResolvedValue(candidate("CLUB_APPROVED", { organization: { clubKind: "ADVENTURER", guestEventId: null } }));
+    await approveForArea("cand-1", area, now);
+    expect(mocks.prisma.masterGuideCandidate.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a visiting club's candidate", async () => {
+    mocks.prisma.masterGuideCandidate.findUnique.mockResolvedValue(candidate("CLUB_APPROVED", { organization: { clubKind: "PATHFINDER", guestEventId: "event-1" } }));
+    expect((await thrown(approveForArea("cand-1", area, now))).code).toBe("NOT_FOUND");
+    expect(mocks.prisma.masterGuideCandidate.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("lists nothing, and reads nothing, for a coordinator with no ministries", async () => {
+    expect(await listAreaApprovalQueue([], now)).toEqual([]);
+    expect(mocks.prisma.masterGuideCandidate.findMany).not.toHaveBeenCalled();
+  });
+
+  it("lists only candidates the club approved, in active conference clubs of the coordinator's ministries with the feature on", async () => {
     mocks.prisma.masterGuideCandidate.findMany.mockResolvedValue([{
       id: "cand-1", organizationId: "club-1", startedOn: new Date("2025-11-01T00:00:00.000Z"), mentorName: null, clubApprovedAt: new Date("2026-11-01T12:00:00.000Z"),
-      person: { firstName: "Casey", lastName: "Sample" }, organization: { name: "Test Pathfinders" },
+      person: { firstName: "Casey", lastName: "Sample" }, organization: { name: "Test Pathfinders", clubKind: "PATHFINDER" },
     }]);
-    const rows = await listAreaApprovalQueue(now);
+    const rows = await listAreaApprovalQueue(["PATHFINDER"], now);
     expect(mocks.prisma.masterGuideCandidate.findMany.mock.calls[0]![0].where).toEqual({
       status: "CLUB_APPROVED",
-      organization: { type: "CLUB", isActive: true, clubOptionalFeatures: { some: { featureKey: "master-guide-tracking" } } },
+      organization: { type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["PATHFINDER"] }, clubOptionalFeatures: { some: { featureKey: "master-guide-tracking" } } },
     });
     expect(rows).toEqual([expect.objectContaining({ id: "cand-1", clubName: "Test Pathfinders", name: "Casey Sample", clubApprovedOn: "2026-11-01" })]);
     // No birth date or age ever reaches the coordinator's rows.

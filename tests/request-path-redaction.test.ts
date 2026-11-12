@@ -16,6 +16,13 @@ describe("redactTokenPath", () => {
     expect(redactTokenPath("/api/public/health-records/abc123")).toBe("/api/public/health-records/[redacted]");
   });
 
+  it("hides the token in a visiting club's invitation link", async () => {
+    const { visitingClubInvitePath } = await import("@/modules/visiting-clubs/domain");
+    expect(redactTokenPath(visitingClubInvitePath("invite-token-1"))).toBe("/account/visiting-club/[redacted]");
+    expect(redactTokenPath("/account/visiting-club/abc123/next")).toBe("/account/visiting-club/[redacted]/next");
+    expect(redactTokenPath("/account/visiting-clubs")).toBe("/account/visiting-clubs");
+  });
+
   it("still hides the existing token paths and leaves ordinary paths alone", () => {
     expect(redactTokenPath("/manage/secret")).toBe("/manage/[redacted]");
     expect(redactTokenPath("/api/events/e1/registrations")).toBe("/api/events/e1/registrations");
@@ -38,6 +45,7 @@ describe("onRequestError", () => {
   it("logs a redacted path without the query string", async () => {
     expect(await pathLoggedFor("/health-records/abc123?x=1")).toBe("/health-records/[redacted]");
     expect(await pathLoggedFor("/manage/secret?next=/a")).toBe("/manage/[redacted]");
+    expect(await pathLoggedFor("/account/visiting-club/secret?x=1")).toBe("/account/visiting-club/[redacted]");
     expect(await pathLoggedFor("/api/events/e1/payments?days=9")).toBe("/api/events/e1/payments");
   });
 });

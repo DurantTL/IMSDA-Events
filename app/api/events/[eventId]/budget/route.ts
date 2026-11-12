@@ -7,8 +7,8 @@ import { findActiveMembership } from "@/modules/events/repository";
 import { withRequestContext } from "@/lib/request-context";
 
 /**
- * Staff switch the Budget sheet on or off (#1682): Event Admins, active Clubs Administrators (an Event Admin on club events)
- * and system administrators; Registration Managers and Finance Managers are refused. Audited.
+ * Staff switch the Budget sheet on or off (#1682): an Event Admin on this event or a system administrator. The Clubs
+ * Administrator role alone does not qualify; Registration Managers and Finance Managers are refused. Audited.
  */
 async function putHandler(request: Request, context: { params: Promise<{ eventId: string }> }) {
   const originError = rejectCrossOriginRequest(request);

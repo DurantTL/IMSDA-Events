@@ -275,7 +275,10 @@ describe("check-in station API: payments (#892)", () => {
     }
   });
 
-  it("lets a check-in-only station note a Square-app payment", async () => {
+  it("lets a check-in-only station note a Square-app payment (Caleb, November 12, 2026)", async () => {
+    // A check-in-only station: it can check people in but not record payments. The note is still allowed on purpose.
+    expect(station.capabilities).toEqual({ canCheckIn: true, canRecordPayments: false });
+    mocks.resolveStation.mockResolvedValue(station);
     const response = await squareNotePost(post("/api/check-in-station/square-app-note", {
       registrationId: "registration_1", amountCents: 6200, receiptNumber: "R-1234",
     }));

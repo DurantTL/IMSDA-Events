@@ -67,11 +67,11 @@ export function canManageMasterGuide(capabilities: Pick<ClubCapabilities, "editP
 }
 
 /**
- * Which clubs an Area Coordinator may approve for. Coordinators work conference-wide until areas exist (#843), so every
- * active club qualifies; narrow it here, in this one place, when areas are assigned.
+ * Whether an Area Coordinator may approve for a club: the club's ministry must be one of the coordinator's (#843), the same
+ * rule as every other coordinator page. A club with no kind, or a coordinator with no ministries, is refused.
  */
-export function areaCoordinatorMayApproveForClub(organizationId: string): boolean {
-  return organizationId.length > 0;
+export function areaCoordinatorMayApproveForClub(ministries: readonly string[], clubKind: string | null | undefined): boolean {
+  return typeof clubKind === "string" && ministries.includes(clubKind);
 }
 
 function pad(value: number) {

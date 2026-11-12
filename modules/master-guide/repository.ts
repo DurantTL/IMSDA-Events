@@ -9,6 +9,9 @@ import { isClubFeatureEnabled } from "@/modules/club-features/repository";
 import { openBirthDate } from "@/modules/club-rosters/birth-dates";
 import { ageOn, calendarDateOf, clubYearFor } from "@/modules/club-rosters/domain";
 import type { MasterGuideAreaActor, MasterGuideClubActor } from "@/modules/master-guide/access";
+import { areaClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
+import { coordinatorMinistriesForAccount } from "@/modules/organizations/area-coordinators";
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
 import {
   MASTER_GUIDE_FEATURE_KEY,
   MASTER_GUIDE_MIN_START_AGE,
@@ -382,22 +385,26 @@ export async function approveForClub(organizationId: string, candidateId: string
   });
 }
 
-/** Candidates the club approved and the Area Coordinator has not yet, in clubs with the feature on, for the coordinator's page. */
-export async function listAreaApprovalQueue(now = new Date()): Promise<AreaApprovalRow[]> {
+/**
+ * Candidates the club approved and the Area Coordinator has not yet, in clubs of the coordinator's ministries (#843) with the
+ * feature on, for the coordinator's page.
+ */
+export async function listAreaApprovalQueue(ministries: readonly ClubKindValue[], now = new Date()): Promise<AreaApprovalRow[]> {
+  if (ministries.length === 0) return [];
   const today = calendarDateOf(now);
   const candidates = await getPrisma().masterGuideCandidate.findMany({
     where: {
       status: "CLUB_APPROVED",
-      organization: { type: "CLUB", isActive: true, clubOptionalFeatures: { some: { featureKey: MASTER_GUIDE_FEATURE_KEY } } },
+      organization: { ...areaClubWhere(ministries), clubOptionalFeatures: { some: { featureKey: MASTER_GUIDE_FEATURE_KEY } } },
     },
     select: {
       id: true, organizationId: true, startedOn: true, mentorName: true, clubApprovedAt: true,
       person: { select: { firstName: true, lastName: true } },
-      organization: { select: { name: true } },
+      organization: { select: { name: true, clubKind: true } },
     },
   });
   return candidates
-    .filter((candidate) => areaCoordinatorMayApproveForClub(candidate.organizationId))
+    .filter((candidate) => areaCoordinatorMayApproveForClub(ministries, candidate.organization.clubKind))
     .map((candidate): AreaApprovalRow => {
       const startedOn = calendarDateOf(candidate.startedOn);
       const clubApprovedOn = candidate.clubApprovedAt ? calendarDateOf(candidate.clubApprovedAt) : null;
@@ -416,16 +423,18 @@ export async function listAreaApprovalQueue(now = new Date()): Promise<AreaAppro
 }
 
 /**
- * The Area Coordinator approves: CLUB_APPROVED to AREA_APPROVED. Only for a club in their scope with the feature on, and
- * only a candidate the club already approved; nothing else about the candidate can change here.
+ * The Area Coordinator approves: CLUB_APPROVED to AREA_APPROVED. Only for a club of their ministries (#843, read fresh from
+ * their grant) with the feature on, and only a candidate the club already approved; nothing else about the candidate can
+ * change here. A club outside their ministries answers like a missing candidate.
  */
 export async function approveForArea(candidateId: string, actor: MasterGuideAreaActor, now = new Date()) {
   await getPrisma().$transaction(async (tx) => {
     const candidate = await tx.masterGuideCandidate.findUnique({
       where: { id: candidateId },
-      select: { id: true, organizationId: true, personId: true, status: true },
+      select: { id: true, organizationId: true, personId: true, status: true, organization: { select: { clubKind: true, guestEventId: true } } },
     });
-    if (!candidate || !areaCoordinatorMayApproveForClub(candidate.organizationId)) throw new MasterGuideError("NOT_FOUND", "That candidate could not be found.");
+    const ministries = candidate ? await coordinatorMinistriesForAccount(actor.accountId, now, tx) : [];
+    if (!candidate || candidate.organization.guestEventId !== null || !areaCoordinatorMayApproveForClub(ministries, candidate.organization.clubKind)) throw new MasterGuideError("NOT_FOUND", "That candidate could not be found.");
     await assertClubAndFeature(tx, candidate.organizationId);
     const status = isMasterGuideStatus(candidate.status) ? candidate.status : null;
     if (!status || !canTransition(status, "AREA_APPROVED")) throw new MasterGuideError("WRONG_STATUS", "Only a candidate the club has approved can be approved here.");
