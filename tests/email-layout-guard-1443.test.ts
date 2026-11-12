@@ -44,6 +44,7 @@ const CLUB_KEYS: MessageTemplateKey[] = [
   "CONFERENCE_CLUB_ORDER_SUBMITTED",
   "CONFERENCE_CLUB_ORDER_CONFIRMATION",
   "STERLING_REMINDER",
+  "MONTHLY_RECORD_REMINDER",
 ];
 
 describe("every template key has a header context and a why line (#1443)", () => {

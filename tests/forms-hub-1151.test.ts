@@ -39,7 +39,7 @@ import { listInformationFormsForHub } from "@/modules/information-forms/hub";
 import { filterFormsHubRows, parseFormsHubFilters, sortFormsHubRows, type FormsHubRow } from "@/modules/forms-hub/rows";
 
 function row(overrides: Partial<FormsHubRow>): FormsHubRow {
-  return { id: "x", kind: "GENERAL", name: "Form", eventName: null, status: "OPEN", statusLabel: "Open", responseCount: 0, lastResponseAt: null, editHref: "/e", responsesHref: "/r", ...overrides };
+  return { id: "x", kind: "GENERAL", name: "Form", eventName: null, eventId: null, status: "OPEN", statusLabel: "Open", responseCount: 0, lastResponseAt: null, editHref: "/e", responsesHref: "/r", ...overrides };
 }
 
 beforeEach(() => {
@@ -102,14 +102,14 @@ describe("filters", () => {
   ];
 
   it("ignores unknown filter values", () => {
-    expect(parseFormsHubFilters({ kind: "BOGUS", status: "x", q: "  a   b " })).toEqual({ kind: null, status: null, q: "a b" });
+    expect(parseFormsHubFilters({ kind: "BOGUS", status: "x", q: "  a   b " })).toEqual({ kind: null, status: null, owner: null, q: "a b" });
   });
 
   it("filters by kind, status and name or event name", () => {
-    expect(filterFormsHubRows(rows, { kind: "EVENT", status: null, q: "" }).map((r) => r.id)).toEqual(["c"]);
-    expect(filterFormsHubRows(rows, { kind: null, status: "OPEN", q: "" }).map((r) => r.id)).toEqual(["b"]);
-    expect(filterFormsHubRows(rows, { kind: null, status: null, q: "SURVEY" }).map((r) => r.id)).toEqual(["b", "c"]);
-    expect(filterFormsHubRows(rows, { kind: null, status: null, q: "camporee" }).map((r) => r.id)).toEqual(["c"]);
+    expect(filterFormsHubRows(rows, { kind: "EVENT", status: null, owner: null, q: "" }).map((r) => r.id)).toEqual(["c"]);
+    expect(filterFormsHubRows(rows, { kind: null, status: "OPEN", owner: null, q: "" }).map((r) => r.id)).toEqual(["b"]);
+    expect(filterFormsHubRows(rows, { kind: null, status: null, owner: null, q: "SURVEY" }).map((r) => r.id)).toEqual(["b", "c"]);
+    expect(filterFormsHubRows(rows, { kind: null, status: null, owner: null, q: "camporee" }).map((r) => r.id)).toEqual(["c"]);
   });
 
   it("orders club, then general, then event forms", () => {
@@ -122,7 +122,7 @@ describe("loaders", () => {
     mocks.templateFindMany.mockResolvedValue([{ id: "t1", key: "medical", name: "Medical", enabled: true }, { id: "t2", key: "trip", name: "Trip", enabled: false }]);
     mocks.submissionGroupBy.mockResolvedValue([{ templateId: "t1", _count: { _all: 3 }, _max: { submittedAt: new Date("2026-05-01T12:00:00Z") } }]);
     const rows = await listClubFormsForHub();
-    expect(rows.map((r) => [r.name, r.statusLabel, r.responseCount, r.lastResponseAt])).toEqual([["Medical", "On", 3, "2026-05-01T12:00:00.000Z"], ["Trip", "Off", 0, null]]);
+    expect(rows.map((r) => [r.name, r.statusLabel, r.responseCount, r.lastResponseAt])).toEqual([["Medical", "Open", 3, "2026-05-01T12:00:00.000Z"], ["Trip", "Closed", 0, null]]);
     expect(rows[0]).toMatchObject({ editHref: "/admin/club-forms/medical", responsesHref: "/more/club-forms?form=medical" });
     expect(mocks.submissionGroupBy).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(mocks.templateFindMany.mock.calls)).not.toContain("answers");

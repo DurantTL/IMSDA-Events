@@ -349,7 +349,7 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
 
   // Help & learning (#1077): the hub, the glossary and the guides this viewer may see. Static titles and keywords
   // written in code, never event data. They are listed after every matching page (see `searchDestinations`).
-  const helpViewer = { isSystemAdmin: context.isSystemAdmin, selectedEventId: context.selectedEventId, permissions: context.permissions };
+  const helpViewer = { isSystemAdmin: context.isSystemAdmin, isClubsAdministrator: Boolean(context.clubsAdmin) || context.isSystemAdmin, selectedEventId: context.selectedEventId, permissions: context.permissions };
   add({ key: "Help:/help", scope: "Help", label: "Help & learning", description: "Short guides for common tasks.", href: withCurrentEvent("/help", context.selectedEventId), keywords: ["guide", "how to", "learn", "training", "support"] });
   for (const guide of visibleGuides(helpViewer)) {
     add({ key: `Help:/help/${guide.id}`, scope: "Help", label: guide.title, description: guide.summary, href: withCurrentEvent(`/help/${guide.id}`, context.selectedEventId), keywords: guide.keywords });

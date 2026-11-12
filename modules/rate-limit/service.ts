@@ -1538,3 +1538,17 @@ export async function checkClubSearchRateLimit(key: string, limit: number) {
     },
   ], configuration);
 }
+
+/** The Area Coordinator search (#1854): one account's (or one staff act-as's) requests per minute, counted apart from the club portal search. */
+export async function checkAreaSearchRateLimit(key: string, limit: number) {
+  const configuration = getRateLimitConfiguration();
+  const who = hashRateLimitIdentifier("area-search", key, configuration);
+  return evaluate([
+    {
+      policy: "area.search.account",
+      limit,
+      windowSeconds: 60,
+      identifierHashes: [who],
+    },
+  ], configuration);
+}

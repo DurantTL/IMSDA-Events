@@ -9,10 +9,15 @@ const state = vi.hoisted(() => ({
   members: [] as unknown[],
   profiles: [] as Array<Record<string, unknown>>,
   positions: [] as Array<{ id: string; name: string; retiredAt: Date | null }>,
-  tags: [] as Array<{ id: string; name: string; retiredAt: Date | null }>,
+  tags: [] as Array<{ id: string; name: string; retiredAt: Date | null; seedKey?: string }>,
   profileTags: [] as Array<{ profileId: string; tagId: string }>,
   audit: vi.fn(),
   rosterFindFirst: vi.fn(),
+  answers: [] as Array<Record<string, unknown>>,
+  queryRaw: vi.fn(),
+  seedTagQueries: 0,
+  profileTagCreate: vi.fn(),
+  profileUpsert: vi.fn(),
 }));
 
 const matches = (member: Record<string, unknown>, where: Record<string, unknown>): boolean => Object.entries(where).every(([key, want]) => {
@@ -39,11 +44,18 @@ const client = {
       tags: state.profileTags.filter((link) => link.profileId === profile.id).map((link) => ({ tag: { ...state.tags.find((t) => t.id === link.tagId)!, sortOrder: 0 } })),
     })),
     findUnique: vi.fn(async () => null),
-    upsert: vi.fn(async () => ({ id: "profile-1" })),
+    upsert: (...args: unknown[]) => state.profileUpsert(...args),
   },
   tltPositionType: { findUnique: vi.fn(async ({ where }: { where: { id: string } }) => state.positions.find((p) => p.id === where.id) ?? null) },
-  tltHelpTag: { findMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) => state.tags.filter((t) => where.id.in.includes(t.id) && t.retiredAt === null)) },
-  tltProfileTag: { deleteMany: vi.fn(), createMany: vi.fn() },
+  tltHelpTag: {
+    findMany: vi.fn(async ({ where }: { where: { id?: { in: string[] }; seedKey?: { in: string[] } } }) => {
+      if (where.seedKey) { state.seedTagQueries += 1; return state.tags.filter((t) => where.seedKey!.in.includes(t.seedKey ?? "") && t.retiredAt === null); }
+      return state.tags.filter((t) => where.id!.in.includes(t.id) && t.retiredAt === null);
+    }),
+    findUnique: vi.fn(async ({ where }: { where: { id: string } }) => state.tags.find((t) => t.id === where.id) ?? null),
+  },
+  tltProfileTag: { deleteMany: vi.fn(), createMany: (...args: unknown[]) => state.profileTagCreate(...args) },
+  $queryRaw: (...args: unknown[]) => state.queryRaw(...args),
   $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(client),
 };
 
@@ -52,9 +64,10 @@ vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ SECRET_ENCRYPTION_KEY: "a-s
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => client }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: state.audit }));
 
+import { Prisma } from "@prisma/client";
 import { sealBirthDate } from "@/modules/club-rosters/birth-dates";
 import { TltDirectoryError, parseTltFilters } from "@/modules/tlt-directory/domain";
-import { listTltDirectoryRows, recordTltDirectoryView, runTltExport, updateTltProfile } from "@/modules/tlt-directory/repository";
+import { acceptTltTagSuggestion, listTltDirectoryRows, recordTltDirectoryView, runTltExport, updateTltProfile } from "@/modules/tlt-directory/repository";
 
 const club = { id: "club-1", name: "Test Pathfinders", type: "CLUB", isActive: true, guestEventId: null, church: "Sample Church" };
 const member = (overrides: Partial<Member>): Member => ({
@@ -67,9 +80,13 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-11-12T15:00:00Z"));
   vi.clearAllMocks();
   state.profiles = [];
+  state.answers = [];
+  state.seedTagQueries = 0;
+  state.queryRaw.mockImplementation(async () => state.answers);
+  state.profileUpsert.mockResolvedValue({ id: "profile-1" });
   state.profileTags = [];
   state.positions = [{ id: "pos-1", name: "Outreach", retiredAt: null }, { id: "pos-old", name: "Old", retiredAt: new Date("2026-01-01T00:00:00Z") }];
-  state.tags = [{ id: "tag-1", name: "Setup", retiredAt: null }, { id: "tag-old", name: "Old tag", retiredAt: new Date("2026-01-01T00:00:00Z") }];
+  state.tags = [{ id: "tag-1", name: "Setup", retiredAt: null, seedKey: "setup" }, { id: "tag-games", name: "Games", retiredAt: null, seedKey: "games" }, { id: "tag-old", name: "Old tag", retiredAt: new Date("2026-01-01T00:00:00Z"), seedKey: "town-crier" }];
   state.members = [
     member({ id: "m1", personId: "p1", first: "Casey", last: "Sample" }),
     member({ id: "m2", personId: "p2", isTlt: false, first: "Notatlt", last: "Member" }),
@@ -127,7 +144,7 @@ describe("saving a TLT record (#1686)", () => {
   it("refuses someone who is not a current TLT", async () => {
     state.rosterFindFirst.mockResolvedValue(null);
     await expect(updateTltProfile(input, actor)).rejects.toMatchObject({ code: "NOT_A_TLT" });
-    expect(client.tltProfile.upsert).not.toHaveBeenCalled();
+    expect(state.profileUpsert).not.toHaveBeenCalled();
     expect(state.audit).not.toHaveBeenCalled();
   });
 
@@ -144,13 +161,13 @@ describe("saving a TLT record (#1686)", () => {
     await expect(updateTltProfile({ ...input, positionTypeId: "pos-old" }, actor)).rejects.toBeInstanceOf(TltDirectoryError);
     await expect(updateTltProfile({ ...input, tagIds: ["tag-old"] }, actor)).rejects.toMatchObject({ code: "TAG_NOT_AVAILABLE" });
     await expect(updateTltProfile({ ...input, positionTypeId: "nope" }, actor)).rejects.toMatchObject({ code: "POSITION_NOT_AVAILABLE" });
-    expect(client.tltProfile.upsert).not.toHaveBeenCalled();
+    expect(state.profileUpsert).not.toHaveBeenCalled();
   });
 
   it("saves the four fields only and audits ids, never a name", async () => {
     state.rosterFindFirst.mockResolvedValue({ id: "m1" });
     await updateTltProfile(input, actor);
-    expect(client.tltProfile.upsert).toHaveBeenCalledWith(expect.objectContaining({
+    expect(state.profileUpsert).toHaveBeenCalledWith(expect.objectContaining({
       create: { personId: "p1", tltYear: 2, positionTypeId: "pos-1", status: "ACTIVE", updatedByAccountId: "account-1" },
     }));
     const entry = state.audit.mock.calls[0]![0];
@@ -181,5 +198,103 @@ describe("opening the directory (#1686)", () => {
     const entry = state.audit.mock.calls[0]![0];
     expect(entry).toMatchObject({ action: "TLT_DIRECTORY_VIEWED", entityType: "TltProfile", metadata: { actorAttendeeAccountId: "account-1", clubYear: "2026-27", rowsShown: 1, rowsMatching: 1, totalTlts: 2, page: 1, filters: ["q", "status"], sort: "club" } });
     expect(JSON.stringify(entry)).not.toMatch(/casey|sample/i);
+  });
+});
+
+const answerRow = (overrides: Record<string, unknown>) => ({ personId: "p1", opportunities: null, attendeeCount: BigInt(1), needShirt: null, shirtType: null, shirtSize: null, ...overrides });
+
+describe("TLT Opportunities answers on the directory (#1686)", () => {
+  it("offers the mapped tags as suggestions, minus tags the TLT already has and retired tags, and never applies them", async () => {
+    state.answers = [answerRow({ opportunities: ["Come early to set up campsites, fire rings, decorations, chairs/pavilion and trash barrels", "Help with games Saturday night", "Town Crier"] })];
+    state.profiles = [{ id: "profile-1", personId: "p1", tltYear: null, positionTypeId: null, status: null }];
+    state.profileTags = [{ profileId: "profile-1", tagId: "tag-1" }];
+    const rows = await listTltDirectoryRows();
+    const casey = rows.find((row) => row.personId === "p1")!;
+    expect(casey.suggestedTags).toEqual([{ id: "tag-games", name: "Games" }]);
+    expect(casey.tags).toEqual([{ id: "tag-1", name: "Setup" }]);
+    expect(state.profileTagCreate).not.toHaveBeenCalled();
+    expect(state.profileUpsert).not.toHaveBeenCalled();
+    expect(rows.find((row) => row.personId === "p9")!.suggestedTags).toEqual([]);
+  });
+
+  it("shows the shirt and nothing else from the answers", async () => {
+    state.answers = [answerRow({ opportunities: ["Help with games Saturday night"], needShirt: "Yes", shirtType: "Polo", shirtSize: "Adult M", health: "synthetic-private-note" })];
+    const rows = await listTltDirectoryRows();
+    expect(rows.find((row) => row.personId === "p1")!.shirt).toEqual({ needed: true, type: "Polo", size: "Adult M" });
+    expect(rows.find((row) => row.personId === "p9")!.shirt).toBeNull();
+    expect(JSON.stringify(rows)).not.toContain("synthetic-private-note");
+  });
+
+  it("reads the answers in one batched query for every person, plus one tag lookup, not one per row", async () => {
+    state.answers = [answerRow({ opportunities: ["Help with games Saturday night"] }), answerRow({ personId: "p9", opportunities: ["Town Crier"] })];
+    await listTltDirectoryRows();
+    expect(state.queryRaw).toHaveBeenCalledTimes(1);
+    expect(state.seedTagQueries).toBe(1);
+    const sql = state.queryRaw.mock.calls[0]![0] as { sql: string; values: unknown[] };
+    expect(sql.values).toContainEqual(["p1", "p9"]);
+    expect(sql.sql).toContain('"SeededFormTemplate"');
+    // Only the four answers are pulled out of the stored responses.
+    expect(sql.sql.match(/'[A-Za-z_]+'/g)).toEqual(["'leadership_opportunities'", "'need_tlt_shirt'", "'shirt_type'", "'shirt_size'", "'SUBMITTED'", "'CONFIRMED'", "'WAITLISTED'"]);
+  });
+
+  it("puts the shirt in the CSV and leaves suggestions out of it", async () => {
+    state.answers = [answerRow({ opportunities: ["Help with games Saturday night"], needShirt: "Yes", shirtType: "T-Shirt", shirtSize: "Adult L" })];
+    const result = await runTltExport(parseTltFilters({ q: "casey" }), { accountId: "account-1" });
+    expect(result.headers.slice(-3)).toEqual(["TLT shirt", "Shirt type", "Shirt size"]);
+    expect(result.rows[0]!.slice(-3)).toEqual(["Yes", "T-Shirt", "Adult L"]);
+    expect(result.csv).not.toContain("Games");
+  });
+});
+
+describe("accepting a suggested tag (#1686)", () => {
+  const actor = { accountId: "account-1" };
+
+  it("adds the tag the answers suggest, creating the record if needed, and audits ids only", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    state.answers = [answerRow({ opportunities: ["Help with games Saturday night"] })];
+    await acceptTltTagSuggestion({ personId: "p1", tagId: "tag-games" }, actor);
+    expect(state.profileUpsert).toHaveBeenCalledWith(expect.objectContaining({ create: { personId: "p1", tltYear: null, positionTypeId: null, status: null, updatedByAccountId: "account-1" } }));
+    expect(state.profileTagCreate).toHaveBeenCalledWith({ data: [{ profileId: "profile-1", tagId: "tag-games" }], skipDuplicates: true });
+    const entry = state.audit.mock.calls[0]![0];
+    expect(entry).toMatchObject({ action: "TLT_DIRECTORY_TAG_SUGGESTION_ACCEPTED", metadata: { actorAttendeeAccountId: "account-1", personId: "p1", tagId: "tag-games" } });
+    expect(JSON.stringify(entry)).not.toMatch(/Casey|Sample|Games/);
+  });
+
+  it.each([
+    ["a tag the answers do not suggest", "tag-1", true],
+    ["a retired tag", "tag-old", true],
+    ["a tag that does not exist", "nope", true],
+    ["a TLT with no answers", "tag-games", false],
+  ])("refuses %s", async (_label, tagId, hasAnswers) => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    state.answers = hasAnswers ? [answerRow({ opportunities: ["Help with games Saturday night", "Town Crier"] })] : [];
+    await expect(acceptTltTagSuggestion({ personId: "p1", tagId }, actor)).rejects.toMatchObject({ code: "NOT_SUGGESTED" });
+    expect(state.profileTagCreate).not.toHaveBeenCalled();
+    expect(state.audit).not.toHaveBeenCalled();
+  });
+
+  it("runs again once when two accepts race to create the record (unique index), and then succeeds", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    state.answers = [answerRow({ opportunities: ["Help with games Saturday night"] })];
+    state.profileUpsert.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError("Unique constraint", { code: "P2002", clientVersion: "test" }));
+    await acceptTltTagSuggestion({ personId: "p1", tagId: "tag-games" }, actor);
+    expect(state.profileUpsert).toHaveBeenCalledTimes(2);
+    expect(state.profileTagCreate).toHaveBeenCalledTimes(1);
+    expect(state.audit).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry other failures, or a second unique failure", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    state.answers = [answerRow({ opportunities: ["Help with games Saturday night"] })];
+    state.profileUpsert.mockRejectedValue(new Error("down"));
+    await expect(acceptTltTagSuggestion({ personId: "p1", tagId: "tag-games" }, actor)).rejects.toThrow("down");
+    expect(state.profileUpsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses someone who is not a current TLT", async () => {
+    state.rosterFindFirst.mockResolvedValue(null);
+    state.answers = [answerRow({ opportunities: ["Help with games Saturday night"] })];
+    await expect(acceptTltTagSuggestion({ personId: "p1", tagId: "tag-games" }, actor)).rejects.toMatchObject({ code: "NOT_A_TLT" });
+    expect(state.profileTagCreate).not.toHaveBeenCalled();
   });
 });

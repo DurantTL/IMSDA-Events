@@ -45,7 +45,7 @@ describe("camporee scoring is an optional tool (#1676)", () => {
   });
 
   it("is switchable by the narrow path beside Club teachers, and by no other", () => {
-    expect(scopedToggleModuleKeys).toEqual(["club-teachers", "event-scoring", "attendance-points", "debrief", "event-budget"]);
+    expect(scopedToggleModuleKeys).toEqual(["club-teachers", "event-scoring", "attendance-points", "debrief", "event-budget", "event-staffing"]);
   });
 });
 

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -66,11 +67,11 @@ describe("people workspace directory review link (#482, #1574)", () => {
   }));
 
   it("reaches the directory review through the one Review queues item, whose card keeps the page's own permission", () => {
-    for (const canEdit of [true, false]) {
-      const html = render(canEdit);
-      expect(html).toContain("/people/review-queues?event=event-1");
-      expect(html).not.toContain("/people/directory-review");
-    }
+    // The Actions menu is drawn by the page's header (#1574); the list itself links nowhere near the old pages.
+    const page = readFileSync("app/(workspace)/people/page.tsx", "utf8");
+    expect(page).toContain("/people/review-queues?event=${encodeURIComponent(event.id)}");
+    expect(page).not.toContain("/people/directory-review");
+    for (const canEdit of [true, false]) expect(render(canEdit)).not.toContain("/people/directory-review");
     const card = (permissions: Array<"MANAGE_REGISTRATION" | "VIEW_SENSITIVE_DATA">) => buildReviewQueuesView({ permissions, audience: "GENERAL" }, "event-1", {}).groups.flatMap((group) => group.cards).map((entry) => entry.href);
     expect(card(["MANAGE_REGISTRATION"])).toContain("/people/directory-review?event=event-1");
     expect(card(["VIEW_SENSITIVE_DATA"])).not.toContain("/people/directory-review?event=event-1");
