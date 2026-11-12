@@ -4,7 +4,7 @@ Every page in the system, who can open it, and where it is in the menus. Staff w
 [staff workspace route matrix](STAFF-WORKSPACE-ROUTES.md); every other page is in a table below.
 
 `tests/site-map-1558.test.ts` fails when a page (`page.tsx` under `app/`) has no row here or in the staff matrix, when a
-page has rows in both, or when a row names a page that no longer exists. When you add a page:
+page has two rows, or when a row names a page that no longer exists. When you add a page:
 
 - a staff workspace page (`app/(workspace)/...`, `/archived-events`, `/select-event`, `/check-in-station`): rerun
   `npx tsx docs/generate-staff-workspace-map.ts`;
@@ -64,7 +64,7 @@ page that replaced them.
 | --- | --- | --- | --- |
 | `/sign-in` | Anyone signed out | Header: Sign in (when the single sign-in is on) | One sign-in for staff and attendees |
 | `/login` | Staff, signed out | Staff sign in; `/sign-in` is used instead when the single sign-in is on | Staff sign-in |
-| `/forgot-password` | Staff | "Reset a team password" on staff sign-in | Ask for a staff password reset |
+| `/forgot-password` | Staff | The password reset link on staff sign-in | Ask for a staff password reset |
 | `/reset-password` | The person the email was sent to | Link in a password reset or account activation email | Choose a password |
 | `/no-access` | A signed-in person with no event to open | Sent here after sign-in | Explains that no event is assigned yet |
 | `/profile` | Staff | Staff account menu: Profile | Edit profile (staff and, when signed in, attendee) |

@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// #1558: the documentation site map. Every page.tsx in app/ has exactly one row, in docs/SITE-MAP.md or (for staff
+// #1558: the documentation site map. Every page file in app/ has exactly one row, in docs/SITE-MAP.md or (for staff
 // workspace pages) the generated docs/STAFF-WORKSPACE-ROUTES.md, and neither document lists a page that no longer exists.
 // Adding a page without a map entry fails here. Documentation only: menus and server guards are tested elsewhere.
 
@@ -15,7 +15,7 @@ function pageRoutes(): Map<string, string> {
     for (const entry of readdirSync(join(process.cwd(), "app", relative), { withFileTypes: true })) {
       const next = relative ? `${relative}/${entry.name}` : entry.name;
       if (entry.isDirectory()) walk(next);
-      else if (entry.name === "page.tsx") {
+      else if (/^page\.(tsx|ts|jsx|js|mdx)$/.test(entry.name)) {
         const segments = relative.split("/").filter((segment) => segment && !/^\(.*\)$/.test(segment));
         const route = `/${segments.join("/")}`;
         expect(routes.has(route), `two page files serve ${route}`).toBe(false);
@@ -27,21 +27,19 @@ function pageRoutes(): Map<string, string> {
   return routes;
 }
 
-/**
- * The route in the first column of each table row, for rows whose first cell is a code span starting with "/". Each route
- * counts once per document: the staff matrix repeats a few routes in its query-state table.
- */
-function mappedRoutes(file: string): string[] {
-  const routes = read(file)
+/** The route in the first column of each table row, for rows whose first cell is a code span starting with "/". */
+function tableRoutes(file: string): string[] {
+  return read(file)
     .split("\n")
     .map((line) => /^\| `(\/[^`?]*)` \|/.exec(line)?.[1])
     .filter((route): route is string => Boolean(route));
-  return [...new Set(routes)];
 }
 
 const pages = pageRoutes();
-const siteMap = mappedRoutes("docs/SITE-MAP.md");
-const staffMap = mappedRoutes("docs/STAFF-WORKSPACE-ROUTES.md");
+const siteMapRows = tableRoutes("docs/SITE-MAP.md");
+const siteMap = [...new Set(siteMapRows)];
+// The staff matrix repeats a few routes in its query-state table on purpose, so each route counts once there.
+const staffMap = [...new Set(tableRoutes("docs/STAFF-WORKSPACE-ROUTES.md"))];
 
 describe("documentation site map (#1558)", () => {
   it("finds the app's pages", () => {
@@ -55,6 +53,11 @@ describe("documentation site map (#1558)", () => {
     const twice = [...counts].filter(([, count]) => count > 1).map(([route]) => route);
     expect(missing, "add a row for each new page to docs/SITE-MAP.md, or rerun npx tsx docs/generate-staff-workspace-map.ts for a staff page").toEqual([]);
     expect(twice, "a page belongs in one map only").toEqual([]);
+  });
+
+  it("gives each page one row in the site map", () => {
+    const repeated = siteMapRows.filter((route, index) => siteMapRows.indexOf(route) !== index);
+    expect(repeated, "a page has one row in docs/SITE-MAP.md").toEqual([]);
   });
 
   it("lists no page that no longer exists", () => {
