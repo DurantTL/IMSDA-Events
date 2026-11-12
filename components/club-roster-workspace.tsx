@@ -40,6 +40,7 @@ import {
   CHURCH_MEMBER_LABEL,
   clubBaptizedLabels,
   defaultRosterRole,
+  displayRosterRole,
   rosterSectionOf,
   schoolGradeOrder,
 } from "@/modules/club-rosters/domain";
@@ -71,6 +72,7 @@ import {
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
 import styles from "@/components/club-roster-sections.module.css";
 import tableStyles from "@/components/club-roster-table.module.css";
+import { clubMemberNounPlural } from "@/modules/organizations/club-kind";
 
 type RosterResponse = {
   members?: RosterMemberRecord[];
@@ -197,8 +199,11 @@ function ClubRosterWorkspaceInner({
   guardiansOnly = false,
   sectionsStartClosed = false,
   schoolDetails = false,
+  clubKind,
   tltDetails,
 }: {
+  /** Pathfinder or Adventurer: the member wording (#1517). Pathfinder when omitted. */
+  clubKind?: string | null;
   /** Each TLT's year and help-area tags by roster member id (#1686): read-only, passed only to the club's director and deputy. */
   tltDetails?: Record<string, { tltYear: number | null; tags: string[] }>;
   /**
@@ -528,7 +533,7 @@ function ClubRosterWorkspaceInner({
   const sortMenuColumns = columns.filter((column): column is RosterSortColumn => (ROSTER_SORT_COLUMNS as readonly string[]).includes(column));
   const sections = [
     { key: "STAFF", title: "Staff", empty: filtersActive ? "No one in Staff matches." : "No staff on the roster yet.", people: sortPeople(visible.filter((member) => rosterSectionOf(member.attendeeType) === "STAFF")) },
-    { key: "MEMBERS", title: "Members", empty: filtersActive ? "No one in Members matches." : "No Pathfinders on the roster yet.", people: sortPeople(visible.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS")) },
+    { key: "MEMBERS", title: "Members", empty: filtersActive ? "No one in Members matches." : `No ${clubMemberNounPlural(clubKind)} on the roster yet.`, people: sortPeople(visible.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS")) },
   ] as const;
   /**
    * Staff and Members open and close on their own (#1305). Order of precedence: a search or filter that matches people
@@ -1202,7 +1207,7 @@ function ClubRosterWorkspaceInner({
                                 case "name": return (
                                   <th className="roster-card-name" key={column} role="rowheader" scope="row">
                                     <strong className={styles.rosterMemberName} translate="no">{member.lastName}, {member.firstName}</strong>
-                                    {member.role && <span className={styles.rosterMemberRole}>{`Role: ${member.role}`}</span>}
+                                    {member.role && <span className={styles.rosterMemberRole}>{`Role: ${displayRosterRole(member.role, clubKind, member.attendeeType)}`}</span>}
                                     {classHistoryBase && member.personId && (
                                       <Link className="text-button roster-class-history-link" href={`${classHistoryBase}/${encodeURIComponent(member.personId)}`}>
                                         Class history<span className="sr-only">{` for ${label}`}</span>
@@ -1437,8 +1442,8 @@ function ClubRosterWorkspaceInner({
           </label>
           <label>
             Role (optional)
-            {/* Left blank, youth save as "Pathfinder"; staff and adults stay blank (#424). */}
-            <input defaultValue={editing?.role ?? ""} maxLength={60} name="role" placeholder={defaultRosterRole(formType)} />
+            {/* Left blank, youth save as "Pathfinder" or "Adventurer" by club kind; staff and adults stay blank (#424). */}
+            <input defaultValue={displayRosterRole(editing?.role, clubKind, editing?.attendeeType)} maxLength={60} name="role" placeholder={defaultRosterRole(formType, clubKind)} />
           </label>
           <label>
             Gender

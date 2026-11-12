@@ -55,7 +55,7 @@ async function requireClub(
 ) {
   const club = await tx.organization.findUnique({
     where: { id: organizationId },
-    select: { id: true, name: true, type: true, isActive: true },
+    select: { id: true, name: true, type: true, isActive: true, clubKind: true },
   });
   if (!club) {
     throw new OrganizationOperationError("ORGANIZATION_NOT_FOUND", "That club could not be found.");

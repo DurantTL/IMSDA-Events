@@ -39,7 +39,7 @@ export default async function StaffClubReportPage({
   const { from } = await searchParams;
   const now = new Date();
   if (!isReportMonth(month) || month > calendarDateIn(now).slice(0, 7)) notFound();
-  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true } });
+  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true, clubKind: true } });
   if (!club || club.type !== "CLUB") notFound();
   const [report, rosterPrefill, review] = await Promise.all([getClubReport(organizationId, month), reportPrefill(organizationId, now), getClubReportReview(organizationId, month)]);
   const prefill = { ...rosterPrefill, averageAttendance: null, honors: [] };
@@ -70,6 +70,7 @@ export default async function StaffClubReportPage({
         </section>
       )}
       <ClubReportForm
+        clubKind={club.clubKind}
         dueLabel={formatDueDate(reportDueDate(month))}
         endpoint={`/api/admin/club-reports/${encodeURIComponent(organizationId)}/${month}`}
         expectedOnTime={isLockedForClub(month, now) ? 0 : ON_TIME_POINTS}

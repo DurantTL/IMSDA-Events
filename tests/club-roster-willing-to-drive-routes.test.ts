@@ -71,6 +71,7 @@ beforeEach(() => {
       update: mocks.memberUpdate,
       create: mocks.memberCreate,
     },
+    organization: { findUnique: vi.fn(async () => ({ clubKind: "PATHFINDER" })) },
     person: { create: mocks.personCreate, update: vi.fn() },
   };
   mocks.getPrisma.mockReturnValue({ ...client, $transaction: async (work: (tx: typeof client) => unknown) => work(client) });

@@ -5,7 +5,7 @@ import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { lockClubOrders } from "@/modules/club-orders/repository";
 import { openBirthDate, sealBirthDate } from "@/modules/club-rosters/birth-dates";
-import { ageOn, birthDateProblem, calendarDateOf, clubYearFor, defaultRosterRole, guardianEditableYears, rosterIsTltFor } from "@/modules/club-rosters/domain";
+import { ageOn, birthDateProblem, calendarDateOf, clubYearFor, defaultRosterRole, guardianEditableYears, isDefaultYouthRole, rosterIsTltFor } from "@/modules/club-rosters/domain";
 import { guardianSetEmailProblem, guardianSetPhoneProblem } from "@/modules/club-rosters/guardians-domain";
 import { deleteGuardiansForMember, replaceGuardians } from "@/modules/club-rosters/guardians-repository";
 import type { RosterMemberInput, RosterMemberUpdate } from "@/modules/club-rosters/schemas";
@@ -263,13 +263,17 @@ export async function addRosterMemberInTransaction(
     data: { firstName: input.firstName, lastName: input.lastName },
     select: { id: true },
   });
+  // The schema fills a blank youth role with the Pathfinder default; an Adventurer club's reads "Adventurer" (#1517).
+  const clubKind = input.attendeeType === "YOUTH" && input.role === defaultRosterRole("YOUTH")
+    ? (await tx.organization.findUnique({ where: { id: organizationId }, select: { clubKind: true } }))?.clubKind
+    : undefined;
   const member = await tx.clubRosterMember.create({
     data: {
       organizationId,
       clubYear,
       personId: person.id,
       attendeeType: input.attendeeType,
-      role: input.role,
+      role: clubKind ? defaultRosterRole("YOUTH", clubKind) : input.role,
       classLevel: input.classLevel,
       // The TLT flag (#1851) is a youth member's own.
       isTlt: rosterIsTltFor(input.attendeeType, input.isTlt),
@@ -350,16 +354,18 @@ export async function updateRosterMember(
     // A blank role defaults by the type the person ends up with (#424): youth
     // become "Pathfinder", staff and adults stay blank. A typed role is kept.
     const finalType = input.attendeeType ?? member.attendeeType;
+    const clubKind = input.role !== undefined || input.attendeeType !== undefined
+      ? (await tx.organization.findUnique({ where: { id: organizationId }, select: { clubKind: true } }))?.clubKind
+      : undefined;
     let role = input.role === undefined
       ? undefined
-      : input.role.trim() || defaultRosterRole(finalType);
+      : input.role.trim() || defaultRosterRole(finalType, clubKind);
     // Changing type carries the old type's default role along ("Pathfinder"
     // for a youth moved to staff). Re-default it, but never a typed role.
     const typeChanged = input.attendeeType !== undefined && input.attendeeType !== member.attendeeType;
-    const oldDefault = defaultRosterRole(member.attendeeType);
     const effectiveRole = role ?? member.role ?? "";
-    if (typeChanged && oldDefault && effectiveRole === oldDefault) {
-      role = defaultRosterRole(finalType);
+    if (typeChanged && member.attendeeType === "YOUTH" && isDefaultYouthRole(effectiveRole)) {
+      role = defaultRosterRole(finalType, clubKind);
     }
     const firstName = input.firstName ?? member.person?.firstName ?? "";
     const lastName = input.lastName ?? member.person?.lastName ?? "";
@@ -507,7 +513,9 @@ async function blankTransferText(tx: Prisma.TransactionClient, personId: string,
  *     membership being erased, so it never keeps a Person. This club's honor
  *     entries are deleted only when the Person itself is deleted (the
  *     foreign key stays `onDelete: Restrict`, so no other path drops honor
- *     history silently; a kept Person keeps their honor history).
+ *     history silently; a kept Person keeps their honor history);
+ *   - deletes the club's Master Guide candidate row (#1698), unless the
+ *     person still has another non-removed roster row in this club.
  *
  * The Person is kept when something outside this membership still needs it: a
  * registration, an account link, another roster or club's records, or an item
@@ -540,6 +548,7 @@ export async function removeRosterMember(organizationId: string, memberId: strin
     // membership (#566). ORDERED, RECEIVED and AWARDED needs are history and stay.
     let ordersCancelled = 0;
     let classCompletionsErased = 0;
+    let masterGuideCandidatesErased = 0;
     if (member.personId) {
       ordersCancelled = (await tx.clubOrderNeed.deleteMany({
         where: { organizationId, personId: member.personId, status: "NEEDED" },
@@ -552,6 +561,15 @@ export async function removeRosterMember(organizationId: string, memberId: strin
       classCompletionsErased = (await tx.memberClassCompletion.deleteMany({
         where: { organizationId, personId: member.personId },
       })).count;
+      // The club's Master Guide candidate row (#1698) belongs to the membership too: erased with the last non-removed row of this person in this club.
+      const otherClubRows = await tx.clubRosterMember.count({
+        where: { organizationId, personId: member.personId, id: { not: memberId }, status: { not: "REMOVED" } },
+      });
+      if (otherClubRows === 0) {
+        masterGuideCandidatesErased = (await tx.masterGuideCandidate.deleteMany({
+          where: { organizationId, personId: member.personId },
+        })).count;
+      }
     }
     let personDeleted = false;
     let nameKept = false;
@@ -640,6 +658,7 @@ export async function removeRosterMember(organizationId: string, memberId: strin
       honorEntriesErased,
       ordersCancelled,
       classCompletionsErased,
+      masterGuideCandidatesErased,
       guardiansErased,
       nameKept,
       tltProfileErased,

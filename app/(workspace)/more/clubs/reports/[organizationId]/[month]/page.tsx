@@ -32,7 +32,7 @@ export default async function EventClubReportPage({
   if (!isReportMonth(month)) notFound();
   // Only clubs registered for this event: the role is for this event only.
   if (!(await canOpenClubRecords({ eventId: event.id, systemAdmin }, organizationId))) notFound();
-  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true } });
+  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true, clubKind: true } });
   if (!club || club.type !== "CLUB") notFound();
   const report = await getClubReport(organizationId, month);
   if (!report || report.status !== "SUBMITTED") notFound();
@@ -45,6 +45,7 @@ export default async function EventClubReportPage({
       <BackLink href={backHref} variant="staff">{backLabel}</BackLink>
       <div className="page-intro"><div><p className="eyebrow">{event.name} · Monthly Record · view only</p><h2 translate="no">{club.name}</h2></div></div>
       <ClubReportForm
+        clubKind={club.clubKind}
         dueLabel={formatDueDate(reportDueDate(month))}
         endpoint="/api/admin/club-reports/view-only"
         expectedOnTime={0}

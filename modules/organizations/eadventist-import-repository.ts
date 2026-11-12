@@ -256,7 +256,7 @@ export async function listDirectoryOrganizations(filters: DirectoryFilters) {
     skip: (page - 1) * DIRECTORY_PAGE_SIZE,
     take: DIRECTORY_PAGE_SIZE,
     select: {
-      id: true, type: true, name: true, isActive: true, sourceOrgType: true, city: true, state: true, district: true,
+      id: true, type: true, name: true, isActive: true, sourceOrgType: true, clubKind: true, city: true, state: true, district: true,
       website: true, officePhone: true, disbandedOn: true, eadventistId: true,
       affiliatedOrganization: { select: { name: true } },
     },

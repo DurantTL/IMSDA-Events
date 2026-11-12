@@ -156,8 +156,15 @@ async function seedBefore527(clubYear: string) {
   // older migrations have not added yet (#649, User.attendeeAccountId #554, and
   // Person.anonymizedAt #127).
   await db.user.create({ data: { id: ids.user, email: `${P}.admin@example.test`, displayName: "Verify Admin", globalRole: "SYSTEM_ADMIN" }, select: { id: true } });
-  await db.organization.create({ data: { id: ids.church, type: "CHURCH", name: "Verify Church", normalizedName: "verify church" }, select: { id: true } });
-  await db.organization.create({ data: { id: ids.club, type: "CLUB", name: "Verify Pathfinders", normalizedName: "verify pathfinders", parentOrganizationId: ids.church }, select: { id: true } });
+  // Raw SQL: the client's INSERT also lists defaulted Organization columns added later (clubKind, #1517).
+  await db.$executeRaw`
+    INSERT INTO "Organization" ("id", "type", "name", "normalizedName", "updatedAt")
+    VALUES (${ids.church}, 'CHURCH'::"OrganizationType", 'Verify Church', 'verify church', NOW())
+  `;
+  await db.$executeRaw`
+    INSERT INTO "Organization" ("id", "type", "name", "normalizedName", "parentOrganizationId", "updatedAt")
+    VALUES (${ids.club}, 'CLUB'::"OrganizationType", 'Verify Pathfinders', 'verify pathfinders', ${ids.church}, NOW())
+  `;
   for (const person of people) {
     await db.person.create({ data: { id: ids.person(person.key), firstName: person.firstName, lastName: person.lastName, normalizedEmail: person.email ?? null }, select: { id: true } });
     // Raw SQL: the client's INSERT lists every defaulted column of the current schema, and later migrations add

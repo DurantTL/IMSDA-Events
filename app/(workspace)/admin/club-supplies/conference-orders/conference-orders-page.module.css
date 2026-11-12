@@ -1,0 +1,44 @@
+/* The "Club type" filter on the staff conference orders page (#1517): plain links, no script. */
+.filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.filterLabel {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.choice[aria-current="page"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--card);
+}

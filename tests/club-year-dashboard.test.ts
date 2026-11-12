@@ -34,6 +34,7 @@ vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: mocks.getRosterAccessStateForPage }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: mocks.listDirectedClubs }));
+vi.mock("@/modules/organizations/club-profile-repository", () => ({ getClubKind: async () => "PATHFINDER" }));
 vi.mock("@/modules/club-rosters/repository", () => ({ listRoster: mocks.listRoster }));
 vi.mock("@/modules/club-registrations/repository", async () => {
   const actual = await vi.importActual<typeof import("@/modules/club-registrations/repository")>("@/modules/club-registrations/repository");

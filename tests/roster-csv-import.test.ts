@@ -49,7 +49,7 @@ const request = (body: unknown) => new Request("https://events.imsda.test/api/at
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
-  mocks.requireRosterAccess.mockResolvedValue({ state: "OPEN", actor: { kind: "ATTENDEE", accountId: "account-1", sessionId: "session-1" } });
+  mocks.requireRosterAccess.mockResolvedValue({ state: "OPEN", club: { clubKind: "PATHFINDER" }, actor: { kind: "ATTENDEE", accountId: "account-1", sessionId: "session-1" } });
   mocks.listRoster.mockResolvedValue([{ id: "member-1", firstName: "Jordan", lastName: "Example" }]);
   mocks.addRosterMember.mockResolvedValue({ memberId: "member-new", personId: "person-new" });
   mocks.updateRosterMember.mockResolvedValue({ personId: "person-existing" });

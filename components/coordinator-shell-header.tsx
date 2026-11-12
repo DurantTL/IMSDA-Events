@@ -7,6 +7,7 @@ import { accountNeedsSecondStep } from "@/modules/attendee-accounts/sign-in-gate
 import { getFormsHelpContact } from "@/modules/system-admin/platform-settings";
 import { isAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { accountIsTltDirector } from "@/modules/tlt-directory/access";
+import { anyClubUsesMasterGuide } from "@/modules/master-guide/repository";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 
 /**
@@ -27,6 +28,7 @@ export async function CoordinatorShellHeader({ children, nav }: { children?: Rea
   const secondStepPending = Boolean(account && via === "attendee" && (await accountNeedsSecondStep(account.id, sessionId)) !== "OK");
   const isCoordinator = Boolean(account && via === "attendee" && !actingAs && !secondStepPending && (await isAreaCoordinator(account.id)));
   const showTlt = Boolean(account && isCoordinator && (await accountIsTltDirector(account.id)));
+  const showMasterGuide = Boolean(account && isCoordinator && (await anyClubUsesMasterGuide()));
   const model = coordinatorMastheadModel({
     account,
     secondStepPending,
@@ -39,7 +41,7 @@ export async function CoordinatorShellHeader({ children, nav }: { children?: Rea
     <div className="coordinator-shell">
       <CoordinatorMastheadView model={model} formsHelpContact={await getFormsHelpContact()} />
       {children}
-      {nav ?? <AreaClubsSubNav items={coordinatorNavItems({ showWaitlists: model.showWaitlists, showTlt })} />}
+      {nav ?? <AreaClubsSubNav items={coordinatorNavItems({ showWaitlists: model.showWaitlists, showTlt, showMasterGuide })} />}
     </div>
   );
 }

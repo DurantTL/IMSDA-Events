@@ -2,6 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
 import type { ClubRole } from "@/modules/organizations/director-grants-domain";
 
 /**
@@ -16,6 +17,8 @@ export type DirectedClub = {
   name: string;
   role: ClubRole;
   sponsoringChurch: string | null;
+  /** Pathfinder or Adventurer, for the portal's member wording (#1517). */
+  clubKind: ClubKindValue;
 };
 
 export async function listDirectedClubs(attendeeAccountId: string, now = new Date()): Promise<DirectedClub[]> {
@@ -34,6 +37,7 @@ export async function listDirectedClubs(attendeeAccountId: string, now = new Dat
         select: {
           id: true,
           name: true,
+          clubKind: true,
           parentOrganization: { select: { name: true } },
         },
       },
@@ -50,6 +54,7 @@ export async function listDirectedClubs(attendeeAccountId: string, now = new Dat
       name: grant.organization.name,
       role: grant.role,
       sponsoringChurch: grant.organization.parentOrganization?.name ?? null,
+      clubKind: grant.organization.clubKind,
     });
   }
   return [...clubs.values()];

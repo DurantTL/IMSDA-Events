@@ -15,7 +15,7 @@ export default async function AreaClubReportPage({ params }: { params: Promise<{
   if (!(await currentAreaCoordinatorViewerActive())) notFound();
   const { organizationId, month } = await params;
   if (!isReportMonth(month)) notFound();
-  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true, isActive: true } });
+  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true, isActive: true, clubKind: true } });
   if (!club || club.type !== "CLUB" || !club.isActive) notFound();
   const report = await getClubReport(organizationId, month);
   if (!report || report.status !== "SUBMITTED") {
@@ -32,6 +32,7 @@ export default async function AreaClubReportPage({ params }: { params: Promise<{
 
   return (
     <ClubReportForm
+        clubKind={club.clubKind}
       dueLabel={formatDueDate(reportDueDate(month))}
       endpoint="/api/attendee/area-report-read-only"
       expectedOnTime={0}

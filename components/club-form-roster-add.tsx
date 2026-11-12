@@ -20,6 +20,7 @@ import {
   clubRosterAttendeeTypeLabels,
   clubRosterGenderLabels,
   defaultRosterRole,
+  displayRosterRole,
   BAPTIZED_LABEL,
   CHURCH_MEMBER_LABEL,
   clubBaptizedLabels,
@@ -47,7 +48,7 @@ type Duplicate = RosterAddReview["duplicates"][number];
 
 const fieldLabels: Record<RosterFormField, string> = { firstName: "First name", lastName: "Last name", birthDate: "Birth date", gender: "Gender" };
 
-export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddReview; formHref: string }) {
+export function ClubFormRosterAdd({ review, formHref, clubKind }: { review: RosterAddReview; formHref: string; /** Pathfinder or Adventurer: the role wording (#1517). */ clubKind?: string | null }) {
   const { prefill } = review;
   const [fieldErrors, setFieldErrors] = useState<RosterFormErrors>({});
   const [guardianErrors, setGuardianErrors] = useState<GuardianFormErrors>({});
@@ -266,7 +267,7 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
           </label>
           <label>
             Role (optional)
-            <input defaultValue={prefill.role} maxLength={60} name="role" placeholder={defaultRosterRole(formType)} />
+            <input defaultValue={displayRosterRole(prefill.role, clubKind, formType)} maxLength={60} name="role" placeholder={defaultRosterRole(formType, clubKind)} />
           </label>
           <label>
             Gender

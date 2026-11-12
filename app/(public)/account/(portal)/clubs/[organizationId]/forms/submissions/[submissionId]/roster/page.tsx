@@ -44,7 +44,7 @@ export default async function AddToRosterPage({ params }: { params: Promise<{ or
         <BackLink href={formHref}>Back to this form</BackLink>
       </div>
       {outcome.review
-        ? <ClubFormRosterAdd formHref={formHref} review={outcome.review} />
+        ? <ClubFormRosterAdd clubKind={access.club.clubKind} formHref={formHref} review={outcome.review} />
         : <div className="inline-notice" role="status">{outcome.message}</div>}
     </div>
   );

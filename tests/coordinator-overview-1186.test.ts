@@ -30,6 +30,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ areaCoordinatorGrant: { findUnique: mocks.areaGrantFindUnique } }) }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
+vi.mock("@/modules/master-guide/repository", () => ({ anyClubUsesMasterGuide: async () => false }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));

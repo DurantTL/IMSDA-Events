@@ -1,0 +1,46 @@
+/* Sits in the overview's content column: the same width and side inset as .attendee-ov-layout. */
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto 16px;
+}
+
+.notice {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.notice > div {
+  flex: 1 1 16rem;
+}
+
+.notice p {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.9rem);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 800;
+}
+
+.dismiss {
+  flex: 0 0 auto;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+@media (max-width: 1228px) {
+  .wrap {
+    margin-right: 24px;
+    margin-left: 24px;
+  }
+}
+
+@media (max-width: 580px) {
+  .wrap {
+    margin-right: 12px;
+    margin-left: 12px;
+  }
+}

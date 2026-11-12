@@ -40,7 +40,7 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
     }
     const clubYear = clubYearFor(new Date());
     const existing = (await listRoster(organizationId, clubYear)).map((member) => ({ id: member.id, firstName: member.firstName, lastName: member.lastName }));
-    const plan = planRosterImport(rows, existing);
+    const plan = planRosterImport(rows, existing, access.club.clubKind);
     if (!confirm) return Response.json({ steps: plan.map(publicStep) }, { headers: { "Cache-Control": "no-store" } });
 
     const actor = actorAttribution(access.actor);
@@ -53,7 +53,7 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
       try {
         if (step.action === "ADD") {
           /** Blank type → Youth; blank role defaults by type (#424), same as the roster form and the preview. */
-          const { attendeeType, role } = rosterCsvAddDefaults(row);
+          const { attendeeType, role } = rosterCsvAddDefaults(row, access.club.clubKind);
           const { personId } = await addRosterMember(organizationId, clubYear, {
             firstName: row.firstName,
             lastName: row.lastName,

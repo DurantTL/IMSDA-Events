@@ -15,6 +15,7 @@ import { countsFromAttendance, countsToSend, groupAttendanceRoster } from "@/mod
 import type { AttendanceRosterEntry, ClubMeetingNoteRecord } from "@/modules/club-meeting-notes/repository";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import type { ReportHonor } from "@/modules/club-reports/domain";
+import { clubMemberNounPlural } from "@/modules/organizations/club-kind";
 
 type NoteResponse = { note?: ClubMeetingNoteRecord; message?: string; issues?: Array<{ message?: string }> };
 
@@ -78,7 +79,10 @@ export function ClubMeetingNotes({
   attendanceAvailable,
   exportHref,
   exportMonthHref,
+  clubKind,
 }: {
+  /** Pathfinder or Adventurer: the member wording (#1517). Pathfinder when omitted. */
+  clubKind?: string | null;
   initialNotes: ClubMeetingNoteRecord[];
   organizationId: string;
   month: string;
@@ -321,7 +325,7 @@ export function ClubMeetingNotes({
               <span>
                 <strong>{formatMeetingDate(note.meetingDate)}</strong>
                 <small>
-                  Pathfinders {note.pathfinderCount ?? "—"} · TLTs {note.tltCount ?? "—"} · Staff {note.staffCount ?? "—"}
+                  {clubMemberNounPlural(clubKind)} {note.pathfinderCount ?? "—"} · TLTs {note.tltCount ?? "—"} · Staff {note.staffCount ?? "—"}
                   {note.attendance.length > 0 ? ` · Attendance taken (${note.attendance.filter((entry) => entry.present).length} of ${note.attendance.length} present)` : ""}
                   {note.honors.length > 0 ? ` · ${note.honors.map((honor) => honor.name).filter(Boolean).join(", ")}` : ""}
                 </small>
@@ -382,7 +386,7 @@ export function ClubMeetingNotes({
             </label>
           </div>
           <div className="form-grid two-column">
-            <label>Pathfinders
+            <label>{clubMemberNounPlural(clubKind)}
               <input inputMode="numeric" max={999} min={0} onChange={(event) => setDraft((current) => ({ ...current, pathfinderCount: event.target.value }))} type="number" value={draft.pathfinderCount} />
             </label>
             <label>TLTs

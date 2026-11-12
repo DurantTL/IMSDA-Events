@@ -42,6 +42,16 @@ function packet(overrides: Partial<ClubPacket> = {}): ClubPacket {
   };
 }
 
+describe("ClubPacketSheet club kind (#1517)", () => {
+  it("reads Pathfinders by default and Adventurers for an Adventurer club", () => {
+    const pathfinder = renderToStaticMarkup(createElement(ClubPacketSheet, { packet: packet(), qrSrc: "/api/x/qr" }));
+    const adventurer = renderToStaticMarkup(createElement(ClubPacketSheet, { packet: packet(), qrSrc: "/api/x/qr", clubKind: "ADVENTURER" }));
+    expect(pathfinder).toContain("<span>Pathfinders</span>");
+    expect(adventurer).toContain("<span>Adventurers</span>");
+    expect(adventurer).not.toContain("<span>Pathfinders</span>");
+  });
+});
+
 describe("ClubPacketSheet", () => {
   it("renders both sides, one letter page each, with side markers and no birth date anywhere", () => {
     const markup = renderToStaticMarkup(createElement(ClubPacketSheet, { packet: packet(), qrSrc: "/api/x/qr" }));
