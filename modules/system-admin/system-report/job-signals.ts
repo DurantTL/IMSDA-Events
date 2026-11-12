@@ -201,6 +201,7 @@ export function monthlyRecordReminderFields(key: string, run: JobRun, readAt: Da
   const problem = runProblem(key, run, readAt, "the Monthly Record reminders");
   if (problem) return problem;
   const status = run.summary?.status;
+  if (status === "NOT_STARTED") return ranFields(key, run, "info", "Off: not started yet. Nothing is sent until a Clubs Administrator turns the reminders on.");
   if (status === "SWITCHED_OFF") return ranFields(key, run, "info", "Switched off by a Clubs Administrator for this club year. Clubs are not being reminded.");
   if (status === "NOT_DUE") return ranFields(key, run, "ok", `Not due yet. Reminders go out from the ${MONTHLY_RECORD_REMINDER_DAY_TEXT} of each month.`);
   if (status === "EMAIL_NOT_CONFIGURED") return { ...ranFields(key, run, "attention", "Email isn't set up, so reminders can't go out. Ask a system administrator."), needsSetup: true };

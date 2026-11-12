@@ -9,7 +9,7 @@ import styles from "./monthly-record-reminders.module.css";
  * The on/off switch of the automatic Monthly Record reminder (#1895). The button reads "Saving…" while the change is
  * being made and one message follows it. The route checks access again.
  */
-export function MonthlyRecordReminderSwitch({ clubYear, enabled }: { clubYear: string; enabled: boolean }) {
+export function MonthlyRecordReminderSwitch({ clubYear, enabled, started, turnOnNote }: { clubYear: string; enabled: boolean; started: boolean; turnOnNote: string }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
@@ -40,12 +40,13 @@ export function MonthlyRecordReminderSwitch({ clubYear, enabled }: { clubYear: s
   return (
     <div className={styles.switchBlock}>
       <div className={styles.switchRow}>
-        <span className={styles.state} data-testid="reminder-state">{`Reminders are ${enabled ? "on" : "off"} for ${clubYear}.`}</span>
+        <span className={styles.state} data-testid="reminder-state">{enabled ? `Reminders are on for ${clubYear}.` : started ? `Reminders are off for ${clubYear}.` : "Reminders are off. They haven't been turned on yet."}</span>
         <button aria-busy={saving || undefined} className={enabled ? "secondary-button" : "primary-button"} disabled={saving} onClick={() => void change(!enabled)} type="button">
           {saving ? "Saving…" : enabled ? "Turn off" : "Turn on"}
           <span className="sr-only">{` the Monthly Record reminders for ${clubYear}`}</span>
         </button>
       </div>
+      {!enabled && turnOnNote && <p className={styles.note}>{turnOnNote}</p>}
       <FormMessage alwaysMounted message={message?.text ?? ""} tone={message?.tone ?? "success"} />
     </div>
   );

@@ -22,6 +22,7 @@ import { getMonthlyRecordReminderOverview } from "@/modules/club-reports/monthly
 import {
   REMINDER_LOG_DEFAULT_SORT,
   REMINDER_LOG_PREFIX,
+  turnOnNote,
   REMINDER_LOG_SORT_COLUMNS,
 } from "@/modules/club-reports/monthly-reminders-domain";
 import { isAccountEmailConfigured } from "@/modules/communications/account-email";
@@ -87,6 +88,8 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
         clubYear={reminders.clubYear}
         emailConfigured={isAccountEmailConfigured()}
         enabled={reminders.enabled}
+        started={reminders.started}
+        turnOnNote={turnOnNote(calendarDateIn(now))}
         pageHref={reminderPageHref}
         sentAtLabels={Object.fromEntries(reminders.slice.items.map((row) => [row.id, formatInConferenceTime(row.sentAt, { dateStyle: "medium", timeStyle: "short" })]))}
         slice={reminders.slice}

@@ -48,7 +48,7 @@ import { clampPage, pageCountFor, type PageSlice } from "@/lib/pagination";
  */
 
 export type MonthlyRecordReminderResult = {
-  status: "NOT_DUE" | "SWITCHED_OFF" | "EMAIL_NOT_CONFIGURED" | "RAN";
+  status: "NOT_DUE" | "NOT_STARTED" | "SWITCHED_OFF" | "EMAIL_NOT_CONFIGURED" | "RAN";
   reportMonth: string | null;
   /** Clubs reminded by this run. */
   reminded: number;
@@ -70,9 +70,23 @@ export function reminderSwitchClubYear(now: Date) {
   return clubYearFor(new Date(`${today}T12:00:00Z`));
 }
 
-async function switchIsOn(client: Pick<ReturnType<typeof getPrisma>, "monthlyRecordReminderSetting">, clubYear: string) {
+type SettingClient = Pick<ReturnType<typeof getPrisma>, "monthlyRecordReminderSetting">;
+
+/**
+ * Whether the reminder is on for a club year, and whether it was ever started. That year's row decides when it exists.
+ * With no row, it is on only once reminders have been turned on for any year (any row exists, since turning it off
+ * needs it to have been on first); until a Clubs Administrator first turns it on, it is off, so a deploy never sends
+ * anything by itself. A new club year after launch has no row and stays on.
+ */
+export async function reminderState(client: SettingClient, clubYear: string): Promise<{ enabled: boolean; started: boolean }> {
   const row = await client.monthlyRecordReminderSetting.findUnique({ where: { clubYear }, select: { enabled: true } });
-  return row ? row.enabled : true;
+  if (row) return { enabled: row.enabled, started: true };
+  const any = await client.monthlyRecordReminderSetting.findFirst({ select: { clubYear: true } });
+  return any ? { enabled: true, started: true } : { enabled: false, started: false };
+}
+
+async function switchIsOn(client: SettingClient, clubYear: string) {
+  return (await reminderState(client, clubYear)).enabled;
 }
 
 export async function sendDueMonthlyRecordReminders(options: { now?: Date } = {}): Promise<MonthlyRecordReminderResult> {
@@ -80,7 +94,8 @@ export async function sendDueMonthlyRecordReminders(options: { now?: Date } = {}
   const window = reminderWindow(calendarDateInEventTimeZone(now, CONFERENCE_TIME_ZONE));
   if (!window) return empty("NOT_DUE");
   const prisma = getPrisma();
-  if (!(await switchIsOn(prisma, window.switchClubYear))) return empty("SWITCHED_OFF", window.reportMonth);
+  const state = await reminderState(prisma, window.switchClubYear);
+  if (!state.enabled) return empty(state.started ? "SWITCHED_OFF" : "NOT_STARTED", window.reportMonth);
   if (!isAccountEmailConfigured()) return empty("EMAIL_NOT_CONFIGURED", window.reportMonth);
 
   const result = empty("RAN", window.reportMonth);
@@ -303,7 +318,7 @@ export async function getMonthlyRecordReminderOverview(
   const pageSize = options.pageSize ?? REMINDER_LOG_PAGE_SIZE;
   const key = options.sort?.key && Object.prototype.hasOwnProperty.call(LOG_ORDER, options.sort.key) ? options.sort.key : REMINDER_LOG_DEFAULT_SORT.key;
   const dir = options.sort?.key ? options.sort.dir : REMINDER_LOG_DEFAULT_SORT.dir;
-  const [enabled, total] = await Promise.all([switchIsOn(prisma, clubYear), prisma.monthlyRecordReminderLog.count()]);
+  const [{ enabled, started }, total] = await Promise.all([reminderState(prisma, clubYear), prisma.monthlyRecordReminderLog.count()]);
   const page = clampPage(options.page ?? 1, total, pageSize);
   const rows = total === 0
     ? []
@@ -330,7 +345,7 @@ export async function getMonthlyRecordReminderOverview(
     from: items.length ? start + 1 : 0,
     to: items.length ? start + items.length : 0,
   };
-  return { clubYear, enabled, slice };
+  return { clubYear, enabled, started, slice };
 }
 
 /**

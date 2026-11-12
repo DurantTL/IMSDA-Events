@@ -78,6 +78,7 @@ vi.mock("@/lib/prisma", () => {
     },
     monthlyRecordReminderSetting: {
       findUnique: async ({ where }: { where: { clubYear: string } }) => state.settings.find((row) => row.clubYear === where.clubYear) ?? null,
+      findFirst: async () => state.settings[0] ?? null,
       upsert: async ({ where, update, create }: { where: { clubYear: string }; update: Row; create: Row }) => {
         const existing = state.settings.find((row) => row.clubYear === where.clubYear);
         if (existing) Object.assign(existing, update); else state.settings.push(create);
@@ -132,6 +133,8 @@ const outboxFor = (templateKey: string) => state.outbox.filter((row) => row.temp
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   Object.assign(state, { clubs: [], reports: [], logs: [], grants: [], coordinators: [], settings: [], outbox: [], audit: [], delivered: [], emailConfigured: true, failClubOutbox: null, nextId: 1 });
+  // Reminders were turned on for this club year before these tests begin; the launch default has its own tests below.
+  state.settings.push({ clubYear: "2026-27", enabled: true });
   state.clubs.push(club("club-a", "Aspen Pathfinders"), club("club-b", "Birch Pathfinders"), club("club-c", "Cedar Pathfinders"), club("club-x", "Closed Pathfinders", false));
   // Aspen has not filed; Birch submitted; Cedar has a draft; the closed club has nothing.
   state.reports.push(
@@ -295,6 +298,51 @@ describe("the switch", () => {
       ["MONTHLY_RECORD_REMINDER_TURNED_OFF", "user-1"],
       ["MONTHLY_RECORD_REMINDER_TURNED_ON", "user-2"],
     ]);
+  });
+});
+
+describe("the launch default: off until a Clubs Administrator first turns reminders on", () => {
+  beforeEach(() => { state.settings.length = 0; });
+
+  it("sends nothing on November 12 when reminders were never turned on, and says so", async () => {
+    at("2026-11-12T15:00:00Z");
+    expect(await sendDueMonthlyRecordReminders()).toMatchObject({ status: "NOT_STARTED", reminded: 0, summaries: 0 });
+    expect(state.outbox).toHaveLength(0);
+    expect(state.logs).toHaveLength(0);
+    expect(await getMonthlyRecordReminderOverview()).toMatchObject({ enabled: false, started: false, clubYear: "2026-27" });
+  });
+
+  it("turning off before it ever started changes nothing and writes nothing", async () => {
+    at("2026-11-12T15:00:00Z");
+    expect(await setMonthlyRecordReminderEnabled(false, "user-1")).toMatchObject({ changed: false, enabled: false });
+    expect(state.settings).toHaveLength(0);
+    expect(state.audit).toHaveLength(0);
+  });
+
+  it("sends once it is turned on, with the turn-on audited", async () => {
+    at("2026-11-12T15:00:00Z");
+    expect(await setMonthlyRecordReminderEnabled(true, "user-1")).toEqual({ clubYear: "2026-27", enabled: true, changed: true });
+    expect(await getMonthlyRecordReminderOverview()).toMatchObject({ enabled: true, started: true });
+    expect(await sendDueMonthlyRecordReminders()).toMatchObject({ status: "RAN", reportMonth: "2026-10", reminded: 2 });
+    expect(state.audit.map((row) => row.action)).toContain("MONTHLY_RECORD_REMINDER_TURNED_ON");
+  });
+
+  it("stays off for the year after being turned on and then off", async () => {
+    at("2026-11-12T15:00:00Z");
+    await setMonthlyRecordReminderEnabled(true, "user-1");
+    await setMonthlyRecordReminderEnabled(false, "user-1");
+    expect(await sendDueMonthlyRecordReminders()).toMatchObject({ status: "SWITCHED_OFF", reminded: 0 });
+    expect(await getMonthlyRecordReminderOverview()).toMatchObject({ enabled: false, started: true });
+    expect(state.outbox).toHaveLength(0);
+  });
+
+  it("a new club year with no row stays on once reminders have launched, even if last year ended off", async () => {
+    at("2026-11-12T15:00:00Z");
+    await setMonthlyRecordReminderEnabled(true, "user-1");
+    await setMonthlyRecordReminderEnabled(false, "user-1");
+    state.reports = [];
+    at("2027-09-11T15:00:00Z");
+    expect(await sendDueMonthlyRecordReminders()).toMatchObject({ status: "RAN", reportMonth: "2027-08" });
   });
 });
 

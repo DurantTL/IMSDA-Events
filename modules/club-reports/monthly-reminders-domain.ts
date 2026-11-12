@@ -30,7 +30,7 @@ export type ReminderWindow = {
   reportClubYear: string;
 };
 
-function previousMonth(month: string) {
+export function previousMonth(month: string) {
   const [year, number] = month.split("-").map(Number);
   return number === 1 ? `${year - 1}-12` : `${year}-${String(number - 1).padStart(2, "0")}`;
 }
@@ -183,3 +183,19 @@ export type ReminderLogColumn = typeof REMINDER_LOG_SORT_COLUMNS[number];
 export const REMINDER_LOG_DEFAULT_SORT = { key: "sent", dir: "desc" } as const;
 export const REMINDER_LOG_PAGE_SIZE = 25;
 export const REMINDER_LOG_PREFIX = "reminders";
+
+/**
+ * What turning the reminders on does right now, in the real dates, for the Clubs Administrator's switch. `today` is the
+ * conference date. From the 11th the previous month's reminders go out on the next scheduled run; before that, the
+ * first ones go out on the 11th.
+ */
+export function turnOnNote(today: string) {
+  const window = reminderWindow(today);
+  if (window) {
+    return `If you turn reminders on now, clubs that have not submitted the ${reportMonthLabel(window.reportMonth)} record (due ${formatDueDate(reportDueDate(window.reportMonth))}) are emailed on the next scheduled run.`;
+  }
+  const month = /^\d{4}-\d{2}-\d{2}$/.test(today) ? previousMonth(today.slice(0, 7)) : null;
+  return month
+    ? `Nothing is sent until the ${MONTHLY_RECORD_REMINDER_DAY_TEXT}. Then clubs that have not submitted the ${reportMonthLabel(month)} record are emailed on the next scheduled run.`
+    : "";
+}

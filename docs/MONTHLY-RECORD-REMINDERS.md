@@ -28,6 +28,17 @@ These are essential role emails to club leaders, so announcement opt-outs do not
 still does. The off control is the Clubs Administrator's switch for the club year. The email's "why you got this" line says the
 person gets it as the club's director or deputy and that the conference Clubs Administrator can turn the reminders off.
 
+## Off until first turned on
+
+Nothing is sent by a deploy. A club year's effective state is that year's `MonthlyRecordReminderSetting` row when one exists.
+With no row it is on only once reminders have been turned on for any year (any row exists; turning off needs a prior turn-on,
+so this equals "ever turned on"), and otherwise off. So the first Clubs Administrator turn-on starts the reminders, "turn off
+for this year" works from then on, and a new club year with no row stays on. Before the first turn-on the sweep step records
+`NOT_STARTED`, the System report row reads "Off: not started yet" (informational, not a failure) and the admin section says
+"Reminders are off. They haven't been turned on yet." Beside the Turn on button it says what turning on does with the real
+dates: from the 11th, clubs missing last month's record are emailed on the next scheduled run; before then, nothing goes out until
+the 11th.
+
 ## Clubs Administrator controls
 
 On **Review monthly records** (`/admin/clubs/reports`), the Monthly Record reminders section shows the log (month, club, people

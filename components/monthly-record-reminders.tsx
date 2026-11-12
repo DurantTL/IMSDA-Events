@@ -28,6 +28,8 @@ const sortLabels: Record<ReminderLogColumn, { label: string; kind: "text" | "dat
 export function MonthlyRecordReminders({
   clubYear,
   enabled,
+  started,
+  turnOnNote,
   emailConfigured,
   isSystemAdmin,
   slice,
@@ -37,6 +39,10 @@ export function MonthlyRecordReminders({
 }: {
   clubYear: string;
   enabled: boolean;
+  /** False until a Clubs Administrator first turns reminders on. */
+  started: boolean;
+  /** What turning them on does right now, in real dates. */
+  turnOnNote: string;
   emailConfigured: boolean;
   /** A system administrator can fix the email setup, so they get the setup help; anyone else is told who to ask. */
   isSystemAdmin: boolean;
@@ -60,7 +66,7 @@ export function MonthlyRecordReminders({
       ) : (
         <p className={styles.problem} role="status">Email isn&apos;t set up, so reminders can&apos;t go out. Ask a system administrator.</p>
       ))}
-      <MonthlyRecordReminderSwitch clubYear={clubYear} enabled={enabled} />
+      <MonthlyRecordReminderSwitch clubYear={clubYear} enabled={enabled} started={started} turnOnNote={turnOnNote} />
       {slice.total === 0 ? (
         <p className={styles.note}>No reminders have been sent yet.</p>
       ) : (

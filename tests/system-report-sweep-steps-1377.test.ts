@@ -74,6 +74,11 @@ describe("monthly record reminders: the readings that are not a plain count", ()
   it("says email is not set up, needing attention, with setup help", () => {
     expect(monthlyRecordReminderFields("k", summary("EMAIL_NOT_CONFIGURED"), now)).toMatchObject({ state: "attention", needsSetup: true, resultText: "Email isn't set up, so reminders can't go out. Ask a system administrator." });
   });
+  it("is info, not a failure and not needing attention, when reminders have not been started yet", () => {
+    const row = monthlyRecordReminderFields("k", summary("NOT_STARTED"), now);
+    expect(row).toMatchObject({ state: "info", resultText: "Off: not started yet. Nothing is sent until a Clubs Administrator turns the reminders on." });
+    expect(row.needsSetup).toBeUndefined();
+  });
   it("is info when switched off, OK when not due, and watch when a club failed", () => {
     expect(monthlyRecordReminderFields("k", summary("SWITCHED_OFF"), now).state).toBe("info");
     expect(monthlyRecordReminderFields("k", summary("NOT_DUE"), now).state).toBe("ok");
