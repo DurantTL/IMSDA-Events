@@ -79,6 +79,17 @@ const makeDb = () => {
         if (found) found.valueHundredths = update.valueHundredths;
         else state.scores.push({ scoredEventId: create.scoredEventId, subjectId: create.subjectId, valueHundredths: create.valueHundredths });
       }),
+      create: vi.fn(async ({ data }: { data: { scoredEventId: string; subjectId: string; valueHundredths: number } }) => { state.scores.push({ scoredEventId: data.scoredEventId, subjectId: data.subjectId, valueHundredths: data.valueHundredths }); }),
+      updateMany: vi.fn(async ({ where, data }: { where: { valueHundredths: number }; data: { valueHundredths: number } }) => {
+        const found = state.scores.find((row) => row.valueHundredths === where.valueHundredths);
+        if (found) found.valueHundredths = data.valueHundredths;
+        return { count: found ? 1 : 0 };
+      }),
+      deleteMany: vi.fn(async ({ where }: { where: { valueHundredths: number } }) => {
+        const at = state.scores.findIndex((row) => row.valueHundredths === where.valueHundredths);
+        if (at >= 0) state.scores.splice(at, 1);
+        return { count: at >= 0 ? 1 : 0 };
+      }),
       delete: vi.fn(),
     },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(db)),
@@ -104,7 +115,7 @@ const put = (path: string, body: unknown) => new Request(`https://events.imsda.t
   headers: { origin: "https://events.imsda.test", "content-type": "application/json" },
   body: JSON.stringify(body),
 });
-const score = (value: string | null, subjectId = "club-1", inspection = "campsite") => ({ action: "saveScore" as const, entry: { inspection: inspection as "campsite", subjectId, value } });
+const score = (value: string | null, subjectId = "club-1", inspection = "campsite", expected = "") => ({ action: "saveScore" as const, entry: { inspection: inspection as "campsite", subjectId, value, expected } });
 
 const adminActor: EventScoringActor = { kind: "staff", userId: "u-admin", administrator: true };
 const managerActor: EventScoringActor = { kind: "staff", userId: "u-manager", administrator: false };
@@ -259,6 +270,48 @@ describe("entering a score (#1896)", () => {
     expect(view.clubs.map((row) => row.name)).toEqual(["Sample Eagles", "Sample Falcons"]);
     mocks.isAreaCoordinator.mockResolvedValue(false);
     await expect(loadInspectionView("event-1", coordinator)).rejects.toBeInstanceOf(EventScoringError);
+  });
+});
+
+describe("a score cannot be overwritten by a stale save (#1896)", () => {
+  const onFile = (hundredths: number) => { state.scores = [{ scoredEventId: "act-campsite", subjectId: "club-1", valueHundredths: hundredths }]; };
+
+  it("accepts a save whose expected score is the one on file, and a first score expected empty", async () => {
+    await applyInspectionAction(adminActor, "event-1", score("80", "club-1", "campsite", ""));
+    expect(state.scores[0].valueHundredths).toBe(8000);
+    await applyInspectionAction(adminActor, "event-1", score("85", "club-1", "campsite", "80"));
+    expect(state.scores[0].valueHundredths).toBe(8500);
+  });
+
+  it("refuses a stale expected score with the score on file, and writes nothing", async () => {
+    onFile(9000);
+    await expect(applyInspectionAction(adminActor, "event-1", score("70", "club-1", "campsite", "80"))).rejects.toMatchObject({ code: "CONFLICT", current: "90" });
+    await expect(applyInspectionAction(adminActor, "event-1", score(null, "club-1", "campsite", "80"))).rejects.toMatchObject({ code: "CONFLICT", current: "90" });
+    await expect(applyInspectionAction(adminActor, "event-1", score("70", "club-1", "campsite", ""))).rejects.toMatchObject({ code: "CONFLICT", current: "90" });
+    expect(state.scores[0].valueHundredths).toBe(9000);
+  });
+
+  it("answers 409 with the current score at the route", async () => {
+    onFile(9000);
+    mocks.currentAreaCoordinator.mockResolvedValue({ id: "acct-ac" });
+    const response = await acPut(put("/x", score("70", "club-1", "campsite", "80")), ctx);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: "CONFLICT", current: "90", message: expect.stringContaining("changed since you opened it") });
+  });
+
+  it("makes the write itself conditional, so a write that slips in between the check and the write is refused", async () => {
+    onFile(8000);
+    db.activityScore.updateMany.mockImplementationOnce((async () => { state.scores[0].valueHundredths = 9500; return { count: 0 }; }) as never);
+    await expect(applyInspectionAction(adminActor, "event-1", score("70", "club-1", "campsite", "80"))).rejects.toMatchObject({ code: "CONFLICT", current: "95" });
+    expect(state.scores[0].valueHundredths).toBe(9500);
+    onFile(8000);
+    db.activityScore.deleteMany.mockImplementationOnce((async () => ({ count: 0 })) as never);
+    await expect(applyInspectionAction(adminActor, "event-1", score(null, "club-1", "campsite", "80"))).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("treats a first score entered at the same moment as a conflict", async () => {
+    db.activityScore.create.mockImplementationOnce((async () => { state.scores.push({ scoredEventId: "act-campsite", subjectId: "club-1", valueHundredths: 7000 }); throw Object.assign(new Error("unique"), { code: "P2002" }); }) as never);
+    await expect(applyInspectionAction(adminActor, "event-1", score("80", "club-1", "campsite", ""))).rejects.toMatchObject({ code: "CONFLICT", current: "70" });
   });
 });
 

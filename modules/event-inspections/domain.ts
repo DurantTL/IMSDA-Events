@@ -34,6 +34,8 @@ export const inspectionScoreSchema = z.object({
   inspection: z.enum(inspectionKeys),
   subjectId: z.string().trim().min(1).max(64),
   value: z.string().trim().max(12).nullable(),
+  /** The score this screen last saw on file for the club, as typed (empty for none). The save is refused if another score is on file. */
+  expected: z.string().trim().max(12),
 }).strict();
 
 /** One request shape for the Inspections route: the switch, or one club's score. The server decides who may do which. */

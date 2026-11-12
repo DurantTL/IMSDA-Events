@@ -100,8 +100,9 @@ describe("planning an import", () => {
 describe("request shapes", () => {
   it("accepts the two actions and nothing extra", () => {
     expect(inspectionActionSchema.safeParse({ action: "switch", enabled: true }).success).toBe(true);
-    expect(inspectionActionSchema.safeParse({ action: "saveScore", entry: { inspection: "uniform", subjectId: "c1", value: null } }).success).toBe(true);
-    expect(inspectionActionSchema.safeParse({ action: "saveScore", entry: { inspection: "kitchen", subjectId: "c1", value: "5" } }).success).toBe(false);
+    expect(inspectionActionSchema.safeParse({ action: "saveScore", entry: { inspection: "uniform", subjectId: "c1", value: null, expected: "" } }).success).toBe(true);
+    expect(inspectionActionSchema.safeParse({ action: "saveScore", entry: { inspection: "uniform", subjectId: "c1", value: "5" } }).success).toBe(false);
+    expect(inspectionActionSchema.safeParse({ action: "saveScore", entry: { inspection: "kitchen", subjectId: "c1", value: "5", expected: "" } }).success).toBe(false);
     expect(inspectionActionSchema.safeParse({ action: "publish" }).success).toBe(false);
     expect(inspectionActionSchema.safeParse({ action: "switch", enabled: true, moduleKey: "merchandise" }).success).toBe(false);
   });

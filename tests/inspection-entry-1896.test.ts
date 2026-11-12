@@ -97,6 +97,54 @@ describe("a row on a slow connection (#1896)", () => {
   });
 });
 
+describe("a conflict, a cancelled removal and the labels (#1896)", () => {
+  it("sends the score last seen as expected, and shows the score on file when the server says it changed", async () => {
+    const fetchMock = vi.fn(async (_url: unknown, init: { body: string }) => {
+      void init;
+      return { ok: false, status: 409, json: async () => ({ error: "CONFLICT", message: "This score changed since you opened it. Here is the score on file.", current: "90" }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const container = await render(view({ entries: [{ inspection: "campsite", subjectId: "club-1", text: "85" }] }));
+    await typeInto(input(container), "70");
+    await submitForm(form(container));
+    await flush();
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).entry).toEqual({ inspection: "campsite", subjectId: "club-1", value: "70", expected: "85" });
+    expect(input(container).value).toBe("90");
+    expect(container.textContent).toContain("Not saved: This score changed since you opened it. Here is the score on file.");
+    expect(input(container).getAttribute("aria-invalid")).toBe("true");
+    expect(container.textContent).not.toContain("Unsaved changes");
+  });
+
+  it("puts the saved score back when a removal is cancelled, and says Saved earlier", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const container = await render(view({ entries: [{ inspection: "campsite", subjectId: "club-1", text: "85" }] }));
+    expect(container.querySelector("[id$='-status']")!.textContent).toBe("Saved earlier");
+    await typeInto(input(container), "");
+    await submitForm(form(container));
+    await vi.waitFor(() => expect([...document.querySelectorAll("button")].some((button) => button.textContent === "Cancel")).toBe(true));
+    await import("./helpers/dom-render").then(({ click }) => click([...document.querySelectorAll("button")].find((button) => button.textContent === "Cancel")!));
+    await flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(input(container).value).toBe("85");
+    expect(container.textContent).not.toContain("Unsaved changes");
+  });
+
+  it("names the inspection that could not be set up, links to scoring, and shows the switch step only to those who can switch", async () => {
+    const one = [{ key: "campsite" as const, name: "Campsite inspection", activityId: "a1" }];
+    let container = await render(view({ inspections: one }));
+    let note = container.querySelector("[data-testid='inspection-missing']")!;
+    expect(note.textContent).toContain("Uniform inspection could not be set up");
+    expect(note.querySelector("a")!.getAttribute("href")).toBe("/more/event-scoring?event=e1");
+    expect(note.textContent).toContain("turn Inspections off and on again here");
+    await mounted!.unmount();
+    container = await render(view({ inspections: one, capabilities: { canSwitch: false, canEnter: true, canCorrectAfterPublish: false } }));
+    note = container.querySelector("[data-testid='inspection-missing']")!;
+    expect(note.textContent).toContain("ask an event administrator");
+    expect(note.textContent).not.toContain("here.");
+  });
+});
+
 describe("removing a score and the surrounding copy (#1896)", () => {
   it("asks before a cleared box deletes a saved score", async () => {
     const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ enabled: true, saved: { inspection: "campsite", subjectId: "club-1", text: "" } }) }));

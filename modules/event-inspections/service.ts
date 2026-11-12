@@ -190,7 +190,7 @@ export async function applyInspectionAction(actor: InspectionActor, eventId: str
     if (!parsed.ok) throw new EventScoringError("INVALID", parsed.message, "value");
     text = scoreInputText("POINTS", parsed.hundredths);
   }
-  await enterScore(actor, eventId, { scoredEventId: activity.id, subjectId: action.entry.subjectId, value: action.entry.value });
+  await enterScore(actor, eventId, { scoredEventId: activity.id, subjectId: action.entry.subjectId, value: action.entry.value, expected: action.entry.expected });
   return { enabled: true, saved: { inspection: action.entry.inspection, subjectId: action.entry.subjectId, text } };
 }
 

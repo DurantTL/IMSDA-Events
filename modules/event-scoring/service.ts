@@ -54,9 +54,11 @@ const moduleKey = "event-scoring" as const;
 
 export class EventScoringError extends Error {
   constructor(
-    public readonly code: "NOT_AVAILABLE" | "EVENT_NOT_FOUND" | "NOT_PERMITTED" | "INVALID" | "NOT_FOUND",
+    public readonly code: "NOT_AVAILABLE" | "EVENT_NOT_FOUND" | "NOT_PERMITTED" | "INVALID" | "NOT_FOUND" | "CONFLICT",
     message: string,
     public readonly field?: string,
+    /** For CONFLICT: the score on file now, as typed into a box (empty for none). */
+    public readonly current?: string,
   ) {
     super(message);
     this.name = "EventScoringError";
@@ -351,7 +353,7 @@ export async function applyEventScoringAction(actor: EventScoringActor, eventId:
 export async function enterScore(
   actor: EventScoringActor,
   eventId: string,
-  entry: { scoredEventId: string; subjectId: string; value: string | null },
+  entry: { scoredEventId: string; subjectId: string; value: string | null; expected?: string },
   context?: { clubIds?: ReadonlySet<string>; published?: boolean },
 ): Promise<void> {
   try {
@@ -445,7 +447,7 @@ async function deleteScoredEvent(actor: EventScoringActor, eventId: string, id: 
   });
 }
 
-async function saveScore(actor: EventScoringActor, eventId: string, entry: { scoredEventId: string; subjectId: string; value: string | null }, capabilities: ScoringCapabilities, context?: { clubIds?: ReadonlySet<string>; published?: boolean }) {
+async function saveScore(actor: EventScoringActor, eventId: string, entry: { scoredEventId: string; subjectId: string; value: string | null; expected?: string }, capabilities: ScoringCapabilities, context?: { clubIds?: ReadonlySet<string>; published?: boolean }) {
   const prisma = getPrisma();
   const row = await prisma.scoredActivity.findFirst({ where: { id: entry.scoredEventId, eventId } });
   if (!row) throw new EventScoringError("NOT_FOUND", "That scored event could not be found.");
@@ -467,10 +469,27 @@ async function saveScore(actor: EventScoringActor, eventId: string, entry: { sco
     before,
     after,
   });
+  // A caller that sends the score it last saw (`expected`, empty for none) is refused when the score on file is another one, so
+  // a save that was slow to arrive cannot overwrite a newer one. The write itself is conditional, so two at once cannot both pass.
+  let expected: number | null | undefined;
+  if (entry.expected !== undefined) {
+    if (entry.expected.trim() === "") expected = null;
+    else {
+      const parsedExpected = parseScoreText(definition.unit, entry.expected);
+      if (!parsedExpected.ok) throw new EventScoringError("INVALID", parsedExpected.message, "expected");
+      expected = parsedExpected.hundredths;
+    }
+  }
+  const conflict = async () => {
+    const now = await prisma.activityScore.findUnique({ where: { scoredEventId_subjectId: { scoredEventId: definition.id, subjectId: entry.subjectId } }, select: { valueHundredths: true } });
+    return new EventScoringError("CONFLICT", "This score changed since you opened it. Here is the score on file.", "value", now ? scoreInputText(definition.unit, now.valueHundredths) : "");
+  };
+  if (expected !== undefined && (existing?.valueHundredths ?? null) !== expected) throw await conflict();
   if (entry.value === null) {
     if (!existing) return;
     await prisma.$transaction(async (tx) => {
-      await tx.activityScore.delete({ where: { id: existing.id } });
+      if (expected === undefined) await tx.activityScore.delete({ where: { id: existing.id } });
+      else if ((await tx.activityScore.deleteMany({ where: { id: existing.id, valueHundredths: expected! } })).count === 0) throw await conflict();
       if (published) await writeAuditLog(audit("EVENT_SCORING_SCORE_REMOVED_AFTER_PUBLISH", "Removed a camporee score after results were published.", existing.valueHundredths, null), tx);
     });
     return;
@@ -478,12 +497,26 @@ async function saveScore(actor: EventScoringActor, eventId: string, entry: { sco
   const parsed = parseScoreText(definition.unit, entry.value);
   if (!parsed.ok) throw new EventScoringError("INVALID", parsed.message, "value");
   if (existing?.valueHundredths === parsed.hundredths) return;
+  const created = { scoredEventId: definition.id, eventId, organizationId, subjectId: entry.subjectId, attendeeId: definition.kind === "PATHFINDER" ? entry.subjectId : null, valueHundredths: parsed.hundredths, ...enteredBy(actor) };
   await prisma.$transaction(async (tx) => {
-    await tx.activityScore.upsert({
-      where: { scoredEventId_subjectId: { scoredEventId: definition.id, subjectId: entry.subjectId } },
-      create: { scoredEventId: definition.id, eventId, organizationId, subjectId: entry.subjectId, attendeeId: definition.kind === "PATHFINDER" ? entry.subjectId : null, valueHundredths: parsed.hundredths, ...enteredBy(actor) },
-      update: { valueHundredths: parsed.hundredths, ...enteredBy(actor) },
-    });
+    if (expected === undefined) {
+      await tx.activityScore.upsert({
+        where: { scoredEventId_subjectId: { scoredEventId: definition.id, subjectId: entry.subjectId } },
+        create: created,
+        update: { valueHundredths: parsed.hundredths, ...enteredBy(actor) },
+      });
+    } else if (existing) {
+      const updated = await tx.activityScore.updateMany({ where: { id: existing.id, valueHundredths: expected! }, data: { valueHundredths: parsed.hundredths, ...enteredBy(actor) } });
+      if (updated.count === 0) throw await conflict();
+    } else {
+      try {
+        await tx.activityScore.create({ data: created });
+      } catch (error) {
+        // Someone else entered a first score at the same moment: the unique index answers.
+        if ((error as { code?: string }).code === "P2002") throw await conflict();
+        throw error;
+      }
+    }
     if (published) await writeAuditLog(audit("EVENT_SCORING_SCORE_CORRECTED_AFTER_PUBLISH", "Changed a camporee score after results were published.", existing?.valueHundredths ?? null, parsed.hundredths), tx);
   });
 }

@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
-import { settingsSaveState } from "@/components/settings-save-state";
+import { settingsSaveState, settingsSaveStateLabels } from "@/components/settings-save-state";
 import { useConfirm } from "@/components/use-confirm";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
   importStatusLabels,
   importStatuses,
   inspectionCsvTemplate,
+  inspectionKeys,
   inspectionNames,
   type ImportPreview,
 } from "@/modules/event-inspections/domain";
@@ -18,7 +19,7 @@ import type { InspectionKey } from "@/modules/event-inspections/domain";
 import type { InspectionActionResult, InspectionImportResult, InspectionView } from "@/modules/event-inspections/service";
 import styles from "@/components/inspection-entry.module.css";
 
-type RowState = { text: string; saved: string; status: "idle" | "saving" | "saved" | "failed"; error: string };
+type RowState = { text: string; saved: string; status: "idle" | "saving" | "saved" | "failed" | "conflict"; error: string };
 type Message = { tone: "success" | "error"; text: string };
 
 const rowKey = (inspection: InspectionKey, subjectId: string) => `${inspection}:${subjectId}`;
@@ -103,7 +104,10 @@ export function InspectionEntry({ endpoint, initial, scoringHref }: { endpoint: 
         confirmLabel: "Remove score",
         destructive: true,
       });
-      if (!ok) return;
+      if (!ok) {
+        patchRow(key, () => ({ text: current.saved, status: "idle", error: "" }));
+        return;
+      }
       if (inflight.current.has(key)) return;
     }
     const id = (sequence.current.get(key) ?? 0) + 1;
@@ -116,11 +120,16 @@ export function InspectionEntry({ endpoint, initial, scoringHref }: { endpoint: 
       const response = await fetch(endpoint, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "saveScore", entry: { inspection, subjectId, value: sent === "" ? null : sent } }),
+        body: JSON.stringify({ action: "saveScore", entry: { inspection, subjectId, value: sent === "" ? null : sent, expected: current.saved } }),
         signal: controller.signal,
       });
-      const result = await response.json().catch(() => ({})) as Partial<InspectionActionResult> & { message?: string };
+      const result = await response.json().catch(() => ({})) as Partial<InspectionActionResult> & { message?: string; current?: string };
       if (sequence.current.get(key) !== id) return;
+      if (response.status === 409 && typeof result.current === "string") {
+        // Another save changed this score: the box shows the score on file now, with a short message.
+        patchRow(key, () => ({ text: result.current!, saved: result.current!, status: "conflict", error: result.message ?? "This score changed since you opened it. Here is the score on file." }));
+        return;
+      }
       if (!response.ok || !result.saved) {
         patchRow(key, () => ({ status: "failed", error: result.message ?? "Try again." }));
         return;
@@ -162,7 +171,11 @@ export function InspectionEntry({ endpoint, initial, scoringHref }: { endpoint: 
         </p>
       )}
       {enabled && initial.scoringEnabled && initial.inspections.length < 2 && (
-        <p className={styles.note}>The two inspections are not both set up. Turn Inspections off and on again. If that does not fix it, a scored event in Camporee scoring is named Campsite inspection or Uniform inspection with other settings; rename it first.</p>
+        <p className={styles.note} data-testid="inspection-missing">
+          {inspectionKeys.filter((key) => !initial.inspections.some((inspection) => inspection.key === key)).map((key) => inspectionNames[key]).join(" and ")} could not be set up.
+          A scored event with that name already exists in <Link href={scoringHref}>Camporee scoring</Link> with other settings; rename it there first.
+          {caps.canSwitch ? " Then turn Inspections off and on again here." : " Then ask an event administrator, the Clubs Administrator or an Area Coordinator to turn Inspections off and on again."}
+        </p>
       )}
 
       {ready && (
@@ -187,7 +200,7 @@ export function InspectionEntry({ endpoint, initial, scoringHref }: { endpoint: 
                   const inputId = `inspection-${selected}-${club.organizationId}`;
                   const statusId = `${inputId}-status`;
                   const changed = row.text.trim() !== row.saved;
-                  const saveState = settingsSaveState({ saving: row.status === "saving", dirty: changed, outcome: row.status === "saved" ? "saved" : row.status === "failed" ? "failed" : null });
+                  const saveState = settingsSaveState({ saving: row.status === "saving", dirty: changed, outcome: row.status === "saved" ? "saved" : row.status === "failed" ? "failed" : null, cleanLabel: row.saved !== "" ? `${settingsSaveStateLabels.saved} earlier` : "" });
                   return (
                     <li className={styles.club} key={key}>
                       <form
@@ -204,7 +217,7 @@ export function InspectionEntry({ endpoint, initial, scoringHref }: { endpoint: 
                         <div className={styles.entry}>
                           <input
                             aria-describedby={statusId}
-                            aria-invalid={row.status === "failed"}
+                            aria-invalid={row.status === "failed" || row.status === "conflict"}
                             autoComplete="off"
                             disabled={locked}
                             id={inputId}
@@ -217,8 +230,8 @@ export function InspectionEntry({ endpoint, initial, scoringHref }: { endpoint: 
                             <span className="sr-only">: <span translate="no">{club.name}</span></span>
                           </button>
                         </div>
-                        <p aria-live="polite" className={`${styles.status} ${saveState.state === "saved" ? styles.saved : saveState.state === "failed" ? styles.failed : styles.pending}`} id={statusId} role="status">
-                          {row.status === "failed" ? notSavedMessage(row.error) : saveState.label}
+                        <p aria-live="polite" className={`${styles.status} ${saveState.state === "saved" ? styles.saved : saveState.state === "failed" || row.status === "conflict" ? styles.failed : styles.pending}`} id={statusId} role="status">
+                          {row.status === "failed" || row.status === "conflict" ? notSavedMessage(row.error) : saveState.label}
                         </p>
                       </form>
                     </li>
