@@ -10252,11 +10252,12 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
    "Your account" panel hangs from. */
 @media (max-width: 640px) {
   .club-masthead-inner { position: relative; justify-content: flex-start; gap: 2px 4px; padding: 6px 0 4px; }
-  .club-masthead-brand { flex: 0 1 auto; gap: 8px; margin-right: auto; min-width: 0; }
-  /* The wordmark gives way before a button wraps (room for one more icon button in the row). */
+  /* The brand takes only the space the buttons leave (a zero flex basis, so the row never breaks to fit it): its
+     wordmark ends in an ellipsis before a button wraps, which leaves room for one more icon button. */
+  .club-masthead-brand { flex: 1 1 0; gap: 8px; min-width: 44px; overflow: hidden; }
   .club-masthead-brand > span:not([data-navigation-pending]) { min-width: 0; }
   .club-masthead-brand small, .club-masthead-brand strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .club-masthead-brand strong { font-size: 1rem; }
+  .club-masthead-brand strong { font-size: var(--type-public-body); }
   .club-masthead-identity { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 }
 .account-portal .account-nav a { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
@@ -10265,7 +10266,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-banner-identity { min-width: 0; flex: 1 1 16rem; }
 .club-banner h1 { margin: 0; color: #fff; font-size: 1.7rem; line-height: 1.2; overflow-wrap: anywhere; }
 .club-banner-identity p { margin: 6px 0 0; color: #dbe9ef; font-size: 0.95rem; overflow-wrap: anywhere; }
-.club-banner-year { display: grid; gap: 2px; margin: 0; border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 12px; padding: 8px 14px; text-align: right; /* Wide enough for "CURRENT CLUB YEAR" in the web font and in its fallback, so the swap does not resize the box and re-wrap the banner (#1557). */ min-width: 11.5rem; box-sizing: border-box; }
+.club-banner-year { display: grid; gap: 2px; margin: 0; border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 12px; padding: 8px 14px; text-align: right; /* Wide enough for "CURRENT CLUB YEAR" in the web font and in its fallback, so the swap does not resize the box and re-wrap the banner (#1557); on a phone it is a one-line chip of the same fixed width. */ min-width: 11.5rem; box-sizing: border-box; }
 .club-banner-year span { color: #dbe9ef; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .club-banner-year strong { font-size: 1.05rem; }
 @media (max-width: 640px) {
@@ -10275,7 +10276,6 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   .club-banner h1 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font-size: 1.2rem; }
   .club-banner-identity p { margin-top: 2px; }
   .club-banner-year { display: flex; flex: 0 0 auto; align-items: baseline; gap: 8px; padding: 3px 10px; border-radius: var(--radius-pill); text-align: left; }
-  .club-banner-year strong { font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 }
 @media print {
   .club-masthead, .club-banner { display: none !important; }
