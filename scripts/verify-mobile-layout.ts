@@ -624,6 +624,7 @@ const dialogOpeners = [
   "[data-meeting-note-add]",
   'button:has-text("Add to roster")',
   'button:has-text("Upload CSV")',
+  "[data-roster-sheet-trigger]",
   'button:has-text("Add club admin")',
   'button:has-text("New announcement")',
   'button[aria-label^="Add or view honors"]',
