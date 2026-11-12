@@ -33,7 +33,7 @@ export default async function StaffChurchPastorContactPage({ params }: { params:
         }}
         notices={(
           <p className="inline-notice" role="status">
-            This is not the billing contact: the treasurer is the billing contact and invoices go there. Nothing is sent to the pastor from this record.
+            This is not the billing contact: the treasurer is the billing contact and invoices go there. The only email sent to the pastor is the optional baptism follow-up notice, for an event that has it turned on, when a club of this church names someone for baptism.
           </p>
         )}
       >

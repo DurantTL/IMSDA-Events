@@ -7,7 +7,7 @@ import { organizationContactActionSchema } from "@/modules/organizations/contact
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
-/** A church's pastor contact (#977): office (system administrator) only. Nothing is sent to the pastor. */
+/** A church's pastor contact (#977): office (system administrator) only. The only email a pastor gets is the optional baptism follow-up notice (#1680). */
 async function postHandler(request: Request, context: { params: Promise<{ organizationId: string }> }) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;

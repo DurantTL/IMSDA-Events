@@ -38,15 +38,17 @@ export async function performFeatureChange(
   next: boolean,
   context: { eventId: string; fetchImpl: typeof fetch },
 ): Promise<void> {
+  // Called as a bare function, never as a method of `context`: a browser's own `fetch` throws "Illegal invocation" otherwise.
+  const fetchImpl = context.fetchImpl;
   const readJson = async (response: Response) => await response.json().catch(() => ({})) as { message?: string };
   const fetchJson: FetchJson = async (url) => {
-    const response = await context.fetchImpl(url, { cache: "no-store" });
+    const response = await fetchImpl(url, { cache: "no-store" });
     const result = await readJson(response);
     if (!response.ok) throw new Error(result.message ?? featureFallbackMessage);
     return result;
   };
   const { url, method, body } = await featureRequest(action, next, { eventId: context.eventId, fetchJson });
-  const response = await context.fetchImpl(url, {
+  const response = await fetchImpl(url, {
     method,
     ...(body === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
   });

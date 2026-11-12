@@ -11,7 +11,8 @@ import type { PastorContactInput } from "@/modules/organizations/contacts-schema
  * Non-billing organization contacts (#977): today a church's pastor. Office-only, the same
  * authority as the billing contact (system administrator), checked here as well as in the route.
  * Entirely separate from `OrganizationBillingContact` (the treasurer, the invoice recipient):
- * nothing here is read by invoice resolution and nothing is ever sent to a pastor. Rows are
+ * nothing here is read by invoice resolution. The one message a pastor is sent is the optional baptism follow-up notice
+ * (#1680, Caleb, Nov 12, 2026), which reads the address in its own server-only path (`modules/baptism-follow-up/notice.ts`). Rows are
  * ended, never deleted. Audit rows hold ids only, never a name, email or phone.
  */
 export type OrganizationContactErrorCode = "ORGANIZATION_NOT_ELIGIBLE" | "CONTACT_NOT_FOUND" | "CONCURRENT_CHANGE" | "INVALID_CONTACT";

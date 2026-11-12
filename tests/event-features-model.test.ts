@@ -48,7 +48,7 @@ const byId = (rows: FeatureRow[], id: string) => rows.find((row) => row.id === i
 describe("every feature is listed (#965)", () => {
   it("lists the catalog modules, the event columns, the club rows, publish, calendar, lodging and meals, in that order", () => {
     expect(buildFeatureRows(input()).map((row) => row.id)).toEqual([
-      "module:honors", "module:event-patches", "module:club-assignments", "module:seminar-assignments", "module:merchandise", "module:attendee-community", "module:public-content", "module:emergency-plans", "module:club-teachers", "module:event-scoring", "module:inspection-scoring", "module:attendance-points", "module:debrief", "module:event-budget", "module:event-staffing",
+      "module:honors", "module:event-patches", "module:club-assignments", "module:seminar-assignments", "module:merchandise", "module:attendee-community", "module:public-content", "module:emergency-plans", "module:club-teachers", "module:event-scoring", "module:inspection-scoring", "module:attendance-points", "module:debrief", "module:event-budget", "module:event-staffing", "module:baptism-follow-up",
       "column:waitlistEnabled", "column:autoPromoteWaitlist", "column:collectsShirtSizes", "column:hostedPaymentLinkEnabled", "column:checksAdultBackgrounds",
       "general-link", "teams", "publish", "calendar", "lodging", "meals",
     ]);
@@ -315,5 +315,19 @@ describe("a refused change shows the server's own message (#965)", () => {
     expect(source).toContain("setDialogError(message)");
     expect(source).toContain('<p className="form-error" role="alert">{error}</p>');
     expect(source).toContain("error={dialogError}");
+  });
+});
+
+describe("performFeatureChange calls fetch as a bare function", () => {
+  it("never calls it as a method of the context, which a browser's fetch refuses with Illegal invocation", async () => {
+    const calls: string[] = [];
+    // `this` is undefined (or the global) for a bare call, and the context object for a method call.
+    const fetchImpl = function (this: unknown, url: unknown) {
+      if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+      calls.push(String(url));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    } as unknown as typeof fetch;
+    await performFeatureChange({ type: "module", moduleKey: "baptism-follow-up" }, true, { eventId: "event_1", fetchImpl });
+    expect(calls.length).toBeGreaterThan(0);
   });
 });

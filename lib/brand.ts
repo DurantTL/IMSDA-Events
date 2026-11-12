@@ -15,3 +15,5 @@ export const BRAND_HOME_LABEL = `${PRODUCT_NAME} home`;
 /** Square copies of the symbol for the staff saved app's manifest (#1567). */
 export const BRAND_ICON_192_PATH = "/brand/imadventist-symbol-192.png";
 export const BRAND_ICON_512_PATH = "/brand/imadventist-symbol-512.png";
+/** The symbol padded into the maskable safe zone on white, for launchers that crop icons to a circle or squircle (#1713). */
+export const BRAND_ICON_MASKABLE_512_PATH = "/brand/imadventist-symbol-maskable-512.png";

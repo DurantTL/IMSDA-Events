@@ -1671,6 +1671,10 @@ async function prepareAccountEmailBody(
   if (input.templateKey === "CLUB_FORM_SUBMITTED") {
     return { bodyText: input.bodyText };
   }
+  // Baptism follow-up notice (#1680): names, the club, the event and its dates only, no sentinel; never rewrite anything in it.
+  if (input.templateKey === "BAPTISM_FOLLOW_UP") {
+    return { bodyText: input.bodyText };
+  }
   // Information form response alert (#1222): names and a link only, no sentinel; never rewrite anything in it.
   if (input.templateKey === "INFORMATION_FORM_SUBMITTED") {
     return { bodyText: input.bodyText };

@@ -2,6 +2,7 @@ import { AccountContent } from "@/components/account-content";
 import { AccountWorkspaceMenuProvider } from "@/components/account-workspace-menu-context";
 import { redirect } from "next/navigation";
 import { AccountPortalMasthead } from "@/components/account-portal-masthead";
+import { AccountInstallPromptCapture } from "@/components/account-install-card";
 import { AccountAnnouncementBanner } from "@/components/account-announcement-banner";
 import { accountPortalNavItems, workspaceMenuNavItems } from "@/components/account-portal-nav";
 import { AccountPortalTabsProvider } from "@/components/account-portal-tabs";
@@ -91,6 +92,8 @@ export default async function AccountPortalLayout({ children }: { children: Reac
     <main className="public-registration-page public-manage-page account-portal">
       <AttendeeAuthReturn />
       <HelpReturnTracker />
+      {/* Keeps the browser's install prompt if it fires on any account page (#1713). */}
+      <AccountInstallPromptCapture />
       <AccountPortalMasthead
         identity={acting ? undefined : chromeAccount?.displayName}
         contexts={workspaceContexts}

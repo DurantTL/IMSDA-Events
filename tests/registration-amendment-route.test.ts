@@ -47,6 +47,10 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+vi.mock("@/modules/baptism-follow-up/notice", () => ({
+  previewBaptismFollowUpNotice: async () => null,
+  sendBaptismFollowUpNoticesForStaffEdit: async () => undefined,
+}));
 vi.mock("@/modules/access/authorization", () => ({
   AccessDeniedError: mocks.AccessDeniedError,
   requirePermission: mocks.requirePermission,

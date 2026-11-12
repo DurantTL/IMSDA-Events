@@ -476,6 +476,8 @@ const pages: PageSpec[] = [
   { ...staff("debrief", `/more/debrief?event=${clubEventId}`, "system-admin"), expectText: /Event debrief/ },
   // The optional Budget sheet (#1682): the switch, the figures, the cost lines and the totals.
   { ...staff("budget", `/more/budget?event=${clubEventId}`, "system-admin"), expectText: /Budget sheet/ },
+  // The optional Baptism follow-up (#1680): the lead address form and the names list (switched on in seedBaptismFollowUp).
+  { ...staff("baptism-follow-up", `/more/baptism-follow-up?event=${clubEventId}`, "system-admin"), expectText: /Baptism follow-up/ },
   // The optional Event staffing sheet (#1678): the switch, the gaps, the activities and the add forms.
   { ...staff("event-staffing", `/more/event-staffing?event=${clubEventId}`, "system-admin"), expectText: /Event staffing/ },
   // The optional Inspections tool (#1896): the switch, the score rows and the import.
@@ -1269,6 +1271,16 @@ async function seedDebriefPages(prisma: PrismaClient): Promise<PageSpec[]> {
     await onDebriefEnabled(tx, { eventId: clubEventId, actor: { kind: "staff", userId: admin.id } });
   });
   return [{ name: "area-debrief-fill", path: `/events/${clubEventSlug}/forms/debrief`, role: "area" }];
+}
+
+/** Baptism follow-up (#1680) switched on for the club weekend with one synthetic event lead address, so the page shows the form and not only the off notice. */
+async function seedBaptismFollowUp(prisma: PrismaClient): Promise<void> {
+  await prisma.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "baptism-follow-up" }], skipDuplicates: true });
+  await prisma.baptismFollowUpSetting.upsert({
+    where: { eventId: clubEventId },
+    create: { eventId: clubEventId, leadEmails: ["lead@example.test"] },
+    update: {},
+  });
 }
 
 /** Inspections (#1896) switched on for the club weekend, on top of Camporee scoring, with its two inspection events, so the audited pages show the score rows and not only the switch. */
@@ -4935,6 +4947,7 @@ async function main() {
     pages.push(...await seedDebriefPages(prisma));
     await seedBudgetSheet(prisma);
     await seedLeaderDirectory(prisma);
+    await seedBaptismFollowUp(prisma);
     await seedEventStaffing(prisma);
     await seedInspections(prisma);
     pages.push(...await seedEventTemplatePages(prisma));

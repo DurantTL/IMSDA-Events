@@ -2,6 +2,7 @@ import {
   BRAND_APPLE_TOUCH_PATH,
   BRAND_ICON_192_PATH,
   BRAND_ICON_512_PATH,
+  BRAND_ICON_MASKABLE_512_PATH,
   PRODUCT_NAME,
 } from "@/lib/brand";
 
@@ -32,6 +33,7 @@ export function buildStaffManifest() {
       { src: BRAND_ICON_192_PATH, sizes: "192x192", type: "image/png", purpose: "any" },
       { src: BRAND_ICON_512_PATH, sizes: "512x512", type: "image/png", purpose: "any" },
       { src: BRAND_APPLE_TOUCH_PATH, sizes: "180x180", type: "image/png", purpose: "any" },
+      { src: BRAND_ICON_MASKABLE_512_PATH, sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }
