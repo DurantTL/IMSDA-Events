@@ -18,7 +18,7 @@ vi.mock("@/modules/payments/square-hosted-invalidation", () => ({
   flushHostedDeletionsAfterResponse: mocks.flushHosted,
 }));
 
-import { checkInAttendee } from "@/modules/checkin/repository";
+import { checkInAttendee, undoCheckIn } from "@/modules/checkin/repository";
 import { recordManualPayment } from "@/modules/payments/repository";
 
 const station = { station: { id: "station_1", label: "Front desk tablet" } };
@@ -31,6 +31,19 @@ function checkInClient() {
       findFirst: vi.fn().mockResolvedValue({ id: "attendee_1", registration: { status: "CONFIRMED" }, checkIns: [] }),
     },
     auditLog: { create: vi.fn().mockResolvedValue({}), findFirst: vi.fn() },
+  };
+  mocks.getPrisma.mockReturnValue({ $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)) });
+  return tx;
+}
+
+function undoClient() {
+  const tx = {
+    checkIn: {
+      findFirst: vi.fn().mockResolvedValue({ id: "checkin_1" }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "checkin_1" }),
+    },
+    auditLog: { create: vi.fn().mockResolvedValue({}) },
   };
   mocks.getPrisma.mockReturnValue({ $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)) });
   return tx;
@@ -79,6 +92,41 @@ describe("station audit context (#892)", () => {
     await checkInAttendee("event_1", "attendee_1", "user_1", idempotencyKey);
     const data = tx.auditLog.create.mock.calls[0][0].data;
     expect(data.summary).toBe("Checked in an attendee.");
+    expect(data).not.toHaveProperty("metadata");
+  });
+
+  it("marks a station undo with the station", async () => {
+    const tx = undoClient();
+    await undoCheckIn("event_1", "attendee_1", "user_1", { auditContext: station });
+    expect(tx.checkIn.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ undoReason: "Corrected at check-in station" }),
+    }));
+    expect(tx.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorUserId: "user_1",
+        action: "ATTENDEE_CHECK_IN_UNDONE",
+        summary: 'Undid an attendee check-in (check-in station "Front desk tablet").',
+        metadata: { channel: "CHECK_IN_STATION", station: { id: "station_1", label: "Front desk tablet" } },
+      }),
+    });
+  });
+
+  it("leaves a newer check-in alone when the station meant an older one", async () => {
+    const tx = undoClient();
+    await expect(undoCheckIn("event_1", "attendee_1", "user_1", { auditContext: station, expectedCheckInId: "checkin_old" })).resolves.toBeNull();
+    expect(tx.checkIn.updateMany).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+    await expect(undoCheckIn("event_1", "attendee_1", "user_1", { auditContext: station, expectedCheckInId: "checkin_1" })).resolves.toEqual({ id: "checkin_1" });
+  });
+
+  it("leaves a desk undo exactly as it was", async () => {
+    const tx = undoClient();
+    await undoCheckIn("event_1", "attendee_1", "user_1");
+    expect(tx.checkIn.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ undoReason: "Corrected by event staff" }),
+    }));
+    const data = tx.auditLog.create.mock.calls[0][0].data;
+    expect(data.summary).toBe("Undid an attendee check-in.");
     expect(data).not.toHaveProperty("metadata");
   });
 

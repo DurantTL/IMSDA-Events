@@ -1047,6 +1047,27 @@ export async function checkClubTransferRequestRateLimit(
 }
 
 /**
+ * A club leader adding or removing a staff training record (#1697): per client, per signed-in leader (an attendee
+ * account, or a staff user acting as director), and per club. Generous: this is data entry, and the limits only stop
+ * scripted hammering.
+ */
+export async function checkClubStaffTrainingRateLimit(
+  request: Request,
+  actorKey: string,
+  organizationId: string,
+) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const actor = hashRateLimitIdentifier("club-staff-training-actor", actorKey, configuration);
+  const club = hashRateLimitIdentifier("club-staff-training-club", organizationId, configuration);
+  return evaluate([
+    { policy: "club-staff-training.write.client", limit: 120, windowSeconds: oneHour, identifierHashes: [client] },
+    { policy: "club-staff-training.write.actor", limit: 120, windowSeconds: oneHour, identifierHashes: [actor] },
+    { policy: "club-staff-training.write.club", limit: 400, windowSeconds: oneDay, identifierHashes: [club] },
+  ], configuration);
+}
+
+/**
  * Per-operation budgets for a club form's private link (#610), per 15
  * minutes. The token is a 256-bit secret, so these exist to stop scripted
  * guessing and hammering, not to slow a parent filling in a form: `read` is
@@ -1371,6 +1392,35 @@ export async function checkNewClubApplicationLinkRateLimit(request: Request, tok
   ], configuration);
 }
 
+/**
+ * A visiting director's request (#835). Submitting writes a row staff must review, so it is held tight like the public
+ * new club form: six an hour from one address and six an hour for one signed-in account, charged once per submit.
+ */
+export async function checkVisitingClubSubmitRateLimit(request: Request, accountId: string) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  return evaluate([
+    { policy: "visiting-club.submit.client", limit: 6, windowSeconds: oneHour, identifierHashes: [client] },
+    {
+      policy: "visiting-club.submit.account",
+      limit: 6,
+      windowSeconds: oneHour,
+      identifierHashes: [hashRateLimitIdentifier("visiting-club-account", accountId, configuration)],
+    },
+  ], configuration);
+}
+
+/** Opening a visiting club private link (#835): the token is a 256-bit secret, so this only stops scripted guessing. */
+export async function checkVisitingClubLinkRateLimit(request: Request, token: string) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const tokenHash = hashRateLimitIdentifier("visiting-club-link-token", token, configuration);
+  return evaluate([
+    { policy: "visiting-club.link.client", limit: 60, windowSeconds: fifteenMinutes, identifierHashes: [client] },
+    { policy: "visiting-club.link.token", limit: 60, windowSeconds: fifteenMinutes, identifierHashes: [tokenHash] },
+  ], configuration);
+}
+
 /** An administrator's "Send verification email": a few per account per hour, and a ceiling per administrator. */
 export async function checkAdminVerificationEmailRateLimit(actorUserId: string, accountId: string) {
   const configuration = getRateLimitConfiguration();
@@ -1503,6 +1553,20 @@ export async function checkClubSearchRateLimit(key: string, limit: number) {
   return evaluate([
     {
       policy: "club.search.account",
+      limit,
+      windowSeconds: 60,
+      identifierHashes: [who],
+    },
+  ], configuration);
+}
+
+/** The Area Coordinator search (#1854): one account's (or one staff act-as's) requests per minute, counted apart from the club portal search. */
+export async function checkAreaSearchRateLimit(key: string, limit: number) {
+  const configuration = getRateLimitConfiguration();
+  const who = hashRateLimitIdentifier("area-search", key, configuration);
+  return evaluate([
+    {
+      policy: "area.search.account",
       limit,
       windowSeconds: 60,
       identifierHashes: [who],

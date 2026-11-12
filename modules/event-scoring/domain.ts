@@ -148,6 +148,11 @@ export function buildScoredEventDefinition(input: ScoredEventInput): { ok: true;
   };
 }
 
+/** An inspection event (#1896) stays a score for each club, entered as a number, where the highest score wins. */
+export function keepsInspectionShape(definition: { kind?: string; unit?: string; higherWins?: boolean }): boolean {
+  return definition.kind === "CLUB" && definition.unit === "POINTS" && definition.higherWins === true;
+}
+
 /** Whether a score meets a band's threshold, in the event's direction. */
 function meetsBand(definition: Pick<ScoredEventDefinition, "higherWins">, value: number, band: RibbonBand): boolean {
   return definition.higherWins ? value >= band.thresholdHundredths : value <= band.thresholdHundredths;

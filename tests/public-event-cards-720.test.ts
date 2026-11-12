@@ -21,6 +21,8 @@ vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSession
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     event: { findFirst: mocks.eventFindFirst },
+    // The guest club rule (#835): no club here is a guest club.
+    organization: { findMany: vi.fn().mockResolvedValue([]) },
     eventContentSection: { findMany: vi.fn().mockResolvedValue([]) },
     registrationAttendee: { count: mocks.attendeeCount },
     registrationForm: { findFirst: mocks.formFindFirst },

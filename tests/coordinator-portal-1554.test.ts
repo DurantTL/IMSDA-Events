@@ -77,7 +77,7 @@ describe("Coordinator header (#1554)", () => {
     const layout = read("components/coordinator-banner.tsx");
     expect(read("app/(public)/account/(portal)/area-clubs/layout.tsx")).toContain("<CoordinatorBanner />");
     expect(layout).toContain('className="club-banner"');
-    expect(layout).toContain('className="club-banner-inner"');
+    expect(layout).toContain("club-banner-inner ${searchStyles.bannerInner}");
     expect(layout).toContain('className="club-banner-identity"');
     expect(layout).toContain("<h1>Club coordination</h1>");
     expect(layout).toContain("Area Coordinator · view only");

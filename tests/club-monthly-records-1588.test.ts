@@ -202,4 +202,24 @@ describe("Monthly records pages (#1588)", () => {
     expect(read("app/(workspace)/admin/clubs/reports/page.tsx").match(/navStyles\.target/g)?.length).toBeGreaterThanOrEqual(3);
     expect(read("app/(workspace)/admin/clubs/reports/year-end/page.tsx").match(/navStyles\.target/g)?.length).toBeGreaterThanOrEqual(2);
   });
+
+  it("the review grid's cell links, registration box and export are 44px at every width", () => {
+    const grid = read("components/club-reports-conference.tsx");
+    expect(grid.match(/styles\.cellLink/g)?.length).toBe(3);
+    expect(grid.match(/styles\.target/g)?.length).toBe(2);
+    const css = read("components/club-reports-conference.module.css");
+    expect(css).toMatch(/a\.cellLink \{[^}]*min-height: 44px;[^}]*min-width: 44px;/);
+    expect(css).not.toMatch(/@media/);
+  });
+
+  it("the Year-End list and its link from the review list carry the year (#1588)", () => {
+    expect(read("app/(workspace)/admin/clubs/reports/page.tsx")).toContain("href={`/admin/clubs/reports/year-end?year=${clubYear}`}");
+    expect(read("app/(workspace)/admin/clubs/reports/year-end/page.tsx")).toContain('back={{ href: `/admin/clubs/reports?year=${reportYear}`, label: "Back to Review monthly records" }}');
+    expect(read("app/(workspace)/admin/clubs/reports/page.tsx")).toContain('back={{ href: clubsAdminHrefs(clubYear).records, label: "Back to Monthly Records" }}');
+  });
+
+  it("the Year-End search box is a 44px tap target", () => {
+    expect(read("components/club-year-end-conference.tsx")).toContain("className={styles.search}");
+    expect(read("components/club-year-end-conference.module.css")).toMatch(/input\.search \{\s*min-height: 44px;/);
+  });
 });

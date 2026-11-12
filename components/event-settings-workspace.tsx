@@ -98,6 +98,10 @@ import {
 } from "@/modules/events/settings-layout";
 import styles from "@/components/public-page-overview.module.css";
 import readinessStyles from "@/components/event-settings-readiness.module.css";
+import archiveStyles from "@/components/event-archive-download.module.css";
+import { ExportLink } from "@/components/export-link";
+import { PageHeader } from "@/components/page-header";
+import { staffPageTitles } from "@/components/staff-navigation";
 
 type EventSettingsWorkspaceProps = {
   mode: "create" | "edit";
@@ -113,6 +117,8 @@ type EventSettingsWorkspaceProps = {
   calendarPrefill?: CalendarPrefill;
   /** Whether to offer Archive / Unarchive: system administrators and the event's Event Admin (#635). The server decides again. */
   canArchiveEvent?: boolean;
+  /** Whether to offer Download event archive (#175): the event is closed or archived and the viewer can view reports or manage finance. The server decides again. */
+  canDownloadEventArchive?: boolean;
   /** Edit mode: the Platform settings defaults a new event is seeded from, to label timezone and edit verification (#1258). */
   platformDefaults?: EventPlatformDefaults;
   /** Edit mode: the event's email sender against the central one, to label display name and reply-to (#1258). */
@@ -251,6 +257,7 @@ export function EventSettingsWorkspace({
   canOpenPlatformSettings = false,
   calendarPrefill,
   canArchiveEvent = false,
+  canDownloadEventArchive = false,
   platformDefaults,
   emailSender,
 }: EventSettingsWorkspaceProps) {
@@ -581,6 +588,12 @@ export function EventSettingsWorkspace({
     target.focus({ preventScroll: true });
   }
 
+  // The Locations and Club event options sections sit below the form, outside the settings blocks (#1586).
+  function jumpToAnchor(sectionId: string, headingId: string) {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById(headingId)?.focus({ preventScroll: true });
+  }
+
   function jumpToBlock(id: SettingsBlockId) {
     setBlockOpen(id, true);
     const block = document.getElementById(settingsBlockDomId(id)) as HTMLDetailsElement | null;
@@ -894,8 +907,35 @@ export function EventSettingsWorkspace({
     .sort(([left], [right]) => settingsBlockIds.indexOf(settingsFieldBlock[left]) - settingsBlockIds.indexOf(settingsFieldBlock[right]))
     .map(([key, message]) => ({ targetId: settingsFieldDomId(key), message: key in SUMMARY_LABELS ? summaryMessage(SUMMARY_LABELS[key], message) : message }));
 
+  // Club events have team rules and a general link below the form; the jump bar reaches them too (#1586).
+  const clubOptions = initialEvent?.audience === "CLUB";
+  const statusBadge = (
+    <span className={`count-badge ${published ? "green" : ""}`}>
+      <ShieldCheck size={16} aria-hidden="true" />
+      {published ? "Published" : "Private draft"}
+    </span>
+  );
+
   return (
     <section className="page-stack event-settings-workspace">
+      {mode === "edit" ? (
+        // The page's one h1 (#1586, #1772): "Event settings", with the Published / Private draft status beside it.
+        <PageHeader
+          title={staffPageTitles.eventSettings}
+          description={`Public details, registration dates, capacity and publishing for ${initialEvent?.name}.`}
+          extra={statusBadge}
+        />
+      ) : (
+        <div className="page-intro">
+          <div>
+            <p className="eyebrow">New event setup</p>
+            {/* The page's one H1 is the PageHeader's "Create an event" (create mode), so no second title here. */}
+            <p>Start with the information attendees and staff need. The event stays private until its registration form and publish checklist are ready.</p>
+          </div>
+          {statusBadge}
+        </div>
+      )}
+
       {mode === "edit" && initialEvent && (
         <DraftCreatedGuideBanner eventId={initialEvent.id} />
       )}
@@ -907,22 +947,6 @@ export function EventSettingsWorkspace({
           )}
         </p>
       )}
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">{mode === "create" ? "New event setup" : "Event setup"}</p>
-          {/* The page's one H1 is the PageHeader's "Create an event" (create mode) or the shell's "Event settings" (#742, #1772), so no second title here. */}
-          <p>
-            {mode === "create"
-              ? "Start with the information attendees and staff need. The event stays private until its registration form and publish checklist are ready."
-              : `Update the public details, registration dates, capacity, and publishing status for ${initialEvent?.name}.`}
-          </p>
-        </div>
-        <span className={`count-badge ${published ? "green" : ""}`}>
-          <ShieldCheck size={16} aria-hidden="true" />
-          {published ? "Published" : "Private draft"}
-        </span>
-      </div>
-
       {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void save()} />}
       {editBackup.restored && (
         <div className="form-notice draft-restored-notice" role="status">
@@ -942,6 +966,12 @@ export function EventSettingsWorkspace({
           {visibleBlocks.map((id) => (
             <li key={id}><a href={`#${settingsBlockDomId(id)}`} onClick={(event) => { event.preventDefault(); jumpToBlock(id); }}>{settingsBlockJumpLabels[id]}</a></li>
           ))}
+          {mode === "edit" && (
+            <li><a href="#event-locations" onClick={(event) => { event.preventDefault(); jumpToAnchor("event-locations", "event-locations-title"); }}>Locations</a></li>
+          )}
+          {mode === "edit" && clubOptions && (
+            <li><a href="#club-event-options" onClick={(event) => { event.preventDefault(); jumpToAnchor("club-event-options", "club-event-options-title"); }}>Club event options</a></li>
+          )}
         </ul>
       </nav>
 
@@ -1372,6 +1402,14 @@ export function EventSettingsWorkspace({
               ) : (
                 <p>Publish the event and at least one registration form to unlock its public link and website embed code.</p>
               )}
+            </section>
+          )}
+
+          {mode === "edit" && initialEvent && canDownloadEventArchive && (
+            <section className="panel" aria-labelledby="event-archive-download-heading">
+              <h2 id="event-archive-download-heading">Download event records</h2>
+              <p className={archiveStyles.help}>One zip of this event&rsquo;s exports you can already download, with a contents page. Health records are never included.</p>
+              <ExportLink className={`secondary-button ${archiveStyles.link}`} href={`/api/events/${encodeURIComponent(initialEvent.id)}/exports/event-archive`}>Download event archive (.zip)</ExportLink>
             </section>
           )}
 

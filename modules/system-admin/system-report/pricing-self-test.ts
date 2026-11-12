@@ -26,7 +26,8 @@ export type PricingCalculationName =
   | "fixed promo code"
   | "deposit"
   | "deposit capped at balance"
-  | "card surcharge";
+  | "card surcharge"
+  | "three price windows";
 
 export type PricingExpected = Record<PricingCalculationName, number>;
 
@@ -40,6 +41,7 @@ export const PRICING_EXPECTED: PricingExpected = {
   deposit: 5_000,
   "deposit capped at balance": 3_000,
   "card surcharge": 405,
+  "three price windows": 15_000,
 };
 
 function fixtureDefinition(): RegistrationFormDefinition {
@@ -66,6 +68,29 @@ function fixtureDefinition(): RegistrationFormDefinition {
   });
 }
 
+/** One $40.00 fee that becomes $50.00 on 2026-10-15 and $60.00 on 2026-11-15 (early, regular, late). */
+function windowsFixtureDefinition(): RegistrationFormDefinition {
+  return registrationFormDefinitionSchema.parse({
+    title: "Price windows self-test",
+    description: "",
+    confirmationMessage: "Done",
+    sections: [{
+      id: "s_main",
+      title: "Main",
+      description: "",
+      fields: [{
+        id: "f_fee", key: "fee", label: "Fee", helpText: "", type: "CALCULATED", scope: "REGISTRATION", required: false, options: [],
+        priceCents: 4000,
+        basePricingLabel: "Early pricing",
+        pricingWindows: [
+          { startsOn: "2026-10-15", label: "Regular pricing", priceCents: 5000 },
+          { startsOn: "2026-11-15", label: "Late pricing", priceCents: 6000 },
+        ],
+      }],
+    }],
+  });
+}
+
 const RESPONSES = { package: "Deluxe", shirts: 3, payment_method: "Card" };
 const EARLY_DATE = "2026-10-01";
 const LATE_DATE = "2026-11-02";
@@ -77,7 +102,10 @@ function computeActual(): PricingExpected {
   const percent = { discountType: "PERCENT_BPS" as const, discountValue: 1000, maximumDiscountCents: 1000, minimumSubtotalCents: 5000 };
   const fixed = { discountType: "FIXED_CENTS" as const, discountValue: 2000, maximumDiscountCents: null, minimumSubtotalCents: null };
   const deposit = { amountCents: 5000, optionValue: "Deposit" };
+  const windows = windowsFixtureDefinition();
+  const windowTotals = ["2026-10-01", "2026-10-20", "2026-11-20"].map((date) => calculateFormTotal(windows, {}, date).totalCents);
   return {
+    "three price windows": windowTotals.reduce((sum, cents) => sum + cents, 0),
     "early-bird total": early.totalCents,
     "late price total": late.totalCents,
     "quantity line": early.lineItems.find((item) => item.key === "shirts")?.amountCents ?? -1,

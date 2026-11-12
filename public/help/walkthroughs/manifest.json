@@ -1,4 +1,12 @@
 {
+  "walkthrough-clubs-find-club": {
+    "capturedFor": "2026-11-12",
+    "sourceHash": "d08cbfdef7f306adc29ca5a4c58c66d10226322ecc030ef5d3a2647cff6b65a7"
+  },
+  "walkthrough-clubs-leaders": {
+    "capturedFor": "2026-11-12",
+    "sourceHash": "afab118b73fcdb747f62edf492b9b410269c9e79b25ff3b1c6fa81e03c8cba4f"
+  },
   "walkthrough-coordinator-clubs": {
     "capturedFor": "2026-11-12",
     "sourceHash": "7c1eeda722fe8b96aa60ddd4dc8cd5c8d830461f494d32174e1d3513920a2f6a"

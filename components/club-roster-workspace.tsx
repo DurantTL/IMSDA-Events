@@ -172,6 +172,11 @@ const rosterSortMenuLabels: Record<RosterSortColumn, string> = {
 
 const rosterFieldLabels: Record<RosterFormField, string> = { firstName: "First name", lastName: "Last name", birthDate: "Birth date", gender: "Gender" };
 
+/** "Year 2 · Setup, Photography": a TLT's year and help-area tags, as the director's roster shows them (#1686). */
+function tltDetailText(detail: { tltYear: number | null; tags: string[] }) {
+  return `${detail.tltYear ? `Year ${detail.tltYear}` : "Year not set"} · ${detail.tags.length > 0 ? detail.tags.join(", ") : "No help areas yet"}`;
+}
+
 function ClubRosterWorkspaceInner({
   canSeeBirthDates,
   clubYear,
@@ -195,9 +200,12 @@ function ClubRosterWorkspaceInner({
   sectionsStartClosed = false,
   schoolDetails = false,
   clubKind,
+  tltDetails,
 }: {
   /** Pathfinder or Adventurer: the member wording (#1517). Pathfinder when omitted. */
   clubKind?: string | null;
+  /** Each TLT's year and help-area tags by roster member id (#1686): read-only, passed only to the club's director and deputy. */
+  tltDetails?: Record<string, { tltYear: number | null; tags: string[] }>;
   /**
    * School type and church membership (#1668): true only where the caller loaded them, which is the club's own roster
    * (director, deputy, registrar) and the system administrator's Open club page. Area Coordinators and event managers
@@ -1214,7 +1222,7 @@ function ClubRosterWorkspaceInner({
                                 );
                                 case "birthDate": return <td {...cardCell("Birth date")} className={tableStyles.cardFact} key={column} translate="no">{birthDates?.[member.id] ?? "—"}</td>;
                                 case "type": return <td {...cardCell("Type")} className={tableStyles.cardPrimary} key={column}>{clubRosterAttendeeTypeLabels[member.attendeeType]}</td>;
-                                case "class": return <td {...cardCell("Current class")} className={tableStyles.cardPrimary} key={column}><>{member.classLevel ? clubClassLevelLabels[member.classLevel] : member.isTlt ? null : "—"}{member.isTlt && <span className={member.classLevel ? `status-chip ${styles.rosterTltChip}` : "status-chip"} title={rosterTltLabel}>TLT</span>}</></td>;
+                                case "class": return <td {...cardCell("Current class")} className={tableStyles.cardPrimary} key={column}><>{member.classLevel ? clubClassLevelLabels[member.classLevel] : member.isTlt ? null : "—"}{member.isTlt && <span className={member.classLevel ? `status-chip ${styles.rosterTltChip}` : "status-chip"} title={rosterTltLabel}>TLT</span>}{member.isTlt && tltDetails?.[member.id] && <span className={styles.rosterTltDetail}>{tltDetailText(tltDetails[member.id]!)}</span>}</></td>;
                                 case "grade": return <td {...cardCell("Grade")} className={tableStyles.cardFact} key={column}>{member.schoolGrade ? clubSchoolGradeLabels[member.schoolGrade] : "—"}</td>;
                                 case "school": return <td {...cardCell("School")} className={tableStyles.cardFact} key={column}>{member.schoolType ? clubSchoolTypeLabels[member.schoolType] : "—"}</td>;
                                 case "churchMember": return <td {...cardCell(CHURCH_MEMBER_LABEL)} className={tableStyles.cardFact} key={column}>{member.churchMember ? clubChurchMemberLabels[member.churchMember] : "—"}</td>;

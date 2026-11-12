@@ -1076,12 +1076,13 @@ export async function endLodgingRule(eventId: string, actorUserId: string, ruleI
 
 const redemptionSelect = {
   registrationId: true, codeSnapshot: true, discountTypeSnapshot: true, discountValueSnapshot: true,
-  maximumDiscountCentsSnapshot: true, minimumSubtotalCentsSnapshot: true, promoCode: { select: { sponsoringOrganizationId: true } },
+  maximumDiscountCentsSnapshot: true, minimumSubtotalCentsSnapshot: true, attendeeTypeCodesSnapshot: true, promoCode: { select: { sponsoringOrganizationId: true } },
 } as const;
-const asRedemptionFact = (row: { codeSnapshot: string; discountTypeSnapshot: RedemptionFact["discountTypeSnapshot"]; discountValueSnapshot: number; maximumDiscountCentsSnapshot: number | null; minimumSubtotalCentsSnapshot: number | null; promoCode: { sponsoringOrganizationId: string | null } }): RedemptionFact => ({
+const asRedemptionFact = (row: { codeSnapshot: string; discountTypeSnapshot: RedemptionFact["discountTypeSnapshot"]; discountValueSnapshot: number; maximumDiscountCentsSnapshot: number | null; minimumSubtotalCentsSnapshot: number | null; attendeeTypeCodesSnapshot: string[]; promoCode: { sponsoringOrganizationId: string | null } }): RedemptionFact => ({
   codeSnapshot: row.codeSnapshot, discountTypeSnapshot: row.discountTypeSnapshot, discountValueSnapshot: row.discountValueSnapshot,
   maximumDiscountCentsSnapshot: row.maximumDiscountCentsSnapshot, minimumSubtotalCentsSnapshot: row.minimumSubtotalCentsSnapshot,
   sponsored: row.promoCode.sponsoringOrganizationId !== null,
+  restricted: row.attendeeTypeCodesSnapshot.length > 0,
 });
 
 /** The pricing snapshot a registration is at now: the latest amendment's, else the submission's. */

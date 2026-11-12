@@ -31,7 +31,16 @@
 .entryRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .entryRow input { flex: 1 1 10rem; min-height: 44px; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--field-border); border-radius: var(--radius-element); background: var(--card); font: inherit; }
 .entryNote { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--muted); }
+.suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 0; padding: 0; list-style: none; }
 .plain { margin: 0; padding: 0; list-style: none; }
+.moveList { display: grid; gap: 4px; margin: 0 0 12px; padding: 0; list-style: none; }
+.moveRow { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 0; border-top: 1px solid var(--line); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.moveRow input { width: 20px; height: 20px; flex: none; }
+.moveWho { display: grid; gap: 0; align-content: center; min-height: 44px; min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+.moveClub { color: var(--muted); }
+.moveYears { white-space: nowrap; font-weight: 600; color: var(--imsda-navy); }
+.moveResult { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-element); background: var(--card); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.moveSubhead { margin: 16px 0 4px; font-size: max(var(--type-staff-floor, 0px), 1rem); color: var(--imsda-navy); }
 @media print {
   .noPrint { display: none !important; }
   .list { display: block; }

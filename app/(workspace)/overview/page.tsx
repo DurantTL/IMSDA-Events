@@ -27,6 +27,7 @@ import { staffPageTitles } from "@/components/staff-navigation";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { otherWorkspaceContextsForStaff } from "@/modules/access/workspace-contexts";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import { LivePageRefresh } from "@/components/live-page-refresh";
 
 export const metadata: Metadata = { title: staffPageTitles.overview };
 
@@ -129,6 +130,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <AdminPageHeader path="/overview" eventId={event.id} />
+      <LivePageRefresh />
       {event.archivedAt && (
         <div className="inline-notice" role="status">
           <span>This event is archived: hidden from pickers and the public site, with registration closed. Its records, reports and exports still work. {permissions.includes("CONFIGURE_EVENT") ? <Link className="text-link" href={`/more/event-settings${query}`}>Unarchive it in Event settings.</Link> : null}</span>

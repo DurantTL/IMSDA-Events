@@ -136,3 +136,36 @@ export function adjustmentWording(churchBilled: boolean, group = false) {
         error: "Unable to adjust the amount owed.",
       };
 }
+
+/**
+ * Whether a refreshed list from the server may replace the one on screen (#1577). Never while a dialog is open, a
+ * form holds typed work, or a save or refund review is under way; the newer list is then applied once that ends.
+ */
+export function canApplyRefreshedRegistrations(state: {
+  dialogOpen: boolean;
+  typedWork: boolean;
+  saving: boolean;
+  reviewingRefund: boolean;
+}) {
+  return !state.dialogOpen && !state.typedWork && !state.saving && !state.reviewingRefund;
+}
+
+export type RegistrationsSync<T> = {
+  /** The last server list this screen has taken in or deliberately dropped. */
+  seen: readonly T[];
+  rows: T[];
+};
+
+/** A server list that is not the one already seen replaces the rows when the screen is idle; otherwise it is held. */
+export function syncRefreshedRegistrations<T>(state: RegistrationsSync<T>, incoming: T[], canApply: boolean): RegistrationsSync<T> {
+  if (state.seen === incoming || !canApply) return state;
+  return { seen: incoming, rows: incoming };
+}
+
+/**
+ * A save made on this screen is newer than any list the server sent before it, so a list held while the dialog was
+ * open is dropped (marked seen) and never applied over the saved row.
+ */
+export function syncAfterLocalSave<T extends { id: string }>(state: RegistrationsSync<T>, currentProps: T[], saved: T): RegistrationsSync<T> {
+  return { seen: currentProps, rows: state.rows.map((row) => (row.id === saved.id ? saved : row)) };
+}

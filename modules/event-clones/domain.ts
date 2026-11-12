@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ClubClassLevel } from "@/modules/club-rosters/domain";
-import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { fieldPriceWindows, registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { isEventMessageTemplateKey, validateMessageTemplate } from "@/modules/communications/templates";
 import { calendarDateSchema, eventNameSchema, eventSlugSchema } from "@/modules/events/schemas";
 import { mealPriceCount, type MealDefinitions } from "@/modules/meals/clone-domain";
@@ -246,6 +246,8 @@ export type SourceConfiguration = {
     minimumSubtotalCents: number | null;
     maximumUses: number | null;
     maximumDiscountCents: number | null;
+    /** Attendee-type restriction (#102), copied with the code. A type the new event does not have matches nobody. Optional so older fixtures still type. */
+    attendeeTypeCodes?: string[];
   }>;
   /** Meal services and plans (#210), definitions only: never selections, orders or the ledger. Optional so older fixtures still type. */
   meals?: MealDefinitions;
@@ -314,7 +316,22 @@ export type SourceConfiguration = {
 // Forms: what is date-bound or capacity in a definition
 // ---------------------------------------------------------------------------
 
-export type FormLatePricingItem = { formId: string; formName: string; fieldKey: string; fieldLabel: string; sourceStartsOn: string };
+/**
+ * One date-bound price window of a form field (#1509). A field with one window
+ * (stored as `latePricing`) has `windowIndex` 0 and `windowCount` 1, exactly as
+ * before; a field with two or three windows lists each one.
+ */
+export type FormLatePricingItem = { formId: string; formName: string; fieldKey: string; fieldLabel: string; sourceStartsOn: string; windowIndex: number; windowCount: number; windowLabel: string };
+
+/** The key of a reviewed date inside one form's rewrite map. */
+export function latePricingDateKey(fieldKey: string, windowIndex: number) {
+  return `${fieldKey}:${windowIndex}`;
+}
+
+/** One key per (form, field, window); keys are never parsed back. */
+export function latePricingWindowKey(formId: string, fieldKey: string, windowIndex: number) {
+  return `${formId}:${fieldKey}:${windowIndex}`;
+}
 
 type ParsedDefinition = ReturnType<typeof registrationFormDefinitionSchema.parse>;
 
@@ -324,9 +341,10 @@ export function parseFormDefinition(value: unknown): ParsedDefinition | null {
 }
 
 export function latePricingItems(formId: string, formName: string, definition: ParsedDefinition): FormLatePricingItem[] {
-  return definition.sections.flatMap((section) => section.fields
-    .filter((field) => field.latePricing)
-    .map((field) => ({ formId, formName, fieldKey: field.key, fieldLabel: field.label, sourceStartsOn: field.latePricing!.startsOn })));
+  return definition.sections.flatMap((section) => section.fields.flatMap((field) => {
+    const windows = fieldPriceWindows(field);
+    return windows.map((window, windowIndex) => ({ formId, formName, fieldKey: field.key, fieldLabel: field.label, sourceStartsOn: window.startsOn, windowIndex, windowCount: windows.length, windowLabel: window.label }));
+  }));
 }
 
 export type FormChoiceLimitItem = {
@@ -358,7 +376,7 @@ function pricedFieldCounts(definition: ParsedDefinition) {
   const fields = definition.sections.flatMap((section) => section.fields);
   return {
     priced: fields.filter((field) => field.priceCents !== undefined || field.choicePricesCents !== undefined || field.creditCentsPerUnit !== undefined).length,
-    latePriced: fields.filter((field) => field.latePricing).length,
+    latePriced: fields.filter((field) => fieldPriceWindows(field).length > 0).length,
     cardFees: definition.payment?.enabled ? 1 : 0,
   };
 }
@@ -373,16 +391,16 @@ function pricedFieldCounts(definition: ParsedDefinition) {
  */
 export function rewriteFormDefinitionForClone(
   definition: ParsedDefinition,
-  latePricingDates: ReadonlyMap<string, string>,
+  latePricingDates: ReadonlyMap<string, string>, // keyed by `latePricingDateKey(fieldKey, windowIndex)`
   choiceLimits: ReadonlyMap<string, ReadonlyMap<string, number | null>>,
 ): ParsedDefinition {
   const next = structuredClone(definition);
   for (const section of next.sections) {
     for (const field of section.fields) {
-      if (field.latePricing) {
-        const startsOn = latePricingDates.get(field.key);
-        if (startsOn) field.latePricing.startsOn = startsOn;
-      }
+      fieldPriceWindows(field).forEach((window, windowIndex) => {
+        const startsOn = latePricingDates.get(latePricingDateKey(field.key, windowIndex));
+        if (startsOn) window.startsOn = startsOn;
+      });
       if (field.choiceLimits !== undefined) {
         const reviewed = choiceLimits.get(field.key);
         const limits: Record<string, number> = {};
@@ -903,6 +921,8 @@ export const confirmEventCloneInputSchema = z.object({
   formLatePricingDates: z.array(z.object({
     formId: z.string().trim().min(1).max(100),
     fieldKey: z.string().trim().min(1).max(60),
+    /** Which price window of the field (0 = the first or only one); absent means 0. */
+    windowIndex: z.number().int().min(0).max(2).optional(),
     startsOn: calendarDateSchema,
   }).strict()).max(500).default([]),
   /** Required: one entry per source choice limit in a copied form. */
@@ -975,20 +995,25 @@ export function reviewIssues(config: SourceConfiguration, input: ConfirmEventClo
     for (const form of config.registrationForms) {
       const definition = parseFormDefinition(form.definition);
       if (!definition) continue;
-      for (const item of latePricingItems(form.formId, form.name, definition)) expectedLate.set(`${item.formId}:${item.fieldKey}`, item);
+      for (const item of latePricingItems(form.formId, form.name, definition)) expectedLate.set(latePricingWindowKey(item.formId, item.fieldKey, item.windowIndex), item);
     }
   }
   const suppliedLate = new Map<string, string>();
+  const pricingLabel = (item: FormLatePricingItem) => item.windowCount > 1 ? `${item.fieldLabel} (${item.windowLabel})` : item.fieldLabel;
   for (const entry of input.formLatePricingDates) {
-    const key = `${entry.formId}:${entry.fieldKey}`;
+    const key = latePricingWindowKey(entry.formId, entry.fieldKey, entry.windowIndex ?? 0);
     const item = expectedLate.get(key);
     if (!item) issues.push(`A late-pricing date was supplied for something that is not being copied (${entry.fieldKey}).`);
-    else if (suppliedLate.has(key)) issues.push(`The late-pricing date for ${item.fieldLabel} was supplied twice.`);
-    else if (entry.startsOn === item.sourceStartsOn) issues.push(`Choose a new late-pricing date for ${item.fieldLabel} on ${item.formName}; it still has the source event's date.`);
+    else if (suppliedLate.has(key)) issues.push(`The late-pricing date for ${pricingLabel(item)} was supplied twice.`);
+    else if (entry.startsOn === item.sourceStartsOn) issues.push(`Choose a new late-pricing date for ${pricingLabel(item)} on ${item.formName}; it still has the source event's date.`);
     suppliedLate.set(key, entry.startsOn);
   }
   for (const [key, item] of expectedLate) {
-    if (!suppliedLate.has(key)) issues.push(`Enter a new late-pricing date for ${item.fieldLabel} on ${item.formName}.`);
+    if (!suppliedLate.has(key)) issues.push(`Enter a new late-pricing date for ${pricingLabel(item)} on ${item.formName}.`);
+    else if (item.windowIndex > 0) {
+      const earlier = suppliedLate.get(latePricingWindowKey(item.formId, item.fieldKey, item.windowIndex - 1));
+      if (earlier && suppliedLate.get(key)! <= earlier) issues.push(`The date for ${pricingLabel(item)} on ${item.formName} must come after the window before it.`);
+    }
   }
 
   // Choice capacity limits: like class capacities, every one is re-entered,

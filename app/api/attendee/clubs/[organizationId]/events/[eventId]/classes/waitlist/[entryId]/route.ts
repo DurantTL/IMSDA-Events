@@ -1,3 +1,4 @@
+import { rejectGuestClubOtherEvent } from "@/modules/club-registrations/event-gate";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
 import { clubRegistrationApiError } from "@/modules/club-registrations/api-errors";
@@ -11,6 +12,8 @@ async function deleteHandler(request: Request, context: { params: Promise<{ orga
   try {
     const { organizationId, eventId, entryId } = await context.params;
     const access = await requireRosterAccess(organizationId, new Date(), "registerForEvents");
+    const guestBlock = await rejectGuestClubOtherEvent(organizationId, eventId);
+    if (guestBlock) return guestBlock;
     const workspace = await leaveClassWaitlist(organizationId, eventId, actorAttribution(access.actor), entryId);
     return Response.json({ workspace }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

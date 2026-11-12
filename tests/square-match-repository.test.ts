@@ -314,4 +314,20 @@ describe("attaching a Square payment by hand", () => {
     expect(result.balanceBeforeCents).toBe(10_000);
     expect(result.overpaidCents).toBe(4_951);
   });
+
+  it("names the check-in station in the audit entry only when one is given", async () => {
+    const tx = transactionClient();
+    dependencies.getPrisma.mockReturnValue(prismaFor(tx));
+    await attachSquarePaymentToRegistration(
+      "event-1", "registration-9", "user-1", { providerPaymentId: "square-payment-ext-1" },
+      { configuration, auditContext: { station: { id: "station-1", label: "Front desk" } } },
+    );
+    expect(tx.auditLog.create.mock.calls[0][0].data.metadata).toMatchObject({
+      channel: "CHECK_IN_STATION", station: { id: "station-1", label: "Front desk" },
+    });
+    const plain = transactionClient();
+    dependencies.getPrisma.mockReturnValue(prismaFor(plain));
+    await attach();
+    expect(plain.auditLog.create.mock.calls[0][0].data.metadata).not.toHaveProperty("station");
+  });
 });

@@ -70,6 +70,8 @@ export function acknowledgmentTypePatch(field: RegistrationFormField, nextType: 
       creditCentsPerUnit: undefined,
       capUnitsAtAttendeeCount: undefined,
       latePricing: undefined,
+      pricingWindows: undefined,
+      basePricingLabel: undefined,
       ageBounds: undefined,
       autoDate: undefined,
       placeholder: undefined,

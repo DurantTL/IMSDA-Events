@@ -143,7 +143,7 @@ export function EventLocationsPanel({
       <div className="section-heading">
         <div>
           <p className="eyebrow">Sites</p>
-          <h2 id="event-locations-title">Locations</h2>
+          <h2 id="event-locations-title" tabIndex={-1}>Locations</h2>
           <p>
             For an event held at more than one site. With no locations the event works as usual. With one or more,
             every new club registration must pick one. Dates left blank use the event&apos;s own dates.
@@ -253,7 +253,7 @@ export function EventLocationsPanel({
           </div>
           <div className="club-registration-toolbar">
             <button className="secondary-button" onClick={() => { setAdding(false); setEditingId(null); setDraft(emptyDraft); }} type="button"><X aria-hidden="true" size={15} /> Cancel</button>
-            <button className="primary-button" disabled={busy} type="submit">{editingId ? "Save location" : "Add location"}</button>
+            <button className="secondary-button" disabled={busy} type="submit">{editingId ? "Save location" : "Add location"}</button>
           </div>
         </form>
       ) : (

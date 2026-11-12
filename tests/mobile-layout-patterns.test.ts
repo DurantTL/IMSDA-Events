@@ -39,7 +39,7 @@ function enclosingMedia(source: string, needle: string): string | null {
 
 describe("tables that became phone cards (#447)", () => {
   it("the attendee listing is a table-cards table with labelled cells and the name as row header", () => {
-    expect(attendeeListing).toContain('role="table" className="report-table table-cards table-cards-max attendee-listing-table"');
+    expect(attendeeListing).toContain('role="table" className={`report-table table-cards table-cards-max attendee-listing-table ${styles.list}`}');
     expect(attendeeListing).toContain("{...cardCell(column.label)}");
     expect(attendeeListing).toMatch(/column\.key === "name"\s*\?\s*<th key=\{column\.key\} data-col=\{column\.key\} role="rowheader" scope="row">/);
     // The header cell comes from the shared SortableHeader, which sets role and scope (#1458).

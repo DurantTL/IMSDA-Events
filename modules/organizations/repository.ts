@@ -279,7 +279,7 @@ export async function createOrganization(
 /** Every club (inactive ones marked) with its sponsoring church and its town: what the duplicate check compares a typed name against. */
 export async function listSimilarClubCandidates(client: Pick<Prisma.TransactionClient, "organization"> = getPrisma()): Promise<SimilarClubCandidate[]> {
   const clubs = await client.organization.findMany({
-    where: { type: "CLUB" },
+    where: { type: "CLUB", guestEventId: null },
     orderBy: [{ name: "asc" }, { id: "asc" }],
     select: {
       id: true,

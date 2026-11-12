@@ -5,6 +5,7 @@ import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { PaymentOperationError } from "@/modules/payments/repository";
+import { SquareMatchOperationError } from "@/modules/payments/square-match-repository";
 import {
   CHECK_IN_STATION_COOKIE_NAME,
   STATION_INACTIVE_MESSAGE,
@@ -49,9 +50,54 @@ const paymentMessages: Record<string, string> = {
   PAYMENT_CONFLICT: "Another payment changed this registration at the same moment. Look the code up again and check the balance.",
 };
 
+const squareMatchMessages: Record<string, { status: number; message: string }> = {
+  PAYMENT_LIKELY_DUPLICATE: {
+    status: 409,
+    message: "This registration already shows a payment. Note it for finance to match later.",
+  },
+  PAYMENT_ALREADY_RECORDED: {
+    status: 409,
+    message: "That Square payment is already recorded. Look the code up again to see the balance.",
+  },
+  PROVIDER_PAYMENT_NOT_FOUND: {
+    status: 409,
+    message: "Square has no record of that payment. Note it for finance to match later.",
+  },
+  PROVIDER_PAYMENT_NOT_COMPLETED: {
+    status: 409,
+    message: "Square does not show that payment as completed. Note it for finance to match later.",
+  },
+  PROVIDER_PAYMENT_WRONG_LOCATION: {
+    status: 409,
+    message: "That payment was taken at a different Square location. Note it for finance to match later.",
+  },
+  REGISTRATION_NOT_FOUND: { status: 404, message: "We could not find that registration for this event." },
+  REGISTRATION_NOT_PAYABLE: {
+    status: 409,
+    message: "Payments can only be recorded for submitted or confirmed registrations. Send this person to the check-in desk.",
+  },
+  SQUARE_NOT_CONFIGURED: { status: 503, message: "Square could not be reached. Note it for finance to match later." },
+  SQUARE_UNREACHABLE: { status: 503, message: "Square could not be reached. Note it for finance to match later." },
+};
+
 export function stationApiError(error: unknown) {
+  if (error instanceof SquareMatchOperationError) {
+    const mapped = squareMatchMessages[error.code] ?? {
+      status: 409,
+      message: "That card payment could not be matched. Note it for finance to match later.",
+    };
+    return stationJson({ error: error.code, message: mapped.message }, { status: mapped.status });
+  }
   if (error instanceof StationServiceError) {
-    const status = error.code === "NOT_FOUND" ? 404 : error.code === "PASS_EXPIRED" ? 410 : 409;
+    const status = error.code === "NOT_FOUND" || error.code === "NOTHING_TO_UNDO"
+      ? 404
+      : error.code === "PASS_EXPIRED"
+        ? 410
+        : error.code === "BALANCE_REASON_REQUIRED"
+          ? 422
+          : error.code === "PERMISSION_DENIED"
+            ? 403
+            : 409;
     return stationJson({ error: error.code, message: error.message }, { status });
   }
   if (error instanceof PaymentOperationError) {
@@ -93,7 +139,7 @@ export function stationInactiveResponse() {
 type StationPostOptions<T> = {
   /** Omit for a body-less action (stop). */
   schema?: z.ZodType<T>;
-  capability?: "payments";
+  capability?: "payments" | "checkIn";
   rateLimit?: (station: ResolvedStation) => Promise<RateLimitOutcome>;
 };
 
@@ -116,6 +162,12 @@ export function stationPostHandler<T = undefined>(
         return stationJson({
           error: "PERMISSION_DENIED",
           message: "This station cannot record payments. Send the payment to the check-in desk or to finance.",
+        }, { status: 403 });
+      }
+      if (options.capability === "checkIn" && !station.capabilities.canCheckIn) {
+        return stationJson({
+          error: "PERMISSION_DENIED",
+          message: "This station cannot check people in or undo a check-in. Use the check-in desk.",
         }, { status: 403 });
       }
       let rateOutcome: RateLimitOutcome | null = null;

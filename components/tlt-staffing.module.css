@@ -1,0 +1,27 @@
+/* The TLT director's staffing pages (#1678): one card per event, one card per activity and per TLT, so it reads at 390px. */
+.empty { margin: 0; color: var(--muted); }
+.events, .activities, .tlts, .people { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.events { grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); }
+.eventCard, .activity, .tlt { display: grid; gap: 6px; min-width: 0; align-content: start; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); padding: 12px 14px; }
+.eventName, .activityName, .tltName { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); font-weight: 700; overflow-wrap: anywhere; }
+.details, .counts { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.counts { font-variant-numeric: tabular-nums; }
+.gap { margin: 0; color: var(--danger); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; overflow-wrap: anywhere; }
+.done { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.block { display: grid; gap: 10px; }
+.heading { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.filters { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); align-items: end; }
+.field { display: grid; gap: 4px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; color: var(--imsda-navy); }
+.field select { min-height: 44px; width: 100%; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--field-border); border-radius: var(--radius-element); background: var(--card); font: inherit; font-weight: 400; color: inherit; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.actions a, .actions button { min-height: 44px; display: inline-flex; align-items: center; }
+.tlts { grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.tag { padding: 2px 8px; border-radius: var(--radius-pill); background: var(--imsda-purple-soft); color: var(--imsda-purple); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.assignRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.assignRow .field { flex: 1 1 10rem; }
+.assignRow button, .removeButton { min-height: 44px; }
+.person { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; border-bottom: 1px solid var(--line); padding: 6px 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.personName { overflow-wrap: anywhere; }
+.role { color: var(--muted); }
+.empty a { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-purple); text-decoration: underline; }

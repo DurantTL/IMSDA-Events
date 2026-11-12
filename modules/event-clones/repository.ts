@@ -20,6 +20,7 @@ import {
   parseFormDefinition,
   previewEventCloneInputSchema,
   reviewIssues,
+  latePricingDateKey,
   rewriteFormDefinitionForClone,
   sanitizeSourceForClone,
   type ClonePricingSummary,
@@ -38,6 +39,7 @@ import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { getEventSettings } from "@/modules/events/repository";
 import { writeCloneModules } from "@/modules/event-modules/defaults";
 import { copyDebriefSetup } from "@/modules/event-debriefs/lifecycle";
+import { ensureInspectionEventsIfOn } from "@/modules/event-inspections/setup";
 import { createRegistrationFormFromDefinitionInTransaction } from "@/modules/forms/repository";
 
 export class EventCloneOperationError extends Error {
@@ -194,6 +196,7 @@ export async function loadSourceConfiguration(db: Db, eventId: string): Promise<
       id: promo.id, code: promo.code, normalizedCode: promo.normalizedCode, discountType: promo.discountType,
       discountValue: promo.discountValue, startsOn: promo.startsOn, endsOn: promo.endsOn,
       minimumSubtotalCents: promo.minimumSubtotalCents, maximumUses: promo.maximumUses, maximumDiscountCents: promo.maximumDiscountCents,
+      attendeeTypeCodes: promo.attendeeTypeCodes,
     })),
     meals: await loadMealDefinitions(db, eventId),
     locations: locations.map((location) => ({
@@ -379,6 +382,8 @@ export async function cloneEvent(actorUserId: string, rawInput: unknown) {
       await writeCloneModules(tx, { sourceEventId: input.sourceEventId, targetEventId: event.id, audience: event.audience, detailsCopied: include.eventDetails });
       // The Debrief (#1679): the copy shows the source's answers read only, and its own schedule follows its own dates.
       await copyDebriefSetup(tx, { sourceEventId: input.sourceEventId, targetEventId: event.id, actorUserId });
+      // Inspections (#1896): a copy that carries the module on gets its own two inspection events (scores are never copied).
+      await ensureInspectionEventsIfOn(tx, event.id, actorUserId);
 
       const copied: Record<string, number> = Object.fromEntries(cloneDomainKeys.map((key) => [key, 0]));
       const sourceVersions: { forms: Array<{ sourceFormId: string; versionId: string; versionNumber: number; newFormId: string }>; messageTemplates: Array<{ key: string; versionId: string; versionNumber: number }> } = { forms: [], messageTemplates: [] };
@@ -448,7 +453,7 @@ export async function cloneEvent(actorUserId: string, rawInput: unknown) {
         for (const form of config.registrationForms) {
           const definition = parseFormDefinition(form.definition);
           if (!definition) { skipped.forms += 1; continue; }
-          const dates = new Map(input.formLatePricingDates.filter((entry) => entry.formId === form.formId).map((entry) => [entry.fieldKey, entry.startsOn]));
+          const dates = new Map(input.formLatePricingDates.filter((entry) => entry.formId === form.formId).map((entry) => [latePricingDateKey(entry.fieldKey, entry.windowIndex ?? 0), entry.startsOn]));
           const limits = new Map<string, Map<string, number | null>>();
           for (const entry of input.formChoiceLimits) {
             if (entry.formId !== form.formId) continue;
@@ -504,6 +509,7 @@ export async function cloneEvent(actorUserId: string, rawInput: unknown) {
               // Copied as they are (#157): the inactive code is the review point.
               minimumSubtotalCents: promo.minimumSubtotalCents, maximumUses: promo.maximumUses,
               maximumDiscountCents: promo.maximumDiscountCents,
+              attendeeTypeCodes: promo.attendeeTypeCodes ?? [],
             },
           });
         }

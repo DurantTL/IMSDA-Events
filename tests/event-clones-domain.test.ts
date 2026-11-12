@@ -11,6 +11,7 @@ import {
   excludedDomains,
   previewEventCloneInputSchema,
   reviewIssues,
+  latePricingDateKey,
   rewriteFormDefinitionForClone,
   sanitizeSourceForClone,
   isEmptyAfterClone,
@@ -142,7 +143,7 @@ describe("rewriteFormDefinitionForClone", () => {
   it("replaces late-pricing dates with the reviewed ones and touches nothing else", () => {
     const definition = registrationFormDefinitionSchema.parse(lateTemplate);
     const fields = definition.sections.flatMap((section) => section.fields).filter((field) => field.latePricing);
-    const dates = new Map(fields.map((field) => [field.key, "2028-03-01"]));
+    const dates = new Map(fields.map((field) => [latePricingDateKey(field.key, 0), "2028-03-01"]));
     const rewritten = rewriteFormDefinitionForClone(definition, dates, new Map());
     const rewrittenFields = rewritten.sections.flatMap((section) => section.fields).filter((field) => field.latePricing);
     expect(rewrittenFields.map((field) => field.latePricing!.startsOn)).toEqual(fields.map(() => "2028-03-01"));
@@ -659,5 +660,60 @@ describe("token routes in copied text (#154)", () => {
     expect(result.text).not.toMatch(/TOK[123]/);
     expect(result.text).toContain("https://example.test/club-forms/TOK4");
     expect(JSON.stringify(result.matches)).not.toMatch(/TOK[123]/);
+  });
+});
+
+describe("price windows on a copied form (#1509)", () => {
+  const windowed = registrationFormDefinitionSchema.parse({
+    title: "Three-tier form",
+    description: "",
+    confirmationMessage: "Done",
+    sections: [{
+      id: "s_fees", title: "Fees", description: "",
+      fields: [{
+        id: "f_fee", key: "fee", label: "Fee", helpText: "", type: "CALCULATED", scope: "REGISTRATION", required: false, options: [],
+        priceCents: 4000, basePricingLabel: "Early pricing",
+        pricingWindows: [
+          { startsOn: "2026-10-15", label: "Regular pricing", priceCents: 5000 },
+          { startsOn: "2026-11-15", label: "Late pricing", priceCents: 6000 },
+        ],
+      }],
+    }],
+  });
+  const windowedConfig = () => config({ registrationForms: [{ formId: "form-w", name: "Windowed", slug: "windowed", versionId: "ver-w", versionNumber: 1, definition: windowed }] });
+  const entry = (windowIndex: number | undefined, startsOn: string) => ({ formId: "form-w", fieldKey: "fee", ...(windowIndex === undefined ? {} : { windowIndex }), startsOn });
+  // Only this form's own findings: the shared fixture's promo codes and honors are not under test here.
+  const issuesFor = (dates: unknown[]) => reviewIssues(windowedConfig(), parseBody(dates)).filter((issue) => /Windowed|Fee|\(fee\)/.test(issue));
+  const parseBody = (dates: unknown[]) => confirmEventCloneInputSchema.parse(validBody({ formLatePricingDates: dates, formChoiceLimits: [], promoCodeWindows: [], honorOfferingCapacities: [] })) as ConfirmEventCloneInput;
+
+  it("lists one review item per window, and a single window still lists once", () => {
+    const items = buildClonePlan(windowedConfig(), fingerprint).review.latePricing;
+    expect(items.map((item) => [item.windowIndex, item.windowCount, item.windowLabel, item.sourceStartsOn])).toEqual([
+      [0, 2, "Regular pricing", "2026-10-15"],
+      [1, 2, "Late pricing", "2026-11-15"],
+    ]);
+    expect(lateItems().every((item) => item.windowIndex === 0 && item.windowCount === 1)).toBe(true);
+  });
+
+  it("rewrites each window with its reviewed date and keeps prices and labels", () => {
+    const dates = new Map([[latePricingDateKey("fee", 0), "2027-10-20"], [latePricingDateKey("fee", 1), "2027-11-20"]]);
+    const field = rewriteFormDefinitionForClone(windowed, dates, new Map()).sections[0]!.fields[0]!;
+    expect(field.pricingWindows).toEqual([
+      { startsOn: "2027-10-20", label: "Regular pricing", priceCents: 5000 },
+      { startsOn: "2027-11-20", label: "Late pricing", priceCents: 6000 },
+    ]);
+    expect(field.basePricingLabel).toBe("Early pricing");
+    expect(windowed.sections[0]!.fields[0]!.pricingWindows![0]!.startsOn).toBe("2026-10-15");
+    expect(() => registrationFormDefinitionSchema.parse(rewriteFormDefinitionForClone(windowed, dates, new Map()))).not.toThrow();
+  });
+
+  it("asks for every window's date, refuses source dates, and requires the new dates to ascend", () => {
+    const missing = issuesFor([entry(0, "2027-10-20")]);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]).toContain("Late pricing");
+    expect(issuesFor([entry(0, "2027-10-20"), entry(1, "2027-11-20")])).toEqual([]);
+    expect(issuesFor([entry(0, "2026-10-15"), entry(1, "2027-11-20")]).some((issue) => issue.includes("source event's date"))).toBe(true);
+    expect(issuesFor([entry(0, "2027-11-20"), entry(1, "2027-10-20")]).some((issue) => issue.includes("must come after"))).toBe(true);
+    expect(issuesFor([entry(0, "2027-10-20"), entry(1, "2027-11-20"), entry(2, "2027-12-20")]).length).toBe(1);
   });
 });

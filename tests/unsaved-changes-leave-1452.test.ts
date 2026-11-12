@@ -98,6 +98,17 @@ describe("registry: leave dialog, subscribe and the one-shot pass (#1452)", () =
     expect(consumeNavigationPass()).toBe(false);
   });
 
+  it("the link listener does not ask about a link that only changes this page's own filters (data-same-page)", () => {
+    const confirm = vi.fn(async () => true);
+    const listener = createLinkNavigationListener({ message: "m", confirm, currentHref: () => "https://events.example.test/tlt/staffing/e1?tag=t1", isAllowed: () => false });
+    const link = (attributes: string[]) => ({ target: "", href: "https://events.example.test/tlt/staffing/e1", hasAttribute: (name: string) => attributes.includes(name), getAttribute: () => "/tlt/staffing/e1" });
+    const click = (found: ReturnType<typeof link>) => listener({ button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, defaultPrevented: false, target: { closest: () => found }, preventDefault() {}, stopPropagation() {} });
+    click(link(["data-same-page"]));
+    expect(confirm).not.toHaveBeenCalled();
+    click(link([]));
+    expect(confirm).toHaveBeenCalledTimes(1);
+  });
+
   it("an in-app check uses the pass up completely, so a reload right after still warns", () => {
     allowNextNavigation();
     expect(consumeNavigationPass()).toBe(true);

@@ -14,13 +14,15 @@ import { rosterYearView } from "@/modules/club-rosters/domain";
 import { rosterGuardiansForAccess } from "@/modules/club-rosters/guardians-access";
 import { ROSTER_DETAILS_NEEDED_FILTER, rosterSectionsStartClosed } from "@/modules/club-rosters/roster-view";
 import { listRoster } from "@/modules/club-rosters/repository";
-import { listTransferClubOptions } from "@/modules/club-transfers/repository";
+import { isGuestClub, listTransferClubOptions } from "@/modules/club-transfers/repository";
 import { personIdsMovedToOtherClubs } from "@/modules/earned-awards/order-source";
 import { rosterHealthAvailable } from "@/modules/club-features/roster-health";
+import { staffTrainingAvailable } from "@/modules/staff-training/repository";
 import { requireHealthViewerForClub } from "@/modules/health-records/access";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthEntryStatusesForMembers, healthRecordFlagsForRoster, healthSummariesForMembers } from "@/modules/health-records/repository";
+import { clubTltDetailsVisible, listClubTltDetails } from "@/modules/tlt-directory/club-view";
 import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Roster" };
@@ -46,7 +48,8 @@ export default async function ClubRosterPage({
   const { clubYear, currentClubYear, readOnly, contactsEditable } = rosterYearView(yearParam);
   // Status only, never the note, and only for a director or deputy: this is the club's own page (#427).
   // Transfers (#489) are the same leader-only capability that manages the club's team.
-  const canTransfer = access.capabilities.manageTeam && !readOnly;
+  // A visiting guest club (#835) takes no part in member transfers.
+  const canTransfer = access.capabilities.manageTeam && !readOnly && !(await isGuestClub(organizationId));
   // School type and church membership (#1668): not for a Clubs Administrator acting as director.
   const schoolDetails = rosterSchoolDetailsVisible(access);
   const [members, complianceStatuses, clubOptions, guardians] = await Promise.all([
@@ -80,12 +83,18 @@ export default async function ClubRosterPage({
   // Anyone who can see these rows, with no health access, still sees a neutral
   // "Has a health record" marker: one boolean saying a record exists, no text (#611).
   const healthRecordFlags = readOnly ? undefined : await healthRecordFlagsForRoster(organizationId, members.map((member) => member.id)).catch(() => undefined);
+  // Each TLT's year and help-area tags, read-only, for this club's own director and deputy only (#1686).
+  const tltDetails = clubTltDetailsVisible(access, readOnly)
+    ? await listClubTltDetails(organizationId, members.filter((member) => member.isTlt).map((member) => member.id))
+    : undefined;
   const registrationHref = registrationReturnTo(organizationId, returnToParam);
   const nextYearOffer = access.capabilities.manageTeam && !readOnly && carryForwardOversightOpen(new Date())
     ? await getCarryForwardOffer(organizationId)
     : null;
   // The optional roster health list (#1709): the link is shown exactly when that page would open, with its own check.
   const showRosterHealth = await rosterHealthAvailable(organizationId, access.capabilities);
+  // The optional staff training records (#1697): shown exactly when that page would open.
+  const showStaffTraining = await staffTrainingAvailable(organizationId, access.capabilities);
   return (
     <>
       {registrationHref && <BackLink href={registrationHref}>Back to registration</BackLink>}
@@ -95,6 +104,11 @@ export default async function ClubRosterPage({
       {showRosterHealth && (
         <p>
           <a className="secondary-button club-event-action" href={`/account/clubs/${organizationId}/roster-health`}>Open roster health</a>
+        </p>
+      )}
+      {showStaffTraining && (
+        <p>
+          <a className="secondary-button club-event-action" href={`/account/clubs/${organizationId}/staff-training`}>Open staff training</a>
         </p>
       )}
       {/* From August a director is offered next year's roster (#414); nothing rolls over until they confirm it. */}
@@ -131,6 +145,7 @@ export default async function ClubRosterPage({
         readOnly={readOnly}
         sectionsStartClosed={rosterSectionsStartClosed(access.club.role)}
         schoolDetails={schoolDetails}
+        tltDetails={tltDetails}
       />
       {canTransfer && <ClubTransfersPanel organizationId={organizationId} />}
     </>

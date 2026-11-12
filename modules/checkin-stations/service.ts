@@ -1,5 +1,6 @@
 import "server-only";
 
+import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { checkInBlocksForAttendees } from "@/modules/background-checks/repository";
@@ -10,19 +11,33 @@ import {
   serializeAttendee,
 } from "@/modules/checkin/attendee-pass-repository";
 import { clubPassTokenPrefix } from "@/modules/checkin/club-pass-token";
-import { CheckInOperationError, checkInAttendee } from "@/modules/checkin/repository";
+import { CheckInOperationError, checkInAttendee, undoCheckIn } from "@/modules/checkin/repository";
 import {
+  STATION_HISTORY_LIMIT,
+  stationBadgeLine,
+  stationBalanceReasonLabel,
+  stationPaymentMethodLabel,
   stationPaymentSummary,
   stationSummarySuffix,
+  type StationBalanceReason,
   type StationCheckInResult,
   type StationFamily,
+  type StationPaymentHistoryEntry,
   type StationPaymentSummary,
+  type StationSquareCandidate,
 } from "@/modules/checkin-stations/domain";
 import type { ResolvedStation } from "@/modules/checkin-stations/repository";
 import { findPaymentReplay } from "@/modules/payments/payment-replay";
 import { PaymentOperationError, recordManualPayment } from "@/modules/payments/repository";
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
-import { registrationBalanceCents } from "@/modules/payments/square-domain";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
+import { moneyToCents, registrationBalanceCents } from "@/modules/payments/square-domain";
+import {
+  SquareMatchOperationError,
+  attachSquarePaymentToRegistration,
+  listUnmatchedSquarePayments,
+} from "@/modules/payments/square-match-repository";
+import { formatCents } from "@/modules/payments/format-cents";
 
 export class StationServiceError extends Error {
   constructor(
@@ -31,7 +46,12 @@ export class StationServiceError extends Error {
       | "PASS_EXPIRED"
       | "SEND_TO_DESK"
       | "BILLED_TO_GROUP"
-      | "NOTHING_DUE",
+      | "NOTHING_DUE"
+      | "BALANCE_REASON_REQUIRED"
+      | "PAYMENT_NOT_LISTED"
+      | "PERMISSION_DENIED"
+      | "NOT_THIS_STATION"
+      | "NOTHING_TO_UNDO",
   ) {
     super(
       code === "NOT_FOUND"
@@ -42,13 +62,147 @@ export class StationServiceError extends Error {
             ? "Send this person to the check-in desk."
             : code === "BILLED_TO_GROUP"
               ? "This registration is billed to the church or group, so nothing is collected here."
-              : "Nothing is due on this registration.",
+              : code === "BALANCE_REASON_REQUIRED"
+                ? "This registration still has a balance due. Pick a reason before checking anyone in."
+                : code === "PAYMENT_NOT_LISTED"
+                  ? "That payment is not listed for this registration. Note it for finance to match later."
+                  : code === "PERMISSION_DENIED"
+                    ? "This station cannot check people in or undo a check-in. Use the check-in desk."
+                    : code === "NOT_THIS_STATION"
+                      ? "Only check-ins made at this station can be undone here. Use the check-in desk."
+                      : code === "NOTHING_TO_UNDO"
+                        ? "Already undone, or not checked in."
+                        : "Nothing is due on this registration.",
     );
     this.name = "StationServiceError";
   }
 }
 
 const squareNoteAction = "CHECK_IN_STATION_SQUARE_APP_NOTED";
+const balanceReasonAction = "CHECK_IN_STATION_BALANCE_REASON";
+
+function metadataObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function stationLabelFrom(metadata: Record<string, unknown>) {
+  const station = metadataObject(metadata.station);
+  return typeof station.label === "string" && station.label.trim() ? station.label.trim() : null;
+}
+
+/** Date and time in the event's own zone, with the zone named. */
+function formatWhen(at: Date, timeZone: string) {
+  try {
+    return formatInTimeZone(at, timeZone, { dateStyle: "medium", timeStyle: "short" });
+  } catch {
+    return formatInTimeZone(at, "UTC", { dateStyle: "medium", timeStyle: "short" });
+  }
+}
+
+/** The history for a response that follows a write: a failed read is logged and left out, never failing the write. */
+export async function stationPaymentHistoryAfterWrite(
+  eventId: string,
+  registrationId: string,
+): Promise<{ paymentHistory?: StationPaymentHistoryEntry[] }> {
+  try {
+    return { paymentHistory: await stationPaymentHistory(eventId, registrationId) };
+  } catch (error) {
+    logError("Station payment history read failed", error);
+    return {};
+  }
+}
+
+/**
+ * The registration's money lines for the station, newest first: payments, "card payment noted" notes and balance
+ * reasons. Only amounts, plain method words, times and the station's own label leave here; no staff names, no
+ * Square notes or ids.
+ */
+export async function stationPaymentHistory(eventId: string, registrationId: string): Promise<StationPaymentHistoryEntry[]> {
+  const prisma = getPrisma();
+  const registration = await prisma.registration.findFirst({
+    where: { id: registrationId, eventId },
+    select: { event: { select: { timezone: true } } },
+  });
+  if (!registration) throw new StationServiceError("NOT_FOUND");
+  const timeZone = registration.event?.timezone || "UTC";
+  const payments = await prisma.payment.findMany({
+    where: { eventId, registrationId, status: "SUCCEEDED" },
+    orderBy: { createdAt: "desc" },
+    take: STATION_HISTORY_LIMIT,
+    select: {
+      id: true,
+      amount: true,
+      method: true,
+      externalReference: true,
+      receivedAt: true,
+      createdAt: true,
+      refunds: { where: { status: "SUCCEEDED" }, select: { amount: true } },
+    },
+  });
+  const paymentIds = payments.map((payment) => payment.id);
+  const logs = await prisma.auditLog.findMany({
+    where: {
+      eventId,
+      OR: [
+        { entityType: "Registration", entityId: registrationId, action: { in: [squareNoteAction, balanceReasonAction] } },
+        ...(paymentIds.length > 0
+          ? [{ entityType: "Payment", entityId: { in: paymentIds }, action: { in: ["MANUAL_PAYMENT_RECORDED", "SQUARE_PAYMENT_MANUALLY_MATCHED"] } }]
+          : []),
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+    take: STATION_HISTORY_LIMIT * 3,
+    select: { id: true, action: true, entityId: true, createdAt: true, metadata: true },
+  });
+  const stationByPayment = new Map<string, string | null>();
+  for (const log of logs) {
+    if ((log.action === "MANUAL_PAYMENT_RECORDED" || log.action === "SQUARE_PAYMENT_MANUALLY_MATCHED") && log.entityId) {
+      stationByPayment.set(log.entityId, stationLabelFrom(metadataObject(log.metadata)));
+    }
+  }
+
+  const entries: StationPaymentHistoryEntry[] = [];
+  for (const payment of payments) {
+    const at = payment.receivedAt ?? payment.createdAt;
+    const refundedCents = payment.refunds.reduce((total, refund) => total + moneyToCents(refund.amount), 0);
+    const method = stationPaymentMethodLabel(payment.method, payment.externalReference);
+    entries.push({
+      id: `payment:${payment.id}`,
+      kind: "PAYMENT",
+      at: at.toISOString(),
+      whenLabel: formatWhen(at, timeZone),
+      text: `${method} - ${formatCents(moneyToCents(payment.amount))}${refundedCents > 0 ? ` (refunded ${formatCents(refundedCents)})` : ""}`,
+      stationLabel: stationByPayment.get(payment.id) ?? null,
+    });
+  }
+  for (const log of logs) {
+    const metadata = metadataObject(log.metadata);
+    if (log.action === squareNoteAction && typeof metadata.amountCents === "number") {
+      entries.push({
+        id: `note:${log.id}`,
+        kind: "CARD_NOTE",
+        at: log.createdAt.toISOString(),
+        whenLabel: formatWhen(log.createdAt, timeZone),
+        text: `Card payment noted for finance - ${formatCents(metadata.amountCents)}`,
+        stationLabel: stationLabelFrom(metadata),
+      });
+    } else if (log.action === balanceReasonAction && typeof metadata.reasonCode === "string") {
+      const note = typeof metadata.note === "string" ? metadata.note.trim() : "";
+      const label = stationBalanceReasonLabel(metadata.reasonCode as StationBalanceReason["code"]);
+      entries.push({
+        id: `reason:${log.id}`,
+        kind: "BALANCE_REASON",
+        at: log.createdAt.toISOString(),
+        whenLabel: formatWhen(log.createdAt, timeZone),
+        text: `Checked in with balance due: ${label}${note ? ` - ${note}` : ""}`,
+        stationLabel: stationLabelFrom(metadata),
+      });
+    }
+  }
+  return entries
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, STATION_HISTORY_LIMIT);
+}
 
 async function paymentSummaryFor(eventId: string, registrationId: string): Promise<StationPaymentSummary> {
   const registration = await getPrisma().registration.findFirst({
@@ -140,6 +294,7 @@ export async function lookupStationFamily(
       needsDeskReview: !attendee.checkedIn && blocks.has(attendee.id),
     })),
     payment: await paymentSummaryFor(eventId, registration.id),
+    paymentHistory: await stationPaymentHistory(eventId, registration.id),
   };
 }
 
@@ -160,7 +315,11 @@ async function refuseClubRegistration(eventId: string, registrationId: string) {
 
 export async function checkInStationFamily(
   station: ResolvedStation,
-  input: { registrationId: string; items: Array<{ attendeeId: string; idempotencyKey: string }> },
+  input: {
+    registrationId: string;
+    items: Array<{ attendeeId: string; idempotencyKey: string }>;
+    balanceReason?: StationBalanceReason;
+  },
 ): Promise<StationCheckInResult[]> {
   const eventId = station.station.eventId;
   await refuseClubRegistration(eventId, input.registrationId);
@@ -171,7 +330,15 @@ export async function checkInStationFamily(
   });
   if (found.length !== ids.length) throw new StationServiceError("NOT_FOUND");
 
+  // A balance still due needs a reason first, decided before anyone is checked in. Paid and church-billed
+  // registrations need none.
+  const summary = await paymentSummaryFor(eventId, input.registrationId);
+  const reason = input.balanceReason;
+  const reasonUsable = reason !== undefined && (reason.code !== "OTHER" || reason.note.trim().length > 0);
+  if (summary.state === "DUE" && !reasonUsable) throw new StationServiceError("BALANCE_REASON_REQUIRED");
+
   const results: StationCheckInResult[] = [];
+  let newlyCheckedIn = false;
   for (const item of input.items) {
     try {
       const operation = await checkInAttendee(
@@ -181,6 +348,7 @@ export async function checkInStationFamily(
         item.idempotencyKey,
         { auditContext: { station: { id: station.station.id, label: station.station.label } } },
       );
+      if (operation.checkedIn && operation.disposition === "CREATED") newlyCheckedIn = true;
       results.push({
         attendeeId: item.attendeeId,
         status: !operation.checkedIn
@@ -204,7 +372,130 @@ export async function checkInStationFamily(
       }
     }
   }
+  // One entry per check-in action, written only when someone was newly checked in, so a replay or a repeat scan
+  // does not record the reason twice.
+  if (newlyCheckedIn && summary.state === "DUE" && reason) {
+    try {
+      const registration = await getPrisma().registration.findFirst({
+        where: { id: input.registrationId, eventId },
+        select: { confirmationCode: true },
+      });
+      await writeAuditLog({
+        eventId,
+        actorUserId: station.starter.id,
+        action: balanceReasonAction,
+        entityType: "Registration",
+        entityId: input.registrationId,
+        summary: `Checked in with a balance due on registration ${registration?.confirmationCode ?? input.registrationId}: ${stationBalanceReasonLabel(reason.code)}${stationSummarySuffix(station.station.label)}.`,
+        metadata: {
+          reasonCode: reason.code,
+          note: reason.note.trim(),
+          balanceCents: summary.balanceCents,
+          channel: "CHECK_IN_STATION",
+          station: { id: station.station.id, label: station.station.label },
+        },
+      });
+    } catch (error) {
+      logError("Station balance reason audit failed", error);
+    }
+  }
   return results;
+}
+
+function unitDisplayName(unit: { name: string; building: { name: string } }) {
+  return `${unit.name}${unit.building.name && unit.building.name !== unit.name ? `, ${unit.building.name}` : ""}`;
+}
+
+/**
+ * What to put in the family's hands after a check-in: one name badge each, and a room key line for every
+ * room-linked item type of the event, per room the newly checked-in people are housed in. Event-scoped and only about
+ * the people given (the ones newly checked in by this request); it returns no names and no other data.
+ */
+export type StationHandOut = {
+  /** The finished lines: "Name badge × 2", "Cabin key K-204". */
+  lines: string[];
+  /** The room-linked item type names, and each person's room label, so the screen can adjust after an undo. */
+  keyTypes: string[];
+  rooms: Array<{ attendeeId: string; label: string }>;
+};
+
+export async function stationHandOutList(station: ResolvedStation, newlyCheckedInIds: string[]): Promise<StationHandOut> {
+  const ids = [...new Set(newlyCheckedInIds)];
+  if (ids.length === 0) return { lines: [], keyTypes: [], rooms: [] };
+  const eventId = station.station.eventId;
+  const prisma = getPrisma();
+  const badge = [stationBadgeLine(ids.length)];
+  const types = await prisma.issuedAssetType.findMany({
+    where: { eventId, active: true, roomLinked: true },
+    orderBy: { name: "asc" },
+    select: { name: true },
+  });
+  if (types.length === 0) return { lines: badge, keyTypes: [], rooms: [] };
+  const assignments = await prisma.eventLodgingAssignment.findMany({
+    where: { eventId, attendeeId: { in: ids }, cancelledAt: null, eventLodgingUnitId: { not: null } },
+    select: { attendeeId: true, eventLodgingUnitId: true },
+  });
+  const keyTypes = types.map((type) => type.name);
+  const unitIds = [...new Set(assignments.map((row) => row.eventLodgingUnitId).filter((id): id is string => Boolean(id)))];
+  if (unitIds.length === 0) return { lines: badge, keyTypes, rooms: [] };
+  const units = await prisma.eventLodgingUnit.findMany({
+    where: { eventId, id: { in: unitIds } },
+    select: { id: true, unit: { select: { name: true, building: { select: { name: true } } } } },
+  });
+  const labelByUnit = new Map(units.map((row) => [row.id, unitDisplayName(row.unit)]));
+  const rooms = assignments.flatMap((row) => {
+    const label = row.eventLodgingUnitId ? labelByUnit.get(row.eventLodgingUnitId) : undefined;
+    return row.attendeeId && label ? [{ attendeeId: row.attendeeId, label }] : [];
+  });
+  const labels = [...new Set(rooms.map((room) => room.label))]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const lines = [...badge];
+  for (const type of keyTypes) {
+    for (const label of labels) lines.push(`${type} ${label}`);
+  }
+  return { lines, keyTypes, rooms };
+}
+
+/**
+ * Undo at the station: only a check-in made by this same station, so the desk's and other stations' work is never
+ * undone from a tablet. The check-in's own audit entry says which station made it.
+ */
+export async function undoStationCheckIn(station: ResolvedStation, attendeeId: string) {
+  if (!station.capabilities.canCheckIn) throw new StationServiceError("PERMISSION_DENIED");
+  const eventId = station.station.eventId;
+  const prisma = getPrisma();
+  const attendee = await prisma.registrationAttendee.findFirst({
+    where: { id: attendeeId, eventId },
+    select: { id: true },
+  });
+  if (!attendee) throw new StationServiceError("NOT_FOUND");
+  const active = await prisma.checkIn.findFirst({
+    where: { eventId, registrationAttendeeId: attendeeId, undoneAt: null },
+    orderBy: { checkedInAt: "desc" },
+    select: { id: true, checkedInAt: true },
+  });
+  if (!active) throw new StationServiceError("NOTHING_TO_UNDO");
+  const entry = await prisma.auditLog.findFirst({
+    where: {
+      eventId,
+      action: "ATTENDEE_CHECKED_IN",
+      entityType: "RegistrationAttendee",
+      entityId: attendeeId,
+      createdAt: { gte: active.checkedInAt },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { metadata: true },
+  });
+  const metadata = entry?.metadata && typeof entry.metadata === "object" && !Array.isArray(entry.metadata)
+    ? entry.metadata as { station?: { id?: unknown } }
+    : {};
+  if (metadata.station?.id !== station.station.id) throw new StationServiceError("NOT_THIS_STATION");
+  const undone = await undoCheckIn(eventId, attendeeId, station.starter.id, {
+    auditContext: { station: { id: station.station.id, label: station.station.label } },
+    expectedCheckInId: active.id,
+  });
+  if (!undone) throw new StationServiceError("NOTHING_TO_UNDO");
+  return { undone: true as const, attendeeId };
 }
 
 async function requirePayableRegistration(station: ResolvedStation, registrationId: string) {
@@ -279,5 +570,88 @@ export async function noteStationSquareAppPayment(
       station: { id: station.station.id, label: station.station.label },
     },
   });
+  return paymentSummaryFor(eventId, input.registrationId);
+}
+
+/** Today's unmatched Square findings that Square ties to this one registration, and nothing else. */
+async function unmatchedForRegistration(eventId: string, registrationId: string) {
+  const report = await listUnmatchedSquarePayments({ eventId, days: 1 });
+  if (report.unreachableSquare) return null;
+  return report.findings.filter((finding) => finding.registrationId === registrationId);
+}
+
+async function registrationHasPayment(eventId: string, registrationId: string) {
+  const count = await getPrisma().payment.count({ where: { eventId, registrationId, status: "SUCCEEDED" } });
+  return count > 0;
+}
+
+/**
+ * Today's unmatched Square payments that Square ties to this one registration, and nothing else: no note, no
+ * reference, no order, no unattributed payment. `unavailable` is true when Square is not set up or not reachable,
+ * so the screen can fall back to "note it for finance". `alreadyHasPayment` is true when the registration already
+ * shows money; those are matched by finance, so no candidates are offered.
+ */
+export async function listStationSquareCandidates(
+  station: ResolvedStation,
+  registrationId: string,
+): Promise<{ candidates: StationSquareCandidate[]; unavailable: boolean; alreadyHasPayment: boolean }> {
+  const eventId = station.station.eventId;
+  const summary = await requirePayableRegistration(station, registrationId);
+  if (summary.state !== "DUE") return { candidates: [], unavailable: false, alreadyHasPayment: false };
+  if (await registrationHasPayment(eventId, registrationId)) {
+    return { candidates: [], unavailable: false, alreadyHasPayment: true };
+  }
+  try {
+    const findings = await unmatchedForRegistration(eventId, registrationId);
+    if (!findings) return { candidates: [], unavailable: true, alreadyHasPayment: false };
+    const registration = await getPrisma().registration.findFirst({
+      where: { id: registrationId, eventId },
+      select: { event: { select: { timezone: true } } },
+    });
+    const timeZone = registration?.event?.timezone || "UTC";
+    return {
+      unavailable: false,
+      alreadyHasPayment: false,
+      candidates: findings.map((finding) => ({
+        providerPaymentId: finding.providerPaymentId,
+        amountCents: finding.amountCents,
+        whenLabel: finding.createdAt
+          ? formatInTimeZone(finding.createdAt, timeZone, { hour: "numeric", minute: "2-digit" })
+          : "",
+        overBalance: finding.amountCents > summary.balanceCents,
+      })),
+    };
+  } catch (error) {
+    if (error instanceof SquareMatchOperationError) return { candidates: [], unavailable: true, alreadyHasPayment: false };
+    throw error;
+  }
+}
+
+/**
+ * Attaches one listed Square payment to the registration. The payment must be in today's list for this very
+ * registration, so a posted id cannot attach someone else's payment. The duplicate acknowledgement is never sent:
+ * a registration that already shows money goes to finance instead.
+ */
+export async function matchStationSquarePayment(
+  station: ResolvedStation,
+  input: { registrationId: string; providerPaymentId: string },
+): Promise<StationPaymentSummary> {
+  const eventId = station.station.eventId;
+  await requirePayableRegistration(station, input.registrationId);
+  const findings = await unmatchedForRegistration(eventId, input.registrationId);
+  if (!findings) throw new SquareMatchOperationError("SQUARE_UNREACHABLE", "Square could not be reached.");
+  if (!findings.some((finding) => finding.providerPaymentId === input.providerPaymentId)) {
+    throw new StationServiceError("PAYMENT_NOT_LISTED");
+  }
+  await attachSquarePaymentToRegistration(
+    eventId,
+    input.registrationId,
+    station.starter.id,
+    {
+      providerPaymentId: input.providerPaymentId,
+      note: `Matched at check-in station ${station.station.label.trim() || "(unnamed)"}`,
+    },
+    { auditContext: { station: { id: station.station.id, label: station.station.label } } },
+  );
   return paymentSummaryFor(eventId, input.registrationId);
 }

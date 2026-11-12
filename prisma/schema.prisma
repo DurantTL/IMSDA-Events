@@ -303,6 +303,8 @@ enum BillingResponsibilitySource {
   UNRESOLVED_NO_ORGANIZATION_LINKED
   STAFF_LINKED
   STAFF_OVERRIDE
+  /// A visiting guest club (#835) is billed to itself, not to a sponsoring church.
+  VISITING_CLUB
 }
 
 enum BillingResponsibilityChangeType {
@@ -668,6 +670,12 @@ enum MessageTemplateKey {
   NEW_CLUB_APPLICATION_DECLINED
   /// A system administrator invited someone to apply for a new club (#817). The body carries a sentinel; the link is minted at delivery.
   NEW_CLUB_APPLICATION_INVITE
+  /// Staff invited a visiting club's director for one event (#835). The body carries a sentinel; the link is minted at delivery.
+  VISITING_CLUB_INVITE
+  /// A visiting club request was approved (#835): sent to the visiting director.
+  VISITING_CLUB_APPROVED
+  /// A visiting club request was declined (#835): sent to the visiting director, with the reason when one was given.
+  VISITING_CLUB_DECLINED
   /// A seat in a full Honors Weekend class was offered to a youth on its waitlist (#831): one email to that club's director. Not an event template.
   HONOR_CLASS_WAITLIST_OFFER
   /// A reinstated or promoted registration came back without some Honors Weekend class picks because the class was full or the club's limit was reached (#880): one email to that club's director. Not an event template.
@@ -702,6 +710,10 @@ enum MessageTemplateKey {
   EVENT_DEBRIEF_INVITE
   /// The one reminder (#1679), sent three days after the invitation and only to people who have not answered. Not an event template.
   EVENT_DEBRIEF_REMINDER
+  /// The automatic Monthly Record reminder (#1895): sent on the 11th to a club's director and deputy when the previous month's record is not submitted. No event.
+  MONTHLY_RECORD_REMINDER
+  /// The counts-only summary of those reminders to Area Coordinators (#1895). Numbers only. No event.
+  MONTHLY_RECORD_REMINDER_SUMMARY
 }
 
 enum MessageTemplateStatus {
@@ -891,6 +903,7 @@ model User {
 
   staffHomeLayout           StaffHomeLayout?
   memberships               EventMembership[]
+  eventStaffingAssignments  EventStaffingAssignment[]
   clubsAdministratorGrant   ClubsAdministratorGrant?
   youthAdministratorGrant   YouthAdministratorGrant?
   siteContentEditorGrant    SiteContentEditorGrant?
@@ -921,6 +934,8 @@ model User {
   notificationSettingUpdates NotificationSetting[]    @relation("NotificationSettingUpdatedBy")
   adminAlertFeedReceipts     AdminAlertFeedReceipt[]
   uploadedEventAssets       EventAsset[]              @relation("EventAssetUploadedBy")
+  createdEventImageLibraryImages EventImageLibraryImage[] @relation("EventImageLibraryCreatedBy")
+  retiredEventImageLibraryImages EventImageLibraryImage[] @relation("EventImageLibraryRetiredBy")
   uploadedMessageFiles      MessageFile[]             @relation("MessageFileUploadedBy")
   appliedProgramAssignments ProgramAssignmentRun[]    @relation("ProgramAssignmentAppliedBy")
   clubAssignmentUpdates     ClubEventAssignment[]     @relation("ClubEventAssignmentUpdatedBy")
@@ -953,6 +968,8 @@ model User {
   createdAreaCoordinatorInvites  AreaCoordinatorInvite[]          @relation("AreaCoordinatorInviteCreatedBy")
   decidedNewClubApplications     NewClubApplication[]             @relation("NewClubApplicationDecider")
   createdNewClubApplicationInvites NewClubApplicationInvite[]     @relation("NewClubApplicationInviteCreator")
+  createdVisitingClubInvites     VisitingClubInvite[]             @relation("VisitingClubInviteCreator")
+  decidedVisitingClubRequests    VisitingClubRequest[]            @relation("VisitingClubRequestDecider")
   passkeys                       UserPasskey[]
   driverVerificationsReviewed    DriverVerification[]              @relation("DriverVerificationReviewedByUser")
   /// The person this staff account is explicitly linked to, if any. Grants
@@ -1230,6 +1247,7 @@ model AttendeeAccount {
   updatedAt          DateTime              @updatedAt
 
   honorInstructorRoles         HonorInstructor[]
+  visitingClubRequests         VisitingClubRequest[]
   credential                   AttendeeCredential?
   identities                   AttendeeIdentity[]
   sessions                     AttendeeSession[]
@@ -1251,6 +1269,7 @@ model AttendeeAccount {
   /// Clubs this account directs. Explicit staff grants only — never inferred.
   clubDirectorGrants                ClubDirectorGrant[]
   areaCoordinatorGrant              AreaCoordinatorGrant?
+  eventStaffingAssignments          EventStaffingAssignment[]        @relation("EventStaffingAssignmentAccount")
   coordinatedLocations              EventLocation[]                  @relation("EventLocationCoordinator")
   grantedClubRoles                  ClubDirectorGrant[]              @relation("ClubDirectorGrantGrantedByAccount")
   acceptedClubInvites               ClubInvite[]                     @relation("ClubInviteAcceptedAccount")
@@ -1639,16 +1658,50 @@ model EventAsset {
   checksum         String
   storageKey       String   @unique
   uploadedByUserId String?
+  /// The shared image library entry this file was copied from (#1913); null for an ordinary upload.
+  libraryImageId   String?
   createdAt        DateTime @default(now())
 
   event      Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
   uploadedBy User?              @relation("EventAssetUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  libraryImage EventImageLibraryImage? @relation("EventAssetLibraryImage", fields: [libraryImageId], references: [id], onDelete: SetNull)
   links      EventContentLink[]
   blockRefs  EventContentSectionAsset[]
   merchandiseArtworkProducts MerchandiseProduct[] @relation("MerchandiseProductArtwork")
   badgeBackgroundEvents      Event[]              @relation("EventBadgeBackground")
 
   @@index([eventId, createdAt])
+  @@index([libraryImageId])
+}
+
+/// A header image kept in the shared library (#1913). The library holds its own copy of the file (own `storageKey`), so
+/// deleting an event or one of its uploads never breaks it. The source event's title and start are snapshots, so searching
+/// by event name or date keeps working after the event changes. Retiring hides the image from the picker only.
+model EventImageLibraryImage {
+  id                  String    @id @default(cuid())
+  displayName         String
+  contentType         String
+  byteSize            Int
+  checksum            String    @unique
+  storageKey          String    @unique
+  /// Suggested alt text; may be empty.
+  altText             String    @default("")
+  tags                String[]  @default([])
+  sourceEventId       String?
+  sourceEventTitle    String    @default("")
+  sourceEventStartsAt DateTime?
+  createdByUserId     String?
+  createdAt           DateTime  @default(now())
+  retiredAt           DateTime?
+  retiredByUserId     String?
+
+  sourceEvent Event?        @relation("EventImageLibrarySource", fields: [sourceEventId], references: [id], onDelete: SetNull)
+  createdBy   User?         @relation("EventImageLibraryCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  retiredBy   User?         @relation("EventImageLibraryRetiredBy", fields: [retiredByUserId], references: [id], onDelete: SetNull)
+  copies      EventAsset[]  @relation("EventAssetLibraryImage")
+
+  @@index([createdAt])
+  @@index([sourceEventId])
 }
 
 /// One of the six "Find your place" tiles on the public homepage (#1251). Exactly six rows, one per `position` (1 to 6),
@@ -1908,6 +1961,7 @@ model Event {
   contentSections                     EventContentSection[]
   emergencyPlan                       EmergencyPlan?
   assets                              EventAsset[]
+  imageLibraryImages                  EventImageLibraryImage[] @relation("EventImageLibrarySource")
   messageFiles                        MessageFile[]
   registrations                       Registration[]
   attendees                           RegistrationAttendee[]
@@ -1928,6 +1982,8 @@ model Event {
   debrief                             EventDebrief?                    @relation("EventDebrief")
   debriefsCarriedHere                 EventDebrief[]                   @relation("EventDebriefCarriedFrom")
   budgetCostLines                     EventBudgetCostLine[]            @relation("EventBudgetCostLines")
+  staffingActivities                  EventStaffingActivity[]          @relation("EventStaffingActivities")
+  staffingAssignments                 EventStaffingAssignment[]        @relation("EventStaffingAssignments")
   formTestSubmissions                 FormTestSubmission[]
   publicFormSubmissions               PublicRegistrationSubmission[]
   capacityReservations                RegistrationCapacityReservation[]
@@ -1948,6 +2004,9 @@ model Event {
   honorRooms                          HonorRoom[]
   honorOfferings                      HonorOffering[]
   honorInstructors                    HonorInstructor[]
+  guestClubs                          Organization[]        @relation("OrganizationGuestEvent")
+  visitingClubInvites                 VisitingClubInvite[]
+  visitingClubRequests                VisitingClubRequest[]
   clubRegistrations                   ClubEventRegistration[]
   teamSettings                        EventTeamSettings?
   teamLevelCheckIns                   ClubTeamLevelCheckIn[]
@@ -2104,6 +2163,65 @@ model EventBudgetCostLine {
   event Event @relation("EventBudgetCostLines", fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId, createdAt])
+}
+
+/// What an assignment on an event's staffing sheet is for (#1678). TLT is part of the table from the start so a later change can
+/// assign TLTs (by help-area tag) without reshaping it; the first slice only writes LEAD, HELPER and LIFEGUARD.
+enum EventStaffingRole {
+  LEAD
+  HELPER
+  LIFEGUARD
+  TLT
+}
+
+/// One activity on an event's optional staffing sheet (#1678): a name, optional text, and how many TLTs, lifeguards and other
+/// helpers it needs. Plain table names so volunteers and shifts (#65, #201, #203) can extend the boundary. Kept when the Event
+/// staffing module is switched off.
+model EventStaffingActivity {
+  id               String   @id @default(cuid())
+  eventId          String
+  name             String
+  description      String   @default("")
+  location         String   @default("")
+  timeText         String   @default("")
+  tltsNeeded       Int      @default(0)
+  lifeguardsNeeded Int      @default(0)
+  helpersNeeded    Int      @default(0)
+  position         Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  event       Event                     @relation("EventStaffingActivities", fields: [eventId], references: [id], onDelete: Cascade)
+  assignments EventStaffingAssignment[]
+
+  @@index([eventId, position])
+}
+
+/// One person in one role on one activity (#1678): a registered person (`personId`), an event staff user (`userId`), or an
+/// Area Coordinator's attendee account (`attendeeAccountId`, LEAD only), exactly one of the three (database check). At most one LEAD per activity and one row per person per activity (unique indexes).
+model EventStaffingAssignment {
+  id         String            @id @default(cuid())
+  eventId    String
+  activityId String
+  role       EventStaffingRole
+  personId   String?
+  userId     String?
+  attendeeAccountId String?
+  createdAt  DateTime          @default(now())
+
+  event    Event                 @relation("EventStaffingAssignments", fields: [eventId], references: [id], onDelete: Cascade)
+  activity EventStaffingActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  person   Person?               @relation(fields: [personId], references: [id], onDelete: Cascade)
+  user     User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attendeeAccount AttendeeAccount? @relation("EventStaffingAssignmentAccount", fields: [attendeeAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, personId])
+  @@unique([activityId, userId])
+  @@unique([activityId, attendeeAccountId])
+  @@index([eventId, personId])
+  @@index([eventId, userId])
+  @@index([eventId, attendeeAccountId])
+  @@index([activityId, role])
 }
 
 enum ModuleRequestStatus {
@@ -2582,6 +2700,7 @@ model Person {
   mergesAsSecondary         PersonMerge[]                       @relation("PersonMergeSecondary")
   anonymization             PersonAnonymization?
   clubRosterMemberships ClubRosterMember[]
+  staffTrainingRecords  ClubStaffTrainingRecord[]
   healthSnapshots       HealthRecordSnapshot[]
   healthSnapshotHolds   HealthSnapshotHold[]
   healthSnapshotBreakGlass HealthSnapshotBreakGlass[]
@@ -2608,6 +2727,7 @@ model Person {
   lodgingRoommateAsked       EventLodgingRoommateRequest[] @relation("LodgingRoommateTargetPerson")
   lodgingRulesAsA            EventLodgingRule[] @relation("LodgingRulePersonA")
   lodgingRulesAsB            EventLodgingRule[] @relation("LodgingRulePersonB")
+  eventStaffingAssignments   EventStaffingAssignment[]
 
   @@index([lastName, firstName])
 }
@@ -2786,11 +2906,13 @@ model UserPersonLink {
  * relationship.
  */
 model Organization {
+  monthlyRecordReminders MonthlyRecordReminderLog[]
   clubEventTeachers ClubEventTeacher[]
   activityScores    ActivityScore[]
   attendancePointsOverrides AttendancePointsOverride[]
   clubEventPointAwards ClubEventPointAward[]
   clubOptionalFeatures ClubOptionalFeature[]
+  staffTrainingRecords ClubStaffTrainingRecord[]
   id                   String           @id @default(cuid())
   scholarshipContributions ScholarshipContribution[]
   scholarshipAwards    ScholarshipAward[]
@@ -2825,10 +2947,13 @@ model Organization {
   /// The export's SubOrgOf, resolved by name. Kept apart from
   /// `parentOrganizationId`, which means "sponsoring church" for a club.
   affiliatedOrganizationId String?
+  /// Set only on a visiting guest club (#835): the one event it may see and register for. Null for every conference club.
+  guestEventId         String?
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
   parentOrganization Organization?      @relation("OrganizationHierarchy", fields: [parentOrganizationId], references: [id], onDelete: Restrict)
+  guestEvent         Event?             @relation("OrganizationGuestEvent", fields: [guestEventId], references: [id], onDelete: Restrict)
   childOrganizations Organization[]     @relation("OrganizationHierarchy")
   affiliatedOrganization Organization?  @relation("OrganizationAffiliation", fields: [affiliatedOrganizationId], references: [id], onDelete: SetNull)
   affiliatedChildren Organization[]     @relation("OrganizationAffiliation")
@@ -2848,6 +2973,7 @@ model Organization {
   clubInvites        ClubInvite[]
   newClubApplicationsAsChurch NewClubApplication[] @relation("NewClubApplicationChurch")
   newClubApplicationCreated   NewClubApplication?  @relation("NewClubApplicationCreatedClub")
+  visitingClubRequestCreated  VisitingClubRequest? @relation("VisitingClubRequestCreatedClub")
   monthlyReports     ClubMonthlyReport[]
   yearEndReports     ClubYearEndReport[]
   meetingNotes       ClubMeetingNote[]
@@ -2879,6 +3005,7 @@ model Organization {
   @@index([parentOrganizationId, isActive])
   @@index([affiliatedOrganizationId])
   @@index([normalizedName])
+  @@index([guestEventId])
 }
 
 /**
@@ -3622,6 +3749,11 @@ model PromoCode {
   /// per redemption — what the church owes is computed on demand from
   /// PromoCodeRedemption, like church-billed club registrations (#409).
   sponsoringOrganizationId String?
+  /// Attendee-type restriction (#102): `EventAttendeeType.code` values of this event the code applies to. Empty means
+  /// every attendee type (all codes made before this existed). Codes, not foreign keys, on purpose: deactivating or
+  /// removing a type never blocks, and a type that no longer exists simply matches nobody, so a restriction can only
+  /// narrow, never silently widen to everyone.
+  attendeeTypeCodes    String[]          @default([])
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
@@ -3654,6 +3786,9 @@ model PromoCodeRedemption {
   /// edits, and never touched by an amendment (which rewrites `discountAmountCents` from the form). The church owes
   /// `discountAmountCents + sponsorLodgingChangeCents`; the registrant's own discount stays `discountAmountCents`.
   sponsorLodgingChangeCents    Int               @default(0)
+  /// The code's attendee-type restriction when it was used (#102); empty means it applied to every attendee type.
+  /// An amendment prices the saved code against this, not against the code's later edits.
+  attendeeTypeCodesSnapshot    String[]          @default([])
   pricingDate                  String
   createdAt                    DateTime          @default(now())
 
@@ -6296,6 +6431,33 @@ model ClubOptionalFeature {
   @@unique([organizationId, featureKey])
 }
 
+/// One certification or workshop a club's director or deputy recorded for an adult on its roster (#1697, optional
+/// feature `staff-training-records`). `kind` is "CERTIFICATION" or "WORKSHOP", validated in code, like the NAD
+/// certification keys (`modules/staff-training/domain.ts`). A certification names one of the five NAD levels in
+/// `certificationKey`; a workshop is a code and title the club typed. Holds no health, contact or identity data.
+/// Exactly one of the two creator columns is set: the attendee account of a director or deputy, or the staff user
+/// acting as the club's director (#442).
+model ClubStaffTrainingRecord {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  personId           String
+  kind               String
+  certificationKey   String?
+  workshopCode       String?
+  workshopTitle      String?
+  completedOn        DateTime @db.Date
+  signedOffBy        String?
+  createdByAccountId String?
+  createdByUserId    String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  person       Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, personId])
+}
+
 /// A club-owned, named roster export format (#490): which columns, in what
 /// order, and under what header names to hand a specific outside camporee.
 /// `columns` holds only that structure (an ordered array of `{key, header}`)
@@ -7243,6 +7405,34 @@ model BackgroundCheckReminder {
 
   @@index([personId, organizationId, sentAt])
   @@index([batchId])
+}
+
+/// One automatic Monthly Record reminder (#1895): one row per club per report month, claimed in the same transaction
+/// that queues its emails. The unique key is what makes the reminder go once however often the sweep runs. Holds a
+/// count of recipients and no address or name (the outbox has those).
+model MonthlyRecordReminderLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  /// The month the record is for, "YYYY-MM" (the month before the one the reminder went out in).
+  reportMonth    String
+  clubYear       String
+  recipients     Int
+  sentAt         DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, reportMonth])
+  @@index([reportMonth])
+  @@index([sentAt])
+}
+
+/// Whether the automatic Monthly Record reminder is on for one club year (#1895). No row means on. A Clubs
+/// Administrator turns it off and back on; each change is audited.
+model MonthlyRecordReminderSetting {
+  clubYear        String   @id
+  enabled         Boolean  @default(true)
+  updatedByUserId String?
+  updatedAt       DateTime @updatedAt
 }
 
 /// One reminder for one deadline at one reminder point, 14 or 2 days before it is
@@ -11517,6 +11707,9 @@ model ScoredActivity {
   /// BANDS mode: `[{ "label": "Blue", "thresholdHundredths": 9000 }, ...]`, best band first.
   ribbonBands    Json               @default("[]")
   sortOrder      Int                @default(0)
+  /// Set on the two inspection events the optional Inspections tool makes (#1896): "campsite" or "uniform". Null for every
+  /// other scored event. One of each per event, so switching the tool on again never duplicates them.
+  inspectionKind String?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
@@ -11524,6 +11717,7 @@ model ScoredActivity {
   scores ActivityScore[]
 
   @@unique([eventId, normalizedName])
+  @@unique([eventId, inspectionKind])
   @@index([eventId, sortOrder])
 }
 
@@ -11698,6 +11892,9 @@ model TltProfile {
   id                  String    @id @default(cuid())
   personId            String    @unique
   tltYear             Int?
+  /// The club year ("2026-27") the current `tltYear` applies to, set whenever the year is saved or moved up. The
+  /// club-year move-up offers a move only when this is null or earlier than the current club year (#1686).
+  tltYearClubYear     String?
   positionTypeId      String?
   status              TltStatus?
   updatedByAccountId  String?
@@ -11721,4 +11918,79 @@ model TltProfileTag {
 
   @@id([profileId, tagId])
   @@index([tagId])
+}
+
+enum VisitingClubRequestStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+enum VisitingClubType {
+  PATHFINDER
+  ADVENTURER
+}
+
+/// A private link staff send a visiting club's director for one event (#835). Single use. Like the new club
+/// application link (#817), the email body holds a sentinel and the token is minted when the message is delivered;
+/// only its SHA-256 is stored. The link by itself grants nothing: the director signs in, asks, and staff approve.
+model VisitingClubInvite {
+  id              String    @id @default(cuid())
+  eventId         String
+  /// Lower-cased. The signed-in account's verified email must be this address.
+  email           String
+  name            String    @default("")
+  tokenHash       String?   @unique
+  /// The outbox message that carries the link, for delivery-time minting.
+  messageId       String?   @unique
+  expiresAt       DateTime
+  usedAt          DateTime?
+  cancelledAt     DateTime?
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+
+  event     Event                 @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  createdBy User?                 @relation("VisitingClubInviteCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  request   VisitingClubRequest?
+
+  @@index([eventId, createdAt])
+  @@index([email])
+}
+
+/// A visiting director's request to register a guest club for one event (#835). Approving creates a guest
+/// `Organization` (`guestEventId` set) and the director's grant, once, in one transaction.
+model VisitingClubRequest {
+  id                    String                    @id @default(cuid())
+  eventId               String
+  inviteId              String                    @unique
+  submittedByAccountId  String
+  status                VisitingClubRequestStatus @default(PENDING)
+  clubName              String
+  clubType              VisitingClubType
+  homeConference        String
+  homeChurch            String
+  directorName          String
+  /// The account's verified email.
+  directorEmail         String
+  directorPhone         String
+  /// When the director confirmed their own conference's adult screening for this club's staff.
+  screeningConfirmedAt  DateTime
+  decidedByUserId       String?
+  decidedAt             DateTime?
+  /// Goes to the director in the email only, never into audit metadata.
+  declineReason         String?
+  /// Set once, in the same transaction that approves: the claim that makes a second approval impossible.
+  createdOrganizationId String?                   @unique
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  event               Event               @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  invite              VisitingClubInvite  @relation(fields: [inviteId], references: [id], onDelete: Restrict)
+  submittedBy         AttendeeAccount     @relation(fields: [submittedByAccountId], references: [id], onDelete: Restrict)
+  decidedBy           User?               @relation("VisitingClubRequestDecider", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+  createdOrganization Organization?       @relation("VisitingClubRequestCreatedClub", fields: [createdOrganizationId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([eventId, status])
+  @@index([submittedByAccountId])
 }

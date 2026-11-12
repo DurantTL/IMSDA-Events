@@ -90,6 +90,9 @@ export const EMAIL_HEADER_RULES: Record<MessageTemplateKey, EmailHeaderRule> = {
   NEW_CLUB_APPLICATION_SUBMITTED: "club",
   NEW_CLUB_APPLICATION_DECLINED: "club",
   NEW_CLUB_APPLICATION_INVITE: "club",
+  VISITING_CLUB_INVITE: "club",
+  VISITING_CLUB_APPROVED: "club",
+  VISITING_CLUB_DECLINED: "club",
   HONOR_CLASS_WAITLIST_OFFER: "club",
   HONOR_CLASS_PICKS_NOT_RESTORED: "club",
   CLUB_TEAM_ADVANCEMENT_NOTICE: "club",
@@ -107,6 +110,8 @@ export const EMAIL_HEADER_RULES: Record<MessageTemplateKey, EmailHeaderRule> = {
   CONFERENCE_CLUB_ORDER_CONFIRMATION: "club",
   PROBLEM_REPORT_COPY: "general",
   STERLING_REMINDER: "club",
+  MONTHLY_RECORD_REMINDER: "club",
+  MONTHLY_RECORD_REMINDER_SUMMARY: "general",
 };
 
 /** The header context for a template. An unknown key (a row from a newer version) is general, never an error. */
@@ -190,6 +195,9 @@ export const EMAIL_WHY_LINES: Record<MessageTemplateKey, string> = {
   NEW_CLUB_APPLICATION_SUBMITTED: "You got this because you are on the list for new club applications.",
   NEW_CLUB_APPLICATION_DECLINED: "You got this because you applied to start a new club.",
   NEW_CLUB_APPLICATION_INVITE: "You got this because you were invited to apply to start a new club.",
+  VISITING_CLUB_INVITE: "You got this because you were invited to bring a visiting club to an event.",
+  VISITING_CLUB_APPROVED: "You got this because you asked to bring a visiting club to an event.",
+  VISITING_CLUB_DECLINED: "You got this because you asked to bring a visiting club to an event.",
   HONOR_CLASS_WAITLIST_OFFER: "You got this because you are the director of a club with youth on an Honors class waitlist.",
   HONOR_CLASS_PICKS_NOT_RESTORED: "You got this because you are the director of a club whose registration came back without some Honors class picks.",
   CLUB_TEAM_ADVANCEMENT_NOTICE: "You got this because you are the director of a team in an event with levels.",
@@ -207,6 +215,8 @@ export const EMAIL_WHY_LINES: Record<MessageTemplateKey, string> = {
   CONFERENCE_CLUB_ORDER_CONFIRMATION: "You got this because you are the director of a club that ordered patches and pins from the conference.",
   PROBLEM_REPORT_COPY: "You got this because this address was given when a problem was reported from the Forms help popup.",
   STERLING_REMINDER: "You got this because you are a club director, or a volunteer with a club, and conference staff sent a Sterling Volunteers reminder.",
+  MONTHLY_RECORD_REMINDER: "You got this because you are the director or deputy of a club whose Monthly Record for last month is not submitted yet. The conference Clubs Administrator can turn these reminders off.",
+  MONTHLY_RECORD_REMINDER_SUMMARY: "You got this because you are an Area Coordinator and clubs were reminded about last month's Monthly Record. The conference Clubs Administrator can turn these reminders off.",
 };
 
 const GENERIC_WHY = "You got this because of something you did on IMAdventist.";

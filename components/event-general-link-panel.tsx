@@ -79,7 +79,7 @@ export function EventGeneralLinkPanel({ eventId, publicUrl, initialSettings }: {
       <div className="section-heading">
         <div>
           <p className="eyebrow">Club registration</p>
-          <h2 id="general-link-heading"><Link2 aria-hidden="true" size={18} /> General registration link</h2>
+          <h3 id="general-link-heading"><Link2 aria-hidden="true" size={18} /> General registration link</h3>
           <p>
             One public link for every club, to share by email, newsletter or social media. A club director with no account registers
             a team and picks the club from the directory. When the director&rsquo;s email is a current director or deputy of that

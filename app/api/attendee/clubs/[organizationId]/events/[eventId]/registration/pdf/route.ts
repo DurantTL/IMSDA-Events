@@ -1,3 +1,4 @@
+import { rejectGuestClubOtherEvent } from "@/modules/club-registrations/event-gate";
 import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
 import { clubRegistrationApiError } from "@/modules/club-registrations/api-errors";
 import { RegistrationPdfError, readClubRegistrationPdfForDownload } from "@/modules/registration-pdf/repository";
@@ -14,6 +15,8 @@ async function getHandler(request: Request, context: { params: Promise<{ organiz
   try {
     const { organizationId, eventId } = await context.params;
     const access = await requireRosterAccess(organizationId, new Date(), "registerForEvents");
+    const guestBlock = await rejectGuestClubOtherEvent(organizationId, eventId);
+    if (guestBlock) return guestBlock;
     const teamKey = new URL(request.url).searchParams.get("team");
     const pdf = await readClubRegistrationPdfForDownload({ organizationId, eventId, teamKey, actor: actorAttribution(access.actor) });
     return new Response(Buffer.from(pdf.bytes), {

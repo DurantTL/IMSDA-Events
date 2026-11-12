@@ -26,6 +26,6 @@ describe("Possible duplicate people sits under System (#1886)", () => {
   });
 
   it("keeps the link from the event's registrations page", () => {
-    expect(read("components/people-workspace.tsx")).toContain('{canReviewPeopleMatches && <li><a href="/people/matches">');
+    expect(read("app/(workspace)/people/page.tsx")).toContain('{canReviewPeopleMatches && <li><a href="/people/matches">');
   });
 });

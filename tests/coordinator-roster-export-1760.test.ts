@@ -194,7 +194,7 @@ describe("which clubs (#1760)", () => {
     asCoordinator();
     mocks.orgFindMany.mockResolvedValue([clubs[1]]);
     await call("columns=club,lastName&clubs=club-b");
-    expect(mocks.orgFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { type: "CLUB", isActive: true, id: { in: ["club-b"] } } }));
+    expect(mocks.orgFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { type: "CLUB", isActive: true, guestEventId: null, id: { in: ["club-b"] } } }));
     expect(mocks.listRoster).toHaveBeenCalledTimes(1);
     expect(mocks.listRoster).toHaveBeenCalledWith("club-b", expect.any(String), expect.any(Date), { includeSchoolDetails: true });
   });

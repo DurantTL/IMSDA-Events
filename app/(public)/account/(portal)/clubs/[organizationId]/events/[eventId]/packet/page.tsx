@@ -1,3 +1,4 @@
+import { clubMayUseEvent } from "@/modules/club-registrations/event-gate";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
@@ -27,14 +28,14 @@ export default async function DirectorClubPacketPage({
   // Which of the club's teams (#809); absent on an event without teams.
   const teamKey = singleSearchParam((await searchParams).team);
   if (teamKey === null) notFound();
+  // The club layout shows the sign-in / unlock prompts; access comes first.
+  const access = await getRosterAccessStateForPage(organizationId);
+  if (access.state !== "OPEN") return clubAccessClosed(access);
+  // A visiting guest club (#835) may use only its own event.
+  if (!(await clubMayUseEvent(organizationId, eventId))) notFound();
   const packet = await loadDirectorClubPacket(organizationId, eventId, teamKey);
-  if (!packet) {
-    // The club layout shows the sign-in / unlock prompts; an open club with
-    // no active registration for this event is simply not found.
-    const access = await getRosterAccessStateForPage(organizationId);
-    if (access.state === "OPEN") notFound();
-    return clubAccessClosed(access);
-  }
+  // An open club with no active registration for this event is simply not found.
+  if (!packet) notFound();
 
   return (
     <section className="page-stack event-packet-workspace">

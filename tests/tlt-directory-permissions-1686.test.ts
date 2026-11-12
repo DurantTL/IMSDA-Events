@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   updateTltProfile: vi.fn(),
   changeTltList: vi.fn(),
   runTltExport: vi.fn(),
+  acceptTltTagSuggestion: vi.fn(),
+  confirmTltMoveUp: vi.fn(),
   accountFindUnique: vi.fn(),
   grantUpdateMany: vi.fn(),
   grantUpsert: vi.fn(),
@@ -35,11 +37,15 @@ vi.mock("@/modules/tlt-directory/repository", () => ({
   updateTltProfile: mocks.updateTltProfile,
   changeTltList: mocks.changeTltList,
   runTltExport: mocks.runTltExport,
+  acceptTltTagSuggestion: mocks.acceptTltTagSuggestion,
+  confirmTltMoveUp: mocks.confirmTltMoveUp,
 }));
 
 import { POST as ACCOUNT_ACTION } from "@/app/api/admin/accounts/[accountId]/route";
 import { POST as EXPORT } from "@/app/api/attendee/area-clubs/tlt-directory/export/route";
 import { POST as LISTS } from "@/app/api/attendee/area-clubs/tlt-directory/lists/route";
+import { POST as SUGGESTION } from "@/app/api/attendee/area-clubs/tlt-directory/suggestion/route";
+import { POST as MOVE_UP } from "@/app/api/attendee/area-clubs/tlt-directory/move-up/route";
 import { POST as PROFILE } from "@/app/api/attendee/area-clubs/tlt-directory/profile/route";
 import { applyAreaCoordinatorChange } from "@/modules/organizations/area-coordinators";
 import { currentTltDirector } from "@/modules/tlt-directory/access";
@@ -51,8 +57,10 @@ const post = (path: string, body: unknown, origin = ORIGIN) => new Request(`${OR
   body: JSON.stringify(body),
 });
 
-const profileBody = { personId: "p1", tltYear: 2, positionTypeId: null, status: "ACTIVE", tagIds: [] };
+const profileBody = { personId: "p1", tltYear: 2, expectedTltYear: 2, positionTypeId: null, status: "ACTIVE", tagIds: [] };
 const listBody = { action: "add", list: "tag", name: "Sound booth" };
+const suggestionBody = { personId: "p1", tagId: "tag-1" };
+const moveUpBody = { clubYear: "2026-27", moveIds: ["p1"], keepIds: [] };
 const exportBody = { q: "", club: "", year: "", position: "", status: "", tag: "", sort: "name" };
 
 type Who =
@@ -89,6 +97,8 @@ beforeEach(() => {
   mocks.clubsGrantFindFirst.mockResolvedValue(null);
   mocks.updateTltProfile.mockResolvedValue(undefined);
   mocks.changeTltList.mockResolvedValue({ id: "entry-1" });
+  mocks.acceptTltTagSuggestion.mockResolvedValue(undefined);
+  mocks.confirmTltMoveUp.mockResolvedValue({ moved: 1, kept: 0, skipped: 0 });
   mocks.runTltExport.mockResolvedValue({ csv: "Name\r\n", rowCount: 0, headers: [], rows: [] });
 });
 
@@ -112,6 +122,8 @@ describe("who is the TLT director (#1686)", () => {
 describe.each([
   ["profile", PROFILE, "/api/attendee/area-clubs/tlt-directory/profile", profileBody, () => mocks.updateTltProfile],
   ["lists", LISTS, "/api/attendee/area-clubs/tlt-directory/lists", listBody, () => mocks.changeTltList],
+  ["suggestion", SUGGESTION, "/api/attendee/area-clubs/tlt-directory/suggestion", suggestionBody, () => mocks.acceptTltTagSuggestion],
+  ["move-up", MOVE_UP, "/api/attendee/area-clubs/tlt-directory/move-up", moveUpBody, () => mocks.confirmTltMoveUp],
   ["export", EXPORT, "/api/attendee/area-clubs/tlt-directory/export", exportBody, () => mocks.runTltExport],
 ] as const)("the TLT directory %s route (#1686)", (_name, handler, path, body, work) => {
   it("works for the TLT director", async () => {
@@ -140,6 +152,33 @@ describe.each([
     const response = await handler(post(path, { ...body, rosterField: "x" }));
     expect(response.status).toBe(400);
     expect(work()).not.toHaveBeenCalled();
+  });
+});
+
+describe("the move-up route answers (#1686)", () => {
+  it("returns the counts and the sentence", async () => {
+    as("tltDirector");
+    mocks.confirmTltMoveUp.mockResolvedValue({ moved: 5, kept: 0, skipped: 1 });
+    const response = await MOVE_UP(post("/api/attendee/area-clubs/tlt-directory/move-up", { clubYear: "2026-27", moveIds: ["p1"] }));
+    expect(await response.json()).toEqual({ moved: 5, kept: 0, skipped: 1, message: "Moved 5 TLTs up a year. 1 was skipped because it had already changed." });
+    expect(mocks.confirmTltMoveUp.mock.calls[0]![1]).toEqual({ accountId: "account-1" });
+  });
+
+  it("answers 409 when a TLT's year changed since the editor loaded it", async () => {
+    as("tltDirector");
+    const { TltDirectoryError } = await import("@/modules/tlt-directory/domain");
+    mocks.updateTltProfile.mockRejectedValue(new TltDirectoryError("YEAR_CHANGED", "This TLT's year changed since you opened the page. Reload and try again."));
+    const response = await PROFILE(post("/api/attendee/area-clubs/tlt-directory/profile", profileBody));
+    expect(response.status).toBe(409);
+    expect((await response.json()).message).toContain("changed since you opened the page");
+  });
+
+  it("answers 409 for a stale club year", async () => {
+    as("tltDirector");
+    const { TltDirectoryError } = await import("@/modules/tlt-directory/domain");
+    mocks.confirmTltMoveUp.mockRejectedValue(new TltDirectoryError("STALE_CLUB_YEAR", "Reload."));
+    const response = await MOVE_UP(post("/api/attendee/area-clubs/tlt-directory/move-up", moveUpBody));
+    expect(response.status).toBe(409);
   });
 });
 

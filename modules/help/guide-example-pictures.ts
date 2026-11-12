@@ -23,4 +23,19 @@ export const guideExamplePictures: readonly GuideExamplePicture[] = [
     guideStepNumber: 3,
     src: "/help/monthly-records-example.webp",
   },
+  // The Clubs Administrator guides (#1882) are staff guides; the capture and the tests read them from the staff registry.
+  {
+    guideId: "clubs-find-a-club",
+    walkthroughId: "walkthrough-clubs-find-club",
+    stepId: "type-name",
+    guideStepNumber: 2,
+    src: "/help/clubs-find-a-club-example.webp",
+  },
+  {
+    guideId: "clubs-leaders-and-invites",
+    walkthroughId: "walkthrough-clubs-leaders",
+    stepId: "status-choice",
+    guideStepNumber: 2,
+    src: "/help/clubs-leaders-example.webp",
+  },
 ];

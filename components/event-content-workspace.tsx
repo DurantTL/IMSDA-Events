@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, FileText, FileUp, Info, Link2, ListOrdered, Plus, Save, Sparkles, SquareCheck, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, FileText, FileUp, Info, Link2, ListOrdered, Plus, Save, SquareCheck, Trash2 } from "lucide-react";
 import type { EventAssetRecord } from "@/modules/events/asset-repository";
 import type { EventContentSectionRecord } from "@/modules/events/content-repository";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -23,7 +23,8 @@ import {
   type EventContentPlacement,
   type EventContentTone,
 } from "@/modules/events/content-schemas";
-import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { EVENT_GUIDE_STARTER_EVENT } from "@/components/event-content-starter-button";
+import styles from "@/components/event-content-workspace.module.css";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { useLocalEditDraft } from "@/components/use-local-edit-draft";
@@ -301,13 +302,6 @@ export function EventContentWorkspace({
     setPendingDelete(null);
     setDeleteError("");
   }, []);
-  // Escape goes through here too: while the delete is in flight the dialog
-  // stays open, so staff always see how it turned out.
-  const dismissDeleteDialog = useCallback(() => {
-    if (deleting) return;
-    closeDeleteDialog();
-  }, [closeDeleteDialog, deleting]);
-  const deleteDialogRef = useAccessibleDialog<HTMLElement>(pendingDelete !== null, dismissDeleteDialog);
   const [saved, setSaved] = useState(() => draftsFrom(initialSections));
   // The same drafts (and ids) as `saved`, so nothing starts out looking edited.
   const [sections, setSections] = useState(saved);
@@ -384,18 +378,23 @@ export function EventContentWorkspace({
     setNotice("");
   }
 
-  function addEventGuideStarter() {
-    setSections((current) => [
-      ...current,
-      ...eventGuideStarterSections.map((section) => ({
-        ...section,
-        cid: newDraftId(),
-        links: section.links.map((link) => ({ ...link })),
-      })),
-    ]);
-    setError("");
-    setNotice("Added five unpublished event-guide sections. Replace the prompts, then publish each section when it is ready.");
-  }
+  // The page header (drawn by the server page) holds the "Add event guide starter" button and asks for it by event.
+  useEffect(() => {
+    const run = () => {
+      setSections((current) => [
+        ...current,
+        ...eventGuideStarterSections.map((section) => ({
+          ...section,
+          cid: newDraftId(),
+          links: section.links.map((link) => ({ ...link })),
+        })),
+      ]);
+      setError("");
+      setNotice("Added five unpublished event-guide sections. Replace the prompts, then publish each section when it is ready.");
+    };
+    window.addEventListener(EVENT_GUIDE_STARTER_EVENT, run);
+    return () => window.removeEventListener(EVENT_GUIDE_STARTER_EVENT, run);
+  }, []);
 
   async function uploadAsset(file: File) {
     setUploading(true);
@@ -525,21 +524,7 @@ export function EventContentWorkspace({
   }
 
   return (
-    <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Event page</p>
-          <h2>Public content</h2>
-          <p>
-            Speaker bios, seminar descriptions, lodging, schedules, and downloads for {eventName}.
-            Each section publishes on its own, so a half-written one can wait while the rest goes live.
-          </p>
-        </div>
-        <button className="secondary-button" type="button" onClick={addEventGuideStarter}>
-          <Sparkles size={16} aria-hidden="true" /> Add event guide starter
-        </button>
-      </div>
-
+    <section className={`page-stack ${styles.workspace}`}>
       {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void save()} />}
       {editBackup.restored && (
         <div className="form-notice draft-restored-notice" role="status">
@@ -550,10 +535,9 @@ export function EventContentWorkspace({
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="inline-notice" role="status">{notice}</p>}
 
-      <section className="panel">
+      <section className={`panel ${styles.anchorTarget}`} id="event-content-uploads">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Files</p>
             <h2>Uploads for this event</h2>
             <p>PDF, PNG, JPEG, or WebP, up to 25 MB. A file is only reachable publicly while a published tile links to it.</p>
           </div>
@@ -592,7 +576,7 @@ export function EventContentWorkspace({
                 </small>
                 <button
                   aria-label={`Delete ${asset.displayName}`}
-                  className="icon-button danger"
+                  className={`icon-button danger ${styles.deleteFile}`}
                   onClick={() => { setDeleteError(""); setPendingDelete(asset); }}
                   type="button"
                 >
@@ -605,18 +589,26 @@ export function EventContentWorkspace({
       </section>
 
       <form className="form-stack" onSubmit={save}>
+        <div className={`${styles.sectionsHead} ${styles.anchorTarget}`} id="event-content-sections">
+          <h2>Sections</h2>
+          <p>
+            Speaker bios, seminar descriptions, lodging, schedules, and downloads for {eventName}.
+            Each section publishes on its own, so a half-written one can wait while the rest goes live.
+          </p>
+        </div>
         {sections.map((section, index) => (
           <section
             className={`panel event-content-section ${section.isPublished ? "" : "is-draft"}`}
             key={section.cid ?? index}
           >
             <div className="message-delivery-toolbar">
-              <div>
-                <p className="eyebrow">
-                  {kindLabels[section.kind]}
-                  {section.kind === "CUSTOM_HTML" && !isSystemAdmin ? " · system administrator only" : ""}
-                  {section.isPublished ? "" : " · draft"}
-                </p>
+              <div className={styles.cardHead}>
+                <h3 className={styles.cardTitle}>{section.title || kindLabels[section.kind]}</h3>
+                <span className={styles.chips}>
+                  <span className="status-chip neutral">{kindLabels[section.kind]}</span>
+                  <span className={`status-chip ${section.isPublished ? "green" : "gold"}`}>{section.isPublished ? "Published" : "Draft"}</span>
+                  {section.kind === "CUSTOM_HTML" && !isSystemAdmin ? <span className="status-chip purple">System administrator only</span> : null}
+                </span>
               </div>
               <div className="icon-button-row">
                 {section.kind !== "HERO" && (
@@ -670,6 +662,7 @@ export function EventContentWorkspace({
                 assets={assets}
                 isSystemAdmin={isSystemAdmin}
                 updateSection={updateSection}
+                onAssetsChange={setAssets}
               />
             ) : section.kind === "RESOURCE_LINKS" ? (
               <LinksEditor section={section} index={index} assets={assets} updateSection={updateSection} />
@@ -774,48 +767,53 @@ export function EventContentWorkspace({
           </section>
         ))}
 
-        <div className="form-actions">
-          <button className="secondary-button" type="button" onClick={() => addSection("RICH_TEXT")}>
-            <FileText size={15} aria-hidden="true" /> Add a text section
-          </button>
-          <button className="secondary-button" type="button" onClick={() => addSection("RESOURCE_LINKS")}>
-            <Link2 size={15} aria-hidden="true" /> Add resource links
-          </button>
-          <button className="secondary-button" type="button" onClick={() => addSection("NOTICE")}>
-            <Info size={15} aria-hidden="true" /> Add a notice card
-          </button>
-          <button className="secondary-button" type="button" onClick={() => addSection("STEPS")}>
-            <ListOrdered size={15} aria-hidden="true" /> Add a steps card
-          </button>
-          <button className="secondary-button" type="button" onClick={() => addSection("CHECKLIST")}>
-            <SquareCheck size={15} aria-hidden="true" /> Add a checklist card
-          </button>
-        </div>
+        <section className={styles.addGroup} aria-labelledby="event-content-add-title">
+          <h2 id="event-content-add-title">Add a section</h2>
+          <div className={styles.addButtons}>
+            <button className="secondary-button" type="button" onClick={() => addSection("RICH_TEXT")}>
+              <FileText size={15} aria-hidden="true" /> Add a text section
+            </button>
+            <button className="secondary-button" type="button" onClick={() => addSection("RESOURCE_LINKS")}>
+              <Link2 size={15} aria-hidden="true" /> Add resource links
+            </button>
+            <button className="secondary-button" type="button" onClick={() => addSection("NOTICE")}>
+              <Info size={15} aria-hidden="true" /> Add a notice card
+            </button>
+            <button className="secondary-button" type="button" onClick={() => addSection("STEPS")}>
+              <ListOrdered size={15} aria-hidden="true" /> Add a steps card
+            </button>
+            <button className="secondary-button" type="button" onClick={() => addSection("CHECKLIST")}>
+              <SquareCheck size={15} aria-hidden="true" /> Add a checklist card
+            </button>
+          </div>
 
-        <div className="event-block-picker">
-          <label>
-            Add a block
-            <select value={blockToAdd} onChange={(event) => setBlockToAdd(event.target.value as typeof blockToAdd)}>
-              {newBlockKinds.map((kind) => (
-                <option
-                  value={kind}
-                  key={kind}
-                  disabled={(kind === "HERO" && hasHero) || (kind === "CUSTOM_HTML" && !isSystemAdmin)}
-                >
-                  {blockKindLabels[kind]}
-                  {kind === "HERO" && hasHero ? " (already on the page)" : ""}
-                  {kind === "CUSTOM_HTML" && !isSystemAdmin ? " (system administrators only)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className="secondary-button" type="button" onClick={() => addSection(blockToAdd)}>
-            <Plus size={15} aria-hidden="true" /> Add block
-          </button>
-        </div>
+          <div className="event-block-picker">
+            <label>
+              Add a block
+              <select value={blockToAdd} onChange={(event) => setBlockToAdd(event.target.value as typeof blockToAdd)}>
+                {newBlockKinds.map((kind) => (
+                  <option
+                    value={kind}
+                    key={kind}
+                    disabled={(kind === "HERO" && hasHero) || (kind === "CUSTOM_HTML" && !isSystemAdmin)}
+                  >
+                    {blockKindLabels[kind]}
+                    {kind === "HERO" && hasHero ? " (already on the page)" : ""}
+                    {kind === "CUSTOM_HTML" && !isSystemAdmin ? " (system administrators only)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="secondary-button" type="button" onClick={() => addSection(blockToAdd)}>
+              <Plus size={15} aria-hidden="true" /> Add block
+            </button>
+          </div>
+        </section>
 
-        <div className="form-actions">
-          {dirty && <span className="unsaved-dot" role="status">Unsaved changes</span>}
+        <div className={`event-savebar${dirty ? " is-pinned" : ""} ${styles.saveBar}`} role="region" aria-label="Save event page">
+          <p className={styles.status} aria-live="polite">
+            {dirty ? <span className="unsaved-dot">Unsaved changes</span> : "No unsaved changes."}
+          </p>
           <button className="primary-button" type="submit" disabled={saving || !dirty}>
             <Save size={16} aria-hidden="true" /> {saving ? "Saving…" : "Save event page"}
           </button>
@@ -842,23 +840,20 @@ export function EventContentWorkspace({
           attendee data is attached to a content section, so nothing else is affected.
         </p>
       </ConfirmDialog>
-      {pendingDelete && (
-        <div
-          className="modal-backdrop"
-          onMouseDown={(event) => { if (event.target === event.currentTarget) dismissDeleteDialog(); }}
-          role="presentation"
-        >
-          <section aria-labelledby="delete-asset-title" aria-modal="true" className="modal-card" ref={deleteDialogRef} role="dialog" tabIndex={-1}>
-            <div className="modal-head">
-              <div>
-                <p className="eyebrow">Files</p>
-                <h2 id="delete-asset-title">Delete {pendingDelete.displayName}?</h2>
-              </div>
-              <button aria-label="Close" className="icon-button modal-close-button" disabled={deleting} onClick={closeDeleteDialog} type="button">
-                <X aria-hidden="true" size={18} />
-              </button>
-            </div>
-            {deleteError && <div className="inline-notice error" role="alert">{deleteError}</div>}
+      <ConfirmDialog
+        busy={deleting}
+        busyLabel="Deleting…"
+        confirmDisabled={deleteBlockedLocally}
+        confirmLabel="Delete file"
+        destructive
+        error={deleteError}
+        onCancel={closeDeleteDialog}
+        onConfirm={() => { if (pendingDelete) void confirmDeleteAsset(pendingDelete); }}
+        open={pendingDelete !== null}
+        title={pendingDelete ? `Delete ${pendingDelete.displayName}?` : "Delete file?"}
+      >
+        {pendingDelete && (
+          <>
             <p className="field-help">This removes the file and its stored copy. This can&apos;t be undone.</p>
             {pendingDelete.usage.draftSectionTitles.length > 0 && (
               <p className="field-help">
@@ -878,15 +873,9 @@ export function EventContentWorkspace({
                   : "."}
               </p>
             )}
-            <div className="form-actions">
-              <button className="secondary-button" disabled={deleting} onClick={closeDeleteDialog} type="button">Cancel</button>
-              <button className="primary-button" disabled={deleting || deleteBlockedLocally} onClick={() => void confirmDeleteAsset(pendingDelete)} type="button">
-                <Trash2 aria-hidden="true" size={16} /> {deleting ? "Deleting…" : "Delete file"}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+          </>
+        )}
+      </ConfirmDialog>
     </section>
   );
 }
