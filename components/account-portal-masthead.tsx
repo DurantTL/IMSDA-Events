@@ -8,12 +8,12 @@ import type { AccountSignOutMode, WorkspaceContext } from "@/modules/access/work
  * wordmark over "My account", the signed-in name and the shared outlined buttons. Chrome only. The portal layout hides it
  * on club and coordinator pages, which draw their own masthead.
  */
-export function AccountPortalMasthead({ identity, contexts, signOut }: { identity?: string; contexts: WorkspaceContext[]; signOut: AccountSignOutMode }) {
+export function AccountPortalMasthead({ identity, contexts, signOut, staffSignInEnded }: { identity?: string; contexts: WorkspaceContext[]; signOut: AccountSignOutMode; staffSignInEnded?: boolean }) {
   return (
     <header className="club-masthead account-masthead">
       <div className="club-masthead-inner">
         <BrandLink label="IMAdventist My account, calendar" className="club-masthead-brand" wordmark={<span><small>{PRODUCT_NAME}</small><strong>My account</strong></span>} />
-        <AccountHeaderActions identity={identity} contexts={contexts} signOut={signOut} />
+        <AccountHeaderActions identity={identity} contexts={contexts} signOut={signOut} staffSignInEnded={staffSignInEnded} />
       </div>
     </header>
   );
