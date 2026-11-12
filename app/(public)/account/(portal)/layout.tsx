@@ -9,6 +9,7 @@ import { ActAsBanner } from "@/components/act-as-banner";
 import { AttendeeAuthReturn } from "@/components/attendee-sign-in-form";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { accountSignOutMode, otherWorkspaceContextsForAttendee } from "@/modules/access/workspace-contexts";
+import { isStaffSessionTimedOutForLinkedAttendee } from "@/modules/account-merge/staff-timeout";
 import { listAccountBannerAnnouncements } from "@/modules/communications/account-banner";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { signInStepRedirectPath } from "@/modules/attendee-accounts/portal-second-step";
@@ -59,6 +60,9 @@ export default async function AccountPortalLayout({ children }: { children: Reac
     hasStaffSession: Boolean(staffSession.user),
     isSystemAdmin: staffSession.user?.globalRole === "SYSTEM_ADMIN",
   });
+  // (#1947) A person linked to a staff account whose staff sign-in has ended gets a "Staff sign-in" link in the top bar.
+  // Never throws; false for attendee-only accounts, staff "act as" sessions and anyone with a live staff session.
+  const staffSignInEnded = !staffSession.user && Boolean(account) && via === "attendee" ? await isStaffSessionTimedOutForLinkedAttendee() : false;
   // Banner announcements are account-session only: a staff "act as" with no
   // attendee account (or a second step still pending) gets none. The banner
   // query starts as soon as the clubs load, alongside the coordinator check.
@@ -86,6 +90,7 @@ export default async function AccountPortalLayout({ children }: { children: Reac
       <AccountPortalMasthead
         identity={acting ? undefined : chromeAccount?.displayName}
         contexts={workspaceContexts}
+        staffSignInEnded={staffSignInEnded}
         signOut={accountSignOutMode({ hasAttendeeAccount: Boolean(account), hasStaffSession: Boolean(staffSession.user), actingAsClubRole: Boolean(acting) })}
       />
       <ActAsBanner acting={acting} inAccount />

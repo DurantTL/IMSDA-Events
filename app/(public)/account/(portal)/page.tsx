@@ -20,6 +20,8 @@ import { accountIsInstructor, listInstructorInvitesForAccount } from "@/modules/
 import { listOwnAssignments } from "@/modules/event-staffing/own-assignments";
 import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { listAreaCoordinatorInvitesForAccount } from "@/modules/organizations/area-coordinator-invites";
+import { StaffSignInEndedNotice } from "@/components/staff-signin-ended-notice";
+import { staffSignInEndedMarker } from "@/modules/account-merge/staff-timeout";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import { logError } from "@/lib/logger";
@@ -55,7 +57,7 @@ export default async function AttendeeAccountOverviewPage() {
   const { account, via } = await getCurrentAttendee();
   if (!account) redirect("/account/sign-in");
 
-  const [registrationsResult, mfaStatus, clubs, invites, areaInvites, areaCoordinator, instructorInvites, isInstructor, ownStaffing] = await Promise.all([
+  const [registrationsResult, mfaStatus, clubs, invites, areaInvites, areaCoordinator, instructorInvites, isInstructor, ownStaffing, staffEndedMarker] = await Promise.all([
     // A failed load is its own calm state with a retry: not "no registrations", and not a blank page.
     listRegistrationsForVerifiedEmail(account.verifiedEmail).then(
       (registrations) => ({ ok: true as const, registrations }),
@@ -80,6 +82,8 @@ export default async function AttendeeAccountOverviewPage() {
       logError("Account overview staffing assignments failed to load", error, { accountId: account.id });
       return [];
     }),
+    // (#1947) Null unless this is an attendee session linked to a staff account whose staff sign-in has ended. Never throws.
+    via === "attendee" ? staffSignInEndedMarker() : Promise.resolve(null),
   ]);
   const registrations = registrationsResult.registrations;
   const upcoming = upcomingRegistrations(registrations);
@@ -127,6 +131,7 @@ export default async function AttendeeAccountOverviewPage() {
       {areaInvites.length > 0 && <AreaCoordinatorInviteAccept invites={areaInvites} fill={invites.length > 0 ? "none" : "first"} />}
       {instructorInvites.length > 0 && <InstructorInviteAccept invites={instructorInvites} fill={invites.length > 0 || areaInvites.length > 0 ? "none" : "first"} />}
 
+      {staffEndedMarker && <StaffSignInEndedNotice marker={staffEndedMarker} />}
       <div className="attendee-ov-layout">
         <div className="attendee-ov-main">
           <section aria-labelledby="attendee-ov-upcoming">
