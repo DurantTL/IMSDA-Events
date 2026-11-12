@@ -10,7 +10,7 @@ import {
 } from "@/modules/area-search/domain";
 import { filterClubsByNameChurchCityOrDirector } from "@/modules/club-reports/area-summary-domain";
 import { coordinatorClubHref } from "@/modules/club-rosters/area-club-switch";
-import { currentAreaCoordinatorViewer } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorViewer, type AreaCoordinatorViewer } from "@/modules/organizations/area-coordinators";
 import { directorGrantIsActive } from "@/modules/organizations/director-grants-domain";
 import { currentOwnDirectedClubIds } from "@/modules/organizations/own-directed-club-ids";
 
@@ -29,9 +29,7 @@ import { currentOwnDirectedClubIds } from "@/modules/organizations/own-directed-
  * monthly reports, standings, roster counts, points and Sterling Volunteers counts.
  */
 
-export type AreaSearchViewer =
-  | { kind: "ATTENDEE"; accountId: string }
-  | { kind: "ACTING"; actAsId: string };
+export type AreaSearchViewer = AreaCoordinatorViewer;
 
 /** The coordinator identity behind this request, or null (the route answers 401): the area-clubs pages' own rule. */
 export async function getAreaSearchViewer(): Promise<AreaSearchViewer | null> {

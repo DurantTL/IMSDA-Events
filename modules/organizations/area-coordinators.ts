@@ -78,7 +78,9 @@ export async function currentAreaCoordinatorViewerActive() {
  * Who the Area Coordinator viewer is, by the same checks as `currentAreaCoordinatorViewerActive` (one rule for the pages
  * and the coordinator search, #1854): the coordinator's own attendee account, or the staff act-as, or null.
  */
-export async function currentAreaCoordinatorViewer(): Promise<{ kind: "ATTENDEE"; accountId: string } | { kind: "ACTING"; actAsId: string } | null> {
+export type AreaCoordinatorViewer = { kind: "ATTENDEE"; accountId: string } | { kind: "ACTING"; actAsId: string };
+
+export async function currentAreaCoordinatorViewer(): Promise<AreaCoordinatorViewer | null> {
   const coordinator = await currentAreaCoordinator();
   if (coordinator) return { kind: "ATTENDEE", accountId: coordinator.id };
   const acting = await currentStaffActingContext();
