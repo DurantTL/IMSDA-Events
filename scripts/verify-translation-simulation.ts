@@ -201,18 +201,22 @@ async function clubRoster(context: J.BrowserContext) {
     if (count !== J.rosterNames.length + 1) fail(`${label}: the active count shows ${count} after adding, expected ${J.rosterNames.length + 1}`);
   });
   await step(`${label}: search as you type`, page, async () => {
+    await J.openRosterTools(page);
     const search = page.locator("#roster-search");
     await search.pressSequentially(first, { delay: 30 });
     await expectText(page, last, `${label}: matching person while searching`);
     await expectGone(page, J.rosterNames[1][1], `${label}: a non-matching person is filtered out`);
     await search.fill("");
     await expectText(page, J.rosterNames[1][1], `${label}: the full list after clearing`);
+    await J.closeRosterTools(page);
   });
   await step(`${label}: filters`, page, async () => {
+    await J.openRosterTools(page);
     await page.getByRole("button", { name: /Details needed/ }).first().click();
     await page.getByRole("button", { name: /Show gender/ }).click();
     await page.getByRole("button", { name: /Show gender/ }).click();
     await page.getByRole("button", { name: /Details needed/ }).first().click();
+    await J.closeRosterTools(page);
   });
   await step(`${label}: edit dialog opens and cancels`, page, async () => {
     await page.getByRole("button", { name: `Edit ${first} ${last}` }).click();

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, ChevronUp, Circle, ExternalLink } from "lucide-react";
 import type { Checklist, ChecklistStep } from "@/modules/setup-help/checklist";
+import styles from "./setup-checklist-panel.module.css";
 
 // Per-browser convenience. Storage can be blocked, so the choice then lasts for this page view only.
 const listeners = new Set<() => void>();
@@ -44,6 +45,7 @@ export function SetupChecklistPanel({
   storageKey,
   headingId = "setup-checklist",
   guide,
+  collapseDone = false,
 }: {
   checklist: Checklist;
   eyebrow: string;
@@ -54,9 +56,13 @@ export function SetupChecklistPanel({
   headingId?: string;
   /** A Help guide for the whole list (#1435); the event Dashboard passes none. */
   guide?: { href: string; label: string };
+  /** Fold finished steps into one "N finished steps" disclosure after the open ones (#1894). Off for the event and coordinator lists. */
+  collapseDone?: boolean;
 }) {
   const collapsed = useSyncExternalStore(subscribe, () => readCollapsed(storageKey), () => false);
   if (checklist.hidden) return null;
+  const folded = collapseDone ? checklist.steps.filter((step) => step.done && !step.reference) : [];
+  const open = collapseDone ? checklist.steps.filter((step) => !folded.includes(step)) : checklist.steps;
 
   return (
     <section className="panel setup-checklist" aria-labelledby={`${headingId}-title`}>
@@ -77,8 +83,16 @@ export function SetupChecklistPanel({
         </button>
       </div>
       <ol className="setup-checklist-steps" hidden={collapsed} id={`${headingId}-steps`}>
-        {checklist.steps.map((step) => <StepRow isNext={step.id === checklist.nextStepId} key={step.id} step={step} />)}
+        {open.map((step) => <StepRow isNext={step.id === checklist.nextStepId} key={step.id} step={step} />)}
       </ol>
+      {folded.length > 0 && (
+        <details className={styles.finished} hidden={collapsed}>
+          <summary className={styles.finishedSummary}>{folded.length} finished {folded.length === 1 ? "step" : "steps"}</summary>
+          <ol className={styles.finishedSteps}>
+            {folded.map((step) => <StepRow isNext={false} key={step.id} step={step} />)}
+          </ol>
+        </details>
+      )}
       {guide && !collapsed && <p className="field-help setup-checklist-guide"><Link className="text-button" href={guide.href}>{guide.label} <ArrowRight aria-hidden="true" size={14} /></Link></p>}
     </section>
   );

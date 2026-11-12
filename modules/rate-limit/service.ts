@@ -1495,3 +1495,17 @@ export async function checkStaffSearchRateLimit(userId: string, limit: number) {
     },
   ], configuration);
 }
+
+/** The club portal search (#1854): one account's (or one staff act-as's) requests per minute. `key` is already prefixed with who it names. */
+export async function checkClubSearchRateLimit(key: string, limit: number) {
+  const configuration = getRateLimitConfiguration();
+  const who = hashRateLimitIdentifier("club-search", key, configuration);
+  return evaluate([
+    {
+      policy: "club.search.account",
+      limit,
+      windowSeconds: 60,
+      identifierHashes: [who],
+    },
+  ], configuration);
+}

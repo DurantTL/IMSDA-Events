@@ -620,6 +620,7 @@ export const pagesSectionHeading = "Pages and tasks";
 export const recordGroupHeadings: Record<RecordGroupKey, string> = { clubs: "Clubs", events: "Events", churches: "Churches", people: "People" };
 const recordGroupOrder: readonly RecordGroupKey[] = ["clubs", "events", "churches", "people"];
 const recordSingular: Record<RecordGroupKey, string> = { clubs: "club", events: "event", churches: "church", people: "person" };
+const recordPlural: Record<RecordGroupKey, string> = { clubs: "clubs", events: "events", churches: "churches", people: "people" };
 const recordBadges: Record<RecordGroupKey, { badge: string; spoken: string }> = {
   clubs: { badge: "Club", spoken: "Club" },
   events: { badge: "Event", spoken: "Event" },
@@ -640,7 +641,35 @@ export function formatEventDates(startsAt: string, endsAt: string, timezone: str
   return start === end ? start : `${start} to ${end}`;
 }
 
-function recordEntries(result: StaffSearchResult): { group: RecordGroupKey; entries: ResultEntry[]; seeAll: ResultEntry | null }[] {
+/** One group of records as the combobox shows it: its heading, the rows, and whether a page can show the rest. */
+export type RecordGroupView = {
+  key: string;
+  heading: string;
+  singular: string;
+  plural: string;
+  entries: ResultEntry[];
+  more: boolean;
+  /** A page this viewer may open that takes the same words, or null when there is none. */
+  seeAllHref: string | null;
+};
+
+/**
+ * What the combobox needs to search records on a server: where to ask, how the answer turns into groups, and the words
+ * around it. The staff header uses `staffRecordSearch`; the club portal masthead has its own (`club-search-model.ts`).
+ * `pages` is set where the pages are not staff destinations: their rows then read as one plain "Page" instead of a staff scope.
+ */
+export type RecordSearchSpec<R extends { query: string } = StaffSearchResult> = {
+  endpoint: string;
+  /** What the server is asked for, in the status line and failure note: "clubs, events and churches". */
+  nouns: string;
+  label: string;
+  placeholder: string;
+  listLabel: string;
+  groups: (result: R) => RecordGroupView[];
+  pages?: { heading: string; badge: string; spoken: string };
+};
+
+function staffRecordGroups(result: StaffSearchResult): RecordGroupView[] {
   return recordGroupOrder.map((group) => {
     const source = result[group];
     const { badge, spoken } = recordBadges[group];
@@ -683,36 +712,58 @@ function recordEntries(result: StaffSearchResult): { group: RecordGroupKey; entr
         badge,
         badgeSpoken: spoken,
       }));
-    const seeAll: ResultEntry | null = source.more && source.seeAllHref
-      ? { key: `see-all:${group}`, kind: "see-all", label: `See all ${recordSingular[group]} results`, description: "More matches than are listed here.", href: source.seeAllHref, badge: "More", badgeSpoken: "More results" }
-      : null;
-    return { group, entries, seeAll };
+    return { key: group, heading: recordGroupHeadings[group], singular: recordSingular[group], plural: recordPlural[group], entries, more: source.more, seeAllHref: source.seeAllHref };
   });
+}
+
+/** The staff header's records: clubs, events and churches (#1837), and people (#1854). */
+export const staffRecordSearch: RecordSearchSpec<StaffSearchResult> = {
+  endpoint: "/api/staff/search",
+  nouns: "clubs, events, churches and people",
+  label: "Search pages, clubs, events, churches and people",
+  // Short enough for the 390px header; the label names every group.
+  placeholder: "Search pages, clubs, events, people",
+  listLabel: "Matching pages and records",
+  groups: staffRecordGroups,
+};
+
+/** A group's rows, then its "See all results" link when more match and a page can show them. */
+function groupRows(group: RecordGroupView): ResultEntry[] {
+  const seeAll: ResultEntry | null = group.more && group.seeAllHref
+    ? { key: `see-all:${group.key}`, kind: "see-all", label: `See all ${group.singular} results`, description: "More matches than are listed here.", href: group.seeAllHref, badge: "More", badgeSpoken: "More results" }
+    : null;
+  return seeAll ? [...group.entries, seeAll] : group.entries;
 }
 
 /**
  * The combobox's rows and, when they are grouped, its sections. Typed words with records on: Pages and tasks, then
- * Clubs, Events, Churches and People (a group with nothing in it is left out). An empty box: the pages, grouped by scope as
- * before (`groupDestinationsByScope`). Records off (the More sheet): ranked pages, ungrouped, as before.
+ * the record groups (a group with nothing in it is left out). An empty box: the pages, grouped by scope as
+ * before (`groupDestinationsByScope`), or one "Pages" section when `spec.pages` is set. Records off (the More sheet):
+ * ranked pages, ungrouped, as before.
  */
-export function buildResultLayout(input: {
+export function buildResultLayout<R extends { query: string } = StaffSearchResult>(input: {
   pages: readonly SearchDestination[];
   hasQuery: boolean;
-  /** `null` when records are off; a result (or null while none has arrived) when they are on. */
-  records: { enabled: boolean; result: StaffSearchResult | null };
+  /** `enabled` is false for the More sheet; a result is null while none has arrived. */
+  records: { enabled: boolean; result: R | null };
+  spec?: RecordSearchSpec<R>;
 }): { entries: ResultEntry[]; sections: ResultSection[] | null } {
+  const spec = input.spec ?? (staffRecordSearch as unknown as RecordSearchSpec<R>);
   const pageEntry = (destination: SearchDestination): ResultEntry => ({
     key: destination.key,
     kind: "page",
     label: destination.label,
     description: destination.description,
     href: destination.href,
-    badge: destinationScopeLabels[destination.scope],
-    badgeSpoken: `Scope: ${destinationScopeDescription(destination.scope)}`,
-    destination,
+    badge: spec.pages?.badge ?? destinationScopeLabels[destination.scope],
+    badgeSpoken: spec.pages?.spoken ?? `Scope: ${destinationScopeDescription(destination.scope)}`,
+    ...(spec.pages ? {} : { destination }),
   });
   const pages = input.pages.map(pageEntry);
   if (!input.hasQuery) {
+    if (spec.pages) {
+      return { entries: pages, sections: pages.length === 0 ? [] : [{ id: "pages", heading: spec.pages.heading, start: 0, entries: pages }] };
+    }
     const sections = groupDestinationsByScope(input.pages).map((group) => ({
       id: `scope-${group.scope}`,
       heading: destinationScopeDescription(group.scope),
@@ -730,9 +781,9 @@ export function buildResultLayout(input: {
     sections.push({ id, heading, start: entries.length, entries: rows });
     entries.push(...rows);
   };
-  push("pages", pagesSectionHeading, pages);
+  push("pages", spec.pages?.heading ?? pagesSectionHeading, pages);
   if (input.records.result) {
-    for (const { group, entries: rows, seeAll } of recordEntries(input.records.result)) push(group, recordGroupHeadings[group], seeAll ? [...rows, seeAll] : rows);
+    for (const group of spec.groups(input.records.result)) push(group.key, group.heading, groupRows(group));
   }
   return { entries, sections };
 }
@@ -742,41 +793,43 @@ function countWord(count: number, one: string, many: string) {
 }
 
 /** The live status line with records on: counts per group, or that the records are still loading or could not be read. */
-export function recordSearchStatus(input: {
+export function recordSearchStatus<R extends { query: string } = StaffSearchResult>(input: {
   query: string;
   pageCount: number;
-  result: StaffSearchResult | null;
+  result: R | null;
   pending: boolean;
   failed: boolean;
+  spec?: RecordSearchSpec<R>;
 }): string {
-  const notes = recordMoreNotes(input.result);
-  const base = recordSearchStatusBase(input);
+  const spec = input.spec ?? (staffRecordSearch as unknown as RecordSearchSpec<R>);
+  const notes = recordMoreNotes(input.result, spec);
+  const base = recordSearchStatusBase(input, spec);
   return notes.length > 0 && !input.pending ? `${base} ${notes.join(" ")}` : base;
 }
 
-function recordSearchStatusBase(input: {
+function recordSearchStatusBase<R extends { query: string }>(input: {
   query: string;
   pageCount: number;
-  result: StaffSearchResult | null;
+  result: R | null;
   pending: boolean;
   failed: boolean;
-}): string {
+}, spec: RecordSearchSpec<R>): string {
   if (!hasSearchWords(input.query)) return destinationSearchStatus(input.query, input.pageCount);
   const parts: string[] = [];
   if (input.pageCount > 0) parts.push(countWord(input.pageCount, "page", "pages"));
   if (input.result) {
-    const { clubs, events, churches, people } = input.result;
-    if (clubs.items.length > 0) parts.push(countWord(clubs.items.length, "club", "clubs"));
-    if (events.items.length > 0) parts.push(countWord(events.items.length, "event", "events"));
-    if (churches.items.length > 0) parts.push(countWord(churches.items.length, "church", "churches"));
-    if (people.items.length > 0) parts.push(countWord(people.items.length, "person", "people"));
+    for (const group of spec.groups(input.result)) {
+      if (group.entries.length > 0) parts.push(countWord(group.entries.length, group.singular, group.plural));
+    }
   }
   const use = "Use the up and down arrow keys, then Enter to open.";
-  const failure = input.failed ? " Clubs, events, churches and people could not be searched." : "";
-  if (input.pending) return parts.length > 0 ? `${parts.join(", ")} so far. Searching clubs, events, churches and people. ${use}` : "Searching clubs, events, churches and people.";
-  if (parts.length === 0) return input.failed ? "Clubs, events, churches and people could not be searched." : "Nothing matches. Try a different word.";
+  const failure = input.failed ? ` ${capitalised(spec.nouns)} could not be searched.` : "";
+  if (input.pending) return parts.length > 0 ? `${parts.join(", ")} so far. Searching ${spec.nouns}. ${use}` : `Searching ${spec.nouns}.`;
+  if (parts.length === 0) return input.failed ? `${capitalised(spec.nouns)} could not be searched.` : "Nothing matches. Try a different word.";
   return `${parts.join(", ")}.${failure} ${use}`.replace("  ", " ");
 }
+
+const capitalised = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** The settled answer, only when it is for exactly these words (never rows found for earlier words). */
 export function recordAnswerFor<T extends { query: string }>(settled: T, words: string): T | null {
@@ -784,11 +837,12 @@ export function recordAnswerFor<T extends { query: string }>(settled: T, words: 
 }
 
 /** A short note per group that has more matches than are listed but no page to see them on. Not a list option. */
-export function recordMoreNotes(result: StaffSearchResult | null): string[] {
+export function recordMoreNotes<R extends { query: string } = StaffSearchResult>(result: R | null, spec?: RecordSearchSpec<R>): string[] {
   if (!result) return [];
-  return recordGroupOrder
-    .filter((group) => result[group].more && !result[group].seeAllHref)
-    .map((group) => `More ${recordGroupHeadings[group].toLowerCase()} match. Type more words to narrow.`);
+  const used = spec ?? (staffRecordSearch as unknown as RecordSearchSpec<R>);
+  return used.groups(result)
+    .filter((group) => group.more && !group.seeAllHref)
+    .map((group) => `More ${group.heading.toLowerCase()} match. Type more words to narrow.`);
 }
 
 /** Where the active entry (kept by its stable key) sits in the current rows: its new index, or -1 when it is gone or none is active. */

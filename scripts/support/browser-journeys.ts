@@ -452,9 +452,36 @@ export async function openRoster(page: Page, url: string = rosterUrl) {
   await settleRoster(page);
 }
 
+/**
+ * Makes the roster's search and filter controls usable. On a computer they are in the page and this does nothing; on a phone
+ * they are in the "Search and filters" sheet, which this opens (retrying until the page has hydrated and the sheet answers).
+ */
+export async function openRosterTools(page: Page) {
+  const search = page.locator("#roster-search");
+  if (await search.isVisible()) return;
+  const trigger = page.locator("[data-roster-sheet-trigger]");
+  for (let attempts = 0; attempts < 20; attempts += 1) {
+    await trigger.click({ timeout: 5_000 });
+    if (await page.getByRole("dialog", { name: "Search and filters" }).isVisible()) return;
+    await page.waitForTimeout(500);
+  }
+  await search.waitFor({ state: "visible", timeout: 5_000 });
+}
+
+/** Closes the phone sheet when it is open (its Close button); does nothing on a computer. */
+export async function closeRosterTools(page: Page) {
+  const sheet = page.getByRole("dialog", { name: "Search and filters" });
+  if (!(await sheet.isVisible())) return;
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await sheet.waitFor({ state: "hidden", timeout: 5_000 });
+}
+
 /** Waits for the roster to be interactive (and translated, when the simulator is on), then opens its Staff and Members sections. */
 export async function settleRoster(page: Page) {
-  await page.locator("#roster-search").waitFor({ state: "visible", timeout: 20_000 });
+  // On a phone the search box lives in the "Search and filters" sheet (#1894): opening it proves the page is interactive.
+  await page.locator("#roster-search, [data-roster-sheet-trigger]").locator("visible=true").first().waitFor({ state: "visible", timeout: 20_000 });
+  await openRosterTools(page);
+  await closeRosterTools(page);
   const translating: boolean = await page.evaluate("typeof window.__translationSim !== 'undefined'");
   if (translating) await page.waitForFunction(() => (window as unknown as { __translationSim: { wrapped: number } }).__translationSim.wrapped > 0, undefined, { timeout: 30_000 });
   const closed = page.locator(".club-roster-stack details[data-roster-section]:not([open]) > summary");

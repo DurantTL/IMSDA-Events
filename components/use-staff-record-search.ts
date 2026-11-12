@@ -7,27 +7,28 @@ import { STAFF_SEARCH_MAX_QUERY_LENGTH, type StaffSearchResult } from "@/modules
 /** Wait this long after the last keystroke before asking the server. */
 export const STAFF_RECORD_SEARCH_DEBOUNCE_MS = 200;
 
-type Settled = { query: string; result: StaffSearchResult | null; failed: boolean };
+type Settled<R> = { query: string; result: R | null; failed: boolean };
 
 /**
- * Clubs, events and churches for the typed words (#1837), from `GET /api/staff/search`. Nothing is requested for an
+ * Records for the typed words from a search endpoint: clubs, events and churches from `GET /api/staff/search` (#1837), or
+ * a club leader's clubs and members from `GET /api/attendee/club-search` (#1854). Nothing is requested for an
  * empty box or a query with no letter or digit. Typing waits 200 ms, and a request that a newer keystroke (or leaving
  * the box) has replaced is aborted, so a slow answer can never overwrite a newer one. The server decides what the
  * viewer may see; this only shows it.
  */
-export function useStaffRecordSearch(query: string, enabled: boolean) {
+export function useRecordSearch<R extends { query: string }>(query: string, enabled: boolean, endpoint: string) {
   const words = query.trim().slice(0, STAFF_SEARCH_MAX_QUERY_LENGTH);
   const active = enabled && hasSearchWords(words);
-  const [settled, setSettled] = useState<Settled>({ query: "", result: null, failed: false });
+  const [settled, setSettled] = useState<Settled<R>>({ query: "", result: null, failed: false });
 
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      fetch(`/api/staff/search?q=${encodeURIComponent(words)}`, { signal: controller.signal, headers: { accept: "application/json" }, cache: "no-store" })
+      fetch(`${endpoint}?q=${encodeURIComponent(words)}`, { signal: controller.signal, headers: { accept: "application/json" }, cache: "no-store" })
         .then(async (response) => {
           if (!response.ok) throw new Error(`Search answered ${response.status}`);
-          return (await response.json()) as StaffSearchResult;
+          return (await response.json()) as R;
         })
         .then((result) => setSettled({ query: words, result, failed: false }))
         .catch((error: unknown) => {
@@ -39,7 +40,7 @@ export function useStaffRecordSearch(query: string, enabled: boolean) {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [active, words]);
+  }, [active, words, endpoint]);
 
   // Rows are shown only for the words they answer: while a newer answer is pending the list is pages-only, so Enter can
   // never open a record found for earlier words.
@@ -50,4 +51,9 @@ export function useStaffRecordSearch(query: string, enabled: boolean) {
     pending: active && !answer,
     failed: Boolean(answer?.failed),
   };
+}
+
+/** The staff header's records (#1837). */
+export function useStaffRecordSearch(query: string, enabled: boolean) {
+  return useRecordSearch<StaffSearchResult>(query, enabled, "/api/staff/search");
 }

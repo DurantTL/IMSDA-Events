@@ -60,7 +60,7 @@ export function ClubPortalMastheadView({ model, role, formsHelpContact }: { mode
               </span>
             )}
           </>}
-          leading={model.showSwitchClub && <Link className={styles.action} href="/account/clubs"><Repeat2 aria-hidden="true" size={16} />Switch club</Link>}
+          leading={model.showSwitchClub && <Link aria-label="Switch club" className={styles.action} href="/account/clubs"><Repeat2 aria-hidden="true" size={16} /><span className={styles.label}>Switch club</span></Link>}
         />
       </div>
     </header>

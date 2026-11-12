@@ -35,6 +35,7 @@ vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: mock
 
 import ClubHomePage from "@/app/(public)/account/(portal)/clubs/[organizationId]/page";
 import { ClubHomeEvents, ClubHomeRoster, ClubHomeSummary, ClubHomeTasks } from "@/components/club-home";
+import { SetupChecklistPanel } from "@/components/setup-checklist-panel";
 import { UpcomingDeadlines } from "@/components/upcoming-deadlines";
 import { areaClubPortalNavItems, clubPortalNavItems } from "@/modules/club-rosters/portal-nav";
 
@@ -85,10 +86,11 @@ beforeEach(() => {
 const home = async () => renderToStaticMarkup(await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) }));
 
 describe("Club home shows the first task and its deadline before the roster and event cards (#743, #1166)", () => {
-  it("renders Continue club work after the summary and before the roster and event card", async () => {
+  it("renders Continue club work before the summary and setup checklist, and before the roster and event card (#1894)", async () => {
     const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
     const order = componentElements(tree).map((element) => element.type);
-    expect(order.indexOf(ClubHomeSummary)).toBeLessThan(order.indexOf(ClubHomeTasks));
+    expect(order.indexOf(ClubHomeTasks)).toBeLessThan(order.indexOf(ClubHomeSummary));
+    expect(order.indexOf(ClubHomeTasks)).toBeLessThan(order.indexOf(SetupChecklistPanel));
     expect(order.indexOf(ClubHomeTasks)).toBeLessThan(order.indexOf(ClubHomeRoster));
     expect(order.indexOf(ClubHomeRoster)).toBeLessThan(order.indexOf(ClubHomeEvents));
   });

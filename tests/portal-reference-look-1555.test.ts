@@ -96,7 +96,9 @@ describe("L9: the account drop-down lives in the masthead row, not on a bar of i
   it("is dressed as the club masthead's outlined button and anchors on screen on a phone", () => {
     expect(menu).toContain("mastheadStyles.action");
     const css = read("components/account-workspace-menu.module.css");
-    expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.panel \{[^}]*left: 0;/);
+    // On a phone it hangs from the masthead row's right edge (#1894), never wider than the window.
+    expect(css).toMatch(/\.panel \{[^}]*right: 0;[^}]*max-width: calc\(100vw - 24px\);/);
+    expect(css).toMatch(/@media \(max-width: 640px\) \{\s*\.menu \{\s*position: static;/);
   });
 
   it("does not recompute the menu items in a masthead", () => {

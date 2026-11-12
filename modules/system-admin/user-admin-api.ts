@@ -1,3 +1,4 @@
+import { TltDirectoryError } from "@/modules/tlt-directory/domain";
 import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import { AreaCoordinatorError } from "@/modules/organizations/area-coordinators";
@@ -19,6 +20,9 @@ export function userAdminApiError(error: unknown, action: string) {
   if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
   if (error instanceof AreaCoordinatorError) {
     return Response.json({ error: error.code, message: error.message }, { status: 404 });
+  }
+  if (error instanceof TltDirectoryError) {
+    return Response.json({ error: error.code, message: error.message }, { status: 409 });
   }
   if (error instanceof PeopleInviteError) {
     return Response.json(

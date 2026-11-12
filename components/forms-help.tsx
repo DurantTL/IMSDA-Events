@@ -14,7 +14,12 @@ import { telHref, type FormsHelpContact } from "@/modules/system-admin/forms-hel
  * short bottom sheet on a phone. Every section starts collapsed (native details), so only headings show until tapped.
  * Dialog behavior (focus trap, Escape, focus back to the button) comes from the shared useAccessibleDialog hook.
  */
-export function FormsHelp({ contact, className }: { contact: FormsHelpContact; className?: string }) {
+export function FormsHelp({ contact, className, labelClassName }: {
+  contact: FormsHelpContact;
+  className?: string;
+  /** Wraps the words in a span with this class (and names the button with aria-label), so a phone header can show the icon alone (#1894). */
+  labelClassName?: string;
+}) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   const dialogRef = useAccessibleDialog<HTMLElement>(open, close);
@@ -23,13 +28,14 @@ export function FormsHelp({ contact, className }: { contact: FormsHelpContact; c
     <>
       <button
         aria-haspopup="dialog"
+        aria-label={labelClassName ? "Forms help" : undefined}
         className={className ?? `text-button ${styles.trigger}`}
         data-forms-help-trigger=""
         onClick={() => setOpen(true)}
         type="button"
       >
         <CircleHelp aria-hidden="true" size={16} />
-        Forms help
+        {labelClassName ? <span className={labelClassName}>Forms help</span> : "Forms help"}
       </button>
       {open && createPortal(
         <div
