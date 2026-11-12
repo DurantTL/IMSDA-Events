@@ -11,6 +11,8 @@ import type { HelpGuide } from "@/modules/help/types";
  */
 export type HelpViewer = {
   isSystemAdmin: boolean;
+  /** An active Clubs Administrator (`hasClubsAdministration` without being a system administrator is true for this too). */
+  isClubsAdministrator: boolean;
   /** The selected event, or "" when there is none (a staff account with no event). */
   selectedEventId: string;
   /** The viewer's permissions for the selected event. */
@@ -32,6 +34,7 @@ export function canSeeGuide(guide: Pick<HelpGuide, "audience">, viewer: HelpView
   switch (guide.audience.kind) {
     case "everyone": return true;
     case "system": return viewer.isSystemAdmin;
+    case "clubs": return viewer.isSystemAdmin || viewer.isClubsAdministrator;
     case "event-permission": return viewer.isSystemAdmin || viewer.permissions.includes(guide.audience.permission);
   }
 }
@@ -62,9 +65,12 @@ export function guideLinksForViewer(guide: HelpGuide, viewer: HelpViewer): { lin
     if (!destination) continue;
     const allowed = destination.scope === "System"
       ? viewer.isSystemAdmin
-      : Boolean(viewer.selectedEventId)
+      : destination.scope === "Clubs"
+        ? viewer.isSystemAdmin || viewer.isClubsAdministrator
+        : Boolean(viewer.selectedEventId)
         && (viewer.isSystemAdmin || !destination.permission || viewer.permissions.includes(destination.permission));
-    if (allowed) links.push({ id, label: destination.label, href: withCurrentEvent(destination.path, viewer.selectedEventId) });
+    // A Clubs page needs no event, so its link never carries one.
+    if (allowed) links.push({ id, label: destination.label, href: destination.scope === "Clubs" ? destination.path : withCurrentEvent(destination.path, viewer.selectedEventId) });
     else unavailable += 1;
   }
   return { links, unavailable };
@@ -72,21 +78,27 @@ export function guideLinksForViewer(guide: HelpGuide, viewer: HelpViewer): { lin
 
 export { filterGuides } from "@/modules/help/guide-filter";
 
-/** The hub's workspace filter: every guide, or only System administration or Event workspace guides. */
-export type WorkspaceFilter = "all" | "System" | "Event";
+/** The hub's workspace filter: every guide, or only System administration, Clubs administration or Event workspace guides. */
+export type WorkspaceFilter = "all" | "System" | "Clubs" | "Event";
 
 export const workspaceFilterLabels: Record<WorkspaceFilter, string> = {
   all: "All",
   System: "System administration",
+  Clubs: "Clubs administration",
   Event: "Event workspace",
 };
 
 /**
- * The filter choices this viewer is offered. System appears only when they have a System guide, so staff who
- * cannot open System guides never see a choice that would always be empty (and never learn they exist).
+ * The filter choices this viewer is offered. System and Clubs appear only when they have a guide of that workspace, so
+ * staff who cannot open those guides never see a choice that would always be empty (and never learn they exist).
  */
 export function workspaceFilterOptions(guides: readonly Pick<HelpGuide, "workspace">[]): WorkspaceFilter[] {
-  return guides.some((guide) => guide.workspace === "System") ? ["all", "System", "Event"] : ["all", "Event"];
+  return [
+    "all",
+    ...(guides.some((guide) => guide.workspace === "System") ? (["System"] as const) : []),
+    ...(guides.some((guide) => guide.workspace === "Clubs") ? (["Clubs"] as const) : []),
+    "Event",
+  ];
 }
 
 export function filterGuidesByWorkspace<T extends Pick<HelpGuide, "workspace">>(guides: readonly T[], filter: WorkspaceFilter): T[] {

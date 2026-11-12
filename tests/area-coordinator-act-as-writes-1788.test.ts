@@ -35,6 +35,9 @@ const WRITE_ROUTES: Record<string, { gate: string; actingStaff: "allowed" | "ref
   "events/[eventId]/debrief/route.ts": { gate: "requireAreaCoordinatorDebriefActor", actingStaff: "refused" },
   "events/[eventId]/budget/route.ts": { gate: "requireAreaCoordinatorBudgetToggleActor", actingStaff: "refused" },
   "events/[eventId]/budget/lines/route.ts": { gate: "requireAreaCoordinatorBudgetActor", actingStaff: "refused" },
+  "events/[eventId]/staffing/route.ts": { gate: "requireAreaCoordinatorStaffingToggleActor", actingStaff: "refused" },
+  "events/[eventId]/staffing/activities/route.ts": { gate: "requireAreaCoordinatorStaffingActor", actingStaff: "refused" },
+  "events/[eventId]/staffing/assignments/route.ts": { gate: "requireAreaCoordinatorStaffingActor", actingStaff: "refused" },
   "events/[eventId]/club-teachers/route.ts": { gate: "requireAreaCoordinatorTeacherActor", actingStaff: "refused" },
   "events/[eventId]/event-scoring/route.ts": { gate: "requireAreaCoordinatorScoringActor", actingStaff: "refused" },
   "team-permissions/[permissionId]/route.ts": { gate: "currentAreaCoordinator", actingStaff: "refused" },
@@ -45,6 +48,7 @@ const WRITE_ROUTES: Record<string, { gate: string; actingStaff: "allowed" | "ref
   "tlt-directory/profile/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
   "tlt-directory/lists/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
   "tlt-directory/export/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
+  "tlt-directory/suggestion/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
 };
 
 function routeFiles(dir: string): string[] {

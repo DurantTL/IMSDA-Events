@@ -9,17 +9,24 @@ import { CheckInPaymentDue } from "@/components/check-in-payment-due";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
+  STATION_BALANCE_NOTE_MAX_LENGTH,
+  STATION_BALANCE_REASONS,
   classifyStationEntry,
   parseDollarsToCents,
   stationAttendeeTypeLabel,
   stationBadgeLine,
   stationResultLabel,
+  type StationBalanceReasonCode,
   type StationCheckInResult,
   type StationFamily,
+  type StationPaymentHistoryEntry,
   type StationPaymentSummary,
+  type StationSquareCandidate,
 } from "@/modules/checkin-stations/domain";
 import { formatCents } from "@/modules/payments/format-cents";
 import styles from "@/components/check-in-station.module.css";
+
+type MoneyUpdate = { payment: StationPaymentSummary; paymentHistory?: StationPaymentHistoryEntry[] };
 
 type JustCheckedIn = { attendeeId: string; name: string; confirmationCode: string };
 
@@ -99,6 +106,8 @@ export function CheckInStationScreen({
   const [message, setMessage] = useState("");
   const [deskNotice, setDeskNotice] = useState("");
   const [busy, setBusy] = useState<"" | "lookup" | "confirm" | "payment" | "stop">("");
+  const [reasonCode, setReasonCode] = useState<StationBalanceReasonCode | "">("");
+  const [reasonNote, setReasonNote] = useState("");
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState("");
   const [stopped, setStopped] = useState(false);
@@ -164,6 +173,8 @@ export function CheckInStationScreen({
     setResults({});
     setMessage("");
     setDeskNotice("");
+    setReasonCode("");
+    setReasonNote("");
     keys.current = new Map();
     setEntry("");
     inputRef.current?.focus();
@@ -189,6 +200,8 @@ export function CheckInStationScreen({
     }
     keys.current = new Map();
     setResults({});
+    setReasonCode("");
+    setReasonNote("");
     setFamily(response.data.family);
     setSelected(new Set(response.data.family.attendees.filter((person) => !person.checkedIn && !person.needsDeskReview).map((person) => person.id)));
     setEntry("");
@@ -211,9 +224,16 @@ export function CheckInStationScreen({
     const items = family.attendees
       .filter((person) => selected.has(person.id))
       .map((person) => ({ attendeeId: person.id, idempotencyKey: keyFor(person.id) }));
-    const response = await post<{ results: StationCheckInResult[]; handOutParts?: { keyTypes: string[]; rooms: Array<{ attendeeId: string; label: string }> } }>("/api/check-in-station/check-in", {
+    const response = await post<{
+      results: StationCheckInResult[];
+      paymentHistory?: StationPaymentHistoryEntry[];
+      handOutParts?: { keyTypes: string[]; rooms: Array<{ attendeeId: string; label: string }> };
+    }>("/api/check-in-station/check-in", {
       registrationId: family.registrationId,
       items,
+      ...(family.payment.state === "DUE" && reasonCode
+        ? { balanceReason: { code: reasonCode, note: reasonNote.trim() } }
+        : {}),
     });
     setBusy("");
     if (!response.ok) {
@@ -238,6 +258,7 @@ export function CheckInStationScreen({
     }
     setFamily({
       ...family,
+      paymentHistory: response.data.paymentHistory ?? family.paymentHistory,
       attendees: family.attendees.map((person) => {
         const status = byId[person.id];
         return status === "CHECKED_IN" || status === "ALREADY_CHECKED_IN"
@@ -304,7 +325,11 @@ export function CheckInStationScreen({
   async function refreshPayment() {
     if (!family) return;
     const response = await post<{ family: StationFamily }>("/api/check-in-station/lookup", { kind: "confirmation", value: family.confirmationCode });
-    if (response.ok) setFamily((current) => (current ? { ...current, payment: response.data.family.payment } : current));
+    if (response.ok) {
+      setFamily((current) => (current
+        ? { ...current, payment: response.data.family.payment, paymentHistory: response.data.family.paymentHistory }
+        : current));
+    }
   }
 
   async function stopStation() {
@@ -335,6 +360,8 @@ export function CheckInStationScreen({
   }
 
   const selectable = family?.attendees.filter((person) => !person.checkedIn && !person.needsDeskReview) ?? [];
+  const balanceDue = family?.payment.state === "DUE";
+  const reasonMissing = balanceDue && (reasonCode === "" || (reasonCode === "OTHER" && reasonNote.trim() === ""));
   const remainingIds = new Set(handOut.attendeeIds);
   const handOutRooms = [...new Set(handOut.rooms.filter((room) => remainingIds.has(room.attendeeId)).map((room) => room.label))]
     .sort((x, y) => x.localeCompare(y, undefined, { numeric: true }));
@@ -403,9 +430,12 @@ export function CheckInStationScreen({
             )}
           </div>
           <PaymentPanel
+            key={family.registrationId}
             family={family}
             canRecordPayments={canRecordPayments}
-            onPayment={(payment) => setFamily((current) => (current ? { ...current, payment } : current))}
+            onPayment={({ payment, paymentHistory }) => setFamily((current) => (current
+              ? { ...current, payment, paymentHistory: paymentHistory ?? current.paymentHistory }
+              : current))}
             onRefresh={refreshPayment}
             busy={busy === "payment"}
             setBusy={(value) => setBusy(value ? "payment" : "")}
@@ -442,12 +472,40 @@ export function CheckInStationScreen({
             {selectable.length > 0 && (
               <p className={styles.cisHelp}>Untick anyone who is not here yet.</p>
             )}
+            {balanceDue && selectable.length > 0 && (
+              <fieldset className={styles.cisReason} aria-describedby="cis-reason-help">
+                <legend>Why check in with a balance due?</legend>
+                <p id="cis-reason-help" className={styles.cisHelp}>Pick one before checking anyone in. It is saved to this registration&apos;s payment history.</p>
+                <div className={styles.cisReasonChoices}>
+                  {STATION_BALANCE_REASONS.map((reason) => (
+                    <label key={reason.code}>
+                      <input
+                        type="radio"
+                        name="cis-balance-reason"
+                        checked={reasonCode === reason.code}
+                        onChange={() => setReasonCode(reason.code)}
+                      />
+                      {reason.label}
+                    </label>
+                  ))}
+                </div>
+                <label htmlFor="cis-reason-note">{reasonCode === "OTHER" ? "Note (required)" : "Note (optional)"}</label>
+                <input
+                  id="cis-reason-note"
+                  autoComplete="off"
+                  maxLength={STATION_BALANCE_NOTE_MAX_LENGTH}
+                  value={reasonNote}
+                  required={reasonCode === "OTHER"}
+                  onChange={(event) => setReasonNote(event.target.value)}
+                />
+              </fieldset>
+            )}
             <div className={styles.cisActions}>
               <button
                 ref={checkInButton}
                 type="button"
                 className={`primary-button ${styles.large}`}
-                disabled={busy !== "" || selected.size === 0}
+                disabled={busy !== "" || selected.size === 0 || (reasonMissing && selectable.length > 0)}
                 onClick={confirmCheckIn}
               >
                 {busy === "confirm" ? "Checking in..." : `Check in${selected.size ? ` (${selected.size})` : ""}`}
@@ -522,7 +580,7 @@ function PaymentPanel({
 }: {
   family: StationFamily;
   canRecordPayments: boolean;
-  onPayment: (payment: StationPaymentSummary) => void;
+  onPayment: (update: MoneyUpdate) => void;
   onRefresh: () => Promise<void>;
   busy: boolean;
   setBusy: (busy: boolean) => void;
@@ -531,11 +589,24 @@ function PaymentPanel({
   const [amount, setAmount] = useState("");
   const [checkNumber, setCheckNumber] = useState("");
   const [squareOpen, setSquareOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [candidates, setCandidates] = useState<StationSquareCandidate[] | null>(null);
+  const [squareUnavailable, setSquareUnavailable] = useState(false);
+  const [alreadyHasPayment, setAlreadyHasPayment] = useState(false);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [confirmCandidate, setConfirmCandidate] = useState<StationSquareCandidate | null>(null);
   const [squareAmount, setSquareAmount] = useState("");
   const [receipt, setReceipt] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const payment = family.payment;
+  const balanceCents = payment.state === "DUE" ? payment.balanceCents : 0;
+  const noteFormVisible = squareOpen && (!canRecordPayments || noteOpen);
+  const typedCents = parseDollarsToCents(amount);
+  const typedNoteCents = parseDollarsToCents(squareAmount);
+  const overBalanceMessage = `That is more than the balance due of ${formatCents(balanceCents)}. Enter the amount actually received, up to the balance.`;
+  const amountOver = typedCents !== null && typedCents > balanceCents;
+  const noteAmountOver = typedNoteCents !== null && typedNoteCents > balanceCents;
   // Unsaved work: a typed cash or check amount or check number, or an open card-note form holding an amount or receipt,
   // until it is recorded or cancelled. The lookup box and attendee ticks are not (#1468).
   useUnsavedChangesGuard(amount.trim() !== "" || (method === "CHECK" && checkNumber.trim() !== "") || (squareOpen && (squareAmount.trim() !== "" || receipt.trim() !== "")));
@@ -556,9 +627,10 @@ function PaymentPanel({
     const cents = parseDollarsToCents(amount || (payment.state === "DUE" ? (payment.balanceCents / 100).toFixed(2) : ""));
     if (!cents) return setError("Enter the amount received, like 25.00.");
     if (method === "CHECK" && !checkNumber.trim()) return setError("Enter the check number.");
+    if (cents > balanceCents) return setError(overBalanceMessage);
     setBusy(true);
     attemptKey.current ??= crypto.randomUUID();
-    const response = await post<{ payment: StationPaymentSummary }>("/api/check-in-station/payment", {
+    const response = await post<MoneyUpdate>("/api/check-in-station/payment", {
       registrationId: family.registrationId,
       method,
       amountCents: cents,
@@ -577,10 +649,69 @@ function PaymentPanel({
       return;
     }
     attemptKey.current = null;
-    onPayment(response.data.payment);
+    onPayment(response.data);
     setNotice(`${method === "CASH" ? "Cash" : "Check"} of ${formatCents(cents)} recorded.`);
     setAmount("");
     setCheckNumber("");
+  }
+
+  async function openSquare() {
+    setSquareOpen(true);
+    setNoteOpen(false);
+    setError("");
+    setNotice("");
+    if (!canRecordPayments) return;
+    setLoadingCandidates(true);
+    setSquareUnavailable(false);
+    setAlreadyHasPayment(false);
+    const response = await post<{ candidates: StationSquareCandidate[]; unavailable: boolean; alreadyHasPayment: boolean }>(
+      "/api/check-in-station/square-unmatched",
+      { registrationId: family.registrationId },
+    );
+    setLoadingCandidates(false);
+    if (!response.ok) {
+      setCandidates([]);
+      setSquareUnavailable(true);
+      return;
+    }
+    setCandidates(response.data.candidates);
+    setSquareUnavailable(response.data.unavailable);
+    setAlreadyHasPayment(response.data.alreadyHasPayment === true);
+  }
+
+  function closeSquare() {
+    setSquareOpen(false);
+    setNoteOpen(false);
+    setCandidates(null);
+    setSquareUnavailable(false);
+    setAlreadyHasPayment(false);
+    setConfirmCandidate(null);
+  }
+
+  function openNoteForm() {
+    setNoteOpen(true);
+    // The form mounts on the next render; move focus to its first field then.
+    setTimeout(() => document.getElementById("cis-square-amount")?.focus(), 0);
+  }
+
+  async function matchPayment(candidate: StationSquareCandidate) {
+    setError("");
+    setNotice("");
+    setBusy(true);
+    const response = await post<MoneyUpdate>("/api/check-in-station/square-match", {
+      registrationId: family.registrationId,
+      providerPaymentId: candidate.providerPaymentId,
+    });
+    setBusy(false);
+    if (!response.ok) {
+      setError(response.message);
+      if (response.status === 0 || response.status >= 500) await onRefresh();
+      return;
+    }
+    setConfirmCandidate(null);
+    onPayment(response.data);
+    setNotice(`Card payment of ${formatCents(candidate.amountCents)} matched.`);
+    closeSquare();
   }
 
   async function noteSquare(event: FormEvent) {
@@ -589,17 +720,19 @@ function PaymentPanel({
     setNotice("");
     const cents = parseDollarsToCents(squareAmount);
     if (!cents) return setError("Enter the amount applied to the balance, like 25.00.");
+    if (cents > balanceCents) return setError(overBalanceMessage);
     setBusy(true);
-    const response = await post<{ payment: StationPaymentSummary }>("/api/check-in-station/square-app-note", {
+    const response = await post<MoneyUpdate>("/api/check-in-station/square-app-note", {
       registrationId: family.registrationId,
       amountCents: cents,
       receiptNumber: receipt.trim(),
     });
     setBusy(false);
     if (!response.ok) return setError(response.message);
-    onPayment(response.data.payment);
+    onPayment(response.data);
     setNotice("Card payment noted - finance will match it from Square.");
     setSquareOpen(false);
+    setNoteOpen(false);
     setSquareAmount("");
     setReceipt("");
   }
@@ -639,8 +772,11 @@ function PaymentPanel({
                   autoComplete="off"
                   value={amount}
                   placeholder={(payment.balanceCents / 100).toFixed(2)}
+                  aria-describedby={amountOver ? "cis-amount-warning" : undefined}
+                  aria-invalid={amountOver || undefined}
                   onChange={(event) => changed(setAmount)(event.target.value)}
                 />
+                {amountOver && <p id="cis-amount-warning" className={styles.cisWarn}>{overBalanceMessage}</p>}
                 {method === "CHECK" && (
                   <>
                     <label htmlFor="cis-check-number">Check number</label>
@@ -654,7 +790,7 @@ function PaymentPanel({
                     />
                   </>
                 )}
-                <button type="submit" className={`primary-button ${styles.large}`} disabled={busy}>
+                <button type="submit" className={`primary-button ${styles.large}`} disabled={busy || amountOver}>
                   {busy ? "Saving..." : method === "CASH" ? "Record cash received" : "Record check received"}
                 </button>
               </fieldset>
@@ -662,24 +798,85 @@ function PaymentPanel({
           )}
 
           {!squareOpen ? (
-            <button type="button" className={`secondary-button ${styles.large}`} onClick={() => { setSquareOpen(true); setError(""); }}>
+            <button type="button" className={`secondary-button ${styles.large}`} onClick={openSquare}>
               <Square aria-hidden="true" size={16} /> Paid by card in Square app
             </button>
           ) : (
-            <form className={styles.cisForm} onSubmit={noteSquare}>
+            <section className={styles.cisForm} aria-labelledby="cis-square-title">
               <fieldset>
-                <legend>Paid by card in Square app</legend>
-                <p className={styles.cisHelp}>This only notes the payment. Finance attaches the real Square payment, so nothing is counted twice.</p>
-                <label htmlFor="cis-square-amount">Amount applied to the balance (without the card fee)</label>
-                <input id="cis-square-amount" inputMode="decimal" autoComplete="off" value={squareAmount} onChange={(event) => setSquareAmount(event.target.value)} />
-                <label htmlFor="cis-square-receipt">Receipt number (optional)</label>
-                <input id="cis-square-receipt" autoComplete="off" value={receipt} maxLength={60} onChange={(event) => setReceipt(event.target.value)} />
+                <legend id="cis-square-title">Paid by card in Square app</legend>
+                {canRecordPayments && (
+                  <div className={styles.cisMatch}>
+                    <p className={styles.cisHelp}>Today&apos;s card payments from the reader that Square ties to this registration.</p>
+                    {loadingCandidates && <p className={styles.cisHelp} role="status">Looking for today&apos;s Square payments...</p>}
+                    {!loadingCandidates && squareUnavailable && (
+                      <p className={styles.cisWarn}>Square could not be reached. Note it for finance to match later.</p>
+                    )}
+                    {!loadingCandidates && alreadyHasPayment && (
+                      <p className={styles.cisWarn}>This registration already shows a payment, so card payments are matched by finance. Note it for finance to match later.</p>
+                    )}
+                    {!loadingCandidates && !squareUnavailable && !alreadyHasPayment && candidates !== null && candidates.length === 0 && (
+                      <p className={styles.cisHelp}>No unmatched Square payment for this registration yet.</p>
+                    )}
+                    {candidates && candidates.length > 0 && (
+                      <ul className={styles.cisMatchList}>
+                        {candidates.map((candidate) => (
+                          <li key={candidate.providerPaymentId} className={styles.cisMatchRow}>
+                            <span>
+                              <strong><Money cents={candidate.amountCents} /></strong>
+                              {candidate.whenLabel && <span className={styles.cisType}> {candidate.whenLabel}</span>}
+                              {candidate.overBalance && (
+                                <span className={styles.cisHelp} id={`cis-over-${candidate.providerPaymentId}`}>
+                                  More than the balance due (card fee?)
+                                </span>
+                              )}
+                            </span>
+                            <button
+                              type="button"
+                              className={`primary-button ${styles.large}`}
+                              disabled={busy}
+                              aria-describedby={candidate.overBalance ? `cis-over-${candidate.providerPaymentId}` : undefined}
+                              onClick={() => (candidate.overBalance ? setConfirmCandidate(candidate) : matchPayment(candidate))}
+                            >
+                              Match
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {!noteOpen && (
+                      <button type="button" className={`secondary-button ${styles.large}`} onClick={openNoteForm} disabled={busy || loadingCandidates}>
+                        Not listed? Note it for finance to match later
+                      </button>
+                    )}
+                  </div>
+                )}
+                {noteFormVisible && (
+                  <form className={styles.cisNoteForm} onSubmit={noteSquare}>
+                    <p className={styles.cisHelp}>This only notes the payment. Finance attaches the real Square payment, so nothing is counted twice.</p>
+                    <label htmlFor="cis-square-amount">Amount applied to the balance (without the card fee)</label>
+                    <input
+                      id="cis-square-amount"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={squareAmount}
+                      aria-describedby={noteAmountOver ? "cis-square-warning" : undefined}
+                      aria-invalid={noteAmountOver || undefined}
+                      onChange={(event) => setSquareAmount(event.target.value)}
+                    />
+                    {noteAmountOver && <p id="cis-square-warning" className={styles.cisWarn}>{overBalanceMessage}</p>}
+                    <label htmlFor="cis-square-receipt">Receipt number (optional)</label>
+                    <input id="cis-square-receipt" autoComplete="off" value={receipt} maxLength={60} onChange={(event) => setReceipt(event.target.value)} />
+                    <div className={styles.cisActions}>
+                      <button type="submit" className={`primary-button ${styles.large}`} disabled={busy || noteAmountOver}>Note card payment</button>
+                    </div>
+                  </form>
+                )}
                 <div className={styles.cisActions}>
-                  <button type="submit" className={`primary-button ${styles.large}`} disabled={busy}>Note card payment</button>
-                  <button type="button" className={`secondary-button ${styles.large}`} onClick={() => setSquareOpen(false)} disabled={busy}>Cancel</button>
+                  <button type="button" className={`secondary-button ${styles.large}`} onClick={closeSquare} disabled={busy}>Cancel</button>
                 </div>
               </fieldset>
-            </form>
+            </section>
           )}
         </>
       )}
@@ -687,6 +884,34 @@ function PaymentPanel({
         {error && <p className={styles.cisError}>{error}</p>}
         {notice && <p className={styles.cisOk}>{notice}</p>}
       </div>
+      {family.paymentHistory.length > 0 && (
+        <div className={styles.cisHistory}>
+          <h4 id="cis-history-title">Payment history</h4>
+          <ul aria-labelledby="cis-history-title">
+            {family.paymentHistory.map((entry) => (
+              <li key={entry.id}>
+                <span>{entry.text}</span>
+                <span className={styles.cisHelp}>{entry.whenLabel}{entry.stationLabel ? ` at ${entry.stationLabel}` : ""}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <ConfirmDialog
+        busy={busy}
+        busyLabel="Matching..."
+        confirmLabel="Match this payment"
+        error={confirmCandidate ? error : ""}
+        onCancel={() => { setConfirmCandidate(null); setError(""); }}
+        onConfirm={() => (confirmCandidate ? matchPayment(confirmCandidate) : Promise.resolve())}
+        open={confirmCandidate !== null}
+        title="Match a payment that is more than the balance?"
+      >
+        <p>
+          This Square payment is {confirmCandidate ? <Money cents={confirmCandidate.amountCents} /> : null}, more than the balance due of <Money cents={balanceCents} />.
+          That is usually the card fee. The whole amount is recorded, and finance reviews the difference.
+        </p>
+      </ConfirmDialog>
     </section>
   );
 }

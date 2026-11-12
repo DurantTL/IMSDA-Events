@@ -147,8 +147,37 @@ export function classifyStationEntry(raw: string): z.infer<typeof stationLookupS
   return looksLikePass ? { kind: "pass", value } : { kind: "confirmation", value };
 }
 
+export const STATION_BALANCE_REASONS = [
+  { code: "PAYING_LATER", label: "Paying later this event" },
+  { code: "GROUP_WILL_PAY", label: "Church or group will pay" },
+  { code: "SCHOLARSHIP_PENDING", label: "Scholarship or discount pending" },
+  { code: "OTHER", label: "Other" },
+] as const;
+
+export type StationBalanceReasonCode = (typeof STATION_BALANCE_REASONS)[number]["code"];
+
+export const STATION_BALANCE_NOTE_MAX_LENGTH = 300;
+
+export const STATION_BALANCE_OTHER_NOTE_MESSAGE = "Add a short note explaining the reason.";
+
+export function stationBalanceReasonLabel(code: StationBalanceReasonCode) {
+  return STATION_BALANCE_REASONS.find((reason) => reason.code === code)?.label ?? "Other";
+}
+
+export const stationBalanceReasonSchema = z.strictObject({
+  code: z.enum(STATION_BALANCE_REASONS.map((reason) => reason.code) as [StationBalanceReasonCode, ...StationBalanceReasonCode[]]),
+  note: z.string().trim().max(STATION_BALANCE_NOTE_MAX_LENGTH).default(""),
+}).refine((value) => value.code !== "OTHER" || value.note.length > 0, {
+  path: ["note"],
+  message: STATION_BALANCE_OTHER_NOTE_MESSAGE,
+});
+
+export type StationBalanceReason = z.infer<typeof stationBalanceReasonSchema>;
+
 export const stationCheckInSchema = z.strictObject({
   registrationId: z.string().trim().min(1).max(100),
+  /** Required (checked on the server) only while the registration still has a balance due. */
+  balanceReason: stationBalanceReasonSchema.optional(),
   items: z.array(z.strictObject({
     attendeeId: z.string().trim().min(1).max(100),
     idempotencyKey: z.uuid(),
@@ -181,6 +210,50 @@ export const stationSquareNoteSchema = z.strictObject({
   amountCents: z.number().int().positive().max(10_000_000),
   receiptNumber: z.string().trim().max(60).default(""),
 });
+
+export const stationSquareUnmatchedSchema = z.strictObject({
+  registrationId: z.string().trim().min(1).max(100),
+});
+
+export const stationSquareMatchSchema = z.strictObject({
+  registrationId: z.string().trim().min(1).max(100),
+  providerPaymentId: z.string().trim().min(1).max(100),
+});
+
+/** One of today's unmatched Square payments that Square itself ties to this registration. Nothing else is sent. */
+export type StationSquareCandidate = {
+  providerPaymentId: string;
+  amountCents: number;
+  /** Time of day in the event's zone, zone named; empty when Square gave none. */
+  whenLabel: string;
+  /** More than the balance due, usually the card fee the payer was charged on top. */
+  overBalance: boolean;
+};
+
+/** One line of the registration's money history on the station. No staff names, no card or Square details. */
+export type StationPaymentHistoryEntry = {
+  id: string;
+  kind: "PAYMENT" | "CARD_NOTE" | "BALANCE_REASON";
+  at: string;
+  /** Date and time in the event's time zone, ready to show. */
+  whenLabel: string;
+  /** Plain-words line, for example "Check #1042 - $25.00 (refunded $5.00)". */
+  text: string;
+  /** The station the entry was made at, when it was made at one. */
+  stationLabel: string | null;
+};
+
+export const STATION_HISTORY_LIMIT = 10;
+
+/** "CASH" to "Cash", a check with its number, a card reference to "Card". */
+export function stationPaymentMethodLabel(method: string, reference: string | null) {
+  switch (method) {
+    case "CASH": return "Cash";
+    case "CHECK": return reference?.trim() ? `Check #${reference.trim()}` : "Check";
+    case "CARD_REFERENCE": return "Card";
+    default: return "Recorded by staff";
+  }
+}
 
 export type StationPaymentSummary =
   | { state: "BILLED_TO_GROUP" }
@@ -218,6 +291,7 @@ export type StationFamily = {
   confirmationCode: string;
   attendees: StationFamilyMember[];
   payment: StationPaymentSummary;
+  paymentHistory: StationPaymentHistoryEntry[];
 };
 
 export type StationCheckInResultStatus =

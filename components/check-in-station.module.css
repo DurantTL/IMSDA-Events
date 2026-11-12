@@ -57,6 +57,20 @@
 .cisOk { color: var(--green); font-weight: 700; }
 .cisError { border-radius: var(--radius-sm); background: var(--coral-soft); color: var(--coral); padding: 9px 11px; }
 .cisDeskNotice { border-radius: var(--radius-sm); background: var(--imsda-gold-soft); color: var(--gold-text); padding: 9px 11px; font-weight: 700; }
+/* Money: balance reason, history, over-balance warning and Square match (#1577). */
+.cisReason { display: grid; gap: 8px; margin: 10px 0 0; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 12px; }
+.cisReason legend { padding: 0 6px; font-weight: 700; }
+.cisReasonChoices { display: grid; gap: 4px; }
+.cisShell .cisReasonChoices label { display: flex; align-items: center; gap: 10px; box-sizing: border-box; min-height: 48px; padding: 0; }
+.cisReasonChoices input[type="radio"] { width: 24px; height: 24px; flex: 0 0 auto; margin: 0; }
+.cisWarn { margin: 4px 0 0; border-radius: var(--radius-sm); background: var(--imsda-gold-soft); color: var(--gold-text); padding: 9px 11px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.cisHistory h4 { margin: 8px 0 4px; font-size: max(var(--type-staff-floor, 0px), 0.95rem); }
+.cisHistory ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.cisHistory li { display: grid; gap: 0; border-top: 1px solid var(--line); padding-top: 6px; overflow-wrap: anywhere; }
+.cisMatch, .cisNoteForm { display: grid; gap: 8px; }
+.cisMatchList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.cisMatchRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 8px 12px; }
+.cisMatchRow > span { display: grid; gap: 2px; min-width: 0; }
 /* After a check-in: what to hand over, and the Just checked in list with Undo (#1577). */
 .cisHandOut { margin-top: 8px; border: 2px solid var(--green); border-radius: var(--radius-card); background: var(--green-soft); padding: 14px 16px; }
 .cisHandOut h3 { margin: 0 0 6px; font-size: max(var(--type-staff-floor, 0px), 1.05rem); }

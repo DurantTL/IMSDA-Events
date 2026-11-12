@@ -76,7 +76,7 @@ describe("the staff club page's club year (#541)", () => {
     const clubLinks = all.filter((element) => typeof element.props.href === "string" && String(element.props.href).startsWith("/admin/organizations/club-1/club"));
     // The staff Honors screen (#591) is a card in the "This club" group (#1587), carrying the year, not a year choice.
     const group = all.find((element) => element.type === HubCardGroup);
-    expect((group?.props.cards as Array<{ href: string }>).map((card) => card.href)).toContain("/admin/organizations/club-1/club/honors?year=2025-26");
+    expect((group?.props.cards as Array<{ href: string }>).map((card) => card.href.split("&from=")[0])).toContain("/admin/organizations/club-1/club/honors?year=2025-26");
     const links = clubLinks;
     expect(links.map((link) => [link.props.href, link.props["aria-current"]])).toEqual([
       ["/admin/organizations/club-1/club?year=2023-24", undefined],

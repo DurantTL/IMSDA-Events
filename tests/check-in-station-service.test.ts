@@ -16,7 +16,13 @@ const mocks = vi.hoisted(() => {
       super(code);
     }
   }
+  class MockSquareError extends Error {
+    constructor(public readonly code: string) {
+      super(code);
+    }
+  }
   return {
+    MockSquareError,
     MockPassError,
     MockCheckInError,
     MockPaymentError,
@@ -27,6 +33,8 @@ const mocks = vi.hoisted(() => {
     undoCheckIn: vi.fn(),
     recordManualPayment: vi.fn(),
     writeAuditLog: vi.fn(),
+    listUnmatchedSquarePayments: vi.fn(),
+    attachSquarePaymentToRegistration: vi.fn(),
   };
 });
 
@@ -48,6 +56,12 @@ vi.mock("@/modules/checkin/repository", () => ({
   checkInAttendee: mocks.checkInAttendee,
   undoCheckIn: mocks.undoCheckIn,
 }));
+vi.mock("@/modules/payments/square-match-repository", () => ({
+  SquareMatchOperationError: mocks.MockSquareError,
+  listUnmatchedSquarePayments: mocks.listUnmatchedSquarePayments,
+  attachSquarePaymentToRegistration: mocks.attachSquarePaymentToRegistration,
+}));
+vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 vi.mock("@/modules/payments/repository", () => ({
   PaymentOperationError: mocks.MockPaymentError,
   recordManualPayment: mocks.recordManualPayment,
@@ -56,7 +70,10 @@ vi.mock("@/modules/payments/repository", () => ({
 import {
   StationServiceError,
   checkInStationFamily,
+  listStationSquareCandidates,
   lookupStationFamily,
+  matchStationSquarePayment,
+  stationPaymentHistory,
   noteStationSquareAppPayment,
   recordStationPayment,
   stationHandOutList,
@@ -73,6 +90,7 @@ const station: ResolvedStation = {
 };
 const keyA = "11111111-1111-4111-8111-111111111111";
 const keyB = "22222222-2222-4222-8222-222222222222";
+const reason = { code: "PAYING_LATER", note: "" } as const;
 
 function registrationRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -85,7 +103,7 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
       { id: "attendee_2", first: "Blair", last: "Example", type: "CHILD", checkedIn: true },
       { id: "attendee_3", first: "Casey", last: "Example", type: "ADULT", checkedIn: false },
     ],
-    event: { billingMode: "ATTENDEE_PAY" },
+    event: { billingMode: "ATTENDEE_PAY", timezone: "America/Chicago" },
     payments: [{ amount: 40, refunds: [] }],
     ...overrides,
   };
@@ -102,8 +120,8 @@ function prismaFor(registration: Record<string, unknown> | null = registrationRo
       findMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) =>
         where.id.in.filter((id) => ["attendee_1", "attendee_2", "attendee_3"].includes(id)).map((id) => ({ id }))),
     },
-    auditLog: { findFirst: vi.fn().mockResolvedValue(note) },
-    payment: { create: vi.fn(), findUnique: vi.fn().mockResolvedValue(null) },
+    auditLog: { findFirst: vi.fn().mockResolvedValue(note), findMany: vi.fn().mockResolvedValue([]) },
+    payment: { create: vi.fn(), findUnique: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0) },
   };
   mocks.getPrisma.mockReturnValue(prisma);
   return prisma;
@@ -127,6 +145,7 @@ describe("station family lookup (#892)", () => {
       { id: "attendee_3", firstName: "Casey", lastName: "Example", attendeeType: "ADULT", checkedIn: false, needsDeskReview: false },
     ]);
     expect(family.payment).toEqual({ state: "DUE", balanceCents: 6000, squareAppNote: null });
+    expect(family.paymentHistory).toEqual([]);
     expect(JSON.stringify(family)).not.toMatch(/email|phone|health|sterling/i);
   });
 
@@ -181,6 +200,7 @@ describe("station check-in (#892)", () => {
     prismaFor();
     const results = await checkInStationFamily(station, {
       registrationId: "registration_1",
+      balanceReason: reason,
       items: [{ attendeeId: "attendee_1", idempotencyKey: keyA }],
     });
     expect(results).toEqual([{ attendeeId: "attendee_1", status: "CHECKED_IN" }]);
@@ -195,6 +215,7 @@ describe("station check-in (#892)", () => {
     const prisma = prismaFor();
     await expect(checkInStationFamily(station, {
       registrationId: "registration_1",
+      balanceReason: reason,
       items: [{ attendeeId: "attendee_1", idempotencyKey: keyA }, { attendeeId: "attendee_other_event", idempotencyKey: keyB }],
     })).rejects.toBeInstanceOf(StationServiceError);
     expect(prisma.registrationAttendee.findMany).toHaveBeenCalledWith(expect.objectContaining({
@@ -208,6 +229,7 @@ describe("station check-in (#892)", () => {
     mocks.checkInAttendee.mockResolvedValue({ checkedIn: true, disposition: "ALREADY_CHECKED_IN" });
     const results = await checkInStationFamily(station, {
       registrationId: "registration_1",
+      balanceReason: reason,
       items: [{ attendeeId: "attendee_1", idempotencyKey: keyA }],
     });
     expect(results).toEqual([{ attendeeId: "attendee_1", status: "ALREADY_CHECKED_IN" }]);
@@ -216,7 +238,7 @@ describe("station check-in (#892)", () => {
   it("replays a retried confirmation with the same key as the same result", async () => {
     prismaFor();
     mocks.checkInAttendee.mockResolvedValue({ checkedIn: true, disposition: "IDEMPOTENT_REPLAY" });
-    const input = { registrationId: "registration_1", items: [{ attendeeId: "attendee_1", idempotencyKey: keyA }] };
+    const input = { registrationId: "registration_1", balanceReason: reason, items: [{ attendeeId: "attendee_1", idempotencyKey: keyA }] };
     expect(await checkInStationFamily(station, input)).toEqual([{ attendeeId: "attendee_1", status: "CHECKED_IN" }]);
     expect(mocks.checkInAttendee.mock.calls[0][3]).toBe(keyA);
   });
@@ -226,6 +248,7 @@ describe("station check-in (#892)", () => {
     mocks.checkInAttendee.mockRejectedValue(new mocks.MockCheckInError("STERLING_CHECK_NEEDED"));
     const results = await checkInStationFamily(station, {
       registrationId: "registration_1",
+      balanceReason: reason,
       items: [{ attendeeId: "attendee_3", idempotencyKey: keyA }],
     });
     expect(results).toEqual([{ attendeeId: "attendee_3", status: "NEEDS_DESK_REVIEW" }]);
@@ -358,6 +381,212 @@ describe("station payments (#892)", () => {
     prismaFor();
     await noteStationSquareAppPayment(station, { registrationId: "registration_1", amountCents: 6000, receiptNumber: "" });
     expect(mocks.writeAuditLog.mock.calls[0][0].metadata).not.toHaveProperty("receiptNumber");
+  });
+});
+
+describe("balance reason at check-in (#1577)", () => {
+  const items = [{ attendeeId: "attendee_1", idempotencyKey: keyA }];
+  const base = { registrationId: "registration_1", items };
+
+  it("refuses a check-in with a balance due and no reason, before anyone is checked in", async () => {
+    prismaFor();
+    await expect(checkInStationFamily(station, base)).rejects.toMatchObject({ code: "BALANCE_REASON_REQUIRED" });
+    expect(mocks.checkInAttendee).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("refuses Other without a note", async () => {
+    prismaFor();
+    await expect(checkInStationFamily(station, { ...base, balanceReason: { code: "OTHER", note: "  " } }))
+      .rejects.toMatchObject({ code: "BALANCE_REASON_REQUIRED" });
+    expect(mocks.checkInAttendee).not.toHaveBeenCalled();
+  });
+
+  it("needs no reason when the registration is paid or billed to the group", async () => {
+    prismaFor(registrationRow({ payments: [{ amount: 100, refunds: [] }] }));
+    expect(await checkInStationFamily(station, base)).toEqual([{ attendeeId: "attendee_1", status: "CHECKED_IN" }]);
+    prismaFor(registrationRow({ event: { billingMode: "DEFERRED_ORGANIZATION_INVOICE", timezone: "America/Chicago" } }));
+    expect(await checkInStationFamily(station, base)).toEqual([{ attendeeId: "attendee_1", status: "CHECKED_IN" }]);
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("writes one audit entry under the starter and station when someone is newly checked in", async () => {
+    prismaFor();
+    await checkInStationFamily(station, {
+      registrationId: "registration_1",
+      items: [{ attendeeId: "attendee_1", idempotencyKey: keyA }, { attendeeId: "attendee_3", idempotencyKey: keyB }],
+      balanceReason: { code: "OTHER", note: "Treasurer is bringing a check" },
+    });
+    expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      eventId: "event_1",
+      actorUserId: "user_1",
+      action: "CHECK_IN_STATION_BALANCE_REASON",
+      entityType: "Registration",
+      entityId: "registration_1",
+      summary: expect.stringContaining('(check-in station "Front desk tablet")'),
+      metadata: {
+        reasonCode: "OTHER",
+        note: "Treasurer is bringing a check",
+        balanceCents: 6000,
+        channel: "CHECK_IN_STATION",
+        station: { id: "station_1", label: "Front desk tablet" },
+      },
+    }));
+  });
+
+  it("does not write the entry again for a replay or an already checked-in person", async () => {
+    prismaFor();
+    mocks.checkInAttendee.mockResolvedValue({ checkedIn: true, disposition: "IDEMPOTENT_REPLAY" });
+    await checkInStationFamily(station, { ...base, balanceReason: reason });
+    mocks.checkInAttendee.mockResolvedValue({ checkedIn: true, disposition: "ALREADY_CHECKED_IN" });
+    await checkInStationFamily(station, { ...base, balanceReason: reason });
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("does not write the entry when the person is held for desk review", async () => {
+    prismaFor();
+    mocks.checkInAttendee.mockRejectedValue(new mocks.MockCheckInError("STERLING_CHECK_NEEDED"));
+    await checkInStationFamily(station, { ...base, balanceReason: reason });
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+});
+
+describe("station payment history (#1577)", () => {
+  it("lists payments, card notes and balance reasons newest first with plain words and station labels", async () => {
+    const prisma = prismaFor();
+    prisma.payment.findMany.mockResolvedValue([
+      { id: "pay_1", amount: 25, method: "CHECK", externalReference: "1042", receivedAt: new Date("2026-10-31T15:30:00.000Z"), createdAt: new Date("2026-10-31T15:30:00.000Z"), refunds: [{ amount: 5 }] },
+      { id: "pay_2", amount: 15, method: "CARD_REFERENCE", externalReference: "sq_secret_ref", receivedAt: null, createdAt: new Date("2026-10-30T15:00:00.000Z"), refunds: [] },
+    ]);
+    prisma.auditLog.findMany.mockResolvedValue([
+      { id: "log_3", action: "CHECK_IN_STATION_BALANCE_REASON", entityId: "registration_1", createdAt: new Date("2026-11-01T16:00:00.000Z"), metadata: { reasonCode: "OTHER", note: "Pastor vouched", station: { id: "s", label: "Gate B" } } },
+      { id: "log_2", action: "CHECK_IN_STATION_SQUARE_APP_NOTED", entityId: "registration_1", createdAt: new Date("2026-10-31T18:00:00.000Z"), metadata: { amountCents: 1000, receiptNumber: "R-9", station: { id: "s", label: "Gate B" } } },
+      { id: "log_4", action: "SQUARE_PAYMENT_MANUALLY_MATCHED", entityId: "pay_2", createdAt: new Date("2026-10-30T15:01:00.000Z"), metadata: { providerPaymentId: "sq_secret_ref", staffNote: "private", channel: "CHECK_IN_STATION", station: { id: "s", label: "Gate C" } } },
+      { id: "log_1", action: "MANUAL_PAYMENT_RECORDED", entityId: "pay_1", createdAt: new Date("2026-10-31T15:30:00.000Z"), metadata: { amountCents: 2500, station: { id: "s", label: "Front desk tablet" } } },
+    ]);
+    const history = await stationPaymentHistory("event_1", "registration_1");
+    expect(history.map((entry) => entry.text)).toEqual([
+      "Checked in with balance due: Other - Pastor vouched",
+      "Card payment noted for finance - $10.00",
+      "Check #1042 - $25.00 (refunded $5.00)",
+      "Card - $15.00",
+    ]);
+    expect(history.map((entry) => entry.stationLabel)).toEqual(["Gate B", "Gate B", "Front desk tablet", "Gate C"]);
+    expect(history[2].whenLabel).toBe("Oct 31, 2026, 10:30 AM CDT");
+    const serialized = JSON.stringify(history);
+    expect(serialized).not.toMatch(/sq_secret_ref|R-9|Casey|user_1|private/);
+    expect(prisma.payment.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { eventId: "event_1", registrationId: "registration_1", status: "SUCCEEDED" },
+      take: 10,
+    }));
+  });
+
+  it("caps the list at ten rows", async () => {
+    const prisma = prismaFor();
+    prisma.payment.findMany.mockResolvedValue(Array.from({ length: 10 }, (_, index) => ({
+      id: `pay_${index}`, amount: 1, method: "CASH", externalReference: null,
+      receivedAt: new Date(Date.UTC(2026, 9, 1, index)), createdAt: new Date(Date.UTC(2026, 9, 1, index)), refunds: [],
+    })));
+    prisma.auditLog.findMany.mockResolvedValue([
+      { id: "n1", action: "CHECK_IN_STATION_SQUARE_APP_NOTED", entityId: "registration_1", createdAt: new Date("2026-10-05T00:00:00.000Z"), metadata: { amountCents: 100 } },
+    ]);
+    expect(await stationPaymentHistory("event_1", "registration_1")).toHaveLength(10);
+  });
+});
+
+describe("station Square match (#1577)", () => {
+  const finding = (overrides: Record<string, unknown>) => ({
+    code: "APPLICABLE", providerPaymentId: "sq_1", amountCents: 6000, currency: "USD", createdAt: "2026-11-01T15:00:00.000Z",
+    confirmationCode: "CM27-ONE", balanceCents: 6000, detail: "x", note: "Alex Example cabin 4", referenceId: "CM27-ONE",
+    orderId: "order_1", registrationId: "registration_1", ...overrides,
+  });
+
+  it("returns only this registration's findings with no note, reference or order", async () => {
+    prismaFor();
+    mocks.listUnmatchedSquarePayments.mockResolvedValue({
+      findings: [
+        finding({}),
+        finding({ providerPaymentId: "sq_2", amountCents: 6300 }),
+        finding({ providerPaymentId: "sq_3", registrationId: "registration_other" }),
+        finding({ providerPaymentId: "sq_4", registrationId: null }),
+      ],
+      examined: 4, unreachableSquare: false, environment: "sandbox",
+    });
+    const result = await listStationSquareCandidates(station, "registration_1");
+    expect(mocks.listUnmatchedSquarePayments).toHaveBeenCalledWith({ eventId: "event_1", days: 1 });
+    expect(result).toEqual({
+      unavailable: false,
+      alreadyHasPayment: false,
+      candidates: [
+        { providerPaymentId: "sq_1", amountCents: 6000, whenLabel: "9:00 AM CST", overBalance: false },
+        { providerPaymentId: "sq_2", amountCents: 6300, whenLabel: "9:00 AM CST", overBalance: true },
+      ],
+    });
+    expect(JSON.stringify(result)).not.toMatch(/cabin|order_1|referenceId|note/);
+  });
+
+  it("reports Square as unavailable when it is not set up or cannot be reached", async () => {
+    prismaFor();
+    mocks.listUnmatchedSquarePayments.mockRejectedValue(new mocks.MockSquareError("SQUARE_NOT_CONFIGURED"));
+    expect(await listStationSquareCandidates(station, "registration_1")).toEqual({ candidates: [], unavailable: true, alreadyHasPayment: false });
+    mocks.listUnmatchedSquarePayments.mockResolvedValue({ findings: [], examined: 0, unreachableSquare: true, environment: "sandbox" });
+    expect(await listStationSquareCandidates(station, "registration_1")).toEqual({ candidates: [], unavailable: true, alreadyHasPayment: false });
+  });
+
+  it("offers no Match when the registration already shows a payment", async () => {
+    const prisma = prismaFor();
+    prisma.payment.count.mockResolvedValue(1);
+    expect(await listStationSquareCandidates(station, "registration_1")).toEqual({ candidates: [], unavailable: false, alreadyHasPayment: true });
+    expect(mocks.listUnmatchedSquarePayments).not.toHaveBeenCalled();
+  });
+
+  it("lists nothing for a church-billed registration", async () => {
+    prismaFor(registrationRow({ event: { billingMode: "DEFERRED_ORGANIZATION_INVOICE", timezone: "America/Chicago" } }));
+    await expect(listStationSquareCandidates(station, "registration_1")).rejects.toMatchObject({ code: "BILLED_TO_GROUP" });
+    expect(mocks.listUnmatchedSquarePayments).not.toHaveBeenCalled();
+  });
+
+  const listed = (...findings: Array<Record<string, unknown>>) =>
+    mocks.listUnmatchedSquarePayments.mockResolvedValue({ findings, examined: findings.length, unreachableSquare: false, environment: "sandbox" });
+
+  it("refuses a payment that is not listed for this registration, without attaching", async () => {
+    prismaFor();
+    listed(finding({ providerPaymentId: "sq_other", registrationId: "registration_other" }), finding({ providerPaymentId: "sq_nobody", registrationId: null }));
+    for (const providerPaymentId of ["sq_other", "sq_nobody", "sq_unknown"]) {
+      await expect(matchStationSquarePayment(station, { registrationId: "registration_1", providerPaymentId }))
+        .rejects.toMatchObject({ code: "PAYMENT_NOT_LISTED" });
+    }
+    expect(mocks.attachSquarePaymentToRegistration).not.toHaveBeenCalled();
+  });
+
+  it("refuses when Square cannot be reached to confirm the list", async () => {
+    prismaFor();
+    mocks.listUnmatchedSquarePayments.mockResolvedValue({ findings: [], examined: 0, unreachableSquare: true, environment: "sandbox" });
+    await expect(matchStationSquarePayment(station, { registrationId: "registration_1", providerPaymentId: "sq_1" }))
+      .rejects.toMatchObject({ code: "SQUARE_UNREACHABLE" });
+    expect(mocks.attachSquarePaymentToRegistration).not.toHaveBeenCalled();
+  });
+
+  it("attaches without ever acknowledging a duplicate, under the starter", async () => {
+    prismaFor();
+    listed(finding({}));
+    mocks.attachSquarePaymentToRegistration.mockResolvedValue({});
+    await matchStationSquarePayment(station, { registrationId: "registration_1", providerPaymentId: "sq_1" });
+    expect(mocks.attachSquarePaymentToRegistration).toHaveBeenCalledWith(
+      "event_1", "registration_1", "user_1",
+      { providerPaymentId: "sq_1", note: "Matched at check-in station Front desk tablet" },
+      { auditContext: { station: { id: "station_1", label: "Front desk tablet" } } },
+    );
+    expect(mocks.attachSquarePaymentToRegistration.mock.calls[0][3]).not.toHaveProperty("acknowledgeDuplicate");
+  });
+
+  it("passes a duplicate refusal through for the route to explain", async () => {
+    prismaFor();
+    listed(finding({}));
+    mocks.attachSquarePaymentToRegistration.mockRejectedValue(new mocks.MockSquareError("PAYMENT_LIKELY_DUPLICATE"));
+    await expect(matchStationSquarePayment(station, { registrationId: "registration_1", providerPaymentId: "sq_1" }))
+      .rejects.toMatchObject({ code: "PAYMENT_LIKELY_DUPLICATE" });
   });
 });
 

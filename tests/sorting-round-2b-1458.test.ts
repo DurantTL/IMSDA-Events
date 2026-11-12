@@ -30,7 +30,7 @@ import type { FormsHubRow } from "@/modules/forms-hub/rows";
 import type { BackgroundFlag } from "@/modules/background-checks/repository";
 
 const hubRow = (index: number): FormsHubRow => ({
-  id: `f${index}`, kind: "GENERAL", name: `Form ${String(index).padStart(2, "0")}`, eventName: null, status: "OPEN", statusLabel: "Open",
+  id: `f${index}`, kind: "GENERAL", name: `Form ${String(index).padStart(2, "0")}`, eventName: null, eventId: null, status: "OPEN", statusLabel: "Open",
   responseCount: index, lastResponseAt: null, editHref: "/e", responsesHref: "/r",
 });
 const formNames = (html: string) => [...html.matchAll(/<th[^>]*scope="row"[^>]*>(Form \d+)</g)].map((match) => match[1]);

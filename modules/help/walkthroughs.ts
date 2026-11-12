@@ -1,4 +1,4 @@
-import type { PortalAudience, PortalGuide, WalkthroughStep } from "@/modules/help/types";
+import type { HelpGuide, PortalAudience, PortalGuide, WalkthroughStep } from "@/modules/help/types";
 
 /**
  * Walkthroughs (#1482): step-by-step guides with a picture of the real screen for every step. This file is pure data
@@ -10,9 +10,10 @@ import type { PortalAudience, PortalGuide, WalkthroughStep } from "@/modules/hel
  * Wording rules: one or two plain sentences, short words, the exact on-screen labels, no jargon. Sample data only.
  */
 export type WalkthroughDefinition = {
-  /** The portal guide id. Stable: picture paths, links and search depend on it. */
+  /** The guide id. Stable: picture paths, links and search depend on it. */
   id: string;
-  audience: PortalAudience;
+  /** A portal audience, or `clubs` for a staff guide for Clubs Administrators (#1882), which lives in the staff registry. */
+  audience: PortalAudience | "clubs";
   title: string;
   summary: string;
   needs: readonly string[];
@@ -485,15 +486,72 @@ export const familyWalkthroughs: readonly WalkthroughDefinition[] = [
   },
 ];
 
+const CLUBS_REVIEWED = "2026-11-12";
+const CLUB_PAGE = "app/(workspace)/admin/organizations/[organizationId]/club";
+const CLUBS_SHELL = ["components/app-shell.tsx", "components/admin-page-header.tsx", "components/staff-shell.module.css", "components/staff-navigation.ts"] as const;
+
+/**
+ * The Clubs Administrator walkthroughs (#1882): staff guides for `hasClubsAdministration` (Clubs Administrators and system
+ * administrators). They start signed in as a sample Clubs Administrator who is not a system administrator. They are staff guides
+ * (workspace Clubs), not portal guides: `walkthroughGuides` leaves them out and `clubsAdminWalkthroughGuides` turns them into staff
+ * `HelpGuide`s. Two short ones, to keep all the walkthrough pictures under their size limit.
+ */
+export const clubsAdminWalkthroughs: readonly WalkthroughDefinition[] = [
+  {
+    id: "walkthrough-clubs-find-club",
+    audience: "clubs",
+    title: "Step by step: Find a club",
+    summary: "Search for a club from the header, then open its page and its Monthly Records.",
+    needs: ["Clubs administration, signed in."],
+    changes: ["Nothing. Searching and opening a club only reads. The club's page is view only."],
+    verify: ["The club's page opens and says Open club · view only.", "It names the club, its sponsoring church and the club year."],
+    next: "To follow every club's records, open Monthly Records in the Clubs menu.",
+    destinationIds: ["club-summary", "club-monthly-records"],
+    keywords: ["find a club", "search", "header search", "club summary", "open club", "club", "look up", "step by step", "walkthrough", "screenshots"],
+    sourceFiles: [
+      `${CLUB_PAGE}/page.tsx`, `${CLUB_PAGE}/club-page.module.css`, "components/staff-header-search.tsx", "components/destination-search.tsx", "components/destination-search.module.css",
+      "modules/staff-search/service.ts", "modules/club-reports/club-page-links.ts", "components/admin-hub.tsx", ...CLUBS_SHELL,
+    ],
+    steps: [
+      { id: "type-name", text: "Type part of the club's name in the header search box. On a phone, tap the search button first.", alt: "The header search box with part of a club's name typed in it, and the club listed under Clubs. The search box is marked." },
+      { id: "pick-club", text: "Choose the club under Clubs in the results.", alt: "The search results with the club's name under Clubs marked." },
+      { id: "open-club", text: "The club's page opens. It says Open club · view only, with the club's name and its sponsoring church.", alt: "The club's page with its name marked, under the words Open club, view only." },
+      { id: "monthly-records", text: "Under This club, choose Monthly Records to read that club's records.", alt: "The This club cards, with the Monthly Records card marked." },
+    ],
+  },
+  {
+    id: "walkthrough-clubs-leaders",
+    audience: "clubs",
+    title: "Step by step: Check club leaders and invites",
+    summary: "See who leads each club, then find the invites that were sent and the ones not sent yet.",
+    needs: ["Clubs administration, signed in.", "Account email set up on the server, to send or resend an invite."],
+    changes: ["Looking changes nothing. Resend and Send all unsent email the people on the invites, after you confirm."],
+    verify: ["Invited lists the invites that were sent.", "Draft lists the invites not sent yet, with Send all unsent."],
+    next: "Review the drafts, then send them. To fix a wrong address, use the pencil button on the row.",
+    destinationIds: ["club-invites"],
+    keywords: ["club leaders", "leaders", "invites", "invited", "draft", "resend", "send all unsent", "status", "director", "step by step", "walkthrough", "screenshots"],
+    sourceFiles: [
+      "app/(workspace)/admin/clubs/leaders/page.tsx", "components/club-leaders-list.tsx", "components/club-invites-workspace.tsx", "components/club-invites-workspace.module.css",
+      "components/people-directory.module.css", "components/get-filter-form.tsx", "modules/system-admin/club-leaders-model.ts", ...CLUBS_SHELL,
+    ],
+    steps: [
+      { id: "status-choice", text: "Choose Clubs, then Club leaders (on a phone, open Clubs menu first). Under Status, Current lists everyone who leads a club now.", alt: "The Club leaders page with the Status box marked. It says Current, and the current leaders are listed under it." },
+      { id: "invited", text: "Pick Invited under Status, then choose Show. Each row is an invite that was sent.", alt: "The Invited list with one invite's row marked. It shows the club, the role and the Sent chip with a date." },
+      { id: "resend", text: "To email an invite again, choose Resend on its row.", alt: "The Invited list with the Resend button on the invite's row marked. It is greyed out here because the sample site sends no email." },
+      { id: "draft", text: "To send invites that were made but not sent, pick Draft under Status, then choose Show. Send all unsent emails every draft.", alt: "The Draft list with the Send all unsent button marked. It is greyed out here because the sample site sends no email." },
+    ],
+  },
+];
+
 /** Every walkthrough, in the order the capture script and the browser check run them. */
-export const walkthroughs: readonly WalkthroughDefinition[] = [...directorWalkthroughs, ...coordinatorWalkthroughs, ...familyWalkthroughs];
+export const walkthroughs: readonly WalkthroughDefinition[] = [...directorWalkthroughs, ...coordinatorWalkthroughs, ...familyWalkthroughs, ...clubsAdminWalkthroughs];
 
 export function findWalkthrough(id: string): WalkthroughDefinition | undefined {
   return walkthroughs.find((walkthrough) => walkthrough.id === id);
 }
 
 /** The portal guide for a walkthrough: `steps` carries the same sentences, so search and the contextual views still work. */
-export function walkthroughGuide(definition: WalkthroughDefinition): PortalGuide {
+export function walkthroughGuide(definition: WalkthroughDefinition & { audience: PortalAudience }): PortalGuide {
   return {
     id: definition.id,
     title: definition.title,
@@ -513,7 +571,34 @@ export function walkthroughGuide(definition: WalkthroughDefinition): PortalGuide
   };
 }
 
-export const walkthroughGuides: readonly PortalGuide[] = walkthroughs.map(walkthroughGuide);
+/** The portal registry's walkthroughs. The Clubs Administrator ones (#1882) are staff guides and are left out. */
+export const walkthroughGuides: readonly PortalGuide[] = walkthroughs
+  .filter((definition): definition is WalkthroughDefinition & { audience: PortalAudience } => definition.audience !== "clubs")
+  .map(walkthroughGuide);
+
+/** The staff guide for a Clubs Administrator walkthrough (#1882): workspace Clubs, audience clubs, `steps` carrying the same sentences. */
+export function clubsAdminWalkthroughGuide(definition: WalkthroughDefinition): HelpGuide {
+  return {
+    id: definition.id,
+    title: definition.title,
+    summary: definition.summary,
+    workspace: "Clubs",
+    audience: { kind: "clubs" },
+    needs: definition.needs,
+    changes: definition.changes,
+    steps: definition.steps.map((step) => step.text),
+    verify: definition.verify,
+    next: definition.next,
+    destinationIds: definition.destinationIds,
+    relatedDocs: [],
+    keywords: definition.keywords,
+    owner: OWNER,
+    lastReviewed: CLUBS_REVIEWED,
+    walkthrough: { steps: definition.steps },
+  };
+}
+
+export const clubsAdminWalkthroughGuides: readonly HelpGuide[] = clubsAdminWalkthroughs.map(clubsAdminWalkthroughGuide);
 
 /**
  * The written guides that have a step-by-step version, by written guide id. Each shows a "See it step by step" link near its
@@ -534,6 +619,10 @@ export const walkthroughsForGuide: Record<string, readonly string[]> = {
   "coordinator-follow-records": ["walkthrough-coordinator-records"],
   "coordinator-follow-up-clubs": ["walkthrough-coordinator-follow-up", "walkthrough-coordinator-no-director"],
   "coordinator-points": ["walkthrough-coordinator-points"],
+  // The Clubs Administrator guides (#1882) are staff guides: `guides.ts` reads these entries for them.
+  "clubs-find-a-club": ["walkthrough-clubs-find-club"],
+  "clubs-leaders-and-invites": ["walkthrough-clubs-leaders"],
+  "clubs-send-draft-invites": ["walkthrough-clubs-leaders"],
   "family-pay-balance": ["walkthrough-family-pay"],
   "family-change-registration": ["walkthrough-family-change"],
   "family-cancel-registration": ["walkthrough-family-cancel"],

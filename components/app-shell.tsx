@@ -143,7 +143,7 @@ export function AppShell({
   );
   const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
   // What the pages below need to decide which Help links and Set up links this viewer may follow (#1435).
-  const staffViewer: HelpViewer = { isSystemAdmin, selectedEventId, permissions: isSystemAdmin ? [...eventPermissions] : [...selectedPermissions] };
+  const staffViewer: HelpViewer = { isSystemAdmin, isClubsAdministrator: isSystemAdmin || Boolean(adminRoleView?.held.includes("CLUBS_ADMIN")), selectedEventId, permissions: isSystemAdmin ? [...eventPermissions] : [...selectedPermissions] };
 
   // Staff with no events can still open their profile (#623); every event control and event-scoped tab would dead-end for them.
   const eventlessProfile = (isProfileRoute || isHelpRoute) && events.length === 0 && !isSystemAdmin;
