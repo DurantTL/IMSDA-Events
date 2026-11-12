@@ -155,6 +155,15 @@ export const stationCheckInSchema = z.strictObject({
   })).min(1).max(100),
 });
 
+export const stationUndoSchema = z.strictObject({
+  attendeeId: z.string().trim().min(1).max(100),
+});
+
+/** One line per thing to give the family after a check-in: "Name badge × 2", "Cabin key K-204". */
+export function stationBadgeLine(count: number) {
+  return `Name badge × ${count}`;
+}
+
 export const stationPaymentSchema = z.strictObject({
   registrationId: z.string().trim().min(1).max(100),
   method: z.enum(["CASH", "CHECK"]),

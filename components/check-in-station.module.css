@@ -57,3 +57,11 @@
 .cisOk { color: var(--green); font-weight: 700; }
 .cisError { border-radius: var(--radius-sm); background: var(--coral-soft); color: var(--coral); padding: 9px 11px; }
 .cisDeskNotice { border-radius: var(--radius-sm); background: var(--imsda-gold-soft); color: var(--gold-text); padding: 9px 11px; font-weight: 700; }
+/* After a check-in: what to hand over, and the Just checked in list with Undo (#1577). */
+.cisHandOut { margin-top: 8px; border: 2px solid var(--green); border-radius: var(--radius-card); background: var(--green-soft); padding: 14px 16px; }
+.cisHandOut h3 { margin: 0 0 6px; font-size: max(var(--type-staff-floor, 0px), 1.05rem); }
+.cisHandOut ul { margin: 0; padding-left: 1.25rem; font-size: max(var(--type-staff-floor, 0px), 1.1rem); font-weight: 700; }
+.cisJustIn { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding-right: 8px; }
+.cisJustIn .cisPersonBody { flex: 1 1 12rem; }
+.cisUndoStatus { min-width: 0; }
+.cisUndoStatus:empty { display: none; }

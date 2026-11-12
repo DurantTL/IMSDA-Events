@@ -34,6 +34,8 @@ const mocks = vi.hoisted(() => {
     revokeStation: vi.fn(),
     lookupStationFamily: vi.fn(),
     checkInStationFamily: vi.fn(),
+    undoStationCheckIn: vi.fn(),
+    stationHandOutList: vi.fn(),
     recordStationPayment: vi.fn(),
     noteStationSquareAppPayment: vi.fn(),
     checkLookupRateLimit: vi.fn(),
@@ -68,6 +70,8 @@ vi.mock("@/modules/checkin-stations/service", () => ({
   StationServiceError: mocks.MockServiceError,
   lookupStationFamily: mocks.lookupStationFamily,
   checkInStationFamily: mocks.checkInStationFamily,
+  undoStationCheckIn: mocks.undoStationCheckIn,
+  stationHandOutList: mocks.stationHandOutList,
   recordStationPayment: mocks.recordStationPayment,
   noteStationSquareAppPayment: mocks.noteStationSquareAppPayment,
 }));
@@ -75,6 +79,7 @@ vi.mock("@/modules/rate-limit/service", () => ({ checkCheckInStationLookupRateLi
 
 import { POST as lookupPost } from "@/app/api/check-in-station/lookup/route";
 import { POST as checkInPost } from "@/app/api/check-in-station/check-in/route";
+import { POST as undoPost } from "@/app/api/check-in-station/undo/route";
 import { POST as paymentPost } from "@/app/api/check-in-station/payment/route";
 import { POST as squareNotePost } from "@/app/api/check-in-station/square-app-note/route";
 import { POST as stopPost } from "@/app/api/check-in-station/stop/route";
@@ -106,6 +111,8 @@ beforeEach(() => {
   mocks.checkLookupRateLimit.mockResolvedValue({ allowed: true, decisions: [] });
   mocks.lookupStationFamily.mockResolvedValue({ registrationId: "registration_1" });
   mocks.checkInStationFamily.mockResolvedValue([{ attendeeId: "attendee_1", status: "CHECKED_IN" }]);
+  mocks.stationHandOutList.mockResolvedValue(["Name badge × 1"]);
+  mocks.undoStationCheckIn.mockResolvedValue({ undone: true, attendeeId: "attendee_1" });
   mocks.recordStationPayment.mockResolvedValue({ state: "PAID" });
   mocks.noteStationSquareAppPayment.mockResolvedValue({ state: "DUE", balanceCents: 1000, squareAppNote: null });
   mocks.getCurrentSession.mockResolvedValue({ user: { id: "user_1" } });
@@ -121,6 +128,7 @@ describe("check-in station API: access (#892)", () => {
   it.each([
     ["lookup", lookupPost, { kind: "confirmation", value: "CM27-ONE" }],
     ["check-in", checkInPost, { registrationId: "r1", items: [{ attendeeId: "a1", idempotencyKey: key }] }],
+    ["undo", undoPost, { attendeeId: "a1" }],
     ["payment", paymentPost, { registrationId: "r1", method: "CASH", amountCents: 100, idempotencyKey: key }],
     ["square-app-note", squareNotePost, { registrationId: "r1", amountCents: 100 }],
     ["stop", stopPost, {}],
@@ -134,6 +142,7 @@ describe("check-in station API: access (#892)", () => {
     expect(mocks.lookupStationFamily).not.toHaveBeenCalled();
     expect(mocks.checkInStationFamily).not.toHaveBeenCalled();
     expect(mocks.recordStationPayment).not.toHaveBeenCalled();
+    expect(mocks.undoStationCheckIn).not.toHaveBeenCalled();
   });
 
   it("never consults a staff session on station routes", async () => {
@@ -191,7 +200,7 @@ describe("check-in station API: scope and results (#892)", () => {
     const response = await checkInPost(post("/api/check-in-station/check-in", body));
     expect(response.status).toBe(200);
     expect(mocks.checkInStationFamily).toHaveBeenCalledWith(station, body);
-    expect(await response.json()).toEqual({ results: [{ attendeeId: "attendee_1", status: "CHECKED_IN" }] });
+    expect(await response.json()).toEqual({ results: [{ attendeeId: "attendee_1", status: "CHECKED_IN" }], handOut: ["Name badge × 1"] });
   });
 
   it("rejects a check-in with no people or a malformed key", async () => {
@@ -311,5 +320,65 @@ describe("check-in station staff routes (#892)", () => {
     const context = { params: Promise.resolve({ eventId: "event_2", stationId: "station_1" }) };
     expect((await revokeDelete(post("/api/events/event_2/check-in-stations/station_1", null, "DELETE"), context)).status).toBe(403);
     expect(mocks.revokeStation).not.toHaveBeenCalled();
+  });
+});
+
+describe("check-in station API: hand out and undo (#1577)", () => {
+  const body = { registrationId: "registration_1", items: [{ attendeeId: "attendee_1", idempotencyKey: key }] };
+
+  it("adds the hand out list for the people newly checked in, and only them", async () => {
+    mocks.checkInStationFamily.mockResolvedValue([
+      { attendeeId: "attendee_1", status: "CHECKED_IN" },
+      { attendeeId: "attendee_2", status: "ALREADY_CHECKED_IN" },
+      { attendeeId: "attendee_3", status: "NEEDS_DESK_REVIEW" },
+    ]);
+    const response = await checkInPost(post("/api/check-in-station/check-in", body));
+    expect(await response.json()).toEqual({
+      results: [
+        { attendeeId: "attendee_1", status: "CHECKED_IN" },
+        { attendeeId: "attendee_2", status: "ALREADY_CHECKED_IN" },
+        { attendeeId: "attendee_3", status: "NEEDS_DESK_REVIEW" },
+      ],
+      handOut: ["Name badge × 1"],
+    });
+    expect(mocks.stationHandOutList).toHaveBeenCalledWith(station, ["attendee_1"]);
+  });
+
+  it("still answers the check-in when the hand out list fails", async () => {
+    mocks.stationHandOutList.mockRejectedValue(new Error("lodging read failed"));
+    const response = await checkInPost(post("/api/check-in-station/check-in", body));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ handOut: [] });
+  });
+
+  it("undoes a person through the service and returns the person's id", async () => {
+    const response = await undoPost(post("/api/check-in-station/undo", { attendeeId: "attendee_1" }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ undone: true, attendeeId: "attendee_1" });
+    expect(mocks.undoStationCheckIn).toHaveBeenCalledWith(station, "attendee_1");
+  });
+
+  it("rejects extra fields and a missing id", async () => {
+    expect((await undoPost(post("/api/check-in-station/undo", { attendeeId: "a1", eventId: "event_2" }))).status).toBe(400);
+    expect((await undoPost(post("/api/check-in-station/undo", {}))).status).toBe(400);
+    expect(mocks.undoStationCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("answers 403 without the check-in capability, without calling the service", async () => {
+    mocks.resolveStation.mockResolvedValue({ ...station, capabilities: { canCheckIn: false, canRecordPayments: false } });
+    const response = await undoPost(post("/api/check-in-station/undo", { attendeeId: "attendee_1" }));
+    expect(response.status).toBe(403);
+    expect(mocks.undoStationCheckIn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["NOT_THIS_STATION", 409],
+    ["NOTHING_TO_UNDO", 404],
+    ["NOT_FOUND", 404],
+    ["PERMISSION_DENIED", 403],
+  ])("maps %s to %i", async (code, status) => {
+    mocks.undoStationCheckIn.mockRejectedValue(new mocks.MockServiceError(code));
+    const response = await undoPost(post("/api/check-in-station/undo", { attendeeId: "attendee_1" }));
+    expect(response.status).toBe(status);
   });
 });

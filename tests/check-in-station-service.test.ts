@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => {
     resolveAttendeePassForEvent: vi.fn(),
     checkInBlocksForAttendees: vi.fn(),
     checkInAttendee: vi.fn(),
+    undoCheckIn: vi.fn(),
     recordManualPayment: vi.fn(),
     writeAuditLog: vi.fn(),
   };
@@ -45,6 +46,7 @@ vi.mock("@/modules/checkin/club-pass-token", () => ({ clubPassTokenPrefix: "imsd
 vi.mock("@/modules/checkin/repository", () => ({
   CheckInOperationError: mocks.MockCheckInError,
   checkInAttendee: mocks.checkInAttendee,
+  undoCheckIn: mocks.undoCheckIn,
 }));
 vi.mock("@/modules/payments/repository", () => ({
   PaymentOperationError: mocks.MockPaymentError,
@@ -57,6 +59,8 @@ import {
   lookupStationFamily,
   noteStationSquareAppPayment,
   recordStationPayment,
+  stationHandOutList,
+  undoStationCheckIn,
 } from "@/modules/checkin-stations/service";
 import type { ResolvedStation } from "@/modules/checkin-stations/repository";
 
@@ -354,5 +358,125 @@ describe("station payments (#892)", () => {
     prismaFor();
     await noteStationSquareAppPayment(station, { registrationId: "registration_1", amountCents: 6000, receiptNumber: "" });
     expect(mocks.writeAuditLog.mock.calls[0][0].metadata).not.toHaveProperty("receiptNumber");
+  });
+});
+
+describe("station undo (#1577)", () => {
+  const madeHere = { metadata: { channel: "CHECK_IN_STATION", station: { id: "station_1", label: "Front desk tablet" } } };
+
+  function undoPrisma(options: { attendee?: unknown; active?: unknown; audit?: unknown } = {}) {
+    const prisma = {
+      registrationAttendee: { findFirst: vi.fn().mockResolvedValue("attendee" in options ? options.attendee : { id: "attendee_1" }) },
+      checkIn: { findFirst: vi.fn().mockResolvedValue("active" in options ? options.active : { checkedInAt: new Date("2026-11-01T15:00:00.000Z") }) },
+      auditLog: { findFirst: vi.fn().mockResolvedValue("audit" in options ? options.audit : madeHere) },
+    };
+    mocks.getPrisma.mockReturnValue(prisma);
+    mocks.undoCheckIn.mockResolvedValue({ id: "checkin_1" });
+    return prisma;
+  }
+
+  it("undoes a check-in made at this station, under the starter, with the station context", async () => {
+    const prisma = undoPrisma();
+    await expect(undoStationCheckIn(station, "attendee_1")).resolves.toEqual({ undone: true, attendeeId: "attendee_1" });
+    expect(prisma.registrationAttendee.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "attendee_1", eventId: "event_1" } }));
+    expect(prisma.auditLog.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        eventId: "event_1", action: "ATTENDEE_CHECKED_IN", entityId: "attendee_1", createdAt: { gte: new Date("2026-11-01T15:00:00.000Z") },
+      }),
+    }));
+    expect(mocks.undoCheckIn).toHaveBeenCalledWith("event_1", "attendee_1", "user_1", {
+      auditContext: { station: { id: "station_1", label: "Front desk tablet" } },
+    });
+  });
+
+  it("refuses a check-in made at another station", async () => {
+    undoPrisma({ audit: { metadata: { channel: "CHECK_IN_STATION", station: { id: "station_2", label: "Side door" } } } });
+    await expect(undoStationCheckIn(station, "attendee_1")).rejects.toMatchObject({
+      code: "NOT_THIS_STATION",
+      message: "Only check-ins made at this station can be undone here. Use the check-in desk.",
+    });
+    expect(mocks.undoCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("refuses a check-in made at the desk (no station on its audit entry) or with no entry", async () => {
+    undoPrisma({ audit: { metadata: null } });
+    await expect(undoStationCheckIn(station, "attendee_1")).rejects.toMatchObject({ code: "NOT_THIS_STATION" });
+    undoPrisma({ audit: null });
+    await expect(undoStationCheckIn(station, "attendee_1")).rejects.toMatchObject({ code: "NOT_THIS_STATION" });
+    expect(mocks.undoCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("answers not found for a person in another event", async () => {
+    undoPrisma({ attendee: null });
+    await expect(undoStationCheckIn(station, "attendee_other_event")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(mocks.undoCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("refuses without the check-in capability", async () => {
+    const prisma = undoPrisma();
+    const noCheckIn = { ...station, capabilities: { canCheckIn: false, canRecordPayments: false } };
+    await expect(undoStationCheckIn(noCheckIn, "attendee_1")).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
+    expect(prisma.registrationAttendee.findFirst).not.toHaveBeenCalled();
+    expect(mocks.undoCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("answers already undone when there is no active check-in, and on a race that lost", async () => {
+    undoPrisma({ active: null });
+    await expect(undoStationCheckIn(station, "attendee_1")).rejects.toMatchObject({ code: "NOTHING_TO_UNDO", message: "Already undone, or not checked in." });
+    undoPrisma();
+    mocks.undoCheckIn.mockResolvedValue(null);
+    await expect(undoStationCheckIn(station, "attendee_1")).rejects.toMatchObject({ code: "NOTHING_TO_UNDO" });
+  });
+});
+
+describe("station hand out list (#1577)", () => {
+  function handOutPrisma(options: { types?: Array<{ name: string }>; assignments?: Array<{ eventLodgingUnitId: string | null }>; units?: unknown[] } = {}) {
+    const prisma = {
+      issuedAssetType: { findMany: vi.fn().mockResolvedValue(options.types ?? []) },
+      eventLodgingAssignment: { findMany: vi.fn().mockResolvedValue(options.assignments ?? []) },
+      eventLodgingUnit: { findMany: vi.fn().mockResolvedValue(options.units ?? []) },
+    };
+    mocks.getPrisma.mockReturnValue(prisma);
+    return prisma;
+  }
+
+  it("lists one name badge each and nothing else without a room-linked type", async () => {
+    const prisma = handOutPrisma();
+    await expect(stationHandOutList(station, ["attendee_1", "attendee_3"])).resolves.toEqual(["Name badge × 2"]);
+    expect(prisma.issuedAssetType.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { eventId: "event_1", active: true, roomLinked: true } }));
+    expect(prisma.eventLodgingAssignment.findMany).not.toHaveBeenCalled();
+  });
+
+  it("adds a key line per room-linked type and distinct room of the newly checked-in people", async () => {
+    const prisma = handOutPrisma({
+      types: [{ name: "Cabin key" }],
+      assignments: [{ eventLodgingUnitId: "unit_1" }, { eventLodgingUnitId: "unit_1" }],
+      units: [{ unit: { name: "K-204", building: { name: "K-204" } } }],
+    });
+    await expect(stationHandOutList(station, ["attendee_1", "attendee_3"])).resolves.toEqual(["Name badge × 2", "Cabin key K-204"]);
+    expect(prisma.eventLodgingAssignment.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { eventId: "event_1", attendeeId: { in: ["attendee_1", "attendee_3"] }, cancelledAt: null, eventLodgingUnitId: { not: null } },
+    }));
+    expect(prisma.eventLodgingUnit.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { eventId: "event_1", id: { in: ["unit_1"] } } }));
+  });
+
+  it("names the building when it differs from the room, like the lodging pages", async () => {
+    handOutPrisma({
+      types: [{ name: "Cabin key" }],
+      assignments: [{ eventLodgingUnitId: "unit_1" }],
+      units: [{ unit: { name: "Cabin 3", building: { name: "Pine Row" } } }],
+    });
+    await expect(stationHandOutList(station, ["attendee_1"])).resolves.toEqual(["Name badge × 1", "Cabin key Cabin 3, Pine Row"]);
+  });
+
+  it("has no room line when the people have no active room", async () => {
+    handOutPrisma({ types: [{ name: "Cabin key" }], assignments: [] });
+    await expect(stationHandOutList(station, ["attendee_1"])).resolves.toEqual(["Name badge × 1"]);
+  });
+
+  it("returns nothing and reads nothing for nobody newly checked in", async () => {
+    const prisma = handOutPrisma();
+    await expect(stationHandOutList(station, [])).resolves.toEqual([]);
+    expect(prisma.issuedAssetType.findMany).not.toHaveBeenCalled();
   });
 });

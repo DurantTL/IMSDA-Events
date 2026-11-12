@@ -1,7 +1,7 @@
 import { logError } from "@/lib/logger";
 import { stationCheckInSchema } from "@/modules/checkin-stations/domain";
 import { stationPostHandler } from "@/modules/checkin-stations/http";
-import { checkInStationFamily } from "@/modules/checkin-stations/service";
+import { checkInStationFamily, stationHandOutList } from "@/modules/checkin-stations/service";
 import { sealHealthSnapshotAfterCheckIn } from "@/modules/health-records/snapshot-hooks";
 
 export const POST = stationPostHandler(
@@ -18,6 +18,16 @@ export const POST = stationPostHandler(
         logError("Health snapshot after station check-in failed", error);
       }
     }
-    return { results };
+    // What to hand over for the people newly checked in just now; it never fails the check-in.
+    let handOut: string[] = [];
+    try {
+      handOut = await stationHandOutList(
+        station,
+        results.filter((result) => result.status === "CHECKED_IN").map((result) => result.attendeeId),
+      );
+    } catch (error) {
+      logError("Hand out list after station check-in failed", error);
+    }
+    return { results, handOut };
   },
 );

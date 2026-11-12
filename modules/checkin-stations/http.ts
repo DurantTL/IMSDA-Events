@@ -51,7 +51,13 @@ const paymentMessages: Record<string, string> = {
 
 export function stationApiError(error: unknown) {
   if (error instanceof StationServiceError) {
-    const status = error.code === "NOT_FOUND" ? 404 : error.code === "PASS_EXPIRED" ? 410 : 409;
+    const status = error.code === "NOT_FOUND" || error.code === "NOTHING_TO_UNDO"
+      ? 404
+      : error.code === "PASS_EXPIRED"
+        ? 410
+        : error.code === "PERMISSION_DENIED"
+          ? 403
+          : 409;
     return stationJson({ error: error.code, message: error.message }, { status });
   }
   if (error instanceof PaymentOperationError) {
@@ -93,7 +99,7 @@ export function stationInactiveResponse() {
 type StationPostOptions<T> = {
   /** Omit for a body-less action (stop). */
   schema?: z.ZodType<T>;
-  capability?: "payments";
+  capability?: "payments" | "checkIn";
   rateLimit?: (station: ResolvedStation) => Promise<RateLimitOutcome>;
 };
 
@@ -116,6 +122,12 @@ export function stationPostHandler<T = undefined>(
         return stationJson({
           error: "PERMISSION_DENIED",
           message: "This station cannot record payments. Send the payment to the check-in desk or to finance.",
+        }, { status: 403 });
+      }
+      if (options.capability === "checkIn" && !station.capabilities.canCheckIn) {
+        return stationJson({
+          error: "PERMISSION_DENIED",
+          message: "This station cannot check people in or undo a check-in. Use the check-in desk.",
         }, { status: 403 });
       }
       let rateOutcome: RateLimitOutcome | null = null;
