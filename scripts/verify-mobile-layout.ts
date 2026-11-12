@@ -1279,12 +1279,12 @@ async function seedInspections(prisma: PrismaClient): Promise<void> {
   }
 }
 
-/** The Budget sheet (#1682) switched on for the club weekend, with two synthetic cost lines, so the audited pages show a sheet and not only the switch. */
-/** The leader directory (#1707) switched on for the conference so the director can open it (switched off again in cleanupSynthetic). */
+/** The leader directory (#1707) switched on for the conference so the director can open it (cleanupSynthetic switches it off again, on purpose, so a local database is left with the default). */
 async function seedLeaderDirectory(prisma: PrismaClient): Promise<void> {
   await prisma.platformSettings.upsert({ where: { id: "platform" }, update: { leaderDirectoryEnabled: true }, create: { id: "platform", leaderDirectoryEnabled: true } });
 }
 
+/** The Budget sheet (#1682) switched on for the club weekend, with two synthetic cost lines, so the audited pages show a sheet and not only the switch. */
 async function seedBudgetSheet(prisma: PrismaClient): Promise<void> {
   await prisma.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "event-budget" }], skipDuplicates: true });
   if (await prisma.eventBudgetCostLine.count({ where: { eventId: clubEventId } }) === 0) {
