@@ -106,7 +106,7 @@
   border-radius: var(--radius-container);
 }
 
-.popup :global(.leaflet-popup-close-button) {
+.map .popup :global(a.leaflet-popup-close-button) {
   width: 44px;
   height: 44px;
   line-height: 44px;
@@ -114,7 +114,7 @@
   color: var(--imsda-navy);
 }
 
-.popup :global(.leaflet-popup-close-button:focus-visible),
+.map .popup :global(a.leaflet-popup-close-button):focus-visible,
 .popup a:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;

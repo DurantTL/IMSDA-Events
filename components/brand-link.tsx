@@ -36,6 +36,15 @@ export function BrandLink({ wordmark = false, guarded = false, destination = "ca
   const home = destination === "home";
   const classes = [styles.link, className ?? styles.standalone].join(" ");
   const Anchor = guarded ? GuardedLink : NavigationLink;
+  // The calendar has its own Content-Security-Policy (it shows map tiles, #1212), which only a full page load picks up.
+  if (!home) {
+    return (
+      <a {...(rest as ComponentProps<"a">)} className={classes} href={BRAND_LINK_HREF} aria-label={label ?? BRAND_LINK_LABEL}>
+        <Image alt="" aria-hidden="true" className={styles.symbol} height={72} src={BRAND_SYMBOL_PATH} width={72} />
+        {wordmark === true ? <span><strong>{PRODUCT_NAME}</strong><small>{PRODUCT_DESCRIPTOR}</small></span> : wordmark || null}
+      </a>
+    );
+  }
   return (
     <Anchor {...rest} className={classes} href={home ? BRAND_HOME_HREF : BRAND_LINK_HREF} aria-label={label ?? (home ? BRAND_HOME_LABEL : BRAND_LINK_LABEL)}>
       <Image alt="" aria-hidden="true" className={styles.symbol} height={72} src={BRAND_SYMBOL_PATH} width={72} />

@@ -1057,14 +1057,14 @@ export function EventSettingsWorkspace({
             {mapSiteOptions && (
               <label>
                 Map pin (optional)
-                <select {...fieldAria("mapSiteOrganizationId")} id={settingsFieldDomId("mapSiteOrganizationId")} value={draft.mapSiteOrganizationId ?? ""} onChange={(event) => update("mapSiteOrganizationId", event.target.value || null)}>
+                <select {...fieldErrorProps(settingsFieldErrorId("mapSiteOrganizationId"), fieldErrors.mapSiteOrganizationId, "event-field-map-site-help")} id={settingsFieldDomId("mapSiteOrganizationId")} value={draft.mapSiteOrganizationId ?? ""} onChange={(event) => update("mapSiteOrganizationId", event.target.value || null)}>
                   <option value="">No map pin</option>
                   {draft.mapSiteOrganizationId && !mapSiteOptions.some((option) => option.id === draft.mapSiteOrganizationId) && (
                     <option value={draft.mapSiteOrganizationId}>Current site (no longer listed)</option>
                   )}
                   {mapSiteOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
-                <small className="field-help" style={{ margin: "4px 0 0" }}>The pin uses the map location of the host church or site you pick. Leave it empty to keep this event off the public calendar map.</small>
+                <small className="field-help" id="event-field-map-site-help" style={{ margin: "4px 0 0" }}>The pin uses the map location of the host church or site you pick. Leave it empty to keep this event off the public calendar map.</small>
               {fieldNote("mapSiteOrganizationId")}</label>
             )}
           </SettingsBlock>

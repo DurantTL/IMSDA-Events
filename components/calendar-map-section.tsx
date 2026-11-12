@@ -30,7 +30,13 @@ export function CalendarMapSection({ data }: { data: CalendarMapData }) {
     return () => { cancelled = true; };
   }, [attempt]);
 
+  // A full reload, not a remount: when the page arrived by client navigation it kept the previous page's
+  // Content-Security-Policy, and only a document load gets the calendar's own, which admits the map tiles.
   function retry() {
+    if (status === "tiles-failed") {
+      window.location.reload();
+      return;
+    }
     setStatus("loading");
     setMapComponent(null);
     setAttempt((value) => value + 1);
@@ -42,14 +48,17 @@ export function CalendarMapSection({ data }: { data: CalendarMapData }) {
     <section aria-labelledby="calendar-map-heading" className={styles.section}>
       <h2 id="calendar-map-heading">Where events are happening</h2>
       <p className={styles.note}>{mapNoteText(data.mappedEvents, data.unmappedEvents)}</p>
-      {problem && (
-        <p className={styles.problem} role="status">
-          {status === "unavailable"
-            ? "The map could not load. The list below still works."
-            : "Map pictures could not load. Pins and the list still work."}{" "}
-          <button className={`secondary-button ${styles.retry}`} onClick={retry} type="button">Retry map</button>
-        </p>
-      )}
+      {/* Always mounted, so a screen reader hears the text appear. */}
+      <p className={styles.problem} role="status">
+        {problem && (
+          <>
+            {status === "unavailable"
+              ? "The map could not load. The list below still works."
+              : "Map pictures could not load. Pins and the list still work."}{" "}
+            <button className={`secondary-button ${styles.retry}`} onClick={retry} type="button">Retry map</button>
+          </>
+        )}
+      </p>
       {MapComponent ? (
         <MapComponent groups={data.groups} key={attempt} onStatus={setStatus} />
       ) : (

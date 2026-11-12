@@ -27,9 +27,9 @@ export default function NotFound() {
         <p>The link may be out of date, or the address may have been typed incorrectly.</p>
         <div className="public-not-found-links">
           <Link className="public-event-not-found-link" href="/">Events home</Link>
-          <Link className="public-event-not-found-link" href="/calendar">
+          <a className="public-event-not-found-link" href="/calendar">
             <CalendarDays size={16} aria-hidden="true" /> See the calendar
-          </Link>
+          </a>
         </div>
       </section>
     </main>

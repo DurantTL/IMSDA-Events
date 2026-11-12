@@ -3,7 +3,6 @@ import {
   buildCalendarMapData,
   buildPopupContent,
   dropDelayMs,
-  groupSignature,
   mapNoteText,
   markerLabel,
 } from "@/components/calendar-map-content";
@@ -118,11 +117,6 @@ describe("labels", () => {
   it("names a pin by its site and events", () => {
     expect(markerLabel(group)).toBe("Maple Grove Church: 2 upcoming events, Camp Meeting, Men's Convention");
     expect(markerLabel({ ...group, events: [group.events[0]] })).toBe("Maple Grove Church: 1 upcoming event, Camp Meeting");
-  });
-
-  it("rebuilds a pin only when its events change", () => {
-    expect(groupSignature(group)).toBe(groupSignature({ ...group }));
-    expect(groupSignature(group)).not.toBe(groupSignature({ ...group, events: [group.events[0]] }));
   });
 
   it("says in plain text how many events are not on the map", () => {

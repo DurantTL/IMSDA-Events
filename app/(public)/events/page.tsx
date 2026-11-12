@@ -185,7 +185,7 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
             <div className="calendar-empty">
               <p>{filtering ? "No events match these filters." : emptyWording[filter]}</p>
               {filtering && <p><Link className="secondary-button open-events-calendar-link" href={clearHref}>Clear filters</Link></p>}
-              <p><Link className="secondary-button open-events-calendar-link" href="/calendar">See the calendar</Link></p>
+              <p><a className="secondary-button open-events-calendar-link" href="/calendar">See the calendar</a></p>
             </div>
           ) : (
             <ul className="calendar-agenda-list open-events-list">

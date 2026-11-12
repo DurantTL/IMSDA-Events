@@ -82,11 +82,6 @@ export function buildCalendarMapData(
 
 const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
 
-/** Which events a pin holds; a pin is rebuilt only when this changes. */
-export function groupSignature(group: CalendarMapGroup) {
-  return `${group.siteName}|${group.latitude},${group.longitude}|${group.events.map((event) => event.href).join(",")}`;
-}
-
 /** Plain-text accessible name for a pin (set with setAttribute, never parsed). */
 export function markerLabel(group: CalendarMapGroup) {
   const count = group.events.length;

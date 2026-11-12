@@ -77,15 +77,15 @@ describe("Content Security Policy (#1401)", () => {
     }
   });
 
-  it("admits OpenStreetMap tiles on /clubs and the church location editor only", () => {
+  it("admits OpenStreetMap tiles on /clubs, /calendar and the church location editor only", () => {
     const sitePolicy = policyFor("/");
-    for (const pathname of ["/clubs", "/admin/organizations/org_synthetic/location"]) {
+    for (const pathname of ["/clubs", "/calendar", "/calendar/", "/admin/organizations/org_synthetic/location"]) {
       const policy = policyFor(pathname);
       expect(directiveSources(policy, "img-src")).toContain(tileOrigin);
       // Only img-src differs.
       expect(policy.replace(` ${tileOrigin}`, "")).toBe(sitePolicy);
     }
-    for (const pathname of ["/", "/clubs/register", "/admin", "/admin/organizations/org_synthetic", "/events/synthetic"]) {
+    for (const pathname of ["/", "/clubs/register", "/admin", "/admin/organizations/org_synthetic", "/events/synthetic", "/calendar/feed.ics", "/embed/calendar"]) {
       expect(policyFor(pathname)).not.toContain(tileOrigin);
     }
   });

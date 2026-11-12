@@ -13,7 +13,8 @@ export function PublicExploreNav({ current, currentKind = "page" }: { current?: 
     <nav aria-label="Explore" className={styles.primaryNav}>
       <Link href="/" {...mark("home")}>Home</Link>
       <Link href="/events" {...mark("events")}>Events</Link>
-      <Link href="/calendar" {...mark("calendar")}>Calendar</Link>
+      {/* A plain anchor: /calendar has its own Content-Security-Policy, which a client-side navigation would not pick up (#1212). */}
+      <a href="/calendar" {...mark("calendar")}>Calendar</a>
       <a href="/clubs" {...mark("clubs")}>Club ministry</a>
     </nav>
   );

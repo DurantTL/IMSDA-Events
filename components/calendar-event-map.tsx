@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { LayerGroup, Map as LeafletMap } from "leaflet";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import type { LayerGroup, Map as LeafletMap, Marker } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
   buildPopupContent,
@@ -42,6 +42,7 @@ export function CalendarEventMap({
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
   const onStatusRef = useRef(onStatus);
   const tileStatusRef = useRef<TileStatus>("ready");
+  const openMarkerRef = useRef<Marker | null>(null);
   const [ready, setReady] = useState(false);
   // Without IntersectionObserver there is nothing to wait for: the pins are placed at once.
   const [revealed, setRevealed] = useState(() => typeof IntersectionObserver === "undefined");
@@ -114,10 +115,28 @@ export function CalendarEventMap({
     groups.forEach((group, index) => {
       const icon = L.divIcon({ className: styles.pin, html: false, iconSize: [44, 48], iconAnchor: [22, 48], popupAnchor: [0, -44] });
       const marker = L.marker([group.latitude, group.longitude], { icon, keyboard: true, riseOnHover: true });
-      marker.bindPopup(buildPopupContent(document, group), { maxWidth: 280, className: styles.popup });
+      // The top-left padding keeps an opened popup clear of the zoom control.
+      marker.bindPopup(buildPopupContent(document, group), { maxWidth: 280, className: styles.popup, autoPanPaddingTopLeft: [60, 10] });
+      // Focus moves into the popup (its first link, else the close button) so a keyboard visitor can use it at once.
+      marker.on("popupopen", (event) => {
+        openMarkerRef.current = marker;
+        const popupElement = event.popup.getElement();
+        const target = popupElement?.querySelector<HTMLElement>("a[href]") ?? popupElement?.querySelector<HTMLElement>(".leaflet-popup-close-button");
+        target?.focus({ preventScroll: true });
+      });
+      marker.on("popupclose", () => {
+        if (openMarkerRef.current === marker) openMarkerRef.current = null;
+      });
       marker.addTo(layer);
       const element = marker.getElement();
       if (element) {
+        // Enter and Space open the popup; preventDefault also stops Leaflet's own Enter handling from toggling it shut again.
+        element.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            marker.openPopup();
+          }
+        });
         element.setAttribute("aria-label", markerLabel(group));
         element.setAttribute("role", "button");
         if (group.events.length > 1) element.dataset.count = String(group.events.length);
@@ -134,8 +153,17 @@ export function CalendarEventMap({
     }
   }, [ready, revealed, groups]);
 
+  // Escape closes the open popup and returns focus to its pin.
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Escape") return;
+    const marker = openMarkerRef.current;
+    if (!marker) return;
+    marker.closePopup();
+    marker.getElement()?.focus({ preventScroll: true });
+  }
+
   return (
-    <div className={styles.frame}>
+    <div className={styles.frame} onKeyDown={onKeyDown}>
       <div aria-label="Map of upcoming events" className={styles.map} ref={containerRef} role="group" />
       <p className={styles.attribution}>
         &copy; <a href="https://www.openstreetmap.org/copyright" rel="noreferrer" target="_blank">OpenStreetMap</a> contributors
