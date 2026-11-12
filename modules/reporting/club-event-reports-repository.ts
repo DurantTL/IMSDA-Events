@@ -26,6 +26,12 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
+/** A stored field's price windows in date order: the several-window list (#1509) or the one `latePricing`. Read from raw JSON, so nothing is assumed. */
+function storedPriceWindows(candidate: Record<string, unknown>): Array<Record<string, unknown>> {
+  if (Array.isArray(candidate.pricingWindows) && candidate.pricingWindows.length > 0) return candidate.pricingWindows.map(record);
+  return candidate.latePricing === undefined ? [] : [record(candidate.latePricing)];
+}
+
 /** The Spring Camporee form's late-pricing label for the attendee fee field, or null if it has none configured. */
 function lateRateLabelFromRegistration(registration: RegistrationRecord | undefined): string | null {
   const definition = record(registration?.publicSubmission?.definition);
@@ -35,7 +41,8 @@ function lateRateLabelFromRegistration(registration: RegistrationRecord | undefi
     for (const field of fields) {
       const candidate = record(field);
       if (candidate.key === "registration_fee") {
-        const latePricing = record(candidate.latePricing);
+        // The last (latest) window is the late rate.
+        const latePricing = storedPriceWindows(candidate).at(-1) ?? {};
         return typeof latePricing.label === "string" ? latePricing.label : null;
       }
     }
@@ -52,7 +59,8 @@ function earlyBirdDeadlineFromRegistration(registration: RegistrationRecord | un
     for (const field of fields) {
       const candidate = record(field);
       if (candidate.key === "registration_fee") {
-        const latePricing = record(candidate.latePricing);
+        // The early-bird deadline is when the first window starts.
+        const latePricing = storedPriceWindows(candidate)[0] ?? {};
         return typeof latePricing.startsOn === "string" ? latePricing.startsOn : null;
       }
     }

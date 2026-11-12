@@ -52,6 +52,7 @@ export const tokenRoutePrefixes: readonly (readonly string[])[] = [
   ["staff-invite"],
   ["unsubscribe"],
   ["clubs", "register"],
+  ["account", "visiting-club"],
   ["api", "public", "manage"],
   ["api", "public", "club-forms"],
   ["api", "public", "health-records"],

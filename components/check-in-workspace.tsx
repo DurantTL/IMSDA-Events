@@ -48,6 +48,7 @@ import {
 import { arrivalMatchesSearch, mergeSterlingHeldIds, offlineCheckInErrorMessage } from "@/modules/checkin/domain";
 import type { CheckInArrival } from "@/modules/checkin/arrival-view";
 import {
+  applyLiveBalanceChanges,
   applyLiveCheckInChanges,
   nextLiveSince,
   nextLivePollDelay,
@@ -90,14 +91,16 @@ export function CheckInWorkspace({
   loadedAt?: string;
 }) {
   const [arrivals, setArrivals] = useState<Arrival[]>(initialArrivals);
+  // Built from the live arrivals, so a payment taken at a check-in station or on the Money tab updates the owing count
+  // and every badge without a reload (#1577).
   const paymentDueByConfirmationCode = useMemo(() => Object.fromEntries(
-    initialArrivals
+    arrivals
       .filter((arrival) => arrival.balanceCents > 0)
       .map((arrival) => [arrival.confirmationCode, {
         balanceCents: arrival.balanceCents,
         partySize: arrival.partySize,
       }]),
-  ), [initialArrivals]);
+  ), [arrivals]);
   const owingCount = Object.keys(paymentDueByConfirmationCode).length;
   const search = useClientSearch();
   const query = search.term;
@@ -203,7 +206,10 @@ export function CheckInWorkspace({
           }
         }
         const skip = new Set([...touchedBefore, ...localActionsRef.current]);
-        setArrivals((current) => applyLiveCheckInChanges(current, live.changes, skip) as Arrival[]);
+        setArrivals((current) => applyLiveBalanceChanges(
+          applyLiveCheckInChanges(current, live.changes, skip),
+          live.balances,
+        ) as Arrival[]);
         since = nextLiveSince(live.now);
         failures = 0;
         setLiveStale(false);

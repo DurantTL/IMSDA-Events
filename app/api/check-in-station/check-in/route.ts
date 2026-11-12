@@ -1,7 +1,12 @@
 import { logError } from "@/lib/logger";
 import { stationCheckInSchema } from "@/modules/checkin-stations/domain";
 import { stationPostHandler } from "@/modules/checkin-stations/http";
-import { checkInStationFamily, stationPaymentHistoryAfterWrite } from "@/modules/checkin-stations/service";
+import {
+  checkInStationFamily,
+  stationHandOutList,
+  stationPaymentHistoryAfterWrite,
+  type StationHandOut,
+} from "@/modules/checkin-stations/service";
 import { sealHealthSnapshotAfterCheckIn } from "@/modules/health-records/snapshot-hooks";
 
 export const POST = stationPostHandler(
@@ -18,7 +23,22 @@ export const POST = stationPostHandler(
         logError("Health snapshot after station check-in failed", error);
       }
     }
+    // What to hand over for the people newly checked in just now; it never fails the check-in.
+    let handOut: StationHandOut = { lines: [], keyTypes: [], rooms: [] };
+    try {
+      handOut = await stationHandOutList(
+        station,
+        results.filter((result) => result.status === "CHECKED_IN").map((result) => result.attendeeId),
+      );
+    } catch (error) {
+      logError("Hand out list after station check-in failed", error);
+    }
     // The reason (if one was needed) is now part of the history; a failed read never fails the check-in.
-    return { results, ...(await stationPaymentHistoryAfterWrite(station.station.eventId, input.registrationId)) };
+    return {
+      results,
+      handOut: handOut.lines,
+      handOutParts: { keyTypes: handOut.keyTypes, rooms: handOut.rooms },
+      ...(await stationPaymentHistoryAfterWrite(station.station.eventId, input.registrationId)),
+    };
   },
 );

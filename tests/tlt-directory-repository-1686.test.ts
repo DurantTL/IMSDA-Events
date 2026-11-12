@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Member = {
   id: string; clubYear: string; attendeeType: string; isTlt: boolean; status: string; personId: string | null; schoolGrade: string | null;
-  reportedAge: number | null; sealedBirthDate: string | null; updatedAt: Date; first: string; last: string; org: { id: string; name: string; type: string; isActive: boolean; church?: string };
+  reportedAge: number | null; sealedBirthDate: string | null; updatedAt: Date; first: string; last: string; org: { id: string; name: string; type: string; isActive: boolean; guestEventId?: string | null; church?: string };
 };
 
 const state = vi.hoisted(() => ({
@@ -69,7 +69,7 @@ import { sealBirthDate } from "@/modules/club-rosters/birth-dates";
 import { TltDirectoryError, parseTltFilters } from "@/modules/tlt-directory/domain";
 import { acceptTltTagSuggestion, listTltDirectoryRows, recordTltDirectoryView, runTltExport, updateTltProfile } from "@/modules/tlt-directory/repository";
 
-const club = { id: "club-1", name: "Test Pathfinders", type: "CLUB", isActive: true, church: "Sample Church" };
+const club = { id: "club-1", name: "Test Pathfinders", type: "CLUB", isActive: true, guestEventId: null, church: "Sample Church" };
 const member = (overrides: Partial<Member>): Member => ({
   id: "m", clubYear: "2026-27", attendeeType: "YOUTH", isTlt: true, status: "ACTIVE", personId: "p", schoolGrade: "GRADE_10", reportedAge: null,
   sealedBirthDate: sealBirthDate("2011-03-04"), updatedAt: new Date("2026-10-01T00:00:00Z"), first: "Casey", last: "Sample", org: club, ...overrides,

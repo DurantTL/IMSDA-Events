@@ -412,9 +412,11 @@ export function buildTemplateFromEvent(
     const next = structuredClone(replaced.definition);
     for (const section of next.sections) {
       for (const field of section.fields) {
-        if (field.latePricing) {
+        if (field.latePricing || field.pricingWindows) {
           latePriceDetails.push(`Form "${formLabel}" field "${field.label}"`);
           delete field.latePricing;
+          delete field.pricingWindows;
+          delete field.basePricingLabel;
         }
         choiceLimitCount += Object.keys(field.choiceLimits ?? {}).length;
       }

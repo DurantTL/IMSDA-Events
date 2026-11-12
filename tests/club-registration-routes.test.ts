@@ -27,6 +27,8 @@ vi.mock("@/lib/prisma", () => ({
     attendeeSession: { findUnique: async () => ({ secondFactorVerifiedAt: new Date() }) },
     attendeePasskey: { count: async () => 0 },
     platformSettings: { findUnique: async () => ({ passkeyRpId: null }) },
+    // The guest club rule (#835) reads the club's `guestEventId`; a conference club has none.
+    organization: { findUnique: async () => ({ guestEventId: null }) },
     event: { findFirst: mocks.eventFindFirst },
     eventTeamSettings: { findUnique: mocks.teamSettingsFind },
     clubRosterMember: { findMany: mocks.rosterFindMany },

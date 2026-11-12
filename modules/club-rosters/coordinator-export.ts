@@ -38,7 +38,7 @@ const CLUB_READ_BATCH = 8;
 /** Every requested club must be an active club: all of them, or a 400 (never a partial export). */
 async function resolveClubs(clubs: "all" | string[]) {
   const found = await getPrisma().organization.findMany({
-    where: { type: "CLUB", isActive: true, ...(clubs === "all" ? {} : { id: { in: clubs } }) },
+    where: { type: "CLUB", isActive: true, guestEventId: null, ...(clubs === "all" ? {} : { id: { in: clubs } }) },
     select: { id: true, name: true },
   });
   if (clubs !== "all" && found.length !== clubs.length) {

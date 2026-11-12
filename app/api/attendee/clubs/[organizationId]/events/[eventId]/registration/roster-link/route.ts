@@ -1,3 +1,4 @@
+import { rejectGuestClubOtherEvent } from "@/modules/club-registrations/event-gate";
 import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
@@ -20,6 +21,8 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
   try {
     const { organizationId, eventId } = await context.params;
     const access = await requireRosterAccess(organizationId, new Date(), "registerForEvents");
+    const guestBlock = await rejectGuestClubOtherEvent(organizationId, eventId);
+    if (guestBlock) return guestBlock;
     const input = bodySchema.parse(await request.json());
     const result = await linkExtraPersonToRoster({ organizationId, eventId, ...input, actor: actorAttribution(access.actor) });
     return Response.json({ result }, { headers: { "Cache-Control": "no-store" } });

@@ -75,6 +75,8 @@ export function stripAttendeeTypeOptions(definition: RegistrationFormDefinition)
         choiceLimits: undefined,
         choicePricesCents: undefined,
         latePricing: undefined,
+        pricingWindows: undefined,
+        basePricingLabel: undefined,
         availabilityMode: "NONE",
       } : field),
     })),

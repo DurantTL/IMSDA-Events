@@ -26,7 +26,7 @@ export async function getAreaClubsSummary(
   const withChecks = options.backgroundChecks !== false;
   const prisma = getPrisma();
   const clubs = await prisma.organization.findMany({
-    where: { type: "CLUB", isActive: true },
+    where: { type: "CLUB", isActive: true, guestEventId: null },
     orderBy: { name: "asc" },
     select: { id: true, name: true, city: true, parentOrganization: { select: { name: true, city: true } }, ...clubJoinSelect },
   });
@@ -102,7 +102,7 @@ export async function listAreaClubEvents(clubYear: string): Promise<AreaClubEven
   const yearStart = new Date(`${clubYear.slice(0, 4)}-09-01T00:00:00Z`);
   const yearEnd = new Date(`${Number(clubYear.slice(0, 4)) + 1}-09-01T00:00:00Z`);
   const [clubs, events] = await Promise.all([
-    prisma.organization.findMany({ where: { type: "CLUB", isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.organization.findMany({ where: { type: "CLUB", isActive: true, guestEventId: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.event.findMany({
       where: { isPublished: true, audience: "CLUB", endsAt: { gte: yearStart }, startsAt: { lt: yearEnd } },
       orderBy: { startsAt: "asc" },

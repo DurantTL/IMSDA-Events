@@ -71,3 +71,26 @@
 .cisMatchList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .cisMatchRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 8px 12px; }
 .cisMatchRow > span { display: grid; gap: 2px; min-width: 0; }
+/* After a check-in: what to hand over, and the Just checked in list with Undo (#1577). */
+.cisHandOut { margin-top: 8px; border: 2px solid var(--green); border-radius: var(--radius-card); background: var(--green-soft); padding: 14px 16px; }
+.cisHandOut h3 { margin: 0 0 6px; font-size: max(var(--type-staff-floor, 0px), 1.05rem); }
+.cisHandOut ul { margin: 0; padding-left: 1.25rem; font-size: max(var(--type-staff-floor, 0px), 1.1rem); font-weight: 700; }
+.cisJustIn { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding: 0 8px; }
+.cisJustIn .cisPersonBody { flex: 1 1 12rem; }
+.cisUndoStatus { min-width: 0; }
+/* Stays in the accessibility tree so the message is announced; with nothing in it, it takes no space. */
+.cisUndoStatus:empty { height: 0; margin-top: -16px; }
+.cisUndoStatus:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+/* Offline: a saved outbox, the connection banner, and three distinct statuses (#1577). Each carries text and an icon. */
+.cisConnection { min-width: 0; }
+.cisBanner { display: grid; gap: 4px; border-radius: var(--radius-card); padding: 12px 16px; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.cisBanner p { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; }
+.cisBannerOffline { border: 2px solid var(--gold-text); background: var(--imsda-gold-soft); color: var(--gold-text); }
+.cisBannerSyncing { border: 2px dashed var(--muted); background: var(--secondary-bg); color: var(--ink); }
+.cisBannerCount { font-weight: 700; }
+.cisBannerWarn { font-weight: 700; }
+.cisStatus { display: inline-flex; align-items: center; gap: 4px; }
+.cisStatusQueued { border: 1px dashed var(--muted); background: var(--secondary-bg); color: var(--ink); }
+.cisStatusConflict { border: 1px solid var(--coral); background: var(--coral-soft); color: var(--coral); }
+.cisAttention { border-color: var(--coral); }
+.cisQueuedRow { border-style: dashed; }

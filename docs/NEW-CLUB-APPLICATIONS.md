@@ -45,3 +45,7 @@ How a new club gets started in IMSDA Events. Decisions are Caleb's, recorded on 
 
 `npm run test:new-club-application` (real database, with a local stand-in for the email provider) and the Vitest files
 `tests/new-club-application-*.test.ts`.
+
+## Visiting clubs
+
+A club from outside the conference joins one event as a guest through its own private link and review, not through this form. See `docs/VISITING-CLUBS.md` (#835). The staff page has a fourth view for it, `?status=visiting` (Visiting clubs).

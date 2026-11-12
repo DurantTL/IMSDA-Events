@@ -1,3 +1,4 @@
+import { clubMayUseEvent } from "@/modules/club-registrations/event-gate";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
@@ -29,6 +30,8 @@ export default async function DirectorTeamFormPage({
   const access = await getRosterAccessStateForPage(organizationId);
   // The club layout shows the sign-in and authenticator steps.
   if (access.state !== "OPEN") return clubAccessClosed(access);
+  // A visiting guest club (#835) may use only its own event.
+  if (!(await clubMayUseEvent(access.club.organizationId, eventId))) notFound();
   const form = await loadFilledTeamForm({ eventId, organizationId: access.club.organizationId, teamKey });
   if (!form) notFound();
   const back = `/account/clubs/${organizationId}/events/${eventId}${teamKey ? `?team=${encodeURIComponent(teamKey)}` : ""}`;

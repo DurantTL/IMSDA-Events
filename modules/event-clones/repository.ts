@@ -20,6 +20,7 @@ import {
   parseFormDefinition,
   previewEventCloneInputSchema,
   reviewIssues,
+  latePricingDateKey,
   rewriteFormDefinitionForClone,
   sanitizeSourceForClone,
   type ClonePricingSummary,
@@ -452,7 +453,7 @@ export async function cloneEvent(actorUserId: string, rawInput: unknown) {
         for (const form of config.registrationForms) {
           const definition = parseFormDefinition(form.definition);
           if (!definition) { skipped.forms += 1; continue; }
-          const dates = new Map(input.formLatePricingDates.filter((entry) => entry.formId === form.formId).map((entry) => [entry.fieldKey, entry.startsOn]));
+          const dates = new Map(input.formLatePricingDates.filter((entry) => entry.formId === form.formId).map((entry) => [latePricingDateKey(entry.fieldKey, entry.windowIndex ?? 0), entry.startsOn]));
           const limits = new Map<string, Map<string, number | null>>();
           for (const entry of input.formChoiceLimits) {
             if (entry.formId !== form.formId) continue;
