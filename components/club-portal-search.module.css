@@ -1,0 +1,76 @@
+/* The club banner search (#1854): an icon button beside the club year opens a panel under the banner at every width,
+   so the masthead and the banner keep their heights. */
+
+/* The banner's inner row anchors the open panel. */
+.bannerInner {
+  position: relative;
+}
+
+/* The club year and the search button stay together on one line; on a phone, where the year already wraps under the
+   club's name, the 44px button rides on that line (the year box is the taller of the two). */
+.tools {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle {
+  flex: none;
+  width: var(--touch-target);
+  min-width: var(--touch-target);
+  height: var(--touch-target);
+  border-color: var(--imsda-navy-soft);
+  border-radius: var(--radius-element);
+  background: var(--imsda-navy-deep);
+  color: var(--paper);
+  padding: 0;
+}
+
+.toggle:hover {
+  border-color: var(--imsda-gold);
+}
+
+.toggle[aria-expanded="true"] {
+  box-shadow: inset 0 -4px var(--imsda-gold);
+}
+
+.search {
+  display: none;
+}
+
+/* Open, one white card under the banner holds the field and its matches. It overlays the page, so opening it never
+   moves anything under the pointer, and it closes as soon as focus moves elsewhere. */
+.search[data-open="true"] {
+  display: block;
+  position: absolute;
+  z-index: 30;
+  top: calc(100% - 12px);
+  right: 0;
+  width: min(28rem, 100%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--card);
+  color: var(--ink);
+  padding: 8px;
+  box-shadow: var(--shadow);
+}
+
+.search :global(.destination-search-empty) {
+  margin: 8px 4px 4px;
+  color: var(--muted);
+}
+
+/* The matches sit in the card's flow, under the field, with no gap for the banner to show through. */
+.search :global(.destination-search-panel) {
+  position: static;
+  margin-top: 8px;
+}
+
+.search :global(.destination-search-panel) :global(.destination-search-list) {
+  position: relative;
+  max-height: min(60dvh, 26rem);
+  margin-top: 0;
+  box-shadow: none;
+}
+

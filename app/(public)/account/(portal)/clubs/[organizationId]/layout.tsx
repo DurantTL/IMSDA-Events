@@ -7,6 +7,8 @@ import { ClubGateSlot, ClubRecordsHint } from "@/components/club-gate-slot";
 import { ClubBannerYear } from "@/components/club-banner-year";
 import { ClubPortalMasthead } from "@/components/club-portal-masthead";
 import { ClubPortalNav } from "@/components/club-portal-nav";
+import { ClubBannerTools, ClubPortalSearch } from "@/components/club-portal-search";
+import searchStyles from "@/components/club-portal-search.module.css";
 import { attendeeSignInRedirectPath } from "@/modules/attendee-accounts/return-redirect";
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
@@ -60,7 +62,7 @@ export default async function ClubLayout({
       {/* This masthead stands in for the account header on club pages (globals.css hides that one here). */}
       <ClubPortalMasthead actingAs={access.state === "OPEN" && access.actor.kind === "STAFF_ACTING"} role={access.club.role} />
       <section aria-label="Club" className="club-banner">
-        <div className="club-banner-inner">
+        <div className={`club-banner-inner ${searchStyles.bannerInner}`}>
           <div className="club-banner-identity">
             <h1 title={access.club.name} translate="no">{access.club.name}</h1>
             <p>
@@ -68,7 +70,11 @@ export default async function ClubLayout({
               {clubDirectorRoleLabels[access.club.role]}
             </p>
           </div>
-          <ClubBannerYear currentYear={clubYearFor(new Date())} />
+          {/* The club search (#1854) sits beside the year: this club's tabs, the leader's clubs and the members the roster shows them. */}
+          <ClubBannerTools>
+            <ClubBannerYear currentYear={clubYearFor(new Date())} />
+            {shellNav.length > 0 && <ClubPortalSearch pages={shellNav.map(({ href, label }) => ({ href, label }))} />}
+          </ClubBannerTools>
         </div>
       </section>
       {shellNav.length > 0 && <ClubPortalNav base={base} items={shellNav} menuLabel="Club menu" menuTitle={access.club.name} phoneBar />}
