@@ -141,6 +141,27 @@ describe("who may answer, checked on the server (#1679)", () => {
     expect(db.created).toHaveLength(0);
   });
 
+  it("counts a filled group such as an address as an answer, and an unticked box alone as empty", async () => {
+    const fields = [
+      { id: "field_where", key: "where_held", label: "Where should it be held?", helpText: "", type: "ADDRESS", scope: "REGISTRATION", required: false, options: [] },
+      { id: "field_again", key: "come_again", label: "Would you help again?", helpText: "", type: "CHECKBOX", scope: "REGISTRATION", required: false, options: [] },
+    ];
+    db.form = formRow({ versions: [{ id: "version-1", status: "PUBLISHED", definition: { ...definition, sections: [{ ...definition.sections[0], fields }] } }] });
+    await expect(storeInformationFormResponse({ formId: "form-debrief", idempotencyKey: "key-12345693", answers: { come_again: false }, attendeeAccountId: "ac-1", now }))
+      .rejects.toMatchObject({ code: "ANSWERS_INVALID", message: "Answer at least one question before sending." });
+    await expect(storeInformationFormResponse({ formId: "form-debrief", idempotencyKey: "key-12345694", answers: { where_held: { line1: "100 Sample Road", locality: "Sampletown", region: "IA", postalCode: "50000", country: "US" } }, attendeeAccountId: "ac-1", now }))
+      .resolves.toMatchObject({ created: true });
+  });
+
+  it("returns the stored answer for a retried send of the same answer, not \"already answered\"", async () => {
+    const prisma = (await import("@/lib/prisma")).getPrisma() as unknown as { informationFormResponse: { findUnique: ReturnType<typeof vi.fn> } };
+    prisma.informationFormResponse.findUnique.mockResolvedValueOnce({ id: "response-first", submittedAt: now });
+    db.responseCount = 1;
+    await expect(storeInformationFormResponse({ formId: "form-debrief", idempotencyKey: "key-12345695", answers: { went_well: "Good" }, attendeeAccountId: "ac-1", now }))
+      .resolves.toEqual({ id: "response-first", created: false });
+    expect(db.created).toHaveLength(0);
+  });
+
   it("checks and writes the one answer under a lock on the form and the person, so concurrent sends cannot both pass", async () => {
     await storeInformationFormResponse({ formId: "form-debrief", idempotencyKey: "key-12345691", answers: { went_well: "Good" }, attendeeAccountId: "ac-1", now });
     expect(db.locks).toBe(1);

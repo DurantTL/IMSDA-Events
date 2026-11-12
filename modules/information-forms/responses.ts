@@ -212,18 +212,23 @@ export async function buildInformationFormMembersCsv(target: InformationFormTarg
 }
 
 /**
- * Stores one submitted response against the form's current published version (#1148). The same `idempotencyKey` for the
- * same form stores once and returns the stored response, so a retried submit never doubles. Used by the public fill
- * page (part C); the caller has already decided who is allowed to answer, and passes the signed-in account if any.
+ * Whether one stored answer says something: non-blank text, a chosen option (a yes/no choice is stored as its text), a
+ * number, a ticked box, or a filled group such as an address. An unticked box says nothing, so it cannot carry an empty send.
  */
-/** Whether one stored answer says something: text with a letter in it, a chosen option, a number or a yes. */
 function hasAnswerText(value: unknown): boolean {
   if (typeof value === "string") return value.trim() !== "";
   if (Array.isArray(value)) return value.some(hasAnswerText);
   if (typeof value === "number") return true;
   if (typeof value === "boolean") return value;
+  if (value && typeof value === "object") return Object.values(value).some(hasAnswerText);
   return false;
 }
+
+/**
+ * Stores one submitted response against the form's current published version (#1148). The same `idempotencyKey` for the
+ * same form stores once and returns the stored response, so a retried submit never doubles. Used by the public fill
+ * page (part C); the caller has already decided who is allowed to answer, and passes the signed-in account if any.
+ */
 
 export async function storeInformationFormResponse(input: {
   formId: string;
@@ -286,10 +291,14 @@ export async function storeInformationFormResponse(input: {
       // One answer per person holds under concurrent sends: the check and the write share a lock on this form and person (#1679).
       ? await prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${form.id}), hashtext(${accountId}))`;
+        // A retried send of the same answer returns the stored one rather than "already answered".
+        const retried = await tx.informationFormResponse.findUnique({ where: { formId_idempotencyKey: { formId: form.id, idempotencyKey: input.idempotencyKey } }, select });
+        if (retried) return { ...retried, retried: true as const };
         if (await hasAnsweredDebrief(form.id, accountId, tx)) throw new InformationFormError("ALREADY_ANSWERED", "You have already answered this form. Thank you.");
         return tx.informationFormResponse.create({ data, select });
       })
       : await prisma.informationFormResponse.create({ data, select });
+    if ("retried" in created) return { id: created.id, created: false };
     // After the response is stored, and never throwing: the saved response stands whatever happens to the alert (#1222).
     await sendInformationFormSubmittedAlert({ responseId: created.id, formId: form.id, submittedAt: created.submittedAt }, alertEnabled);
     return { id: created.id, created: true };
