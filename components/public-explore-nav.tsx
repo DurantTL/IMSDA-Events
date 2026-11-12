@@ -14,7 +14,7 @@ export function PublicExploreNav({ current, currentKind = "page" }: { current?: 
       <Link href="/" {...mark("home")}>Home</Link>
       <Link href="/events" {...mark("events")}>Events</Link>
       {/* A plain anchor: /calendar has its own Content-Security-Policy, which a client-side navigation would not pick up (#1212). */}
-      <a href="/calendar" {...mark("calendar")}>Calendar</a>
+      <a {...mark("calendar")} href="/calendar">Calendar</a>
       <a href="/clubs" {...mark("clubs")}>Club ministry</a>
     </nav>
   );
