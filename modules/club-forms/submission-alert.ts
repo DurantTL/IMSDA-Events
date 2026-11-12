@@ -8,7 +8,7 @@ import { getPrisma } from "@/lib/prisma";
 import { neutralizePlaceholders } from "@/modules/club-applications/email";
 import { AccountEmailNotConfiguredError, getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
-import { clubFormClubLabel, type ClubFormActor } from "@/modules/club-forms/domain";
+import { clubFormClubLabel, isTltFormTemplateKey, type ClubFormActor } from "@/modules/club-forms/domain";
 import { recordAlertFeedItem } from "@/modules/notifications/feed";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
@@ -28,7 +28,7 @@ import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export const CLUB_FORM_SUBMITTED_TEMPLATE_KEY = "CLUB_FORM_SUBMITTED";
 
-type Client = Pick<Prisma.TransactionClient, "messageOutbox" | "adminAlertFeedItem" | "clubFormTemplate" | "organization" | "attendeeAccount" | "user">;
+type Client = Pick<Prisma.TransactionClient, "messageOutbox" | "adminAlertFeedItem" | "clubFormTemplate" | "organization" | "attendeeAccount" | "user" | "areaCoordinatorGrant">;
 
 export type ClubFormSubmittedInput = {
   submissionId: string;
@@ -78,6 +78,55 @@ export function clubFormSubmittedContent(input: { formName: string; clubName: st
   };
 }
 
+/**
+ * What a TLT director's alert says (#1686): which form, which club, when, and a link to the TLT forms inbox. Takes
+ * names of the form and the club and a time only: no answer, no child's name, no submitter, so there is nowhere for
+ * one to get in. She signs in to read it.
+ */
+export function tltFormSubmittedContent(input: { formName: string; clubName: string; submittedAt: Date }) {
+  const formName = neutralizePlaceholders(input.formName);
+  const clubName = neutralizePlaceholders(input.clubName);
+  const when = formatInConferenceTime(input.submittedAt, { dateStyle: "long", timeStyle: "short" });
+  const path = "/account/area-clubs/tlt/forms";
+  let link = path;
+  try {
+    link = new URL(path, getServerEnv().APP_BASE_URL).toString();
+  } catch {
+    // The relative path stays.
+  }
+  return {
+    subject: `TLT form submitted: ${formName} (${clubName})`,
+    bodyText: [
+      "A TLT form was submitted.",
+      "",
+      `Form: ${formName}`,
+      `Club: ${clubName}`,
+      `When: ${when}`,
+      "",
+      "Open the TLT forms inbox (sign-in required):",
+      link,
+      "",
+      "The answers are not in this email.",
+      "",
+      "IMAdventist",
+    ].join("\n"),
+  };
+}
+
+/** The addresses of every account that is the TLT director right now: an active Area Coordinator grant with the setting on, on an active account. Lowercased, de-duplicated. */
+async function tltDirectorEmails(client: Client, now: Date): Promise<string[]> {
+  const grants = await client.areaCoordinatorGrant.findMany({
+    where: {
+      tltDirector: true,
+      revokedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      attendeeAccount: { status: "ACTIVE", disabledAt: null },
+    },
+    select: { attendeeAccount: { select: { email: true } } },
+  });
+  return [...new Set(grants.map((grant) => grant.attendeeAccount.email.trim().toLowerCase()).filter(Boolean))];
+}
+
 async function submitterName(client: Client, actor: ClubFormActor | null): Promise<string | null> {
   if (!actor) return null;
   if (actor.kind === "ATTENDEE") {
@@ -91,9 +140,14 @@ async function submitterName(client: Client, actor: ClubFormActor | null): Promi
 /** Queues one email per listed address. Returns the new message ids, to deliver after commit. */
 export async function queueClubFormSubmittedEmails(client: Client, input: ClubFormSubmittedInput, enabled: boolean): Promise<string[]> {
   if (!enabled) return [];
-  const template = await client.clubFormTemplate.findUnique({ where: { id: input.templateId }, select: { name: true, submissionNotifyEmails: true } });
-  const recipients = [...new Set((template?.submissionNotifyEmails ?? []).map((email) => email.trim().toLowerCase()).filter(Boolean))];
-  if (!template || recipients.length === 0) return [];
+  const template = await client.clubFormTemplate.findUnique({ where: { id: input.templateId }, select: { key: true, name: true, submissionNotifyEmails: true } });
+  if (!template) return [];
+  // The TLT director (#1686) is alerted to the three TLT forms with her own, answer-free message and an inbox link she
+  // can open. An address she shares with the form's list gets this one, not the staff link she cannot open: one email each.
+  const directors = isTltFormTemplateKey(template.key) ? await tltDirectorEmails(client, input.submittedAt) : [];
+  const directorSet = new Set(directors);
+  const recipients = [...new Set((template.submissionNotifyEmails ?? []).map((email) => email.trim().toLowerCase()).filter(Boolean))].filter((email) => !directorSet.has(email));
+  if (recipients.length === 0 && directors.length === 0) return [];
   let from;
   try {
     from = getAccountEmailSender();
@@ -112,17 +166,22 @@ export async function queueClubFormSubmittedEmails(client: Client, input: ClubFo
     submittedAt: input.submittedAt,
     submissionId: input.submissionId,
   });
+  const tltContent = directors.length > 0
+    ? tltFormSubmittedContent({ formName: template.name, clubName: input.organizationId ? organization?.name ?? "A club" : clubFormClubLabel(null, input.unlistedClubName), submittedAt: input.submittedAt })
+    : null;
   const keyFor = (email: string) => `club-form-submitted:${input.submissionId}:${email}`;
   // A retry of the same submission finds its rows and adds nothing.
+  const everyone = [...recipients, ...directors];
   const already = await client.messageOutbox.findMany({
-    where: { idempotencyKey: { in: recipients.map(keyFor) } },
+    where: { idempotencyKey: { in: everyone.map(keyFor) } },
     select: { idempotencyKey: true },
   });
   const done = new Set(already.map((row) => row.idempotencyKey));
   const ids: string[] = [];
-  for (const email of recipients) {
+  for (const email of everyone) {
     if (done.has(keyFor(email))) continue;
-    const message = await client.messageOutbox.create({
+    const message = directorSet.has(email) && tltContent ? tltContent : content;
+    const created = await client.messageOutbox.create({
       data: {
         eventId: null,
         templateKey: CLUB_FORM_SUBMITTED_TEMPLATE_KEY,
@@ -132,8 +191,8 @@ export async function queueClubFormSubmittedEmails(client: Client, input: ClubFo
         senderNameSnapshot: from.name,
         senderEmailSnapshot: from.address,
         replyToEmailSnapshot: from.replyTo,
-        subjectSnapshot: content.subject,
-        bodyTextSnapshot: content.bodyText,
+        subjectSnapshot: message.subject,
+        bodyTextSnapshot: message.bodyText,
         metadata: { trigger: CLUB_FORM_SUBMITTED_TEMPLATE_KEY, submissionId: input.submissionId, templateId: input.templateId, accountEmail: false, realDelivery: true },
         idempotencyKey: keyFor(email),
         correlationId: randomUUID(),
@@ -141,7 +200,7 @@ export async function queueClubFormSubmittedEmails(client: Client, input: ClubFo
       },
       select: { id: true },
     });
-    ids.push(message.id);
+    ids.push(created.id);
   }
   // The feed item (#1033) beside the emails, in the same transaction: one per submission however many addresses. The
   // form's own name is a label staff chose; no answer and no submitter name.

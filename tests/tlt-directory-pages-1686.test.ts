@@ -21,6 +21,7 @@ vi.mock("@/components/tlt-directory", () => ({ TltDirectory: () => null }));
 vi.mock("@/components/tlt-lists-editor", () => ({ TltListsEditor: () => null }));
 vi.mock("@/components/coordinator-section-heading", () => ({ CoordinatorSectionHeading: () => null }));
 vi.mock("@/components/navigation-link", () => ({ NavigationLink: () => null }));
+vi.mock("@/modules/tlt-directory/forms", () => ({ countTltFormsByPerson: vi.fn(async () => new Map()) }));
 vi.mock("@/modules/tlt-directory/repository", () => ({ readTltDirectory: mocks.readTltDirectory, listTltLists: mocks.listTltLists, recordTltDirectoryView: mocks.recordTltDirectoryView }));
 
 import ListsPage from "@/app/(public)/account/(portal)/area-clubs/tlt/lists/page";
