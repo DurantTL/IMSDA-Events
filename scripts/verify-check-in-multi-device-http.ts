@@ -239,6 +239,7 @@ async function main() {
   assert.ok(live.text.length < 10_000, `the live answer is small (${live.text.length} bytes)`);
   const quiet = await call(devices[3], "GET", `/api/events/${eventId}/check-ins?since=${encodeURIComponent(new Date(Date.now() + 60_000).toISOString())}`);
   assert.deepEqual(quiet.json?.changes, []);
+  assert.deepEqual(quiet.json?.balances, [], "a quiet poll has no balance changes");
   assert.ok(quiet.text.length < 100, "a quiet poll is a few dozen bytes");
   assert.equal((await call(devices[3], "GET", `/api/events/${eventId}/check-ins`)).status, 400, "since is required");
 

@@ -1,13 +1,31 @@
 "use client";
 
 import { Money } from "@/components/exact-value";
-import { CheckCircle2, CreditCard, ShieldAlert, Square } from "lucide-react";
+import { CheckCircle2, Clock, CreditCard, ShieldAlert, Square, TriangleAlert, WifiOff } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { formatPersonName } from "@/lib/person-name";
 import { CheckInPaymentDue } from "@/components/check-in-payment-due";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import { CHECK_IN_AUTO_RETRY_MS, CHECK_IN_REQUEST_TIMEOUT_MS } from "@/components/use-offline-check-in-queue";
+import {
+  STATION_LOOKUP_OFFLINE_MESSAGE,
+  STATION_PAYMENTS_OFFLINE_NOTE,
+  STATION_QUEUED_LABEL,
+  mapStationSyncResponse,
+  purgeOtherStationQueues,
+  readStationQueue,
+  stationAttentionLine,
+  stationQueueBanner,
+  stationQueuedAttendeeIds,
+  stationQueuedPeopleCount,
+  stationStopQueueWarning,
+  stationUnsyncedNotice,
+  writeStationQueue,
+  type StationQueuedBatch,
+  type StationSyncOutcome,
+} from "@/modules/checkin-stations/offline-queue";
 import {
   STATION_BALANCE_NOTE_MAX_LENGTH,
   STATION_BALANCE_REASONS,
@@ -59,15 +77,38 @@ function writeJustIn(stationId: string, rows: JustCheckedIn[]) {
 
 type HandOut = { keyTypes: string[]; rooms: Array<{ attendeeId: string; label: string }>; attendeeIds: string[] };
 
+type CheckInAnswer = {
+  results: StationCheckInResult[];
+  paymentHistory?: StationPaymentHistoryEntry[];
+  handOutParts?: { keyTypes: string[]; rooms: Array<{ attendeeId: string; label: string }> };
+};
+
+type AttentionEntry = { id: string; name: string; text: string };
+
 type ApiFailure = { error?: string; message?: string };
 
-async function post<T>(path: string, body: unknown): Promise<{ ok: true; data: T } | { ok: false; status: number; message: string }> {
+type PostResult<T> = { ok: true; data: T } | { ok: false; status: number; message: string };
+type Send = <T>(path: string, body: unknown, timeoutMs?: number) => Promise<PostResult<T>>;
+
+const UNDO_OFFLINE_NOTE = "Undo waits until you're back online.";
+
+function deviceStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** No answer (offline, or past the timeout) comes back as status 0. */
+async function post<T>(path: string, body: unknown, timeoutMs?: number): Promise<PostResult<T>> {
   try {
     const response = await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       cache: "no-store",
+      signal: timeoutMs && typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(timeoutMs) : undefined,
     });
     const data = await response.json().catch(() => ({})) as T & ApiFailure;
     if (!response.ok) {
@@ -111,16 +152,38 @@ export function CheckInStationScreen({
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState("");
   const [stopped, setStopped] = useState(false);
+  const [unsyncedNames, setUnsyncedNames] = useState<string[]>([]);
+  const queuedHeading = useRef<HTMLHeadingElement>(null);
   const noHandOut: HandOut = { keyTypes: [], rooms: [], attendeeIds: [] };
   const [handOut, setHandOut] = useState<HandOut>(noHandOut);
   const [justIn, setJustIn] = useState<JustCheckedIn[]>([]);
   const [undoMessage, setUndoMessage] = useState<{ text: string; name?: string } | null>(null);
-  const [focusTarget, setFocusTarget] = useState<{ kind: "undo" | "checkin" | "status"; id?: string; n: number } | null>(null);
+  const [focusTarget, setFocusTarget] = useState<{ kind: "undo" | "checkin" | "status" | "queued"; id?: string; n: number } | null>(null);
   const undoButtons = useRef<Map<string, HTMLButtonElement>>(new Map());
   const checkInButton = useRef<HTMLButtonElement>(null);
   const undoStatus = useRef<HTMLDivElement>(null);
   const [undoing, setUndoing] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  // Offline (#1577): check-ins that could not be sent wait on this device, with the same keys, and retry on their own.
+  const [online, setOnline] = useState(true);
+  const [unreachable, setUnreachable] = useState(false);
+  const [queue, setQueue] = useState<StationQueuedBatch[]>([]);
+  const queueRef = useRef<StationQueuedBatch[]>([]);
+  const [storageFailed, setStorageFailed] = useState(false);
+  const [attention, setAttentionState] = useState<AttentionEntry[]>([]);
+  // Kept in a ref too, so a stop that happens inside the sync loop sees entries added a moment earlier.
+  const attentionRef = useRef<AttentionEntry[]>([]);
+  function setAttention(update: (current: AttentionEntry[]) => AttentionEntry[]) {
+    attentionRef.current = update(attentionRef.current);
+    setAttentionState(attentionRef.current);
+  }
+  const syncingRef = useRef(false);
+  const stoppedRef = useRef(false);
+  const familyRef = useRef<StationFamily | null>(null);
+  const syncRef = useRef<() => Promise<void>>(async () => {});
+  const offline = !online || unreachable;
+  const waiting = stationQueuedPeopleCount(queue);
+  const queuedIds = stationQueuedAttendeeIds(queue);
   // One key per person for as long as this family is on screen, so a double tap or a retry replays safely.
   const keys = useRef<Map<string, string>>(new Map());
 
@@ -131,6 +194,21 @@ export function CheckInStationScreen({
       keys.current.set(attendeeId, key);
     }
     return key;
+  }
+
+  // Every request goes through here, so a request with no answer marks the station offline and any answer clears it.
+  const send: Send = async (path, body, timeoutMs) => {
+    const result = await post<never>(path, body, timeoutMs);
+    if (!result.ok && result.status === 0) setUnreachable(true);
+    else setUnreachable(false);
+    return result;
+  };
+
+  function persist(next: StationQueuedBatch[]) {
+    queueRef.current = next;
+    setQueue(next);
+    const kept = writeStationQueue(deviceStorage(), stationId, next);
+    setStorageFailed(next.length > 0 && !kept);
   }
 
   // Read after mount so the server and the first client render agree.
@@ -148,9 +226,143 @@ export function CheckInStationScreen({
       ? undoButtons.current.get(focusTarget.id)
       : focusTarget.kind === "checkin"
         ? checkInButton.current
-        : undoStatus.current;
+        : focusTarget.kind === "queued"
+          ? queuedHeading.current
+          : undoStatus.current;
     (element ?? undoStatus.current)?.focus();
   }, [focusTarget]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setOnline(navigator.onLine);
+      purgeOtherStationQueues(deviceStorage(), stationId);
+      const saved = readStationQueue(deviceStorage(), stationId);
+      if (saved === null) {
+        setStorageFailed(true);
+      } else if (saved.length > 0) {
+        queueRef.current = saved;
+        setQueue(saved);
+        void syncRef.current();
+      }
+    }, 0);
+    const goOnline = () => {
+      setMessage((current) => (current === STATION_LOOKUP_OFFLINE_MESSAGE ? "" : current));
+      setOnline(true);
+      setUnreachable(false);
+      void syncRef.current();
+    };
+    const goOffline = () => setOnline(false);
+    // A weak link keeps navigator.onLine true, so waiting check-ins also retry on a timer, oldest first, same keys.
+    const interval = window.setInterval(() => {
+      if (!navigator.onLine) return;
+      if (queueRef.current.length > 0) void syncRef.current();
+      else setUnreachable(false);
+    }, CHECK_IN_AUTO_RETRY_MS);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearInterval(interval);
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, [stationId]);
+
+  // Only when the device could not keep the queue: leaving the page would lose the waiting check-ins.
+  useUnsavedChangesGuard(storageFailed && waiting > 0, "Check-ins are waiting to sync and this device could not save them. Leave this page and lose them?");
+
+  async function syncQueue() {
+    if (syncingRef.current || stoppedRef.current || !navigator.onLine) return;
+    syncingRef.current = true;
+    try {
+      for (;;) {
+        const batch = queueRef.current[0];
+        if (!batch || stoppedRef.current) break;
+        const response = await send<CheckInAnswer>("/api/check-in-station/check-in", {
+          registrationId: batch.registrationId,
+          items: batch.items.map(({ attendeeId, idempotencyKey }) => ({ attendeeId, idempotencyKey })),
+          ...(batch.balanceReason ? { balanceReason: batch.balanceReason } : {}),
+        }, CHECK_IN_REQUEST_TIMEOUT_MS);
+        const outcome = mapStationSyncResponse(batch, response);
+        if (outcome.kind === "STOPPED") {
+          markStopped();
+          break;
+        }
+        if (outcome.kind === "RETRY_LATER") break;
+        persist(queueRef.current.filter((entry) => entry.id !== batch.id));
+        applySyncOutcome(batch, outcome, response.ok ? response.data : null);
+      }
+    } finally {
+      syncingRef.current = false;
+    }
+  }
+
+  function applySyncOutcome(batch: StationQueuedBatch, outcome: Extract<StationSyncOutcome, { kind: "ANSWERED" }>, data: CheckInAnswer | null) {
+    const nameOf = (attendeeId: string) => batch.items.find((item) => item.attendeeId === attendeeId)?.name ?? "This person";
+    const newlyIn = batch.items.filter((item) => outcome.confirmed.some((entry) => entry.attendeeId === item.attendeeId && entry.newlyCheckedIn));
+    if (newlyIn.length > 0) {
+      updateJustIn((rows) => [
+        ...newlyIn.map((item) => ({ attendeeId: item.attendeeId, name: item.name, confirmationCode: batch.confirmationCode })).reverse(),
+        ...rows.filter((row) => !newlyIn.some((item) => item.attendeeId === row.attendeeId)),
+      ]);
+    }
+    if (outcome.attention.length > 0) {
+      setAttention((current) => [
+        ...current,
+        ...outcome.attention.map((entry) => ({ id: `${batch.id}:${entry.attendeeId}`, name: nameOf(entry.attendeeId), text: stationAttentionLine(nameOf(entry.attendeeId), entry) })),
+      ]);
+    }
+    // The hand-out box and the on-screen ticks only matter while that registration is the one in front of staff.
+    if (familyRef.current?.registrationId !== batch.registrationId) return;
+    const byId: Record<string, StationCheckInResult["status"]> = {};
+    for (const entry of outcome.confirmed) byId[entry.attendeeId] = entry.newlyCheckedIn ? "CHECKED_IN" : "ALREADY_CHECKED_IN";
+    for (const attendeeId of outcome.needsDeskReview) byId[attendeeId] = "NEEDS_DESK_REVIEW";
+    setResults((current) => ({ ...current, ...byId }));
+    if (newlyIn.length > 0) {
+      setHandOut({
+        keyTypes: data?.handOutParts?.keyTypes ?? [],
+        rooms: data?.handOutParts?.rooms ?? [],
+        attendeeIds: newlyIn.map((item) => item.attendeeId),
+      });
+    }
+    setFamily((current) => (current && current.registrationId === batch.registrationId
+      ? {
+        ...current,
+        paymentHistory: data?.paymentHistory ?? current.paymentHistory,
+        attendees: current.attendees.map((person) => {
+          const status = byId[person.id];
+          return status === "CHECKED_IN" || status === "ALREADY_CHECKED_IN"
+            ? { ...person, checkedIn: true }
+            : status === "NEEDS_DESK_REVIEW"
+              ? { ...person, needsDeskReview: true }
+              : person;
+        }),
+      }
+      : current));
+  }
+
+  function saveBatchOnDevice(current: StationFamily, items: Array<{ attendeeId: string; idempotencyKey: string }>) {
+    const batch: StationQueuedBatch = {
+      id: crypto.randomUUID(),
+      queuedAt: new Date().toISOString(),
+      registrationId: current.registrationId,
+      confirmationCode: current.confirmationCode,
+      ...(current.payment.state === "DUE" && reasonCode ? { balanceReason: { code: reasonCode, note: reasonNote.trim() } } : {}),
+      items: items.map((item) => {
+        const person = current.attendees.find((entry) => entry.id === item.attendeeId);
+        return { ...item, name: person ? formatPersonName(person) : "Guest" };
+      }),
+    };
+    persist([...queueRef.current, batch]);
+    setSelected(new Set());
+    // The Check in button is about to stop applying to these people: move focus to where they now are.
+    setFocusTarget((previous) => ({ kind: "queued", n: (previous?.n ?? 0) + 1 }));
+  }
+
+  useEffect(() => {
+    familyRef.current = family;
+    syncRef.current = syncQueue;
+  });
 
   function updateJustIn(update: (rows: JustCheckedIn[]) => JustCheckedIn[]) {
     setJustIn((current) => {
@@ -161,6 +373,14 @@ export function CheckInStationScreen({
   }
 
   function markStopped() {
+    stoppedRef.current = true;
+    // Only names are kept, so staff can send these people to the desk; the saved batches themselves are cleared.
+    setUnsyncedNames([...new Set([
+      ...queueRef.current.flatMap((batch) => batch.items.map((item) => item.name)),
+      ...attentionRef.current.map((entry) => entry.name),
+    ])]);
+    persist([]);
+    setAttention(() => []);
     setJustIn([]);
     writeJustIn(stationId, []);
     setStopped(true);
@@ -184,10 +404,14 @@ export function CheckInStationScreen({
     event.preventDefault();
     const lookupInput = classifyStationEntry(entry);
     if (!lookupInput || busy) return;
+    if (!navigator.onLine) {
+      setMessage(STATION_LOOKUP_OFFLINE_MESSAGE);
+      return;
+    }
     setBusy("lookup");
     setMessage("");
     setDeskNotice("");
-    const response = await post<{ family: StationFamily }>("/api/check-in-station/lookup", lookupInput);
+    const response = await send<{ family: StationFamily }>("/api/check-in-station/lookup", lookupInput);
     setBusy("");
     if (!response.ok) {
       if (response.status === 401) markStopped();
@@ -203,7 +427,9 @@ export function CheckInStationScreen({
     setReasonCode("");
     setReasonNote("");
     setFamily(response.data.family);
-    setSelected(new Set(response.data.family.attendees.filter((person) => !person.checkedIn && !person.needsDeskReview).map((person) => person.id)));
+    // People still waiting to sync on this device are not ticked: they are already on their way.
+    const waitingIds = stationQueuedAttendeeIds(queueRef.current);
+    setSelected(new Set(response.data.family.attendees.filter((person) => !person.checkedIn && !person.needsDeskReview && !waitingIds.has(person.id)).map((person) => person.id)));
     setEntry("");
   }
 
@@ -217,28 +443,32 @@ export function CheckInStationScreen({
   }
 
   async function confirmCheckIn() {
-    if (!family || busy || selected.size === 0) return;
+    const ticked = family?.attendees.filter((person) => selected.has(person.id) && !person.checkedIn && !person.needsDeskReview && !queuedIds.has(person.id)) ?? [];
+    if (!family || busy || ticked.length === 0) return;
     setBusy("confirm");
     setMessage("");
     setUndoMessage(null);
-    const items = family.attendees
-      .filter((person) => selected.has(person.id))
+    const items = ticked
       .map((person) => ({ attendeeId: person.id, idempotencyKey: keyFor(person.id) }));
-    const response = await post<{
-      results: StationCheckInResult[];
-      paymentHistory?: StationPaymentHistoryEntry[];
-      handOutParts?: { keyTypes: string[]; rooms: Array<{ attendeeId: string; label: string }> };
-    }>("/api/check-in-station/check-in", {
+    if (!navigator.onLine) {
+      setOnline(false);
+      saveBatchOnDevice(family, items);
+      setBusy("");
+      return;
+    }
+    const response = await send<CheckInAnswer>("/api/check-in-station/check-in", {
       registrationId: family.registrationId,
       items,
       ...(family.payment.state === "DUE" && reasonCode
         ? { balanceReason: { code: reasonCode, note: reasonNote.trim() } }
         : {}),
-    });
+    }, CHECK_IN_REQUEST_TIMEOUT_MS);
     setBusy("");
     if (!response.ok) {
       if (response.status === 401) markStopped();
-      setMessage(response.message);
+      // No answer: the server may or may not have it. Save the batch with the same keys; the server replays safely.
+      else if (response.status === 0) saveBatchOnDevice(family, items);
+      else setMessage(response.message);
       return;
     }
     const byId: Record<string, StationCheckInResult["status"]> = {};
@@ -272,10 +502,10 @@ export function CheckInStationScreen({
   }
 
   async function undoCheckIn(row: JustCheckedIn) {
-    if (undoing) return;
+    if (undoing || offline) return;
     setUndoing(row.attendeeId);
     setUndoMessage(null);
-    const response = await post<{ undone: boolean }>("/api/check-in-station/undo", { attendeeId: row.attendeeId });
+    const response = await send<{ undone: boolean }>("/api/check-in-station/undo", { attendeeId: row.attendeeId });
     setUndoing("");
     const index = justIn.findIndex((item) => item.attendeeId === row.attendeeId);
     const neighbour = justIn[index + 1] ?? justIn[index - 1];
@@ -324,7 +554,7 @@ export function CheckInStationScreen({
   // After a network error on a payment: ask the server for the registration's current balance.
   async function refreshPayment() {
     if (!family) return;
-    const response = await post<{ family: StationFamily }>("/api/check-in-station/lookup", { kind: "confirmation", value: family.confirmationCode });
+    const response = await send<{ family: StationFamily }>("/api/check-in-station/lookup", { kind: "confirmation", value: family.confirmationCode });
     if (response.ok) {
       setFamily((current) => (current
         ? { ...current, payment: response.data.family.payment, paymentHistory: response.data.family.paymentHistory }
@@ -351,6 +581,12 @@ export function CheckInStationScreen({
         <section className={styles.cisCard}>
           <h1>Check-in station</h1>
           <p>This station is not active. Ask a staff member to start it again from Check-in.</p>
+          {unsyncedNames.length > 0 && (
+            <p role="status" className={styles.cisDeskNotice}>
+              <ShieldAlert aria-hidden="true" size={18} />
+              <span>{stationUnsyncedNotice(unsyncedNames.length)} <span translate="no">{unsyncedNames.join(", ")}</span></span>
+            </p>
+          )}
           <p className={styles.cisActions}>
             <Link href="/check-in" className={`secondary-button ${styles.large}`}>Go to Check-in</Link>
           </p>
@@ -359,7 +595,9 @@ export function CheckInStationScreen({
     );
   }
 
-  const selectable = family?.attendees.filter((person) => !person.checkedIn && !person.needsDeskReview) ?? [];
+  const selectable = family?.attendees.filter((person) => !person.checkedIn && !person.needsDeskReview && !queuedIds.has(person.id)) ?? [];
+  const tickedCount = selectable.filter((person) => selected.has(person.id)).length;
+  const banner = stationQueueBanner({ offline, waiting, storageFailed });
   const balanceDue = family?.payment.state === "DUE";
   const reasonMissing = balanceDue && (reasonCode === "" || (reasonCode === "OTHER" && reasonNote.trim() === ""));
   const remainingIds = new Set(handOut.attendeeIds);
@@ -383,6 +621,19 @@ export function CheckInStationScreen({
           Stop station
         </button>
       </header>
+
+      <div role="status" aria-live="polite" className={styles.cisConnection}>
+        {banner && (
+          <div className={`${styles.cisBanner} ${banner.tone === "offline" ? styles.cisBannerOffline : styles.cisBannerSyncing}`}>
+            <p>
+              {banner.tone === "offline" ? <WifiOff aria-hidden="true" size={18} /> : <Clock aria-hidden="true" size={18} />}
+              <strong>{banner.text}</strong>
+              {banner.waitingLabel && <span className={styles.cisBannerCount}> {banner.waitingLabel}</span>}
+            </p>
+            {banner.storageWarning && <p className={styles.cisBannerWarn}>{banner.storageWarning}</p>}
+          </div>
+        )}
+      </div>
 
       <form className={`${styles.cisCard} ${styles.cisLookup}`} onSubmit={lookup}>
         <label htmlFor="cis-code"><strong>Scan a pass or type the confirmation code</strong></label>
@@ -433,6 +684,8 @@ export function CheckInStationScreen({
             key={family.registrationId}
             family={family}
             canRecordPayments={canRecordPayments}
+            offline={offline}
+            send={send}
             onPayment={({ payment, paymentHistory }) => setFamily((current) => (current
               ? { ...current, payment, paymentHistory: paymentHistory ?? current.paymentHistory }
               : current))}
@@ -452,8 +705,14 @@ export function CheckInStationScreen({
                         <strong translate="no">{person.firstName} {person.lastName}</strong>
                         <span className={styles.cisType}>{stationAttendeeTypeLabel(person.attendeeType)}</span>
                         {person.checkedIn
-                          ? <span className={`${styles.cisStatus} ${styles.cisStatusOk}`}>{result ? stationResultLabel(result) : "Checked in"}</span>
-                          : <span className={`${styles.cisStatus} ${styles.cisStatusHold}`}>Needs desk review - send to the check-in desk</span>}
+                          ? <span className={`${styles.cisStatus} ${styles.cisStatusOk}`}><CheckCircle2 aria-hidden="true" size={14} /> {result ? stationResultLabel(result) : "Checked in"}</span>
+                          : <span className={`${styles.cisStatus} ${styles.cisStatusHold}`}><TriangleAlert aria-hidden="true" size={14} /> Needs desk review - send to the check-in desk</span>}
+                      </span>
+                    ) : queuedIds.has(person.id) ? (
+                      <span className={styles.cisPersonBody}>
+                        <strong translate="no">{formatPersonName(person)}</strong>
+                        <span className={styles.cisType}>{stationAttendeeTypeLabel(person.attendeeType)}</span>
+                        <span className={`${styles.cisStatus} ${styles.cisStatusQueued}`}><Clock aria-hidden="true" size={14} /> {STATION_QUEUED_LABEL}</span>
                       </span>
                     ) : (
                       <label className={`${styles.cisPersonBody} ${styles.cisPersonPick}`}>
@@ -505,10 +764,10 @@ export function CheckInStationScreen({
                 ref={checkInButton}
                 type="button"
                 className={`primary-button ${styles.large}`}
-                disabled={busy !== "" || selected.size === 0 || (reasonMissing && selectable.length > 0)}
+                disabled={busy !== "" || tickedCount === 0 || (reasonMissing && selectable.length > 0)}
                 onClick={confirmCheckIn}
               >
-                {busy === "confirm" ? "Checking in..." : `Check in${selected.size ? ` (${selected.size})` : ""}`}
+                {busy === "confirm" ? "Checking in..." : `Check in${tickedCount ? ` (${tickedCount})` : ""}`}
               </button>
               <button type="button" className={`secondary-button ${styles.large}`} onClick={reset} disabled={busy !== ""}>Next person</button>
             </div>
@@ -524,9 +783,51 @@ export function CheckInStationScreen({
           </p>
         )}
       </div>
+      {queue.length > 0 && (
+        <section className={styles.cisCard} aria-labelledby="cis-queued-title">
+          <h2 id="cis-queued-title" ref={queuedHeading} tabIndex={-1}>Saved on this device</h2>
+          <ul className={styles.cisPeople}>
+            {queue.flatMap((batch) => batch.items.map((item) => (
+              <li key={`${batch.id}:${item.attendeeId}`} className={`${styles.cisPerson} ${styles.cisQueuedRow}`}>
+                <span className={styles.cisPersonBody}>
+                  <strong translate="no">{item.name}</strong>
+                  <span className={styles.cisType}>Registration <span translate="no">{batch.confirmationCode}</span></span>
+                  <span className={`${styles.cisStatus} ${styles.cisStatusQueued}`}><Clock aria-hidden="true" size={14} /> {STATION_QUEUED_LABEL}</span>
+                </span>
+              </li>
+            )))}
+          </ul>
+        </section>
+      )}
+      {attention.length > 0 && (
+        <section className={`${styles.cisCard} ${styles.cisAttention}`} aria-labelledby="cis-attention-title">
+          <h2 id="cis-attention-title">Needs attention</h2>
+          <ul className={styles.cisPeople}>
+            {attention.map((entry) => (
+              <li key={entry.id} className={`${styles.cisPerson} ${styles.cisJustIn}`}>
+                <span className={styles.cisPersonBody}>
+                  <span className={`${styles.cisStatus} ${styles.cisStatusConflict}`}><TriangleAlert aria-hidden="true" size={14} /> Needs the desk</span>
+                  <span translate="no">{entry.text}</span>
+                </span>
+                <button
+                  type="button"
+                  className={`secondary-button ${styles.large}`}
+                  onClick={() => {
+                    setAttention((current) => current.filter((item) => item.id !== entry.id));
+                    setFocusTarget((current) => ({ kind: "status", n: (current?.n ?? 0) + 1 }));
+                  }}
+                >
+                  Dismiss
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {justIn.length > 0 && (
         <section className={styles.cisCard} aria-labelledby="cis-just-in-title">
           <h2 id="cis-just-in-title">Just checked in</h2>
+          {offline && <p className={styles.cisHelp}>{UNDO_OFFLINE_NOTE}</p>}
           <ul className={styles.cisPeople}>
             {justIn.map((row) => (
               <li key={row.attendeeId} className={`${styles.cisPerson} ${styles.cisJustIn}`}>
@@ -542,7 +843,7 @@ export function CheckInStationScreen({
                   type="button"
                   className={`secondary-button ${styles.large}`}
                   aria-label={`Undo check-in for ${row.name}`}
-                  disabled={undoing !== ""}
+                  disabled={undoing !== "" || offline}
                   onClick={() => undoCheckIn(row)}
                 >
                   {undoing === row.attendeeId ? "Undoing..." : "Undo"}
@@ -565,6 +866,7 @@ export function CheckInStationScreen({
         title="Stop this station?"
       >
         <p>This device will go back to the &quot;not active&quot; screen. Staff can start it again from Check-in.</p>
+        {waiting > 0 && <p><strong>{stationStopQueueWarning(waiting)}</strong></p>}
       </ConfirmDialog>
     </main>
   );
@@ -573,6 +875,8 @@ export function CheckInStationScreen({
 function PaymentPanel({
   family,
   canRecordPayments,
+  offline,
+  send: post,
   onPayment,
   onRefresh,
   busy,
@@ -580,6 +884,8 @@ function PaymentPanel({
 }: {
   family: StationFamily;
   canRecordPayments: boolean;
+  offline: boolean;
+  send: Send;
   onPayment: (update: MoneyUpdate) => void;
   onRefresh: () => Promise<void>;
   busy: boolean;
@@ -624,6 +930,7 @@ function PaymentPanel({
     event.preventDefault();
     setError("");
     setNotice("");
+    if (offline) return setError(STATION_PAYMENTS_OFFLINE_NOTE);
     const cents = parseDollarsToCents(amount || (payment.state === "DUE" ? (payment.balanceCents / 100).toFixed(2) : ""));
     if (!cents) return setError("Enter the amount received, like 25.00.");
     if (method === "CHECK" && !checkNumber.trim()) return setError("Enter the check number.");
@@ -656,6 +963,7 @@ function PaymentPanel({
   }
 
   async function openSquare() {
+    if (offline) return;
     setSquareOpen(true);
     setNoteOpen(false);
     setError("");
@@ -695,6 +1003,7 @@ function PaymentPanel({
   }
 
   async function matchPayment(candidate: StationSquareCandidate) {
+    if (offline) return setError(STATION_PAYMENTS_OFFLINE_NOTE);
     setError("");
     setNotice("");
     setBusy(true);
@@ -718,6 +1027,7 @@ function PaymentPanel({
     event.preventDefault();
     setError("");
     setNotice("");
+    if (offline) return setError(STATION_PAYMENTS_OFFLINE_NOTE);
     const cents = parseDollarsToCents(squareAmount);
     if (!cents) return setError("Enter the amount applied to the balance, like 25.00.");
     if (cents > balanceCents) return setError(overBalanceMessage);
@@ -757,6 +1067,7 @@ function PaymentPanel({
             The payer can also pay privately on their phone from the manage link in their confirmation email.
           </p>
 
+          {offline && <p className={styles.cisWarn}>{STATION_PAYMENTS_OFFLINE_NOTE}</p>}
           {canRecordPayments && (
             <form className={styles.cisForm} onSubmit={recordReceived}>
               <fieldset>
@@ -790,7 +1101,7 @@ function PaymentPanel({
                     />
                   </>
                 )}
-                <button type="submit" className={`primary-button ${styles.large}`} disabled={busy || amountOver}>
+                <button type="submit" className={`primary-button ${styles.large}`} disabled={busy || amountOver || offline}>
                   {busy ? "Saving..." : method === "CASH" ? "Record cash received" : "Record check received"}
                 </button>
               </fieldset>
@@ -798,7 +1109,7 @@ function PaymentPanel({
           )}
 
           {!squareOpen ? (
-            <button type="button" className={`secondary-button ${styles.large}`} onClick={openSquare}>
+            <button type="button" className={`secondary-button ${styles.large}`} onClick={openSquare} disabled={offline}>
               <Square aria-hidden="true" size={16} /> Paid by card in Square app
             </button>
           ) : (
@@ -834,7 +1145,7 @@ function PaymentPanel({
                             <button
                               type="button"
                               className={`primary-button ${styles.large}`}
-                              disabled={busy}
+                              disabled={busy || offline}
                               aria-describedby={candidate.overBalance ? `cis-over-${candidate.providerPaymentId}` : undefined}
                               onClick={() => (candidate.overBalance ? setConfirmCandidate(candidate) : matchPayment(candidate))}
                             >
@@ -845,7 +1156,7 @@ function PaymentPanel({
                       </ul>
                     )}
                     {!noteOpen && (
-                      <button type="button" className={`secondary-button ${styles.large}`} onClick={openNoteForm} disabled={busy || loadingCandidates}>
+                      <button type="button" className={`secondary-button ${styles.large}`} onClick={openNoteForm} disabled={busy || loadingCandidates || offline}>
                         Not listed? Note it for finance to match later
                       </button>
                     )}
@@ -868,7 +1179,7 @@ function PaymentPanel({
                     <label htmlFor="cis-square-receipt">Receipt number (optional)</label>
                     <input id="cis-square-receipt" autoComplete="off" value={receipt} maxLength={60} onChange={(event) => setReceipt(event.target.value)} />
                     <div className={styles.cisActions}>
-                      <button type="submit" className={`primary-button ${styles.large}`} disabled={busy || noteAmountOver}>Note card payment</button>
+                      <button type="submit" className={`primary-button ${styles.large}`} disabled={busy || noteAmountOver || offline}>Note card payment</button>
                     </div>
                   </form>
                 )}
