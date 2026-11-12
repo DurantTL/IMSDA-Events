@@ -5,7 +5,7 @@ import { getPrisma } from "@/lib/prisma";
 import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { rolePermissions } from "@/modules/access/permissions";
-import { resolveAreaCoordinatorViewer } from "@/modules/club-forms/access";
+import { resolveAreaCoordinatorViewer, resolveAreaCoordinatorViewerForClub } from "@/modules/club-forms/access";
 import type { requireRosterAccess } from "@/modules/club-rosters/access";
 import { RosterAccessError } from "@/modules/club-rosters/access";
 import { listGuardiansByMember } from "@/modules/club-rosters/guardians-repository";
@@ -57,8 +57,9 @@ export async function rosterGuardiansForAccess(
 }
 
 /** An Area Coordinator (their own account, or a system administrator or Clubs Administrator acting as one), or null. */
-export async function resolveAreaGuardianViewer(): Promise<Extract<GuardianViewer, { kind: "AREA_COORDINATOR" }> | null> {
-  const viewer = await resolveAreaCoordinatorViewer();
+export async function resolveAreaGuardianViewer(organizationId?: string): Promise<Extract<GuardianViewer, { kind: "AREA_COORDINATOR" }> | null> {
+  // With a club named, one outside the coordinator's ministries has no viewer (#843).
+  const viewer = organizationId === undefined ? await resolveAreaCoordinatorViewer() : await resolveAreaCoordinatorViewerForClub(organizationId);
   if (!viewer) return null;
   return {
     kind: "AREA_COORDINATOR",

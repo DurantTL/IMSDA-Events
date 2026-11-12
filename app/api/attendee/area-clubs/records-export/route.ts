@@ -7,7 +7,7 @@ import { resolveAreaClubYear } from "@/modules/club-reports/area-club-year";
 import { runRecordsExport } from "@/modules/club-reports/records-export";
 import { parseRecordsExportBody } from "@/modules/club-reports/records-export-columns";
 import { rosterApiError, readRosterJson } from "@/modules/club-rosters/api-errors";
-import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorClubKinds } from "@/modules/organizations/area-coordinators";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 function notFound() {
@@ -23,14 +23,15 @@ function notFound() {
 async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
-  if (!(await currentAreaCoordinatorViewerActive())) return notFound();
+  const kinds = await currentAreaCoordinatorClubKinds();
+  if (!kinds) return notFound();
   const viewer = await resolveAreaCoordinatorViewer();
   if (!viewer) return notFound();
   try {
     const params = parseRecordsExportBody(await readRosterJson(request));
     const clubYear = resolveAreaClubYear(params.year);
     const result = await runRecordsExport(
-      { columns: params.columns, layout: params.layout, clubs: params.clubs, clubYear, months: params.months, preview: params.preview },
+      { columns: params.columns, layout: params.layout, clubs: params.clubs, clubYear, months: params.months, preview: params.preview, kinds },
       viewer.actor.kind === "ATTENDEE" ? { accountId: viewer.actor.accountId } : { userId: viewer.actor.userId, actAsId: viewer.actor.actAsId, ...actAsRoleMarks(viewer.actor) },
     );
     if (result.csv !== null) {

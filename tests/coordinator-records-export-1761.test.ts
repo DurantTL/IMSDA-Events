@@ -202,8 +202,22 @@ describe("body validation (#1761)", () => {
     asCoordinator();
     const response = await post({ columns: ["club"], clubs: ["club-a", "not-a-club"] });
     expect(response.status).toBe(400);
-    expect(mocks.orgFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { type: "CLUB", isActive: true, guestEventId: null } }));
+    expect(mocks.orgFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["PATHFINDER"] } } }));
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("answers a club outside the coordinator's ministries exactly like a club that does not exist: 400, nothing exported, no audit (#843)", async () => {
+    asCoordinator();
+    // The database applies the ministries filter: an Adventurer club is not among the rows for a Pathfinder-only grant.
+    mocks.orgFindMany.mockImplementation(async (args: { where: { clubKind: { in: string[] } } }) => (args.where.clubKind.in.includes("ADVENTURER") ? dbClubs : [dbClubs[0]]));
+    const outside = await post({ columns: ["club"], clubs: ["club-a", "club-b"] });
+    const missing = await post({ columns: ["club"], clubs: ["club-a", "not-a-club"] });
+    expect(outside.status).toBe(400);
+    expect(await outside.json()).toEqual(await missing.json());
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+    // Both ministries: the same request goes through.
+    mocks.areaGrantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null, ministries: ["PATHFINDER", "ADVENTURER"] });
+    expect((await post({ columns: ["club"], clubs: ["club-a", "club-b"] })).status).toBe(200);
   });
 
   it("parses, orders the columns in the one fixed order and defaults to the whole year and one row per club", () => {

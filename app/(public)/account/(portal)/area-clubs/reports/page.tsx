@@ -18,7 +18,7 @@ import { logError } from "@/lib/logger";
 import { filterClubsByName, parseClubQuery } from "@/modules/club-reports/area-summary-domain";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { getAreaClubsSummary } from "@/modules/club-reports/area-summary-repository";
-import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorClubKinds } from "@/modules/organizations/area-coordinators";
 
 export const metadata: Metadata = { title: "Monthly Records summary", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -30,7 +30,8 @@ export const dynamic = "force-dynamic";
  */
 export default async function AreaMonthlyReportsPage({ searchParams }: { searchParams: Promise<{ year?: string; q?: string; month?: string; all?: string; sort?: string; dir?: string; gridSort?: string; gridDir?: string }> }) {
   // Layouts do not re-run on navigation, so every page checks for itself (#657).
-  if (!(await currentAreaCoordinatorViewerActive())) notFound();
+  const kinds = await currentAreaCoordinatorClubKinds();
+  if (!kinds) notFound();
   const params = await searchParams;
   const clubYear = resolveAreaClubYear(params.year);
   const query = parseClubQuery(params.q);
@@ -42,7 +43,7 @@ export default async function AreaMonthlyReportsPage({ searchParams }: { searchP
   const monthSorting = serverSort("/account/area-clubs/reports", params, COORDINATOR_MONTH_SORT_COLUMNS, { key: null, dir: "asc" });
   const gridColumns = ["club", "submitted", "notSubmitted", ...clubYearMonths(clubYear).map((entry) => `month-${entry}` as const)] as const;
   const gridSorting = serverSort<RecordsGridColumn>("/account/area-clubs/reports", params, gridColumns, { key: null, dir: "asc" }, { prefix: "grid" });
-  const allClubs = await getAreaClubsSummary(clubYear, now, { backgroundChecks: false }).catch((error: unknown) => {
+  const allClubs = await getAreaClubsSummary(clubYear, now, { backgroundChecks: false, kinds }).catch((error: unknown) => {
     // Logged without club or person data.
     logError("Coordinator Monthly Records read failed", error, { clubYear });
     return null;

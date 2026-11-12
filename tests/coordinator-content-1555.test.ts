@@ -39,7 +39,7 @@ describe("coordinator page content uses the club portal's pieces (#1555, rule L9
     expect(layout).not.toContain("AccountSectionNav");
     expect(layout).not.toContain("public-registration-hero");
     // The access check and the 404 guards are unchanged.
-    expect(layout).toContain("currentAreaCoordinatorViewerActive");
+    expect(layout).toContain("currentAreaCoordinatorClubKinds");
     expect(layout).toContain("notFound()");
   });
 

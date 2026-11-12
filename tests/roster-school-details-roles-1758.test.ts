@@ -33,7 +33,7 @@ vi.mock("@/components/club-import-year-move", () => ({ ClubImportYearMove: () =>
 vi.mock("@/components/admin-hub", () => ({ HubCardGroup: () => null }));
 vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ organization: { findUnique: mocks.organizationFindUnique } }) }));
-vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinatorViewerActive: mocks.currentAreaCoordinatorViewerActive }));
+vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinatorMaySeeClub: mocks.currentAreaCoordinatorViewerActive }));
 vi.mock("@/modules/background-checks/notes-access", () => ({ canSeeIssuesTextForAreaClub: () => true }));
 vi.mock("@/modules/club-rosters/guardians-access", () => ({
   resolveAreaGuardianViewer: mocks.resolveAreaGuardianViewer,

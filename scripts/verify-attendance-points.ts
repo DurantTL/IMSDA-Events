@@ -18,6 +18,7 @@
  *
  *   npm run test:attendance-points
  */
+import { ALL_CLUB_KINDS } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { randomUUID } from "node:crypto";
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
@@ -284,7 +285,7 @@ async function main() {
 
   // The points board: totals, the reason, the director's year, and Monthly Records unchanged.
   await prisma.clubMonthlyReport.deleteMany({ where: { organizationId: ids.clubA } });
-  const summary = (await getAreaClubsSummary(CLUB_YEAR, new Date("2026-11-08T12:00:00Z"), { backgroundChecks: false })).filter((entry) => clubIds.includes(entry.id));
+  const summary = (await getAreaClubsSummary(CLUB_YEAR, new Date("2026-11-08T12:00:00Z"), { backgroundChecks: false, kinds: ALL_CLUB_KINDS })).filter((entry) => clubIds.includes(entry.id));
   const summaryA = summary.find((entry) => entry.id === ids.clubA)!;
   const summaryD = summary.find((entry) => entry.id === ids.clubD)!;
   const yearRows = (await listClubReportsForYear(CLUB_YEAR)).filter((entry) => clubIds.includes(entry.id));

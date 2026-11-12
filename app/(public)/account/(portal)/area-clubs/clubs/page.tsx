@@ -10,7 +10,7 @@ import { parseClubQuery } from "@/modules/club-reports/area-summary-domain";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { getAreaClubsSummary } from "@/modules/club-reports/area-summary-repository";
 import { yearLabel } from "@/modules/club-rosters/home-view";
-import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorClubKinds } from "@/modules/organizations/area-coordinators";
 import { currentOwnDirectedClubIds } from "@/modules/organizations/own-directed-club-ids";
 
 export const metadata: Metadata = { title: "Clubs", robots: { index: false, follow: false, nocache: true } };
@@ -22,12 +22,13 @@ export const dynamic = "force-dynamic";
  * also directs opens normally (#1551). Layouts do not re-run on navigation, so the page checks for itself (#657).
  */
 export default async function AreaClubsPage({ searchParams }: { searchParams: Promise<{ year?: string; q?: string }> }) {
-  if (!(await currentAreaCoordinatorViewerActive())) notFound();
+  const kinds = await currentAreaCoordinatorClubKinds();
+  if (!kinds) notFound();
   const params = await searchParams;
   const clubYear = resolveAreaClubYear(params.year);
   const query = parseClubQuery(params.q);
   const [clubs, ownClubIds] = await Promise.all([
-    getAreaClubsSummary(clubYear).catch((error: unknown) => {
+    getAreaClubsSummary(clubYear, new Date(), { kinds }).catch((error: unknown) => {
       logError("Coordinator clubs list read failed", error, { clubYear });
       return null;
     }),

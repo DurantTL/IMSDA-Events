@@ -16,6 +16,7 @@ import {
 const mocks = vi.hoisted(() => ({
   areaGrantFindUnique: vi.fn(),
   organizationFindUnique: vi.fn(),
+  organizationFindFirst: vi.fn(),
   getCurrentAttendee: vi.fn(),
   accountNeedsSecondStep: vi.fn(),
   currentStaffActingContext: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock("next/navigation", () => ({ notFound: mocks.notFound, redirect: vi.fn() 
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     areaCoordinatorGrant: { findUnique: mocks.areaGrantFindUnique },
-    organization: { findUnique: mocks.organizationFindUnique },
+    organization: { findUnique: mocks.organizationFindUnique, findFirst: mocks.organizationFindFirst },
   }),
 }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
@@ -61,7 +62,8 @@ async function overviewProps(organizationId = "club-1") {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "account-1" }, via: "attendee", sessionId: "s1" });
-  mocks.areaGrantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null });
+  mocks.areaGrantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null, ministries: ["PATHFINDER"] });
+  mocks.organizationFindFirst.mockResolvedValue({ id: "club-1" });
   mocks.accountNeedsSecondStep.mockResolvedValue("OK");
   mocks.currentStaffActingContext.mockResolvedValue(null);
   mocks.resolveAreaGuardianViewer.mockResolvedValue(null);
@@ -131,6 +133,17 @@ describe("the Area Coordinator club page (#443)", () => {
     expect(mocks.organizationFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "club-2" } }));
   });
 
+  it("is not found for a club outside the coordinator's ministries, before the club or its notes are read (#843)", async () => {
+    // The scoped lookup carries the grant's ministries; an Adventurer club does not match a Pathfinder-only grant.
+    mocks.organizationFindFirst.mockResolvedValue(null);
+    await expect(AreaClubPage(params("club-adventurer"))).rejects.toThrow("NOT_FOUND");
+    expect(mocks.organizationFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "club-adventurer", clubKind: { in: ["PATHFINDER"] } }),
+    }));
+    expect(mocks.organizationFindUnique).not.toHaveBeenCalled();
+    expect(mocks.resolveAreaGuardianViewer).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["a non-coordinator", () => mocks.areaGrantFindUnique.mockResolvedValue(null)],
     ["a revoked grant", () => mocks.areaGrantFindUnique.mockResolvedValue({ revokedAt: new Date("2026-01-01"), expiresAt: null })],
@@ -139,6 +152,7 @@ describe("the Area Coordinator club page (#443)", () => {
     arrange();
     await expect(AreaClubPage(params("club-1"))).rejects.toThrow("NOT_FOUND");
     expect(mocks.organizationFindUnique).not.toHaveBeenCalled();
+    expect(mocks.organizationFindFirst).not.toHaveBeenCalled();
   });
 
   it("does not ask for counts only any more: the per-adult status is the fuller view", () => {

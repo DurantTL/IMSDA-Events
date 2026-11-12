@@ -237,7 +237,7 @@ describe("Who's missing what is scoped to the coordinator's own clubs", () => {
     const body = read("components/coordinator-overview.tsx");
     expect(body).toContain("whosMissingWhat(clubs, overview.month, now)");
     const page = read(`${COORD}overview/page.tsx`);
-    expect(page.indexOf("currentAreaCoordinatorViewerActive")).toBeLessThan(page.indexOf("getAreaClubsSummary(clubYear)"));
+    expect(page.indexOf("currentAreaCoordinatorClubKinds")).toBeLessThan(page.indexOf("getAreaClubsSummary(clubYear"));
     const view = read("components/coordinator-whos-missing.tsx") + read("modules/club-reports/whos-missing-what.ts");
     expect(view).not.toMatch(/getPrisma|repository|fetch\(/);
   });

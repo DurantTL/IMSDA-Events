@@ -10,7 +10,7 @@ import { filterClubsByName, parseClubQuery } from "@/modules/club-reports/area-s
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { areaHealthLinkEventIds } from "@/modules/coordinator-health/event-links";
 import { listAreaClubEvents } from "@/modules/club-reports/area-summary-repository";
-import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorClubKinds } from "@/modules/organizations/area-coordinators";
 
 export const metadata: Metadata = { title: "Club events", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -23,12 +23,13 @@ export const dynamic = "force-dynamic";
  */
 export default async function AreaEventsPage({ searchParams }: { searchParams: Promise<{ year?: string; q?: string; sort?: string; dir?: string }> }) {
   // Layouts do not re-run on navigation, so every page checks for itself (#657).
-  if (!(await currentAreaCoordinatorViewerActive())) notFound();
+  const kinds = await currentAreaCoordinatorClubKinds();
+  if (!kinds) notFound();
   const params = await searchParams;
   const clubYear = resolveAreaClubYear(params.year);
   const query = parseClubQuery(params.q);
   const [allEvents, healthEventIds] = await Promise.all([
-    listAreaClubEvents(clubYear).catch((error: unknown) => {
+    listAreaClubEvents(clubYear, { kinds }).catch((error: unknown) => {
       logError("Coordinator club events read failed", error, { clubYear });
       return null;
     }),

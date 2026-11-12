@@ -10,23 +10,26 @@ import {
 } from "@/modules/club-reports/area-summary-domain";
 import { clubJoinSelect, clubJoinedOn } from "@/modules/club-reports/domain";
 import { loadClubEventPoints } from "@/modules/event-points/awards";
+import { areaClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
 import { directorGrantIsActive } from "@/modules/organizations/director-grants-domain";
 
 /**
  * Every active club's report summary for a club year: read-only, counts and
  * points only. Sterling Volunteers shows the same counts-only reminder figures a
  * coordinator already sees on a club (#479), never a name or note. Director
- * names are the club's current Director role holders.
+ * names are the club's current Director role holders. `kinds` is the ministries to include (#843): an Area Coordinator
+ * passes their own scope; conference staff pages leave it out and see every ministry.
  */
 export async function getAreaClubsSummary(
   clubYear: string,
   now = new Date(),
-  options: { backgroundChecks?: boolean } = {},
+  options: { backgroundChecks?: boolean; kinds: readonly ClubKindValue[] },
 ): Promise<AreaClubSummary[]> {
   const withChecks = options.backgroundChecks !== false;
   const prisma = getPrisma();
   const clubs = await prisma.organization.findMany({
-    where: { type: "CLUB", isActive: true, guestEventId: null },
+    where: areaClubWhere(options.kinds),
     orderBy: { name: "asc" },
     select: { id: true, name: true, city: true, parentOrganization: { select: { name: true, city: true } }, ...clubJoinSelect },
   });
@@ -97,12 +100,12 @@ export type AreaClubEvent = {
 };
 
 /** Club-audience events that fall inside the club year (Sept 1 to before the next Sept 1), with each active club's registration status and headcount. */
-export async function listAreaClubEvents(clubYear: string): Promise<AreaClubEvent[]> {
+export async function listAreaClubEvents(clubYear: string, options: { kinds: readonly ClubKindValue[] }): Promise<AreaClubEvent[]> {
   const prisma = getPrisma();
   const yearStart = new Date(`${clubYear.slice(0, 4)}-09-01T00:00:00Z`);
   const yearEnd = new Date(`${Number(clubYear.slice(0, 4)) + 1}-09-01T00:00:00Z`);
   const [clubs, events] = await Promise.all([
-    prisma.organization.findMany({ where: { type: "CLUB", isActive: true, guestEventId: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.organization.findMany({ where: areaClubWhere(options.kinds), orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.event.findMany({
       where: { isPublished: true, audience: "CLUB", endsAt: { gte: yearStart }, startsAt: { lt: yearEnd } },
       orderBy: { startsAt: "asc" },

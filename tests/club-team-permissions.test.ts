@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(),
   getCurrentSession: vi.fn(),
   currentAreaCoordinator: vi.fn(),
+  coordinatorMinistries: vi.fn(),
 }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ APP_BASE_URL: "https://events.imsda.test" }) }));
@@ -21,7 +22,7 @@ vi.mock("@/modules/access/authorization", () => ({
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: () => null }));
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn() }));
-vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: mocks.currentAreaCoordinator, currentAreaCoordinatorViewerActive: vi.fn() }));
+vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: mocks.currentAreaCoordinator, currentAreaCoordinatorViewerActive: vi.fn(), coordinatorMinistriesForAccount: mocks.coordinatorMinistries }));
 
 import { decideTeamPermission, syncTeamMemberPermissions } from "@/modules/club-teams/permission-repository";
 import { permissionNotice, permissionPendingNotice, permissionShortLabel } from "@/modules/club-teams/permission-domain";
@@ -31,7 +32,7 @@ import { PUT as coordinatorPut } from "@/app/api/attendee/area-clubs/team-permis
 type Row = { id: string; personId: string; registrationAttendeeId: string | null; active: boolean; status: "PENDING" | "GRANTED" | "DECLINED"; ageOnAgeDate: number };
 const row = (attendeeId: string, status: Row["status"], extra: Partial<Row> = {}): Row => ({ id: `perm-${attendeeId}`, personId: `person-${attendeeId}`, registrationAttendeeId: attendeeId, active: true, status, ageOnAgeDate: 18, ...extra });
 
-function database(options: { existing?: Row[]; coordinator?: boolean; coordinatorDirectsClub?: boolean; staff?: Array<{ email: string; displayName: string }> } = {}) {
+function database(options: { existing?: Row[]; coordinator?: boolean; coordinatorDirectsClub?: boolean; ministries?: string[]; clubKind?: string; staff?: Array<{ email: string; displayName: string }> } = {}) {
   const tx = {
     clubTeamMemberPermission: {
       findMany: vi.fn().mockResolvedValue(options.existing ?? []),
@@ -45,9 +46,9 @@ function database(options: { existing?: Row[]; coordinator?: boolean; coordinato
         event: { name: "Synthetic PBE" },
         location: {
           name: "Iowa",
-          coordinator: options.coordinator === false ? null : { id: "acct-ac", email: "ac@example.test", displayName: "Alex Coordinator", disabledAt: null, areaCoordinatorGrant: { revokedAt: null, expiresAt: null } },
+          coordinator: options.coordinator === false ? null : { id: "acct-ac", email: "ac@example.test", displayName: "Alex Coordinator", disabledAt: null, areaCoordinatorGrant: { revokedAt: null, expiresAt: null, ministries: options.ministries ?? ["PATHFINDER"] } },
         },
-        clubRegistration: { teamName: "Bible Bees", organizationId: "club-1", organization: { name: "Test Pathfinders" } },
+        clubRegistration: { teamName: "Bible Bees", organizationId: "club-1", organization: { name: "Test Pathfinders", clubKind: options.clubKind ?? "PATHFINDER" } },
       }),
     },
     clubDirectorGrant: { findFirst: vi.fn().mockResolvedValue(options.coordinatorDirectsClub ? { id: "grant-1" } : null) },
@@ -66,6 +67,7 @@ const run = (tx: ReturnType<typeof database>, people: ReturnType<typeof person>[
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.coordinatorMinistries.mockResolvedValue(["PATHFINDER"]);
 });
 
 describe("flagging team members of 18 or older (#809)", () => {
@@ -208,6 +210,20 @@ describe("flagging team members of 18 or older (#809)", () => {
   });
 });
 
+describe("ministry scope for the request email (#843)", () => {
+  it("goes to event staff, as with no coordinator, when the club is in another ministry than the coordinator's", async () => {
+    const tx = database({ clubKind: "ADVENTURER", ministries: ["PATHFINDER"], staff: [{ email: "staff@example.test", displayName: "Sam Staff" }] });
+    await run(tx, [person("a", "Alex One", 18)]);
+    expect(tx.messageOutbox.upsert.mock.calls.map(([call]) => call.create.recipientEmail)).toEqual(["staff@example.test"]);
+  });
+
+  it("goes to the coordinator when the club's ministry is one of theirs", async () => {
+    const tx = database({ clubKind: "ADVENTURER", ministries: ["PATHFINDER", "ADVENTURER"], staff: [{ email: "staff@example.test", displayName: "Sam Staff" }] });
+    await run(tx, [person("a", "Alex One", 18)]);
+    expect(tx.messageOutbox.upsert.mock.calls.map(([call]) => call.create.recipientEmail)).toEqual(["ac@example.test"]);
+  });
+});
+
 describe("deciding a permission (#809)", () => {
   const found = {
     id: "perm-a", eventId: "event-1", clubEventRegistrationId: "cer-1", status: "PENDING", ageOnAgeDate: 18, decidedAt: null,
@@ -256,6 +272,9 @@ describe("deciding a permission (#809)", () => {
     const coordinatorTx = decideDatabase({ first: null });
     await expect(decideTeamPermission({ permissionId: "perm-a", decision: "GRANTED", actor: { accountId: "acct-2" }, scope: { coordinatorAccountId: "acct-2" } })).rejects.toMatchObject({ code: "REGISTRATION_NOT_FOUND" });
     expect(coordinatorTx.clubTeamMemberPermission.findFirst.mock.calls[0]![0].where.clubEventRegistration.registration.location.is.coordinatorAccountId).toBe("acct-2");
+    // Only clubs in the coordinator's ministries (#843): the lookup carries them, so another ministry's flag is not found.
+    expect(coordinatorTx.clubTeamMemberPermission.findFirst.mock.calls[0]![0].where.clubEventRegistration.organization).toEqual({ clubKind: { in: ["PATHFINDER"] } });
+    expect(mocks.coordinatorMinistries).toHaveBeenCalledWith("acct-2", expect.any(Date), coordinatorTx);
     expect(coordinatorTx.clubTeamMemberPermission.update).not.toHaveBeenCalled();
     const staffTx = decideDatabase();
     await decideTeamPermission({ permissionId: "perm-a", decision: "DECLINED", actor: { userId: "user-1" }, scope: { eventId: "event-1" } });

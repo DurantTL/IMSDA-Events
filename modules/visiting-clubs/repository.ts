@@ -462,6 +462,8 @@ export async function decideVisitingClubRequest(
         guestEventId: request.eventId,
         isActive: true,
         sourceOrgType: visitingClubSourceOrgType[request.clubType],
+        // The ministry follows the request, so an Adventurer visiting club is an Adventurer club (#843).
+        clubKind: request.clubType === "ADVENTURER" ? "ADVENTURER" : "PATHFINDER",
       },
       select: { id: true },
     });

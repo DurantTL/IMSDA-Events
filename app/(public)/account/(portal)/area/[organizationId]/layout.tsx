@@ -13,7 +13,8 @@ import { currentOwnDirectedClubIds } from "@/modules/organizations/own-directed-
 import { getPrisma } from "@/lib/prisma";
 import { areaViewedClubNavItems } from "@/modules/club-rosters/portal-nav";
 import { clubYearFor } from "@/modules/club-rosters/domain";
-import { currentAreaCoordinatorViewerActive, requireSecondStepForAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { areaClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
+import { currentAreaCoordinatorClubKinds, requireSecondStepForAreaCoordinator } from "@/modules/organizations/area-coordinators";
 
 /**
  * An Area Coordinator's view of one club (#722, #1555): the club home's navy band and
@@ -27,21 +28,23 @@ export default async function AreaClubLayout({
   children: React.ReactNode;
   params: Promise<{ organizationId: string }>;
 }) {
-  if (!(await currentAreaCoordinatorViewerActive())) {
+  const kinds = await currentAreaCoordinatorClubKinds();
+  if (!kinds) {
     // A coordinator without a real second step in this session is sent to the club gate, not shown a 404 (#1410).
     await requireSecondStepForAreaCoordinator();
     notFound();
   }
   const { organizationId } = await params;
-  const club = await getPrisma().organization.findUnique({
-    where: { id: organizationId },
-    select: { type: true, name: true, isActive: true, parentOrganization: { select: { name: true } } },
+  // A club outside the coordinator's ministries answers exactly like a missing one (#843).
+  const club = await getPrisma().organization.findFirst({
+    where: { id: organizationId, ...areaClubWhere(kinds) },
+    select: { name: true, parentOrganization: { select: { name: true } } },
   });
-  if (!club || club.type !== "CLUB" || !club.isActive) notFound();
-  // The switcher's list: the same scope the coordinator already sees (every active club), name and parent church only (#1759).
+  if (!club) notFound();
+  // The switcher's list: the same scope the coordinator already sees (the active clubs of their ministries), name and parent church only (#1759).
   const ownClubIds = await currentOwnDirectedClubIds();
   const switchable = (await getPrisma().organization.findMany({
-    where: { type: "CLUB", isActive: true },
+    where: areaClubWhere(kinds),
     select: { id: true, name: true, parentOrganization: { select: { name: true } } },
     orderBy: { name: "asc" },
   })).map((entry) => ({ id: entry.id, name: entry.name, church: entry.parentOrganization?.name ?? null }));

@@ -15,6 +15,8 @@ import { teamLabel } from "@/modules/club-teams/domain";
 import { ClubTeamError } from "@/modules/club-teams/errors";
 import { permissionNotice, type PermissionDecision, type PermissionStatus } from "@/modules/club-teams/permission-domain";
 import { coordinatorGrantActive } from "@/modules/event-locations/domain";
+import { grantMinistries, ministriesIncludeKind } from "@/modules/organizations/area-coordinator-ministries-domain";
+import { coordinatorMinistriesForAccount } from "@/modules/organizations/area-coordinators";
 import { formatPersonName } from "@/lib/person-name";
 
 /**
@@ -134,8 +136,8 @@ async function queuePermissionRequest(
     select: {
       confirmationCode: true,
       event: { select: { name: true } },
-      location: { select: { name: true, coordinator: { select: { id: true, email: true, displayName: true, disabledAt: true, areaCoordinatorGrant: { select: { revokedAt: true, expiresAt: true } } } } } },
-      clubRegistration: { select: { teamName: true, organizationId: true, organization: { select: { name: true } } } },
+      location: { select: { name: true, coordinator: { select: { id: true, email: true, displayName: true, disabledAt: true, areaCoordinatorGrant: { select: { revokedAt: true, expiresAt: true, ministries: true } } } } } },
+      clubRegistration: { select: { teamName: true, organizationId: true, organization: { select: { name: true, clubKind: true } } } },
     },
   });
   if (!registration) return [];
@@ -143,6 +145,8 @@ async function queuePermissionRequest(
   const coordinator = registration.location?.coordinator;
   const recipients: Array<{ email: string; name: string; staff: boolean }> = [];
   const coordinatorEligible = coordinator && !coordinator.disabledAt && coordinatorGrantActive(coordinator.areaCoordinatorGrant)
+    // The request goes to the location's coordinator only when the club is in their ministry (#843); otherwise it falls back to event staff.
+    && !(registration.clubRegistration && !ministriesIncludeKind(grantMinistries(coordinator.areaCoordinatorGrant?.ministries), registration.clubRegistration.organization.clubKind))
     && !(registration.clubRegistration && await accountActsForClub(tx, coordinator.id, registration.clubRegistration.organizationId));
   if (coordinator && coordinatorEligible) {
     recipients.push({ email: coordinator.email, name: coordinator.displayName, staff: false });
@@ -309,10 +313,13 @@ export async function listEventTeamPermissions(eventId: string): Promise<TeamPer
  * active and their account enabled. Nothing for anyone else.
  */
 export async function listCoordinatorTeamPermissions(accountId: string, now = new Date()): Promise<TeamPermissionRow[]> {
+  // Only teams of clubs in the coordinator's ministries (#843).
+  const kinds = await coordinatorMinistriesForAccount(accountId, now);
   const rows = await getPrisma().clubTeamMemberPermission.findMany({
     where: {
       active: true,
       clubEventRegistration: {
+        organization: { clubKind: { in: kinds } },
         registration: {
           status: { in: LIVE_TEAM_STATUSES },
           location: { is: { coordinatorAccountId: accountId, coordinator: { is: { disabledAt: null, areaCoordinatorGrant: { is: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } } } } } },
@@ -375,13 +382,15 @@ export async function decideTeamPermission(input: {
 }): Promise<TeamPermissionRow> {
   const now = input.now ?? new Date();
   return getPrisma().$transaction(async (tx) => {
+    // A coordinator decides only for clubs in their ministries (#843); a club outside is "not found".
+    const coordinatorKinds = "coordinatorAccountId" in input.scope ? await coordinatorMinistriesForAccount(input.scope.coordinatorAccountId, now, tx) : [];
     const found = await tx.clubTeamMemberPermission.findFirst({
       where: {
         id: input.permissionId,
         active: true,
         ...("eventId" in input.scope
           ? { eventId: input.scope.eventId, clubEventRegistration: { registration: { status: { in: LIVE_TEAM_STATUSES } } } }
-          : { clubEventRegistration: { registration: { status: { in: LIVE_TEAM_STATUSES }, location: { is: { coordinatorAccountId: input.scope.coordinatorAccountId, coordinator: { is: { disabledAt: null, areaCoordinatorGrant: { is: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } } } } } } } } }),
+          : { clubEventRegistration: { organization: { clubKind: { in: coordinatorKinds } }, registration: { status: { in: LIVE_TEAM_STATUSES }, location: { is: { coordinatorAccountId: input.scope.coordinatorAccountId, coordinator: { is: { disabledAt: null, areaCoordinatorGrant: { is: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } } } } } } } } }),
       },
       select: rowSelect,
     });

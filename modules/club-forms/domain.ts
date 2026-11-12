@@ -350,7 +350,8 @@ export type ClubFormActor =
  * - CLUB_LEADER: a director or deputy of `organizationId` (or a system
  *   administrator acting as that club's director). Fills in, sends links, and
  *   sees the club's files, including sensitive answers and birth dates.
- * - AREA_COORDINATOR: read-only over every club; every sensitive answer is
+ * - AREA_COORDINATOR: read-only over the clubs of their ministries (#843: the pages and the link route check the
+ *   scope with `resolveAreaCoordinatorViewerForClub`); every sensitive answer is
  *   "Restricted".
  * - TLT_DIRECTOR (#1686): the conference TLT director, signed in with her own account. Reads the three TLT forms
  *   (`TLT_FORM_TEMPLATE_KEYS`) from every club, sensitive answers included, and nothing else; every view is audited.
@@ -391,8 +392,8 @@ export function viewerCanWriteForClub(viewer: ClubFormsViewer, organizationId: s
 
 /**
  * Who may send a private link for a club (#1221). A club's own director or deputy, or an Area Coordinator.
- * Area Coordinators are not assigned to areas yet and the grant is conference-wide, so any active Area Coordinator
- * may send for any club until #843 decides area assignment; narrow that here, in this one place. "Active" (not
+ * An Area Coordinator may send for the clubs of their ministries; the ministry check is made when the viewer is
+ * resolved for a club (`resolveAreaCoordinatorViewerForClub`). "Active" (not
  * removed, not past an act-as end) is decided when the viewer is resolved (`resolveAreaCoordinatorViewer`).
  */
 export function viewerCanSendLinkForClub(viewer: ClubFormsViewer, organizationId: string) {

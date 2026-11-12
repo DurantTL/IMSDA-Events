@@ -60,7 +60,7 @@ describe("the health permission (#658)", () => {
 describe("viewer scope", () => {
   const leader: HealthViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } };
   const role: HealthViewer = { kind: "HEALTH_ROLE", userId: "u1", eventIds: ["e1"] };
-  const coordinator: HealthViewer = { kind: "AREA_COORDINATOR", accountId: "acct-2" };
+  const coordinator: HealthViewer = { kind: "AREA_COORDINATOR", accountId: "acct-2", kinds: ["PATHFINDER"] };
   const admin: HealthViewer = { kind: "SYSTEM_ADMIN", userId: "u9" };
 
   it("keeps a club leader to their own club and a role holder to the events they were granted", () => {

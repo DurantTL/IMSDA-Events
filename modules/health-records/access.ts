@@ -7,7 +7,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { passkeysConfigured } from "@/modules/attendee-accounts/passkeys";
 import { ROSTER_UNLOCK_HOURS, requireRosterAccess } from "@/modules/club-rosters/access";
-import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { coordinatorMinistriesForAccount, currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import type { AcknowledgmentViewer } from "@/modules/health-records/acknowledgment-domain";
 import { isClubFormsRole } from "@/modules/club-forms/domain";
@@ -104,7 +104,7 @@ export async function requireAreaCoordinatorHealthViewer(now = new Date()): Prom
   if (!verifiedAt || now.getTime() - verifiedAt.getTime() > ROSTER_UNLOCK_HOURS * 3_600_000) {
     throw new HealthRecordError("STEP_UP_REQUIRED", "Confirm it's you with your authenticator code or passkey to open health records.");
   }
-  return { kind: "AREA_COORDINATOR", accountId: account.id };
+  return { kind: "AREA_COORDINATOR", accountId: account.id, kinds: await coordinatorMinistriesForAccount(account.id) };
 }
 
 /**

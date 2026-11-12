@@ -9,7 +9,7 @@ import { ClubOverview } from "@/components/club-overview";
 import { getPrisma } from "@/lib/prisma";
 import { canSeeIssuesTextForAreaClub } from "@/modules/background-checks/notes-access";
 import { resolveAreaGuardianViewer } from "@/modules/club-rosters/guardians-access";
-import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorMaySeeClub } from "@/modules/organizations/area-coordinators";
 
 export const metadata: Metadata = { title: "Club", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -23,9 +23,10 @@ export const dynamic = "force-dynamic";
  * are shown too, view only (#1758).
  */
 export default async function AreaClubPage({ params }: { params: Promise<{ organizationId: string }> }) {
-  const areaCoordinatorActive = await currentAreaCoordinatorViewerActive();
-  if (!areaCoordinatorActive) notFound();
   const { organizationId } = await params;
+  // Out of the coordinator's ministries answers like a missing club (#843).
+  const areaCoordinatorActive = await currentAreaCoordinatorMaySeeClub(organizationId);
+  if (!areaCoordinatorActive) notFound();
   const club = await getPrisma().organization.findUnique({
     where: { id: organizationId },
     select: { type: true, isActive: true },
@@ -34,7 +35,7 @@ export default async function AreaClubPage({ params }: { params: Promise<{ organ
   // The full note for a club in scope only (#443); a club director never gets it.
   const includeNotes = canSeeIssuesTextForAreaClub({ areaCoordinatorActive }, club);
 
-  const guardianViewer = await resolveAreaGuardianViewer();
+  const guardianViewer = await resolveAreaGuardianViewer(organizationId);
 
   return (
     <>
@@ -51,7 +52,7 @@ export default async function AreaClubPage({ params }: { params: Promise<{ organ
         reportHref={(month) => `/account/area/${organizationId}/reports/${month}`}
         reportsEditable={false}
         // School type and church membership, view only (#1758): an active Area Coordinator (checked above) sees them for
-        // every active club, since coordinators work conference-wide until areas exist (#843).
+        // every active club in their ministries (#843).
         schoolDetails
       />
       {guardianViewer && <ClubGuardiansPanel emptyHelp={<CoordinatorSetupHelp context="emergency contacts" id="club-no-emergency-contacts" />} organizationId={organizationId} viewer={guardianViewer} />}

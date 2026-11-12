@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound, redirect: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ organization: { findUnique: mocks.orgFindUnique } }) }));
-vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinatorViewerActive: mocks.viewerActive }));
+vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinatorMaySeeClub: mocks.viewerActive }));
 vi.mock("@/modules/club-reports/repository", () => ({ getClubReport: mocks.getClubReport, reportPrefill: mocks.reportPrefill }));
 
 import AreaClubReportPage from "@/app/(public)/account/(portal)/area/[organizationId]/reports/[month]/page";
@@ -54,6 +54,13 @@ describe("area club report page (#703)", () => {
     mocks.viewerActive.mockResolvedValue(false);
     await expect(AreaClubReportPage(params("2026-09"))).rejects.toThrow("NOT_FOUND");
     expect(mocks.orgFindUnique).not.toHaveBeenCalled();
+  });
+
+  it("is a 404 for a club outside the coordinator's ministries, asking for that club and reading nothing (#843)", async () => {
+    mocks.viewerActive.mockResolvedValue(false);
+    await expect(AreaClubReportPage(params("2026-09"))).rejects.toThrow("NOT_FOUND");
+    expect(mocks.viewerActive).toHaveBeenCalledWith("club-1");
+    expect(mocks.getClubReport).not.toHaveBeenCalled();
   });
 
   it("keeps the 404 for a malformed month and for a club that is not an active club", async () => {

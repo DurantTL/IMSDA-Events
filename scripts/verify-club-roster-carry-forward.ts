@@ -25,6 +25,7 @@
  *
  *   npm run test:club-roster-carry-forward
  */
+import { ALL_CLUB_KINDS } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
@@ -109,7 +110,7 @@ async function main() {
   for (const date of birthDates) assert(!JSON.stringify(offer).includes(date), "the offer never holds a birth date");
 
   // Oversight before anyone starts: A and B have people last year and haven't started.
-  const before = await listClubsNewYearStatus(august);
+  const before = await listClubsNewYearStatus(august, { kinds: ALL_CLUB_KINDS });
   assert(before.notStarted.some((club) => club.organizationId === clubs.a && club.lastYearActive === 3), "club A hasn't started (3 active last year)");
   assert(before.notStarted.some((club) => club.organizationId === clubs.b), "club B hasn't started");
   assert(!before.clubs.some((club) => club.organizationId === clubs.c), "a club with nobody last year is not listed");
@@ -178,8 +179,8 @@ async function main() {
   assert((await codeOf(carryRosterForward(clubs.a, { confirm: true, people: [{ memberId: a[2]!.memberId, attendeeType: "YOUTH" }] }, actor, september))) === "CARRY_FORWARD_DONE", "a repeat after September 1 is refused too");
   assert((await prisma.clubRosterMember.count({ where: { organizationId: clubs.a, clubYear: to } })) === 2, "the repeat added nobody");
   assert((await getCarryForwardOffer(clubs.a, august)).state === "DONE", "the offer says it is done");
-  assert((await listClubsNewYearStatus(august)).notStarted.every((club) => club.organizationId !== clubs.a), "club A shows as started");
-  assert((await listClubsNewYearStatus(august)).notStarted.some((club) => club.organizationId === clubs.b), "club B still hasn't started");
+  assert((await listClubsNewYearStatus(august, { kinds: ALL_CLUB_KINDS })).notStarted.every((club) => club.organizationId !== clubs.a), "club A shows as started");
+  assert((await listClubsNewYearStatus(august, { kinds: ALL_CLUB_KINDS })).notStarted.some((club) => club.organizationId === clubs.b), "club B still hasn't started");
 
   // Racing confirmations: exactly one wins, no duplicate rows (club D).
   const d = [await addPerson(clubs.d, 0), await addPerson(clubs.d, 1)];

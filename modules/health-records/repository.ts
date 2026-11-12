@@ -166,6 +166,8 @@ async function assertEventScope(
     where: {
       eventId: input.eventId,
       organizationId: input.organizationId,
+      // A club outside the coordinator's ministries is not found (#843).
+      ...(input.viewer.kind === "AREA_COORDINATOR" ? { organization: { clubKind: { in: [...input.viewer.kinds] } } } : {}),
       registration: {
         status: { in: ["SUBMITTED", "CONFIRMED"] },
         attendees: { some: { personId: input.member.personId } },

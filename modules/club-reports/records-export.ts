@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { actAsActorRoleFields } from "@/modules/audit/act-as-actor-role";
@@ -36,11 +37,13 @@ export async function runRecordsExport(
     clubYear: string;
     months: string[];
     preview: boolean;
+    /** The coordinator's ministries (#843): a chosen club outside them is refused like one that does not exist. */
+    kinds: readonly ClubKindValue[];
   },
   actor: RecordsExportActor,
   now = new Date(),
 ) {
-  const everyClub = await getAreaClubsSummary(input.clubYear, now, { backgroundChecks: false });
+  const everyClub = await getAreaClubsSummary(input.clubYear, now, { backgroundChecks: false, kinds: input.kinds });
   const known = new Set(everyClub.map((club) => club.id));
   // Every requested club must be an active club: all of them, or a 400 (never a partial export).
   if (input.clubs !== "all" && input.clubs.some((id) => !known.has(id))) {

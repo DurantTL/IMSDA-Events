@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { CoordinatorDestinationHeading } from "@/components/coordinator-destinations";
 import { RosterExportBuilder } from "@/components/roster-export-builder";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-club-year";
-import { currentAreaCoordinatorViewerActive, listClubsForArea } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorClubKinds, listClubsForArea } from "@/modules/organizations/area-coordinators";
 
 export const metadata: Metadata = { title: "Export rosters", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -14,9 +14,10 @@ export const dynamic = "force-dynamic";
  */
 export default async function AreaRosterExportPage({ searchParams }: { searchParams: Promise<{ club?: string; year?: string }> }) {
   // Layouts do not re-run on navigation, so every page checks for itself (#657).
-  if (!(await currentAreaCoordinatorViewerActive())) notFound();
+  const kinds = await currentAreaCoordinatorClubKinds();
+  if (!kinds) notFound();
   const params = await searchParams;
-  const clubs = (await listClubsForArea()).map((club) => ({ id: club.organizationId, name: club.name }));
+  const clubs = (await listClubsForArea(kinds)).map((club) => ({ id: club.organizationId, name: club.name }));
   const clubYear = resolveAreaClubYear(params.year);
   const requested = params.club;
   const found = Boolean(requested) && clubs.some((club) => club.id === requested);

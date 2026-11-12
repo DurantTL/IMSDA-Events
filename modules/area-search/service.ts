@@ -10,7 +10,8 @@ import {
 } from "@/modules/area-search/domain";
 import { filterClubsByNameChurchCityOrDirector } from "@/modules/club-reports/area-summary-domain";
 import { coordinatorClubHref } from "@/modules/club-rosters/area-club-switch";
-import { currentAreaCoordinatorViewer, type AreaCoordinatorViewer } from "@/modules/organizations/area-coordinators";
+import { areaClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
+import { areaCoordinatorClubKinds, currentAreaCoordinatorViewer, type AreaCoordinatorViewer } from "@/modules/organizations/area-coordinators";
 import { directorGrantIsActive } from "@/modules/organizations/director-grants-domain";
 import { currentOwnDirectedClubIds } from "@/modules/organizations/own-directed-club-ids";
 
@@ -24,7 +25,9 @@ import { currentOwnDirectedClubIds } from "@/modules/organizations/own-directed-
  * a club director with no grant, an expired or removed grant, a pending second step) has no viewer, the route answers 401
  * and nothing is read.
  *
- * Cost: every active club is read per request (id, name, city, church, active directors). That is the same scope as the
+ * Scope (#843): only the clubs of the viewer's ministries are read, matched and returned (staff acting as a coordinator see every ministry).
+ *
+ * Cost: every active club in scope is read per request (id, name, city, church, active directors). That is the same scope as the
  * Clubs page, which also reads every club, and is small at the conference's size; unlike `getAreaClubsSummary` it skips the
  * monthly reports, standings, roster counts, points and Sterling Volunteers counts.
  */
@@ -42,10 +45,10 @@ export const areaSearchRateLimitKey = (viewer: AreaSearchViewer) => (viewer.kind
 type ClubRow = { id: string; name: string; sponsoringChurch: string | null; city: string | null; directors: string[] };
 
 /** Every active club with only what the search matches on and shows. Director names stay inside this module's matching. */
-async function listClubRows(now: Date): Promise<ClubRow[]> {
+async function listClubRows(viewer: AreaSearchViewer, now: Date): Promise<ClubRow[]> {
   const prisma = getPrisma();
   const clubs = await prisma.organization.findMany({
-    where: { type: "CLUB", isActive: true },
+    where: areaClubWhere(await areaCoordinatorClubKinds(viewer)),
     orderBy: [{ name: "asc" }, { id: "asc" }],
     select: { id: true, name: true, city: true, parentOrganization: { select: { name: true, city: true } } },
   });
@@ -74,11 +77,11 @@ async function listClubRows(now: Date): Promise<ClubRow[]> {
   }));
 }
 
-export async function searchAreaClubs(_viewer: AreaSearchViewer, rawQuery: string | null | undefined, now = new Date()): Promise<AreaSearchResult> {
+export async function searchAreaClubs(viewer: AreaSearchViewer, rawQuery: string | null | undefined, now = new Date()): Promise<AreaSearchResult> {
   const query = cleanAreaSearchQuery(rawQuery);
   if (query === "") return emptyAreaSearchResult();
 
-  const [rows, ownClubIds] = await Promise.all([listClubRows(now), currentOwnDirectedClubIds()]);
+  const [rows, ownClubIds] = await Promise.all([listClubRows(viewer, now), currentOwnDirectedClubIds()]);
   const own = new Set(ownClubIds);
   const matches = filterClubsByNameChurchCityOrDirector(rows, query);
   const more = matches.length > AREA_SEARCH_GROUP_LIMIT;

@@ -6,7 +6,7 @@ import { resolveAreaClubYear } from "@/modules/club-reports/area-club-year";
 import { rosterApiError, readRosterJson } from "@/modules/club-rosters/api-errors";
 import { parseCoordinatorRosterExportBody } from "@/modules/club-rosters/coordinator-export-columns";
 import { runCoordinatorRosterExport } from "@/modules/club-rosters/coordinator-export";
-import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorClubKinds } from "@/modules/organizations/area-coordinators";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 function notFound() {
@@ -22,14 +22,15 @@ function notFound() {
 async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
-  if (!(await currentAreaCoordinatorViewerActive())) return notFound();
+  const kinds = await currentAreaCoordinatorClubKinds();
+  if (!kinds) return notFound();
   const viewer = await resolveAreaCoordinatorViewer();
   if (!viewer) return notFound();
   try {
     const params = parseCoordinatorRosterExportBody(await readRosterJson(request));
     const clubYear = resolveAreaClubYear(params.year);
     const result = await runCoordinatorRosterExport(
-      { columns: params.columns, clubs: params.clubs, clubYear, preview: params.preview },
+      { columns: params.columns, clubs: params.clubs, clubYear, preview: params.preview, kinds },
       viewer.actor.kind === "ATTENDEE" ? { accountId: viewer.actor.accountId } : { userId: viewer.actor.userId, actAsId: viewer.actor.actAsId, ...actAsRoleMarks(viewer.actor) },
     );
     if ("csv" in result) {

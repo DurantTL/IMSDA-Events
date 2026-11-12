@@ -207,6 +207,23 @@ describe("waiting clubs at locations", () => {
     }));
   });
 
+  it("lists only the waiting clubs of the coordinator's ministries (#843)", async () => {
+    const location = { id: "loc-1", name: "Camp Heritage", eventId: "event-1", event: { name: "Honors Weekend" } };
+    const client = {
+      eventLocation: { findMany: vi.fn().mockResolvedValue([{ ...location, coordinator: { areaCoordinatorGrant: { ministries: ["ADVENTURER"] } } }]) },
+      registrationWaitlistEntry: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    await listWaitingClubsForCoordinator(client as never, "account-1");
+    expect(client.registrationWaitlistEntry.findMany.mock.calls[0]![0].where.registration.OR).toEqual([
+      { clubRegistration: { is: null } },
+      { clubRegistration: { organization: { clubKind: { in: ["ADVENTURER"] } } } },
+    ]);
+    // A grant with no stored list reads as a Pathfinder coordinator.
+    client.eventLocation.findMany.mockResolvedValue([{ ...location, coordinator: { areaCoordinatorGrant: null } }]);
+    await listWaitingClubsForCoordinator(client as never, "account-1");
+    expect(client.registrationWaitlistEntry.findMany.mock.calls[1]![0].where.registration.OR[1]).toEqual({ clubRegistration: { organization: { clubKind: { in: ["PATHFINDER"] } } } });
+  });
+
   it("lists a location with no clubs waiting as an empty location", async () => {
     const client = {
       eventLocation: { findMany: vi.fn().mockResolvedValue([{ id: "loc-1", name: "Camp Heritage", eventId: "event-1", event: { name: "Honors Weekend" } }]) },

@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   currentAreaCoordinator: vi.fn(),
   currentStaffActingContext: vi.fn(),
   findOrganization: vi.fn(),
+  maySeeClub: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -14,7 +15,7 @@ vi.mock("@/modules/club-rosters/access", async () => {
   const actual = await vi.importActual<typeof import("@/modules/club-rosters/access")>("@/modules/club-rosters/access");
   return { ...actual, requireRosterAccess: mocks.requireRosterAccess, requireClubCapability: mocks.requireClubCapability };
 });
-vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: mocks.currentAreaCoordinator }));
+vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: mocks.currentAreaCoordinator, currentAreaCoordinatorMaySeeClub: mocks.maySeeClub }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
 
 import { RosterAccessError } from "@/modules/club-rosters/access";
@@ -28,6 +29,7 @@ describe("honors access — the roster's own gate first, Area Coordinator read-o
     mocks.currentAreaCoordinator.mockResolvedValue(null);
     mocks.currentStaffActingContext.mockResolvedValue(null);
     mocks.findOrganization.mockResolvedValue({ type: "CLUB", isActive: true });
+    mocks.maySeeClub.mockResolvedValue(true);
   });
 
   it("gives a director with an open roster edit access, through requireRosterAccess (never requireClubCapability)", async () => {
@@ -50,13 +52,13 @@ describe("honors access — the roster's own gate first, Area Coordinator read-o
     await expect(requireHonorsAccess("club-1")).resolves.toEqual({ mode: "READ", viewer: { userId: "user-9", actAsId: "actas-2" } });
   });
 
-  it("404s an Area Coordinator for an organization that isn't an active club", async () => {
+  it("404s an Area Coordinator for an organization that isn't an active club in their ministries (#843)", async () => {
     mocks.requireRosterAccess.mockRejectedValue(notFound());
     mocks.currentAreaCoordinator.mockResolvedValue({ id: "acct-ac" });
-    for (const organization of [null, { type: "CHURCH", isActive: true }, { type: "CLUB", isActive: false }]) {
-      mocks.findOrganization.mockResolvedValue(organization);
-      await expect(requireHonorsAccess("org-x")).rejects.toMatchObject({ code: "NOT_FOUND", status: 404 });
-    }
+    // One scope check covers a missing club, a church, an inactive club and a club of another ministry.
+    mocks.maySeeClub.mockResolvedValue(false);
+    await expect(requireHonorsAccess("org-x")).rejects.toMatchObject({ code: "NOT_FOUND", status: 404 });
+    expect(mocks.maySeeClub).toHaveBeenCalledWith("org-x");
   });
 
   it("never falls back to Area Coordinator read access past a club role's MFA or role denial", async () => {

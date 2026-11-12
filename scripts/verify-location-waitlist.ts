@@ -475,6 +475,10 @@ async function main() {
   assert(portal.length === 1 && portal[0]!.locationName === "Camp Heritage 1", "the coordinator sees their own location");
   assert(portal[0]!.clubs.length === 1 && portal[0]!.clubs[0]!.clubName === "Wl Club a4" && portal[0]!.clubs[0]!.place === 1 && portal[0]!.clubs[0]!.attendeeCount === 2, "and the club waiting there, with its place in line");
   assert((await listWaitingClubsForCoordinator(prisma, revokedAccountId)).length === 0, "a revoked coordinator sees nothing");
+  // Ministry scope (#843): the coordinator's grant names Pathfinder only, so the same club as an Adventurer club is not listed for them.
+  await prisma.organization.update({ where: { id: clubOf("a4") }, data: { clubKind: "ADVENTURER" } });
+  assert((await listWaitingClubsForCoordinator(prisma, coordinatorAccountId))[0]!.clubs.length === 0, "a Pathfinder coordinator does not see an Adventurer club waiting at their location");
+  await prisma.organization.update({ where: { id: clubOf("a4") }, data: { clubKind: "PATHFINDER" } });
   console.log("ok  the coordinator portal lists their location's waiting clubs; a revoked coordinator sees none");
 
   // 10b. The director's own emails: a delivery failure after the commit never blocks or undoes the registration change.

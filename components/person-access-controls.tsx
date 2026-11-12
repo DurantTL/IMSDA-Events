@@ -1,6 +1,7 @@
 "use client";
 
 import { SubmitButton } from "@/components/submit-button";
+import { savedMessage } from "@/components/form-message";
 import { PhoneInput } from "@/components/phone-input";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -19,6 +20,7 @@ import { roleLabel } from "@/modules/access/role-display";
 import { RoleDetails } from "@/components/role-details";
 import { systemRoleText } from "@/modules/access/role-descriptions";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
+import { CLUB_KINDS, type ClubKindValue } from "@/modules/organizations/club-kind";
 import styles from "./people-directory.module.css";
 
 /**
@@ -179,6 +181,48 @@ export function RoleToggle({ kind, on, name, userId, accountId }: {
       </button>
       {status}
     </>
+  );
+}
+
+/** The ministries an Area Coordinator sees (#843): Pathfinder and/or Adventurer, at least one. Same people who can change the role. */
+export function AreaCoordinatorMinistries({ accountId, ministries, name }: { accountId: string; ministries: ClubKindValue[]; name: string }) {
+  const { busy, run, status } = useChange();
+  const saved = CLUB_KINDS.filter((kind) => ministries.includes(kind));
+  const [chosen, setChosen] = useState<ClubKindValue[]>(saved);
+  const next = CLUB_KINDS.filter((kind) => chosen.includes(kind));
+  const changed = next.join(",") !== saved.join(",");
+  useUnsavedChangesGuard(changed);
+
+  function toggle(kind: ClubKindValue, on: boolean) {
+    setChosen((current) => (on ? [...current, kind] : current.filter((value) => value !== kind)));
+  }
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (next.length === 0 || !changed) return;
+    await run(async () => {
+      const result = await callJson(`/api/admin/accounts/${encodeURIComponent(accountId)}`, { method: "POST", json: { action: "area-coordinator-ministries", ministries: next } }, "The ministries could not be changed.");
+      return result.message ?? savedMessage();
+    }, "The ministries could not be changed.");
+  }
+
+  return (
+    <form className={styles.inviteForm} onSubmit={(event) => void save(event)}>
+      <fieldset>
+        <legend>Ministries {name} sees</legend>
+        {CLUB_KINDS.map((kind) => (
+          <label className={styles.check} key={kind}>
+            <input checked={chosen.includes(kind)} disabled={busy} onChange={(event) => toggle(kind, event.target.checked)} type="checkbox" />
+            <span>{kind === "ADVENTURER" ? "Adventurer clubs" : "Pathfinder clubs"}</span>
+          </label>
+        ))}
+      </fieldset>
+      {next.length === 0 ? <p className={styles.statusError} role="alert">Choose at least one ministry.</p> : null}
+      <div className={styles.inline}>
+        <SubmitButton className="secondary-button" disabled={next.length === 0 || !changed} label="Save ministries" submitting={busy} submittingLabel="Saving…" />
+      </div>
+      {status}
+    </form>
   );
 }
 

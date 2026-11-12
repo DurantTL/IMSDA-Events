@@ -10,6 +10,9 @@ import {
 } from "@/modules/club-reports/area-card-domain";
 import { registrationStatusFor } from "@/modules/club-reports/area-summary-domain";
 import { clubYearFor } from "@/modules/club-rosters/domain";
+import { coordinatorMinistriesForAccount } from "@/modules/organizations/area-coordinators";
+import { areaClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
 
 export type AreaCardEvent = {
   eventId: string;
@@ -32,9 +35,9 @@ export type AreaCoordinatorCard = {
 };
 
 /** Counts of active clubs needing attention, without building the full per-club summary. */
-async function loadClubsNeedingAttention(clubYear: string, now: Date) {
+async function loadClubsNeedingAttention(clubYear: string, now: Date, kinds: readonly ClubKindValue[]) {
   const prisma = getPrisma();
-  const clubs = await prisma.organization.findMany({ where: { type: "CLUB", isActive: true }, select: { id: true, ...clubJoinSelect } });
+  const clubs = await prisma.organization.findMany({ where: areaClubWhere(kinds), select: { id: true, ...clubJoinSelect } });
   const clubIds = clubs.map((club) => club.id);
   const [reports, checks] = await Promise.all([
     prisma.clubMonthlyReport.findMany({
@@ -57,6 +60,8 @@ export async function getAreaCoordinatorCard(account: { id: string }, now = new 
   const prisma = getPrisma();
   const accountId = account.id;
   const clubYear = clubYearFor(now);
+  // The upcoming-events counts and the clubs needing attention cover the coordinator's ministries only (#843).
+  const kinds = await coordinatorMinistriesForAccount(accountId, now);
   const [locations, clubEvents, needingAttention] = await Promise.all([
     prisma.eventLocation.findMany({
       where: { coordinatorAccountId: accountId, isActive: true, event: { isPublished: true, archivedAt: null, audience: "CLUB", endsAt: { gte: now } } },
@@ -80,12 +85,12 @@ export async function getAreaCoordinatorCard(account: { id: string }, now = new 
         registrationOpensOn: true,
         registrationClosesOn: true,
         clubRegistrations: {
-          where: { organization: { isActive: true } },
+          where: { organization: { isActive: true, clubKind: { in: [...kinds] } } },
           select: { organizationId: true, registration: { select: { status: true, _count: { select: { attendees: true } } } } },
         },
       },
     }),
-    loadClubsNeedingAttention(clubYear, now),
+    loadClubsNeedingAttention(clubYear, now, kinds),
   ]);
 
   const locationIds = locations.map((location) => location.id);

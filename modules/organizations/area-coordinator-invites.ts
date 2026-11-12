@@ -71,7 +71,7 @@ export function areaCoordinatorInviteEmailContent(rawInput: { name: string; emai
       "If you're asked for an emailed code, choose Send a new code.",
       "",
       "What you'll see:",
-      "- Club coordination: every club, view only, with ages but not birth dates.",
+      "- Club coordination: the clubs of your ministry, view only, with ages but not birth dates.",
       "- Each club's Monthly Records, points and club event registrations, all in one place.",
       "- Help guides with pictures are under Help on your account page.",
       "",

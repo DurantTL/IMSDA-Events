@@ -1,6 +1,8 @@
 import "server-only";
 
 import type { LocationWaitlistChangeKind, Prisma } from "@prisma/client";
+import { grantMinistries } from "@/modules/organizations/area-coordinator-ministries-domain";
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
 
 /**
  * Location waitlists (#599). Waitlist entries keep the event-wide `position`
@@ -78,10 +80,19 @@ export async function recordLocationWaitlistChange(
 export async function listWaitingClubsAtLocations(
   client: Pick<Tx, "registrationWaitlistEntry">,
   locationIds: readonly string[],
+  options: { kinds?: readonly ClubKindValue[] } = {},
 ) {
   if (locationIds.length === 0) return [];
   const entries = await client.registrationWaitlistEntry.findMany({
-    where: { status: "WAITING", registration: { locationId: { in: [...locationIds] }, status: "WAITLISTED" } },
+    where: {
+      status: "WAITING",
+      registration: {
+        locationId: { in: [...locationIds] },
+        status: "WAITLISTED",
+        // An Area Coordinator hears about their ministries' clubs only (#843); a registration with no club has no ministry.
+        ...(options.kinds ? { OR: [{ clubRegistration: { is: null } }, { clubRegistration: { organization: { clubKind: { in: [...options.kinds] } } } }] } : {}),
+      },
+    },
     orderBy: { position: "asc" },
     select: {
       position: true,
@@ -123,7 +134,7 @@ export async function listWaitingClubsAtLocations(
 /**
  * The waitlisted clubs at every location this Area Coordinator is set as the
  * coordinator of, for the coordinator portal (#599), while their Area
- * Coordinator grant is active.
+ * Coordinator grant is active, limited to the clubs of their ministries (#843).
  */
 export async function listWaitingClubsForCoordinator(
   client: Pick<Tx, "eventLocation" | "registrationWaitlistEntry">,
@@ -140,9 +151,11 @@ export async function listWaitingClubsForCoordinator(
       },
     },
     orderBy: [{ eventId: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, eventId: true, event: { select: { name: true } } },
+    select: { id: true, name: true, eventId: true, event: { select: { name: true } }, coordinator: { select: { areaCoordinatorGrant: { select: { ministries: true } } } } },
   });
-  const waiting = await listWaitingClubsAtLocations(client, locations.map((location) => location.id));
+  // Only the clubs of the coordinator's ministries (#843), read from the same grant the where above checked.
+  const kinds = grantMinistries(locations[0]?.coordinator?.areaCoordinatorGrant?.ministries);
+  const waiting = await listWaitingClubsAtLocations(client, locations.map((location) => location.id), { kinds });
   return locations.map((location) => ({
     locationId: location.id,
     locationName: location.name,

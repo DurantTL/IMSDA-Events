@@ -16,6 +16,8 @@ import {
   clubPeopleWhere,
 } from "@/modules/system-admin/people-directory-model";
 import { containsAnyOf } from "@/lib/server-search";
+import { grantMinistries } from "@/modules/organizations/area-coordinator-ministries-domain";
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
 
 /**
  * People & access (#1275): one directory over staff logins (`User`) and website accounts
@@ -226,6 +228,8 @@ export type PersonDetail = {
   areaCoordinator: boolean;
   /** The TLT director setting on the Area Coordinator role (#1686); on only while the role is current. */
   tltDirector?: boolean;
+  /** The ministries an active Area Coordinator sees (#843); empty when the role is off. */
+  areaCoordinatorMinistries?: ClubKindValue[];
   staff: null | {
     status: string;
     signInDisabled: boolean;
@@ -322,7 +326,7 @@ export async function getPersonDetail(
         status: true,
         disabledAt: true,
         emailVerifiedAt: true,
-        areaCoordinatorGrant: { select: { revokedAt: true, expiresAt: true, tltDirector: true } },
+        areaCoordinatorGrant: { select: { revokedAt: true, expiresAt: true, tltDirector: true, ministries: true } },
         mfaEnrollment: { select: { status: true } },
         _count: { select: { passkeys: { where: { revokedAt: null } } } },
         sessions: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
@@ -352,6 +356,7 @@ export async function getPersonDetail(
     siteContentEditor: Boolean(user?.siteContentEditorGrant && !user.siteContentEditorGrant.revokedAt),
     areaCoordinator: Boolean(account?.areaCoordinatorGrant && isGrantCurrent(account.areaCoordinatorGrant, now)),
     tltDirector: Boolean(account?.areaCoordinatorGrant && account.areaCoordinatorGrant.tltDirector && isGrantCurrent(account.areaCoordinatorGrant, now)),
+    areaCoordinatorMinistries: account?.areaCoordinatorGrant && isGrantCurrent(account.areaCoordinatorGrant, now) ? grantMinistries(account.areaCoordinatorGrant.ministries) : [],
     staff: full && user ? {
       status: user.accountStatus,
       signInDisabled: Boolean(user.credential?.disabledAt),

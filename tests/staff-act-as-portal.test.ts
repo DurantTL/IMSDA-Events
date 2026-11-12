@@ -31,7 +31,8 @@ const client = {
   userSession: { findUnique: mocks.sessionFindUnique },
   clubsAdministratorGrant: { findFirst: mocks.grantFindFirst },
   youthAdministratorGrant: { findFirst: async () => null },
-  organization: { findUnique: mocks.orgFindUnique },
+  // `findFirst` is the coordinator scope lookup (#843): an active club of the filter's ministries, which the double reads from the same club table.
+  organization: { findUnique: mocks.orgFindUnique, findFirst: async ({ where }: { where: { id: string } }) => { const club = await mocks.orgFindUnique({ where: { id: where.id } }); return club && club.type === "CLUB" && club.isActive ? club : null; } },
   attendeeMfaEnrollment: { findUnique: async () => ({ status: "ACTIVE" }) },
   attendeePasskey: { count: async () => 0 },
   attendeeSession: { findUnique: async () => ({ secondFactorVerifiedAt: new Date(Date.now() - 60_000) }) },

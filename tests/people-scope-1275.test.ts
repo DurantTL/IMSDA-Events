@@ -87,6 +87,28 @@ describe("the person page by viewer scope", () => {
     ]) expect(html, absent).not.toContain(absent);
   });
 
+  it("shows the ministry choice only while the Area Coordinator role is on, to the same people who toggle the role (#843)", () => {
+    expect(render("clubs")).not.toContain("Save ministries");
+    const on = (scope: "full" | "clubs", ministries?: string[]) => renderToStaticMarkup(createElement(PersonAccess, {
+      person: { ...person, areaCoordinator: true, areaCoordinatorMinistries: ministries as never },
+      scope,
+      viewerUserId: "u-viewer",
+      eventOptions: [],
+      clubOptions: [],
+      linkedEmailChangesTogether: false,
+    }));
+    for (const scope of ["clubs", "full"] as const) {
+      const html = on(scope, ["ADVENTURER"]);
+      expect(html).toContain("Save ministries");
+      expect(html).toContain("Pathfinder clubs");
+      expect(html).toContain("Adventurer clubs");
+      // Only the Adventurer box starts checked.
+      expect(html.match(/checked=""/g)).toHaveLength(1);
+    }
+    // A grant with no list shown yet reads as Pathfinder.
+    expect(on("full").match(/checked=""/g)).toHaveLength(1);
+  });
+
   it("gives a system administrator every box and control", () => {
     const html = render("full");
     for (const present of [

@@ -8,7 +8,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { requireRosterAccess, type ClubActor } from "@/modules/club-rosters/access";
 import { isClubFormsRole, type ClubFormActor, type ClubFormsViewer } from "@/modules/club-forms/domain";
 import { ClubFormError } from "@/modules/club-forms/errors";
-import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { areaCoordinatorMaySeeClub, currentAreaCoordinator, type AreaCoordinatorViewer } from "@/modules/organizations/area-coordinators";
 import { actAsRoleMarks } from "@/modules/audit/act-as-actor-role";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 
@@ -61,14 +61,30 @@ export async function resolveAreaCoordinatorViewer(): Promise<Extract<ClubFormsV
 }
 
 /**
- * For the Area Coordinator's send-a-link route (#1221): an active Area Coordinator, or a system administrator acting
- * as one, or a 403. A removed or expired grant resolves to no viewer. Which clubs they may send for
- * is `viewerCanSendLinkForClub` (all clubs until #843).
+ * An Area Coordinator viewer for one club (#843): null when nobody is viewing as a coordinator, or when the club is
+ * outside the coordinator's ministries (a missing club answers the same way). Staff acting as a coordinator see every ministry.
  */
-export async function requireAreaCoordinatorViewer() {
+export async function resolveAreaCoordinatorViewerForClub(organizationId: string): Promise<Extract<ClubFormsViewer, { kind: "AREA_COORDINATOR" }> | null> {
   const viewer = await resolveAreaCoordinatorViewer();
-  if (viewer) return viewer;
-  throw new AccessDeniedError("Area Coordinator access is required.", 403, "PERMISSION_DENIED");
+  if (!viewer) return null;
+  const scope: AreaCoordinatorViewer = viewer.actor.kind === "ATTENDEE"
+    ? { kind: "ATTENDEE", accountId: viewer.actor.accountId }
+    : { kind: "ACTING", actAsId: viewer.actor.actAsId };
+  return (await areaCoordinatorMaySeeClub(scope, organizationId)) ? viewer : null;
+}
+
+/**
+ * For the Area Coordinator's send-a-link route (#1221): an active Area Coordinator, or a system administrator acting
+ * as one, or a 403. A removed or expired grant resolves to no viewer. A club outside the coordinator's ministries is
+ * "not found" (#843); `viewerCanSendLinkForClub` then decides the rest.
+ */
+export async function requireAreaCoordinatorViewer(organizationId?: string) {
+  const viewer = await resolveAreaCoordinatorViewer();
+  if (!viewer) throw new AccessDeniedError("Area Coordinator access is required.", 403, "PERMISSION_DENIED");
+  if (organizationId !== undefined && !(await resolveAreaCoordinatorViewerForClub(organizationId))) {
+    throw new ClubFormError("CLUB_NOT_FOUND", "That club could not be found.");
+  }
+  return viewer;
 }
 
 /**

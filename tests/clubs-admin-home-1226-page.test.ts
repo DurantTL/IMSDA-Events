@@ -122,8 +122,8 @@ describe("what it shows", () => {
     const html = await render({ year: "2024-25", q: "alpha" });
     expect(html).toContain("year=2024-25");
     expect(html).toContain('value="alpha"');
-    expect(mocks.getAreaClubsSummary).toHaveBeenCalledWith("2024-25", expect.any(Date), { backgroundChecks: false });
-    expect(mocks.listAreaClubEvents).toHaveBeenCalledWith("2024-25");
+    expect(mocks.getAreaClubsSummary).toHaveBeenCalledWith("2024-25", expect.any(Date), { backgroundChecks: false, kinds: ["PATHFINDER", "ADVENTURER"] });
+    expect(mocks.listAreaClubEvents).toHaveBeenCalledWith("2024-25", { kinds: ["PATHFINDER", "ADVENTURER"] });
   });
 
   it("shows the event links to a Clubs Administrator with no staff assignment: they administer every club event (#1643)", async () => {

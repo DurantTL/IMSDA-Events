@@ -103,7 +103,7 @@ export function AreaCoordinatorInviteAccept({ invites, fill = "all" }: { invites
       fill={fill}
       heading="You're invited to be an Area Coordinator"
       headingId="area-coordinator-invite-heading"
-      items={invites.map((invite) => ({ id: invite.id, title: "Area Coordinator", detail: "See every club, view only, from the Iowa-Missouri Conference" }))}
+      items={invites.map((invite) => ({ id: invite.id, title: "Area Coordinator", detail: "See the clubs of your ministry, view only, from the Iowa-Missouri Conference" }))}
       nextUrl={(result) => result.nextUrl}
     />
   );

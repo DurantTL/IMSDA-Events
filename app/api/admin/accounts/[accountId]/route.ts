@@ -4,7 +4,9 @@ import { deliverQueuedAttendeeEmail } from "@/modules/attendee-accounts/attendee
 import { HAND_LINK_NOTE_MAX, HAND_LINK_REASON_CODES } from "@/modules/account-merge/hand-link-reasons";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { requireClubsAdministration, requireSystemAdministrator } from "@/modules/organizations/access";
-import { setAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { setAreaCoordinator, setAreaCoordinatorMinistries } from "@/modules/organizations/area-coordinators";
+import { ministriesLabel } from "@/modules/organizations/area-coordinator-ministries-domain";
+import { CLUB_KINDS } from "@/modules/organizations/club-kind";
 import { setTltDirector } from "@/modules/tlt-directory/access";
 import {
   findStaffUserIdByEmail,
@@ -26,6 +28,8 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reset-two-step") }).strict(),
   z.object({ action: z.literal("sign-out") }).strict(),
   z.object({ action: z.literal("area-coordinator"), on: z.boolean() }).strict(),
+  // The ministries an Area Coordinator sees (#843): at least one, no repeats. Admitted like the role itself.
+  z.object({ action: z.literal("area-coordinator-ministries"), ministries: z.array(z.enum(CLUB_KINDS)).min(1, "Choose at least one ministry.").refine((list) => new Set(list).size === list.length, "Choose each ministry once.") }).strict(),
   // The TLT director setting on an Area Coordinator's role (#1686): system administrators only.
   z.object({ action: z.literal("tlt-director"), on: z.boolean() }).strict(),
   // Hand-linking a person's team sign-in and this account when their emails differ (#554).
@@ -37,7 +41,7 @@ const actionSchema = z.discriminatedUnion("action", [
 
 /**
  * Actions on an attendee account (#386). Audited. Every action is for system administrators only, except
- * "area-coordinator" (#1275, decision A), which an active Clubs Administrator may also do. Order: cross-origin check,
+ * "area-coordinator" and "area-coordinator-ministries" (#1275, decision A; #843), which an active Clubs Administrator may also do. Order: cross-origin check,
  * then the role gate that admits both roles, then the body, then the system administrator gate for every other action (the TLT director setting too, #1686).
  */
 async function postHandler(request: Request, context: { params: Promise<{ accountId: string }> }) {
@@ -48,7 +52,7 @@ async function postHandler(request: Request, context: { params: Promise<{ accoun
     const admitted = await requireClubsAdministration("System administrator access is required.");
     const { accountId } = await context.params;
     const input = actionSchema.parse(await request.json());
-    const actor = input.action === "area-coordinator" ? admitted : await requireSystemAdministrator();
+    const actor = input.action === "area-coordinator" || input.action === "area-coordinator-ministries" ? admitted : await requireSystemAdministrator();
     if (input.action === "reset-two-step") {
       await resetAttendeeTwoStep(accountId, actor.id);
       return Response.json({ message: "Two-step sign-in reset and signed out everywhere. Club roles will set it up again at their next sign-in." });
@@ -60,6 +64,10 @@ async function postHandler(request: Request, context: { params: Promise<{ accoun
           ? `Now an ${systemRoleText.AREA_COORDINATOR.name}. ${systemRoleText.AREA_COORDINATOR.summary}`
           : "No longer an Area Coordinator.",
       });
+    }
+    if (input.action === "area-coordinator-ministries") {
+      const saved = await setAreaCoordinatorMinistries(accountId, input.ministries, actor.id);
+      return Response.json({ message: `Now sees ${ministriesLabel(saved)} clubs.`, ministries: saved });
     }
     if (input.action === "tlt-director") {
       await setTltDirector(accountId, input.on, actor.id);

@@ -33,7 +33,14 @@ vi.mock("@/lib/prisma", () => ({
     attendeePasskey: { count: mocks.countPasskeys },
     platformSettings: { findUnique: mocks.findSettings },
     areaCoordinatorGrant: { findUnique: mocks.findAreaGrant },
-    organization: { findUnique: mocks.findOrganization },
+    organization: {
+      findUnique: mocks.findOrganization,
+      // The coordinator scope lookup (#843): an active club only; the double stands in for the database's ministry filter.
+      findFirst: async (args: unknown) => {
+        const organization = await mocks.findOrganization(args) as { type: string; isActive: boolean } | null;
+        return organization && organization.type === "CLUB" && organization.isActive ? organization : null;
+      },
+    },
   }),
 }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));

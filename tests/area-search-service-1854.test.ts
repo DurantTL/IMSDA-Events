@@ -11,8 +11,9 @@ const NOW = new Date("2027-02-01T12:00:00.000Z");
 const database = vi.hoisted(() => ({
   clubs: [] as { id: string; name: string; city: string | null; parentOrganization: { name: string; city: string | null } | null }[],
   grants: [] as { organizationId: string; effectiveFrom: Date; effectiveTo: Date | null; revokedAt: Date | null; attendeeAccount: { displayName: string } }[],
-  coordinatorGrant: null as { revokedAt: Date | null; expiresAt: Date | null } | null,
+  coordinatorGrant: null as { revokedAt: Date | null; expiresAt: Date | null; ministries?: string[] } | null,
   reads: [] as string[],
+  clubWhere: null as Row | null,
 }));
 
 const mocks = vi.hoisted(() => ({
@@ -42,8 +43,9 @@ vi.mock("@/lib/prisma", () => ({
       }),
     },
     organization: {
-      findMany: vi.fn(async (args: { select: Row }) => {
+      findMany: vi.fn(async (args: { select: Row; where: Row }) => {
         database.reads.push("organization");
+        database.clubWhere = args.where;
         expect(args.select).not.toHaveProperty("contactEmail");
         return database.clubs;
       }),
@@ -137,6 +139,22 @@ describe("getAreaSearchViewer: the area-clubs gate", () => {
   it("refuses a staff sign-in that is not the attendee's own account", async () => {
     signedIn("staff");
     expect(await getAreaSearchViewer()).toBeNull();
+  });
+});
+
+describe("searchAreaClubs ministry scope (#843)", () => {
+  it("reads only the clubs of the coordinator's ministries", async () => {
+    database.coordinatorGrant = { revokedAt: null, expiresAt: null, ministries: ["ADVENTURER"] };
+    await searchAreaClubs(coordinator, "alpha", NOW);
+    expect(database.clubWhere).toEqual({ type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["ADVENTURER"] } });
+    database.coordinatorGrant = { revokedAt: null, expiresAt: null, ministries: ["PATHFINDER", "ADVENTURER"] };
+    await searchAreaClubs(coordinator, "alpha", NOW);
+    expect(database.clubWhere).toEqual({ type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["PATHFINDER", "ADVENTURER"] } });
+  });
+
+  it("reads every ministry for staff acting as a coordinator", async () => {
+    await searchAreaClubs({ kind: "ACTING", actAsId: "act_1" }, "alpha", NOW);
+    expect(database.clubWhere).toEqual({ type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["PATHFINDER", "ADVENTURER"] } });
   });
 });
 

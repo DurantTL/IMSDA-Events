@@ -16,6 +16,7 @@ import { parseFormsHubReturn } from "@/modules/forms-hub/return";
 import { resolveStaffViewer } from "@/modules/club-forms/access";
 import { CLUB_FORM_SORT_COLUMNS, pageSubmissionsForViewer, type ClubFormSortColumn } from "@/modules/club-forms/submissions";
 import { listClubFormTemplateNames } from "@/modules/club-forms/templates";
+import { ALL_CLUB_KINDS } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { listClubsForArea } from "@/modules/organizations/area-coordinators";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
@@ -60,7 +61,7 @@ export default async function StaffClubFormsPage({
   const sorting = serverSort<ClubFormSortColumn>("/more/club-forms", params, CLUB_FORM_SORT_COLUMNS, { key: null, dir: "asc" });
   const [templates, clubs, list] = await Promise.all([
     listClubFormTemplateNames(),
-    listClubsForArea(),
+    listClubsForArea(ALL_CLUB_KINDS),
     pageSubmissionsForViewer(viewer, { templateKey: form || undefined, organizationId: club || undefined }, { sort: sorting.order, page: parsePageParam(params.page), pageSize: STAFF_FORMS_PAGE_SIZE }),
   ]);
   const rows = list.rows;

@@ -19,7 +19,7 @@ export function userAdminApiError(error: unknown, action: string) {
   }
   if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
   if (error instanceof AreaCoordinatorError) {
-    return Response.json({ error: error.code, message: error.message }, { status: 404 });
+    return Response.json({ error: error.code, message: error.message }, { status: error.code === "INVALID_MINISTRIES" ? 400 : error.code === "NOT_COORDINATOR" ? 409 : 404 });
   }
   if (error instanceof TltDirectoryError) {
     return Response.json({ error: error.code, message: error.message }, { status: 409 });

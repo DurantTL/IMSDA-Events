@@ -1,4 +1,5 @@
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
 import { formatPersonName } from "@/lib/person-name";
 
 /**
@@ -57,8 +58,8 @@ export type HealthViewer =
   | { kind: "SYSTEM_ADMIN"; userId: string }
   /** Holds VIEW_HEALTH_INFORMATION on these events only (granted by a system administrator). */
   | { kind: "HEALTH_ROLE"; userId: string; eventIds: readonly string[] }
-  /** Automatic. An active Area Coordinator who passed the second step. */
-  | { kind: "AREA_COORDINATOR"; accountId: string }
+  /** Automatic. An active Area Coordinator who passed the second step, for the clubs of `kinds` (their ministries, #843) only. */
+  | { kind: "AREA_COORDINATOR"; accountId: string; kinds: readonly ClubKindValue[] }
   /** The club's own director or deputy, for that club only. */
   | { kind: "CLUB_LEADER"; organizationId: string; actor: HealthActor };
 

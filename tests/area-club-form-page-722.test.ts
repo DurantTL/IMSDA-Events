@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound, redirect: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ organization: { findUnique: mocks.orgFindUnique } }) }));
-vi.mock("@/modules/club-forms/access", () => ({ resolveAreaCoordinatorViewer: mocks.resolveViewer }));
+vi.mock("@/modules/club-forms/access", () => ({ resolveAreaCoordinatorViewerForClub: mocks.resolveViewer }));
 vi.mock("@/modules/club-forms/submissions", () => ({ getSubmissionForViewer: mocks.getSubmission }));
 
 import AreaClubFormPage from "@/app/(public)/account/(portal)/area/[organizationId]/forms/[submissionId]/page";
@@ -34,6 +34,14 @@ describe("area club form page (#722)", () => {
   it("is a 404 for an unknown club", async () => {
     mocks.orgFindUnique.mockResolvedValue(null);
     await expect(AreaClubFormPage(props)).rejects.toThrow("NOT_FOUND");
+    expect(mocks.getSubmission).not.toHaveBeenCalled();
+  });
+
+  it("is a 404 for a club outside the coordinator's ministries (no viewer for that club) and reads nothing (#843)", async () => {
+    mocks.resolveViewer.mockResolvedValue(null);
+    await expect(AreaClubFormPage(props)).rejects.toThrow("NOT_FOUND");
+    expect(mocks.resolveViewer).toHaveBeenCalledWith("club-1");
+    expect(mocks.orgFindUnique).not.toHaveBeenCalled();
     expect(mocks.getSubmission).not.toHaveBeenCalled();
   });
 
