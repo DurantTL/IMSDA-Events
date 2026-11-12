@@ -253,7 +253,7 @@ export function EventLocationsPanel({
           </div>
           <div className="club-registration-toolbar">
             <button className="secondary-button" onClick={() => { setAdding(false); setEditingId(null); setDraft(emptyDraft); }} type="button"><X aria-hidden="true" size={15} /> Cancel</button>
-            <button className="primary-button" disabled={busy} type="submit">{editingId ? "Save location" : "Add location"}</button>
+            <button className="secondary-button" disabled={busy} type="submit">{editingId ? "Save location" : "Add location"}</button>
           </div>
         </form>
       ) : (
