@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   updateTltProfile: vi.fn(),
   changeTltList: vi.fn(),
   runTltExport: vi.fn(),
+  acceptTltTagSuggestion: vi.fn(),
   accountFindUnique: vi.fn(),
   grantUpdateMany: vi.fn(),
   grantUpsert: vi.fn(),
@@ -35,11 +36,13 @@ vi.mock("@/modules/tlt-directory/repository", () => ({
   updateTltProfile: mocks.updateTltProfile,
   changeTltList: mocks.changeTltList,
   runTltExport: mocks.runTltExport,
+  acceptTltTagSuggestion: mocks.acceptTltTagSuggestion,
 }));
 
 import { POST as ACCOUNT_ACTION } from "@/app/api/admin/accounts/[accountId]/route";
 import { POST as EXPORT } from "@/app/api/attendee/area-clubs/tlt-directory/export/route";
 import { POST as LISTS } from "@/app/api/attendee/area-clubs/tlt-directory/lists/route";
+import { POST as SUGGESTION } from "@/app/api/attendee/area-clubs/tlt-directory/suggestion/route";
 import { POST as PROFILE } from "@/app/api/attendee/area-clubs/tlt-directory/profile/route";
 import { applyAreaCoordinatorChange } from "@/modules/organizations/area-coordinators";
 import { currentTltDirector } from "@/modules/tlt-directory/access";
@@ -53,6 +56,7 @@ const post = (path: string, body: unknown, origin = ORIGIN) => new Request(`${OR
 
 const profileBody = { personId: "p1", tltYear: 2, positionTypeId: null, status: "ACTIVE", tagIds: [] };
 const listBody = { action: "add", list: "tag", name: "Sound booth" };
+const suggestionBody = { personId: "p1", tagId: "tag-1" };
 const exportBody = { q: "", club: "", year: "", position: "", status: "", tag: "", sort: "name" };
 
 type Who =
@@ -89,6 +93,7 @@ beforeEach(() => {
   mocks.clubsGrantFindFirst.mockResolvedValue(null);
   mocks.updateTltProfile.mockResolvedValue(undefined);
   mocks.changeTltList.mockResolvedValue({ id: "entry-1" });
+  mocks.acceptTltTagSuggestion.mockResolvedValue(undefined);
   mocks.runTltExport.mockResolvedValue({ csv: "Name\r\n", rowCount: 0, headers: [], rows: [] });
 });
 
@@ -112,6 +117,7 @@ describe("who is the TLT director (#1686)", () => {
 describe.each([
   ["profile", PROFILE, "/api/attendee/area-clubs/tlt-directory/profile", profileBody, () => mocks.updateTltProfile],
   ["lists", LISTS, "/api/attendee/area-clubs/tlt-directory/lists", listBody, () => mocks.changeTltList],
+  ["suggestion", SUGGESTION, "/api/attendee/area-clubs/tlt-directory/suggestion", suggestionBody, () => mocks.acceptTltTagSuggestion],
   ["export", EXPORT, "/api/attendee/area-clubs/tlt-directory/export", exportBody, () => mocks.runTltExport],
 ] as const)("the TLT directory %s route (#1686)", (_name, handler, path, body, work) => {
   it("works for the TLT director", async () => {
