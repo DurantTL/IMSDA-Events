@@ -112,12 +112,11 @@ describe("saving the event lead addresses (#1680)", () => {
     await expect(saveBaptismLeadEmails({ userId: "u" }, "event-1", "lead@example.test")).rejects.toBeInstanceOf(BaptismFollowUpError);
   });
 
-  it("audits a change with counts only, and a repeat changes and audits nothing", async () => {
+  it("audits a change with counts and the addresses added and removed, and a repeat changes and audits nothing", async () => {
     await saveBaptismLeadEmails({ userId: "u" }, "event-1", "lead@example.test");
     expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
     const entry = mocks.writeAuditLog.mock.calls[0]![0] as { metadata: unknown };
-    expect(entry.metadata).toEqual({ eventId: "event-1", previousCount: 0, newCount: 1 });
-    expect(JSON.stringify(entry)).not.toContain("lead@example.test");
+    expect(entry.metadata).toEqual({ eventId: "event-1", previousCount: 0, newCount: 1, addedEmails: ["lead@example.test"], removedEmails: [] });
     mocks.writeAuditLog.mockClear();
     mocks.settingUpsert.mockClear();
     mocks.settingFindUnique.mockResolvedValue({ leadEmails: ["lead@example.test"] });
@@ -129,6 +128,7 @@ describe("saving the event lead addresses (#1680)", () => {
   it("clears the lead addresses with an empty list", async () => {
     mocks.settingFindUnique.mockResolvedValue({ leadEmails: ["lead@example.test"] });
     await expect(saveBaptismLeadEmails({ userId: "u" }, "event-1", "")).resolves.toEqual({ leadEmails: [] });
+    expect((mocks.writeAuditLog.mock.calls[0]![0] as { metadata: unknown }).metadata).toMatchObject({ addedEmails: [], removedEmails: ["lead@example.test"] });
     expect(mocks.settingUpsert).toHaveBeenCalledWith(expect.objectContaining({ update: { leadEmails: [] } }));
   });
 });
@@ -139,9 +139,10 @@ describe("the pastor's address stays on the server (#1680)", () => {
     const settings = readFileSync("modules/baptism-follow-up/settings.ts", "utf8");
     expect(notice).toContain('import "server-only"');
     expect(notice).toContain("select: { email: true }");
-    // The page query asks only which churches have a pastor with an email.
-    expect(settings).toContain("select: { organizationId: true }");
-    expect(settings).not.toMatch(/email: true/);
+    // The page applies the send path's own validity test and returns only a yes or no, never the address.
+    expect(settings).toContain("usablePastorEmail(pastor.email)");
+    expect(notice).toContain("usablePastorEmail(pastor?.email)");
+    expect(settings).not.toMatch(/pastorEmail|email: pastor/);
     for (const file of ["components/baptism-follow-up-list.tsx", "components/baptism-follow-up-panel.tsx", "app/(workspace)/more/baptism-follow-up/page.tsx"]) {
       expect(readFileSync(file, "utf8")).not.toMatch(/pastorEmail|organizationContact/);
     }

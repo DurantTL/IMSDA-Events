@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { BAPTISM_MAX_LEAD_EMAILS } from "@/modules/baptism-follow-up/domain";
@@ -11,6 +11,8 @@ export function BaptismFollowUpPanel({ endpoint, initialEmails }: { endpoint: st
   const [saved, setSaved] = useState(initialEmails);
   const [text, setText] = useState(initialEmails.join("\n"));
   const [busy, setBusy] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const dirty = text.trim() !== saved.join("\n");
   useUnsavedChangesGuard(dirty && !busy, "You have unsaved event lead addresses. Leave this page and discard them?");
@@ -19,11 +21,17 @@ export function BaptismFollowUpPanel({ endpoint, initialEmails }: { endpoint: st
     event.preventDefault();
     setBusy(true);
     setMessage(null);
+    setFieldError(null);
     try {
       const response = await fetch(endpoint, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ leadEmails: text }) });
       const result = await response.json().catch(() => ({})) as { leadEmails?: string[]; message?: string };
       if (!response.ok || !result.leadEmails) {
-        setMessage({ tone: "error", text: notSavedMessage(result.message ?? "Try Save again.") });
+        const reason = result.message ?? "Try Save again.";
+        setFieldError(reason);
+        setMessage({ tone: "error", text: notSavedMessage(reason) });
+        // The field is re-enabled before focus moves: a disabled control cannot take it.
+        setBusy(false);
+        setTimeout(() => fieldRef.current?.focus(), 0);
         return;
       }
       setSaved(result.leadEmails);
@@ -40,7 +48,8 @@ export function BaptismFollowUpPanel({ endpoint, initialEmails }: { endpoint: st
     <form className={styles.panel} data-testid="baptism-follow-up-panel" noValidate onSubmit={save}>
       <label className={styles.field} htmlFor="baptism-lead-emails">
         Event lead email addresses
-        <textarea aria-describedby="baptism-lead-emails-help" autoComplete="off" disabled={busy} id="baptism-lead-emails" onChange={(event) => setText(event.target.value)} rows={4} spellCheck={false} value={text} />
+        <textarea aria-describedby={fieldError ? "baptism-lead-emails-error baptism-lead-emails-help" : "baptism-lead-emails-help"} aria-invalid={fieldError ? true : undefined} autoComplete="off" disabled={busy} id="baptism-lead-emails" onChange={(event) => { setText(event.target.value); setFieldError(null); }} ref={fieldRef} rows={4} spellCheck={false} value={text} />
+        {fieldError && <span className={styles.error} id="baptism-lead-emails-error">{fieldError}</span>}
         <span className={styles.help} id="baptism-lead-emails-help">One per line, up to {BAPTISM_MAX_LEAD_EMAILS}. Nothing is sent until at least one is saved.</span>
       </label>
       <div className={styles.row}>

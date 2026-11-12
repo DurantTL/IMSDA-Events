@@ -2,7 +2,6 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
-import { isEmail } from "@/lib/field-validation";
 import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -11,6 +10,7 @@ import {
   BAPTISM_FOLLOW_UP_TEMPLATE_KEY,
   baptismNoticeContent,
   newBaptismNames,
+  usablePastorEmail,
   type BaptismRecipientRole,
 } from "@/modules/baptism-follow-up/domain";
 import { AccountEmailNotConfiguredError, getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
@@ -48,8 +48,7 @@ async function pastorEmailFor(client: Pick<Prisma.TransactionClient, "organizati
     where: { organizationId: churchId, kind: "PASTOR", effectiveTo: null },
     select: { email: true },
   });
-  const email = pastor?.email?.trim().toLowerCase() ?? "";
-  return email && isEmail(email) ? email : null;
+  return usablePastorEmail(pastor?.email);
 }
 
 /** Queues the notices for the names this club has not had notified. Returns the outbox ids to deliver and what was done. */

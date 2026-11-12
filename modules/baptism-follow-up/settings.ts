@@ -3,7 +3,7 @@ import "server-only";
 import { getPrisma } from "@/lib/prisma";
 import type { MembershipLookup, Session } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { BAPTISM_FOLLOW_UP_MODULE_KEY, parseLeadEmails } from "@/modules/baptism-follow-up/domain";
+import { BAPTISM_FOLLOW_UP_MODULE_KEY, parseLeadEmails, usablePastorEmail } from "@/modules/baptism-follow-up/domain";
 import { requireStaffToggleAccess } from "@/modules/event-modules/scoped-toggle";
 
 /**
@@ -35,7 +35,7 @@ export async function baptismFollowUpIsOn(eventId: string): Promise<boolean> {
   return row !== null;
 }
 
-/** Saves the event lead addresses (empty clears them, which stops notices). Audited with counts only, never an address. */
+/** Saves the event lead addresses (empty clears them, which stops notices). Audited with the counts and the addresses added and removed. */
 export async function saveBaptismLeadEmails(actor: { userId: string }, eventId: string, raw: string | readonly string[]) {
   await loadClubEvent(eventId);
   if (!(await baptismFollowUpIsOn(eventId))) throw new BaptismFollowUpError("MODULE_OFF", "Baptism follow-up is off for this event. Ask a system administrator to turn it on.");
@@ -58,7 +58,15 @@ export async function saveBaptismLeadEmails(actor: { userId: string }, eventId: 
         entityType: "BaptismFollowUpSetting",
         entityId: eventId,
         summary: "Changed who is emailed about baptism follow-up.",
-        metadata: { eventId, previousCount: before.length, newCount: parsed.emails.length },
+        // The event lead addresses are staff contacts, not attendee data, so who was added and removed is recorded with the counts.
+        // No attendee name is ever put in an audit entry.
+        metadata: {
+          eventId,
+          previousCount: before.length,
+          newCount: parsed.emails.length,
+          addedEmails: parsed.emails.filter((email) => !before.includes(email)),
+          removedEmails: before.filter((email) => !parsed.emails.includes(email)),
+        },
       }, tx);
     }
     return { leadEmails: parsed.emails };
@@ -70,8 +78,10 @@ export type BaptismRecipients = "lead" | "lead and pastor";
 export type BaptismClubRow = {
   organizationId: string;
   clubName: string;
-  /** The club's church has an active pastor with an email on file. The address itself is never read for this page. */
+  /** The club's church has an active pastor with a usable email (the send path's own test). The address is not returned. */
   pastorOnFile: boolean;
+  /** The sponsoring church, for the office's pastor page; null when the club has none. */
+  churchId: string | null;
   names: Array<{ displayName: string; notifiedAt: string; recipients: BaptismRecipients }>;
 };
 
@@ -99,18 +109,19 @@ export async function loadBaptismFollowUpPage(eventId: string): Promise<BaptismF
     ? []
     : await prisma.organization.findMany({ where: { id: { in: clubIds } }, select: { id: true, name: true, parentOrganizationId: true } });
   const churchIds = [...new Set(clubs.flatMap((club) => club.parentOrganizationId ?? []))];
-  // Existence only: the select leaves the pastor's name and address unread.
+  // The address is read only to apply the send path's validity test, and is never returned.
   const pastors = churchIds.length === 0
     ? []
     : await prisma.organizationContact.findMany({
       where: { organizationId: { in: churchIds }, kind: "PASTOR", effectiveTo: null, email: { not: null } },
-      select: { organizationId: true },
+      select: { organizationId: true, email: true },
     });
-  const churchesWithPastor = new Set(pastors.map((pastor) => pastor.organizationId));
+  const churchesWithPastor = new Set(pastors.filter((pastor) => usablePastorEmail(pastor.email) !== null).map((pastor) => pastor.organizationId));
   const result: BaptismClubRow[] = clubs
     .map((club) => ({
       organizationId: club.id,
       clubName: club.name,
+      churchId: club.parentOrganizationId,
       pastorOnFile: club.parentOrganizationId !== null && churchesWithPastor.has(club.parentOrganizationId),
       names: rows
         .filter((row) => row.organizationId === club.id)

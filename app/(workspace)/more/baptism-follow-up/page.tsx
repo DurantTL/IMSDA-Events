@@ -6,7 +6,7 @@ import { BaptismFollowUpPanel } from "@/components/baptism-follow-up-panel";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { logError } from "@/lib/logger";
-import { loadBaptismFollowUpPage } from "@/modules/baptism-follow-up/settings";
+import { BaptismFollowUpError, loadBaptismFollowUpPage } from "@/modules/baptism-follow-up/settings";
 import { resolveClubOversight } from "@/modules/club-rosters/event-oversight";
 
 export const metadata: Metadata = { title: staffPageTitles.baptismFollowUp };
@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function BaptismFollowUpPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const requested = (await searchParams).event;
-  const { event, allowed, clubEvent } = await resolveClubOversight(requested);
+  const { event, allowed, clubEvent, systemAdmin } = await resolveClubOversight(requested);
   if (!clubEvent) {
     return <NotAvailableForEvent reason="This event doesn't take club registrations. Choose a club event to set up baptism follow-up." />;
   }
@@ -30,6 +30,9 @@ export default async function BaptismFollowUpPage({ searchParams }: { searchPara
   try {
     state = await loadBaptismFollowUpPage(event.id);
   } catch (error) {
+    if (error instanceof BaptismFollowUpError && error.code === "EVENT_NOT_FOUND") {
+      return <NotAvailableForEvent reason="Baptism follow-up is for club events. Choose a club event, or this one may be archived." />;
+    }
     logError("Baptism follow-up page read failed", error, { eventId: event.id });
     return (
       <section className="page-stack">
@@ -57,13 +60,17 @@ export default async function BaptismFollowUpPage({ searchParams }: { searchPara
             {state.leadEmails.length === 0 && <p className="field-help">No event lead is set, so no notices are sent. Add an address above.</p>}
           </>
         ) : (
-          <p className="field-help" role="status">Baptism follow-up is off for this event, so no notices are sent. A system administrator can turn it on from the event features page.</p>
+          <p className="field-help" role="status">Baptism follow-up is off for this event, so no notices are sent.{" "}
+            {systemAdmin
+              ? <Link className="text-button" href={`/more/features?event=${encodeURIComponent(event.id)}`}>Turn it on from the event features page</Link>
+              : "A system administrator can turn it on from the event features page."}
+          </p>
         )}
       </div>
       {state.enabled && (
         <div className="panel page-stack">
           <h2>Names passed on</h2>
-          <BaptismFollowUpList clubs={state.clubs} />
+          <BaptismFollowUpList canAddPastor={systemAdmin} clubs={state.clubs} />
         </div>
       )}
     </section>

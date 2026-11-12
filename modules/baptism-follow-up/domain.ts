@@ -52,6 +52,12 @@ export function newBaptismNames(answer: unknown, alreadyNotified: ReadonlySet<st
   return splitBaptismNames(answer).filter((name) => !alreadyNotified.has(name.key));
 }
 
+/** The pastor's address when it can be used: trimmed, lowercased and a valid email, else null. The send path and the page's "pastor on file" share this. */
+export function usablePastorEmail(email: string | null | undefined): string | null {
+  const value = email?.trim().toLowerCase() ?? "";
+  return value && isEmail(value) ? value : null;
+}
+
 export type LeadEmailsResult = { ok: true; emails: string[] } | { ok: false; message: string };
 
 /**

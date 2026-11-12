@@ -459,6 +459,8 @@ const pages: PageSpec[] = [
   { ...staff("debrief", `/more/debrief?event=${clubEventId}`, "system-admin"), expectText: /Event debrief/ },
   // The optional Budget sheet (#1682): the switch, the figures, the cost lines and the totals.
   { ...staff("budget", `/more/budget?event=${clubEventId}`, "system-admin"), expectText: /Budget sheet/ },
+  // The optional Baptism follow-up (#1680): the lead address form and the names list (switched on in seedBaptismFollowUp).
+  { ...staff("baptism-follow-up", `/more/baptism-follow-up?event=${clubEventId}`, "system-admin"), expectText: /Baptism follow-up/ },
   // Home (#1568): the work waiting for this person, and the upcoming events they can open.
   { ...staff("home-needs-you", "/home", "system-admin"), expectText: /Needs you/ },
   { ...staff("home-coming-up", "/home/coming-up", "system-admin"), expectText: /Coming up/ },
@@ -1248,6 +1250,16 @@ async function seedDebriefPages(prisma: PrismaClient): Promise<PageSpec[]> {
     await onDebriefEnabled(tx, { eventId: clubEventId, actor: { kind: "staff", userId: admin.id } });
   });
   return [{ name: "area-debrief-fill", path: `/events/${clubEventSlug}/forms/debrief`, role: "area" }];
+}
+
+/** Baptism follow-up (#1680) switched on for the club weekend with one synthetic event lead address, so the page shows the form and not only the off notice. */
+async function seedBaptismFollowUp(prisma: PrismaClient): Promise<void> {
+  await prisma.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "baptism-follow-up" }], skipDuplicates: true });
+  await prisma.baptismFollowUpSetting.upsert({
+    where: { eventId: clubEventId },
+    create: { eventId: clubEventId, leadEmails: ["lead@example.test"] },
+    update: {},
+  });
 }
 
 /** The Budget sheet (#1682) switched on for the club weekend, with two synthetic cost lines, so the audited pages show a sheet and not only the switch. */
@@ -4840,6 +4852,7 @@ async function main() {
     pages.push(...await seedInformationForm(prisma));
     pages.push(...await seedDebriefPages(prisma));
     await seedBudgetSheet(prisma);
+    await seedBaptismFollowUp(prisma);
     pages.push(...await seedEventTemplatePages(prisma));
     const cookies = await mintSessions(prisma, tokens);
     console.log(`Auditing ${pages.length} pages at ${widths.join(", ")} px; output in ${outDir}`);
