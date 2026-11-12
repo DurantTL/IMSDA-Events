@@ -37,7 +37,7 @@ describe("GET /api/staff/search", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(mocks.search).toHaveBeenCalledWith(staff, "synth camp");
     expect(mocks.rateLimit).toHaveBeenCalledWith(staff.id, STAFF_SEARCH_REQUESTS_PER_MINUTE);
-    expect(await response.json()).toMatchObject({ clubs: { items: [] }, events: { items: [] }, churches: { items: [] } });
+    expect(await response.json()).toMatchObject({ clubs: { items: [] }, events: { items: [] }, churches: { items: [] }, people: { items: [] } });
   });
 
   it("passes a missing query through as nothing to search", async () => {

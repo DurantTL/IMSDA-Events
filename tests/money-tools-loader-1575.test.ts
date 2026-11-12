@@ -89,7 +89,7 @@ describe("More money tools loaders (#1575)", () => {
       expect(values.unmatchedSquare).toBeNull();
       expect(values.churchFlags).toBe(1);
       // The same list the Square page reads, so the chip and that page agree.
-      expect(listUnmatchedSquarePayments).toHaveBeenCalledWith();
+      expect(listUnmatchedSquarePayments).toHaveBeenCalledWith({ eventId: "evt_1", includeUnattributed: false });
     } finally {
       vi.useRealTimers();
     }

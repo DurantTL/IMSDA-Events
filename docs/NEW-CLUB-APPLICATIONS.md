@@ -20,6 +20,10 @@ How a new club gets started in IMSDA Events. Decisions are Caleb's, recorded on 
    **New clubs** tab under Clubs). Each application shows the director's **Sterling Volunteers** status (Clear, Expiring soon, Not
    in compliance, No record), matched by email to an existing person or attendee account. It is a flag, not a block. Possible duplicates
    (same name at the same church, a church that already has a club, a twin application) are flagged.
+   **Staff queue (#1589):** `/admin/clubs/applications` has three views in the address, `?status=waiting` (the default), `decided`
+   and `links` (Private links). Each application is a compact card with an **Open application** link to `?application=<id>`, the one
+   place Approve and Decline live, in a Decision section under the details. An id that matches nothing shows "That application could
+   not be found." The Area Coordinator's list is unchanged: full read-only cards.
 5. **Approve** (one transaction): creates the club (`Organization` type CLUB under its sponsoring church; its kind is kept in
    `sourceOrgType` as "Pathfinder Club" or "Adventurer Club") and the director's ordinary club invite (`ClubInvite`, source
    `APPLICATION`, emailed right away). The director signs in and accepts, and lands in the new club. The status claim makes a second

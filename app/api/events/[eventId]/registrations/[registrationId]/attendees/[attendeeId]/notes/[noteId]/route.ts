@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AccessDeniedError, requirePermission } from "@/modules/access/authorization";
+import { AccessDeniedError, effectivePermissions, requirePermission } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { findActiveMembership } from "@/modules/events/repository";
@@ -13,13 +13,17 @@ function apiError(error: unknown) {
   return Response.json({ error: "NOTE_REQUEST_FAILED", message: "The note request could not be completed." }, { status: 500 });
 }
 
-async function patchHandler(request: Request, context: { params: Promise<{ eventId: string; attendeeId: string; noteId: string }> }) {
+async function patchHandler(request: Request, context: { params: Promise<{ eventId: string; registrationId: string; attendeeId: string; noteId: string }> }) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const { eventId, noteId } = await context.params;
+    const { eventId, registrationId, noteId, attendeeId } = await context.params;
     const access = await requirePermission(await getCurrentSession(), eventId, "MANAGE_REGISTRATION", findActiveMembership);
-    const note = await addNoteRevision(eventId, noteId, access.user.id, await request.json());
+    const note = await addNoteRevision(eventId, noteId, access.user.id, await request.json(), {
+      subject: { attendeeId },
+      attendeeRegistrationId: registrationId,
+      actorPermissions: new Set(effectivePermissions(access.user, access.membership)),
+    });
     return Response.json({ note });
   } catch (error) { return apiError(error); }
 }

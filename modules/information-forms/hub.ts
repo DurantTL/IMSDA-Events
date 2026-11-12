@@ -17,10 +17,12 @@ export async function listInformationFormsForHub(): Promise<FormsHubRow[]> {
   const prisma = getPrisma();
   const [forms, grouped] = await Promise.all([
     prisma.informationForm.findMany({
+      // The debrief and the director evaluation (#1679) are the Debrief's own: they are managed and read from the event, never listed here.
+      where: { purpose: null },
       select: { id: true, scope: true, eventId: true, name: true, status: true, event: { select: { name: true } } },
       orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
     }),
-    prisma.informationFormResponse.groupBy({ by: ["formId"], _count: { _all: true }, _max: { submittedAt: true } }),
+    prisma.informationFormResponse.groupBy({ by: ["formId"], where: { form: { purpose: null } }, _count: { _all: true }, _max: { submittedAt: true } }),
   ]);
   const byForm = new Map(grouped.map((group) => [group.formId, group]));
   return forms.map((form) => {

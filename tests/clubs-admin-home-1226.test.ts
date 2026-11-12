@@ -116,6 +116,11 @@ describe("next club event", () => {
 });
 
 describe("new clubs", () => {
+  it("encodes the application id in the review link (#1589)", () => {
+    const home = buildClubsAdminHome({ ...base, applications: [application("app 1/a", "2026-10-10T15:00:00.000Z")], waitingCount: 1 });
+    expect(home.newClubs[0]!.reviewHref).toBe("/admin/clubs/applications?application=app%201%2Fa");
+  });
+
   it("lists pending applications only, oldest first, with the review link", () => {
     const applications = [
       application("b", "2026-10-20T15:00:00.000Z", { otherBoardMembers: ["One", "Two", "Three"] }),
@@ -125,7 +130,7 @@ describe("new clubs", () => {
     ];
     const home = buildClubsAdminHome({ ...base, applications, waitingCount: 2 });
     expect(home.newClubs.map((item) => item.id)).toEqual(["a", "b"]);
-    expect(home.newClubs[0]).toMatchObject({ boardMembersLabel: "1 board member listed", submittedLabel: "Oct 10, 2026", reviewHref: "/admin/clubs/applications#application-a" });
+    expect(home.newClubs[0]).toMatchObject({ boardMembersLabel: "1 board member listed", submittedLabel: "Oct 10, 2026", reviewHref: "/admin/clubs/applications?application=a" });
     expect(home.newClubs[1]!.boardMembersLabel).toBe("3 board members listed");
     expect(home.moreNewClubs).toBe(false);
   });

@@ -11,7 +11,7 @@ import { portalGuides } from "@/modules/help/portal-guides";
 import { checkWalkthroughManifest, walkthroughCapturedFor } from "@/modules/help/walkthrough-check";
 import { readWalkthroughManifest, walkthroughSourceHash } from "@/modules/help/walkthrough-files";
 import { walkthroughDesktopMinWidth, walkthroughImage, walkthroughImageBudgets, walkthroughImageFileSize, type WalkthroughImageKind } from "@/modules/help/walkthrough-images";
-import { coordinatorWalkthroughs, directorWalkthroughs, walkthroughGuides, walkthroughs, walkthroughsForGuide } from "@/modules/help/walkthroughs";
+import { coordinatorWalkthroughs, directorWalkthroughs, familyWalkthroughs, walkthroughGuides, walkthroughs, walkthroughsForGuide } from "@/modules/help/walkthroughs";
 import { assertWalkthroughSafety, signInRateLimitPolicies } from "@/scripts/support/help-walkthrough-fixtures";
 import { buildClubChecklist, type ClubChecklistFacts } from "@/modules/setup-help/club-checklist";
 import { buildCoordinatorChecklist } from "@/modules/setup-help/coordinator-checklist";
@@ -26,12 +26,14 @@ const root = process.cwd();
 const kinds: WalkthroughImageKind[] = ["phone", "desktop"];
 
 describe("walkthrough data and browser actions", () => {
-  it("has the 10 club director and the 6 area coordinator walkthroughs", () => {
+  it("has the 10 club director, the 6 area coordinator and the 3 family walkthroughs", () => {
     expect(directorWalkthroughs).toHaveLength(10);
     expect(coordinatorWalkthroughs).toHaveLength(6);
+    expect(familyWalkthroughs).toHaveLength(3);
     expect(coordinatorWalkthroughs.every((walkthrough) => walkthrough.audience === "coordinator")).toBe(true);
+    expect(familyWalkthroughs.every((walkthrough) => walkthrough.audience === "attendee")).toBe(true);
     expect(new Set(walkthroughs.map((walkthrough) => walkthrough.id)).size).toBe(walkthroughs.length);
-    for (const walkthrough of walkthroughs) expect(walkthrough.id, walkthrough.id).toMatch(/^walkthrough-(director|coordinator)-[a-z0-9-]+$/);
+    for (const walkthrough of walkthroughs) expect(walkthrough.id, walkthrough.id).toMatch(/^walkthrough-(director|coordinator|family)-[a-z0-9-]+$/);
   });
 
   it("gives every data step exactly one browser action, and every browser action a data step", () => {
@@ -41,10 +43,11 @@ describe("walkthrough data and browser actions", () => {
       const ids = walkthrough.steps.map((step) => step.id);
       expect(new Set(ids).size, `${walkthrough.id} step ids are unique`).toBe(ids.length);
       expect(Object.keys(actions.steps).sort(), walkthrough.id).toEqual([...ids].sort());
-      expect(["signed-out", "signed-in", "signed-in-coordinator"]).toContain(actions.start);
-      // A coordinator walkthrough never starts as the club director, and the reverse.
-      if (walkthrough.audience === "coordinator") expect(actions.start, walkthrough.id).not.toBe("signed-in");
-      if (walkthrough.audience === "director") expect(actions.start, walkthrough.id).not.toBe("signed-in-coordinator");
+      expect(["signed-out", "signed-in", "signed-in-coordinator", "signed-in-family"]).toContain(actions.start);
+      // Each audience starts as its own sample account: a coordinator is never the club director, a family is never either, and the reverse.
+      if (walkthrough.audience === "coordinator") expect(actions.start, walkthrough.id).not.toMatch(/^signed-in(-family)?$/);
+      if (walkthrough.audience === "director") expect(actions.start, walkthrough.id).not.toMatch(/^signed-in-(coordinator|family)$/);
+      if (walkthrough.audience === "attendee") expect(["signed-out", "signed-in-family"], walkthrough.id).toContain(actions.start);
     }
   });
 
@@ -178,8 +181,8 @@ describe("walkthrough pictures", () => {
       }
     }
     if (overTarget.length > 0) console.warn(`Over the target size:\n${overTarget.join("\n")}`);
-    // About 6 MB for all 16 walkthroughs.
-    expect(total).toBeLessThanOrEqual(6 * 1024 * 1024);
+    // About 8 MB for all 19 walkthroughs (#1883 added the three family walkthroughs and raised the budget from 6 MB).
+    expect(total).toBeLessThanOrEqual(8 * 1024 * 1024);
   });
 
   it("has no picture file that no step uses", () => {
@@ -343,7 +346,7 @@ describe("the capture and check scripts", () => {
   });
 
   it("clears only the sign-in rate limits, and has no outbox fallback for the code", () => {
-    expect(signInRateLimitPolicies).toEqual(["attendee.sign-in", "attendee.roster-unlock", "attendee.passkey"]);
+    expect(signInRateLimitPolicies).toEqual(["attendee.sign-in", "attendee.roster-unlock", "attendee.passkey", "attendee.edit-step-up", "public.manage."]);
     expect(read("scripts/support/walkthrough-harness.ts")).not.toContain("messageOutbox");
     expect(read("scripts/support/help-walkthrough-fixtures.ts")).not.toMatch(/rateLimitBucket\.deleteMany\(\{\}\)/);
   });

@@ -691,6 +691,10 @@ enum MessageTemplateKey {
   PROBLEM_REPORT_COPY
   /// A reminder to a club director (and the volunteer, when an email is on file) that a Sterling Volunteers check is expiring or not current (#1844). Sent only when staff press Send after a preview. No event.
   STERLING_REMINDER
+  /// The post-event debrief invitation (#1679): one email to each person on the event's debrief audience, the morning after the last day, with a link to the debrief form. Never carries a question or an answer. Not an event template.
+  EVENT_DEBRIEF_INVITE
+  /// The one reminder (#1679), sent three days after the invitation and only to people who have not answered. Not an event template.
+  EVENT_DEBRIEF_REMINDER
 }
 
 enum MessageTemplateStatus {
@@ -1913,6 +1917,8 @@ model Event {
   awardItems                          EventAwardItem[]
   registrationForms                   RegistrationForm[]
   informationForms                    InformationForm[]
+  debrief                             EventDebrief?                    @relation("EventDebrief")
+  debriefsCarriedHere                 EventDebrief[]                   @relation("EventDebriefCarriedFrom")
   formTestSubmissions                 FormTestSubmission[]
   publicFormSubmissions               PublicRegistrationSubmission[]
   capacityReservations                RegistrationCapacityReservation[]
@@ -2056,6 +2062,21 @@ model EventModule {
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, moduleKey])
+}
+
+/// The debrief module's own settings for one event (#1679): the club director evaluation's switch (off by default) and the
+/// event whose debrief answers this one shows read-only, set when the event is a copy of one that had a debrief.
+model EventDebrief {
+  eventId            String   @id
+  evaluationEnabled  Boolean  @default(false)
+  carriedFromEventId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  event Event @relation("EventDebrief", fields: [eventId], references: [id], onDelete: Cascade)
+  carriedFromEvent Event? @relation("EventDebriefCarriedFrom", fields: [carriedFromEventId], references: [id], onDelete: SetNull)
+
+  @@index([carriedFromEventId])
 }
 
 enum ModuleRequestStatus {
@@ -2366,6 +2387,9 @@ enum ScheduledEmailTrigger {
   BEFORE_REGISTRATION_CLOSE
   BEFORE_EVENT_START
   BEFORE_PAYMENT_DUE
+  /// Debrief (#1679): a number of calendar days after the event's last day, at a wall-clock time in the event's zone.
+  /// Written only by the event debrief module, never by staff; `daysBefore` holds the days after.
+  AFTER_EVENT_END
 }
 
 /// SCHEDULED: written and reviewed, but not approved; nothing will send. ACTIVE: a person approved it, so the sweep
@@ -2430,8 +2454,12 @@ model ScheduledEmailBatch {
   excludedCount            Int                       @default(0)
   revision                 Int                       @default(1)
   status                   ScheduledEmailBatchStatus @default(SCHEDULED)
-  createdByUserId          String
+  /// Null for a debrief batch (#1679) made by an Area Coordinator's switch, which has no staff user; `createdByAttendeeAccountId` names them instead.
+  createdByUserId          String?
+  createdByAttendeeAccountId String?
   activatedByUserId        String?
+  /// The person who approved a debrief batch (#1679) when it was an Area Coordinator, who has no staff user. Only a debrief batch may be approved this way.
+  activatedByAttendeeAccountId String?
   activatedAt              DateTime?
   pausedAt                 DateTime?
   pauseReason              String?
@@ -2447,7 +2475,7 @@ model ScheduledEmailBatch {
   updatedAt                DateTime                  @updatedAt
 
   event       Event                      @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  createdBy   User                       @relation("ScheduledEmailCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdBy   User?                      @relation("ScheduledEmailCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   activatedBy User?                      @relation("ScheduledEmailActivatedBy", fields: [activatedByUserId], references: [id], onDelete: Restrict)
   recipients  ScheduledEmailRecipient[]
 
@@ -4784,6 +4812,13 @@ enum InformationFormFillAccess {
   SIGNED_IN
 }
 
+/// What a form is for when the system made it (#1679). Null for every form staff make. DEBRIEF is the post-event debrief
+/// and DIRECTOR_EVALUATION the optional club director evaluation: both are answered only by their own audience.
+enum InformationFormPurpose {
+  DEBRIEF
+  DIRECTOR_EVALUATION
+}
+
 enum InformationFormVersionStatus {
   DRAFT
   PUBLISHED
@@ -4803,6 +4838,8 @@ model InformationForm {
   slug                    String
   status                  InformationFormStatus     @default(DRAFT)
   fillAccess              InformationFormFillAccess @default(ANYONE_WITH_LINK)
+  /// Set only on the debrief and director evaluation forms the debrief module makes (#1679).
+  purpose                 InformationFormPurpose?
   opensAt                 DateTime?
   closesAt                DateTime?
   createdByUserId         String
@@ -4820,6 +4857,7 @@ model InformationForm {
   responses             InformationFormResponse[]
 
   @@unique([scopeKey, slug])
+  @@unique([eventId, purpose])
   @@index([scope, status, updatedAt])
   @@index([eventId, status, updatedAt])
 }

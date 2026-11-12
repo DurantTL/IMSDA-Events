@@ -167,12 +167,19 @@ describe("the Clubs destination groups", () => {
     for (const label of ["Club administration", "Club summary", "New club applications", "Club leaders", "Club member transfers", "Monthly Records"]) expect(home).toContain(`>${label}`);
     expect(home).not.toContain("Clubs and churches");
     expect(home).toContain('aria-current="page" href="/admin/clubs"');
-    // The Clubs Administrator's imports and Sterling Volunteers are views of Club administration, so none lost its home.
-    for (const href of ["/admin/clubs/import", "/admin/clubs/health-import", "/admin/organizations/background-checks"]) expect(home).toContain(`href="${href}"`);
+    // Sterling Volunteers is a view of Club administration; the club imports are views of the Club directory (#1589), so none lost its home.
+    expect(home).toContain('href="/admin/organizations/background-checks"');
+    expect(home).not.toContain('href="/admin/clubs/import"');
+    navigation.pathname = "/admin/clubs/summary";
+    const directory = tabsOf(render({ user: staff, adminRoleView: view }));
+    for (const href of ["/admin/clubs/import", "/admin/clubs/health-import"]) expect(directory).toContain(`href="${href}"`);
+    navigation.pathname = "/admin/clubs";
     navigation.pathname = "/admin/clubs/invites";
     expect(currentOf(render({ user: staff, adminRoleView: view }))).toEqual(["Club leaders"]);
     const off = tabsOf(render({ user: staff, adminRoleView: { ...view, healthImport: false } }));
     expect(off).not.toContain("/admin/clubs/health-import");
+    navigation.pathname = "/admin/clubs/summary";
+    expect(tabsOf(render({ user: staff, adminRoleView: { ...view, healthImport: false } }))).not.toContain("/admin/clubs/health-import");
   });
 
   it("adds ?year= to the Clubs links when the URL has one", () => {

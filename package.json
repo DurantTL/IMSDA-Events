@@ -81,6 +81,7 @@
     "test:club-teachers": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-club-teachers.ts",
     "test:event-scoring": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-scoring.ts",
     "test:attendance-points": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-attendance-points.ts",
+    "test:event-debrief": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-debrief.ts",
     "test:pbe-registration": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-pbe-registration.ts",
     "test:pbe-advancement": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-pbe-advancement.ts",
     "test:general-link-registration": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-general-link-registration.ts",

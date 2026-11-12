@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 
 import { ClubTransferCard, RequestTransferButton, transferActionEndpoint } from "@/components/club-transfers-panel";
 import { ClubTransferQueue, StaffTransferCard } from "@/components/club-transfer-queue";

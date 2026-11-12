@@ -66,7 +66,7 @@ describe("email inputs", () => {
     "components/event-settings-workspace.tsx": NOT_YET,
     "components/health-record-actions.tsx": NOT_YET,
     "components/honors-instructors-workspace.tsx": NOT_YET,
-    "components/new-club-applications-queue.tsx": NOT_YET,
+    "components/staff-private-links.tsx": NOT_YET,
     "components/notifications-workspace.tsx": NOT_YET,
     "components/organization-billing-contact.tsx": NOT_YET,
     "components/people-workspace.tsx": NOT_YET,

@@ -31,6 +31,8 @@ const director = (...clubs: Array<[string, "DIRECTOR" | "DEPUTY" | "REGISTRAR" |
 const coordinator: PortalHelpViewer = { ...none, isAreaCoordinator: true };
 const ids = (viewer: PortalHelpViewer) => visiblePortalGuides(viewer).map((guide) => guide.id);
 const forAudience = (audience: string) => portalGuides.filter((guide) => guide.audience === audience).map((guide) => guide.id);
+/** The guides of these audiences in the registry's own order (the written guides, then the walkthroughs). */
+const forAudiences = (...audiences: string[]) => portalGuides.filter((guide) => audiences.includes(guide.audience)).map((guide) => guide.id);
 
 describe("portal guide registry", () => {
   it("has unique, URL-safe ids that do not collide with a route below /account/help", () => {
@@ -44,7 +46,14 @@ describe("portal guide registry", () => {
   });
 
   it("covers the attendee, director and coordinator tasks, with the fields every guide needs", () => {
-    expect(forAudience("attendee")).toEqual(["find-my-registration"]);
+    expect(forAudience("attendee")).toEqual([
+      "find-my-registration",
+      "family-pay-balance",
+      "family-change-registration",
+      "family-cancel-registration",
+      // The step-by-step walkthroughs (#1883), in modules/help/walkthroughs.ts.
+      ...walkthroughs.filter((walkthrough) => walkthrough.audience === "attendee").map((walkthrough) => walkthrough.id),
+    ]);
     expect(forAudience("director")).toEqual([
       "director-choose-club",
       "director-monthly-record",
@@ -104,6 +113,16 @@ describe("portal guide registry", () => {
     expect(find("coordinator-find-club")).toMatch(/view only/i);
     expect(find("coordinator-team-approvals")).toMatch(/cannot approve or decline/i);
   });
+
+  it("says a cancellation is a request for the event team, and states no refund amount, percentage, deadline or fee (#1883)", () => {
+    const cancel = findPortalGuide("family-cancel-registration")!;
+    expect(cancel.changes.join(" ")).toMatch(/does not cancel your registration, refund anything or change what you paid/i);
+    expect(cancel.steps.join(" ")).toMatch(/cancellation policy as it applies today/i);
+    for (const id of ["family-pay-balance", "family-change-registration", "family-cancel-registration"]) {
+      const text = findPortalGuide(id)!.steps.join(" ") + findPortalGuide(id)!.changes.join(" ");
+      expect(text, id).not.toMatch(/\$\d|\d\s*%|\d+\s+days?\b/);
+    }
+  });
 });
 
 describe("portal guide visibility", () => {
@@ -113,8 +132,8 @@ describe("portal guide visibility", () => {
   });
 
   it("adds the director guides only for someone who directs a club, and the coordinator guides only for a coordinator", () => {
-    expect(ids(director(["org_a", "DIRECTOR"]))).toEqual([...forAudience("attendee"), ...forAudience("director")]);
-    expect(ids(coordinator)).toEqual([...forAudience("attendee"), ...forAudience("coordinator")]);
+    expect(ids(director(["org_a", "DIRECTOR"]))).toEqual(forAudiences("attendee", "director"));
+    expect(ids(coordinator)).toEqual(forAudiences("attendee", "coordinator"));
     expect(ids({ ...coordinator, directedClubs: [{ organizationId: "org_a", role: "DEPUTY" }] })).toEqual(portalGuides.map((guide) => guide.id));
   });
 

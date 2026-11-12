@@ -31,6 +31,7 @@ const WRITE_ROUTES: Record<string, { gate: string; actingStaff: "allowed" | "ref
   "[organizationId]/forms/links/route.ts": { gate: "requireAreaCoordinatorViewer", actingStaff: "allowed" },
   "events/[eventId]/report-columns/route.ts": { gate: "resolveCoordinatorReportActor", actingStaff: "allowed" },
   "events/[eventId]/attendance-points/route.ts": { gate: "requireAreaCoordinatorPointsActor", actingStaff: "refused" },
+  "events/[eventId]/debrief/route.ts": { gate: "requireAreaCoordinatorDebriefActor", actingStaff: "refused" },
   "events/[eventId]/club-teachers/route.ts": { gate: "requireAreaCoordinatorTeacherActor", actingStaff: "refused" },
   "events/[eventId]/event-scoring/route.ts": { gate: "requireAreaCoordinatorScoringActor", actingStaff: "refused" },
   "team-permissions/[permissionId]/route.ts": { gate: "currentAreaCoordinator", actingStaff: "refused" },

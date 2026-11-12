@@ -190,7 +190,9 @@ export function adminBackLink(
   if (/^\/admin\/organizations\/[^/]+\/(billing|location)(\/|$)/.test(pathname)) return clubList;
   if (/^\/admin\/organizations\/map-locations(\/|$)/.test(pathname)) return { href: "/admin/organizations/directory", label: "Back to Organization directory" };
   if (/^\/admin\/organizations\/(directory|import)(\/|$)/.test(pathname)) return { href: "/admin/organizations", label: "Back to Clubs and churches" };
-  if (/^\/admin\/clubs\/(import|invites|health-import)(\/|$)/.test(pathname)) return clubList;
+  // The club imports are views of the Club directory (#1589), in both views.
+  if (/^\/admin\/clubs\/(import|health-import)(\/|$)/.test(pathname)) return { href: "/admin/clubs/summary", label: "Back to Club summary" };
+  if (/^\/admin\/clubs\/invites(\/|$)/.test(pathname)) return clubList;
   if (/^\/admin\/clubs\/reports\/?$/.test(pathname)) return { href: recordsTabHref(options.clubYear), label: "Back to Monthly Records" };
   if (/^\/admin\/clubs\/reports\/year-end(\/|$)/.test(pathname)) return { href: "/admin/clubs/reports", label: reviewListLabel };
   match = /^\/admin\/clubs\/reports\/([^/]+)\/[^/]+(\/|$)/.exec(pathname);
