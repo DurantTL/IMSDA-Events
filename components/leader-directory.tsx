@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
+import { EmailValue, ExactValue, PhoneValue } from "@/components/exact-value";
 import { ListPager } from "@/components/list-pager";
 import { SearchAsYouTypeForm, SearchResultStatus } from "@/components/search-as-you-type";
 import type { PageSlice } from "@/lib/pagination";
@@ -49,18 +50,20 @@ export function LeaderDirectory({ slice, total, filters }: { slice: PageSlice<Le
       <SearchResultStatus message={`${slice.total} ${slice.total === 1 ? "leader" : "leaders"} found`} />
       <ListPager hrefFor={(page) => hrefFor(filters, page)} label="Leader pages" noun="leaders" nounOne="leader" part="count" slice={slice} />
 
-      {slice.items.length === 0 ? (
-        <p>{total === 0 ? "No leaders are listed yet." : "No leaders match these filters."}</p>
+      {slice.items.length === 0 && total === 0 ? (
+        <p>No leaders are listed yet. Leaders choose whether to be listed on <Link href="/account/profile">their profile</Link>, where you can check your own choice too.</p>
+      ) : slice.items.length === 0 ? (
+        <p>No leaders match these filters. Clear the search or choose another role.</p>
       ) : (
         <ul className={styles.list}>
           {slice.items.map((entry, index) => (
             <li className={styles.card} key={`${slice.from + index}`}>
-              <h2 className={styles.name}>{entry.name}</h2>
+              <h2 className={styles.name}><ExactValue>{entry.name}</ExactValue></h2>
               <dl className={styles.facts}>
                 <div><dt>Role</dt><dd>{entry.roleLabel}</dd></div>
-                <div><dt>Club</dt><dd>{entry.clubName}</dd></div>
-                {entry.email ? <div><dt>Email</dt><dd><a className={styles.contact} href={`mailto:${entry.email}`}>{entry.email}</a></dd></div> : null}
-                {entry.phone ? <div><dt>Phone</dt><dd><a className={styles.contact} href={`tel:${entry.phone.replace(/[^+\d]/g, "")}`}>{entry.phone}</a></dd></div> : null}
+                <div><dt>Club</dt><dd><ExactValue>{entry.clubName}</ExactValue></dd></div>
+                {entry.email ? <div><dt>Email</dt><dd><a className={styles.contact} href={`mailto:${entry.email}`}><EmailValue address={entry.email} /></a></dd></div> : null}
+                {entry.phone ? <div><dt>Phone</dt><dd><a className={styles.contact} href={`tel:${entry.phone.replace(/[^+\d]/g, "")}`}><PhoneValue number={entry.phone} /></a></dd></div> : null}
               </dl>
             </li>
           ))}

@@ -121,7 +121,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
-| D1 | The leader directory is off until a system administrator turns it on, and turning it on or off is audited. When on, a club leader is listed unless they opt out on their profile, and the opt-out takes effect everywhere the directory appears (the page and its search results). The directory shows only a leader's role, club and the contact that leader chose to share, and only a club director, deputy or Area Coordinator can open it. | `tests/leader-directory-1707.test.ts` (who can open it, opt-out, what is shared, the read selects nothing else, the admin switch is audited) | manual: the directory and the profile section at 1280 and 390 px in the #1707 review (no scripted browser test yet) | Caleb, Nov 12 (#1707) |
+| DR1 | The leader directory is off until a system administrator turns it on, and turning it on or off is audited. When on, a club leader is listed unless they opt out on their profile, and the opt-out takes effect everywhere the directory appears (the page and its search results). The directory shows only a leader's role, club and the contact that leader chose to share, and only a club director, deputy or Area Coordinator can open it. | `tests/leader-directory-1707.test.ts` (who can open it, opt-out, what is shared, the read selects nothing else, the admin switch is audited) | manual: the directory and the profile section at 1280 and 390 px in the #1707 review (no scripted browser test yet) | Caleb, Nov 12 (#1707) |
 
 ## Sign-in
 

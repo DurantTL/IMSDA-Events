@@ -2,6 +2,7 @@ import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
+import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { leaderChoicesSchema } from "@/modules/leader-directory/domain";
 import { saveLeaderChoices } from "@/modules/leader-directory/repository";
 import { withRequestContext } from "@/lib/request-context";
@@ -25,6 +26,10 @@ async function patchHandler(request: Request) {
   }
   if (await attendeeSignInStepPending()) {
     return json({ code: "SECOND_STEP_REQUIRED", message: "Finish two-step sign-in to change your choices." }, { status: 403 });
+  }
+  // Only an account with an active club leader grant has these choices (the profile card is shown to the same accounts).
+  if ((await listDirectedClubs(current.account.id)).length === 0) {
+    return json({ message: "Leader directory choices are for club leaders." }, { status: 403 });
   }
   try {
     const input = leaderChoicesSchema.parse(await request.json());

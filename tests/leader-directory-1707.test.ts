@@ -212,6 +212,14 @@ describe("PATCH /api/attendee/leader-directory (#1707)", () => {
   beforeEach(() => {
     mocks.getCurrentAttendee.mockResolvedValue(attendee);
     mocks.prefUpsert.mockResolvedValue({});
+    mocks.grantFindMany.mockResolvedValue(viewerGrants(["REGISTRAR"]));
+  });
+
+  it("refuses an account with no active club leader grant", async () => {
+    mocks.grantFindMany.mockResolvedValue([]);
+    const response = await (CHOICES as (r: Request) => Promise<Response>)(patch("/api/attendee/leader-directory", choicesBody));
+    expect(response.status).toBe(403);
+    expect(mocks.prefUpsert).not.toHaveBeenCalled();
   });
 
   it("writes only the caller's own row and audits the three values", async () => {

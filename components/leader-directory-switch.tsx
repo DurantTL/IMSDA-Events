@@ -39,7 +39,7 @@ export function LeaderDirectorySwitch({ initial }: { initial: LeaderDirectorySwi
     <section className="panel" aria-labelledby="leader-directory-switch-heading">
       <div className="section-heading">
         <div>
-          <p className="eyebrow"><Users aria-hidden="true" size={14} /> Leader directory</p>
+          <p className="eyebrow"><Users aria-hidden="true" size={14} /> Club leaders</p>
           <h2 id="leader-directory-switch-heading">Leader directory</h2>
         </div>
       </div>
@@ -50,7 +50,7 @@ export function LeaderDirectorySwitch({ initial }: { initial: LeaderDirectorySwi
       <p className={`field-help ${styles.help}`}>
         Off by default. When on, club directors, deputies and Area Coordinators can see other clubs&apos; leaders. Leaders are listed unless they opt out on their profile.
       </p>
-      {state.setAt && <p className={`field-help ${styles.help}`}>Last changed {formatInConferenceTime(state.setAt, { dateStyle: "medium", hour: "numeric", minute: "2-digit" })}.</p>}
+      {state.setAt && <p className={`field-help ${styles.help}`}>Last changed {formatInConferenceTime(state.setAt, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}.</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="inline-notice" role="status">{notice}</p>}
     </section>

@@ -9,7 +9,7 @@
 .card { display: grid; gap: 6px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); align-content: start; }
 .name { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); font-weight: 700; overflow-wrap: anywhere; }
 .facts { display: grid; gap: 2px; margin: 0; }
-.facts div { display: flex; flex-wrap: wrap; gap: 0 6px; }
+.facts div { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; }
 .facts dt { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .facts dt::after { content: ":"; }
 .facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

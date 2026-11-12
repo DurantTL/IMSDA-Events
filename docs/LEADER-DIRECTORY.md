@@ -4,8 +4,10 @@ An optional page where club directors, deputies and Area Coordinators can look u
 
 ## The switch
 
-- Platform settings has a "Leader directory" on/off setting. It is **off by default**, and with it off the page does not
-  exist for anyone (it answers "not found") and nothing new appears in the account menu.
+- Platform settings has a "Leader directory" on/off setting. It is **off by default**, and with it off, a signed-in
+  account that is not allowed in gets "not found" (signed-out visitors go to sign-in, and an account that still owes the
+  second step goes to the code step first), and nothing new appears in the account menu. Site rule DR1 in
+  `docs/SITE-RULES.md` records this.
 - Only a system administrator can change it. Each change is written to the audit log with the old and new value, and the
   platform settings row keeps when it was last changed and by whom.
 - No email announces it.

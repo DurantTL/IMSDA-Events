@@ -254,6 +254,8 @@ const pages: PageSpec[] = [
   { name: "account-overview-attendee", path: "/account", role: "attendee", flow: "portal-navigation" },
   { name: "account-registrations", path: "/account/registrations", role: "director" },
   { name: "account-profile", path: "/account/profile", role: "director" },
+  // The optional leader directory (#1707): the page and its search, switched on for the conference in seedLeaderDirectory.
+  { name: "account-leader-directory", path: "/account/leader-directory", role: "director", expectText: /Leader directory/ },
   { name: "account-registrations-attendee", path: "/account/registrations", role: "attendee" },
   { name: "account-profile-attendee", path: "/account/profile", role: "attendee" },
   // The plain attendee with registrations in every lifecycle state (#1111): see seedHistoryAccount.
@@ -1278,6 +1280,11 @@ async function seedInspections(prisma: PrismaClient): Promise<void> {
 }
 
 /** The Budget sheet (#1682) switched on for the club weekend, with two synthetic cost lines, so the audited pages show a sheet and not only the switch. */
+/** The leader directory (#1707) switched on for the conference so the director can open it (switched off again in cleanupSynthetic). */
+async function seedLeaderDirectory(prisma: PrismaClient): Promise<void> {
+  await prisma.platformSettings.upsert({ where: { id: "platform" }, update: { leaderDirectoryEnabled: true }, create: { id: "platform", leaderDirectoryEnabled: true } });
+}
+
 async function seedBudgetSheet(prisma: PrismaClient): Promise<void> {
   await prisma.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "event-budget" }], skipDuplicates: true });
   if (await prisma.eventBudgetCostLine.count({ where: { eventId: clubEventId } }) === 0) {
@@ -1556,6 +1563,7 @@ async function seedLauncherModule(prisma: PrismaClient) {
 /** MOBILE_LAYOUT_CLEANUP=1: deletes every row the audit created, children before parents. */
 async function cleanupSynthetic(prisma: PrismaClient) {
   await prisma.clubFormTemplate.updateMany({ where: { key: "can_collecting_report" }, data: { requirement: "NOT_REQUIRED", requiredRoles: [] } }).catch((error: Error) => console.error(`Could not undo the synthetic Required setting: ${error.message}`));
+  await prisma.platformSettings.updateMany({ where: { id: "platform" }, data: { leaderDirectoryEnabled: false } }).catch((error: Error) => console.error(`Could not switch the synthetic leader directory off: ${error.message}`));
   const orgs = { organizationId: { in: [clubA, clubB] } };
   await prisma.clubOptionalFeature.deleteMany({ where: orgs });
   await prisma.clubStaffTrainingRecord.deleteMany({ where: orgs });
@@ -4898,6 +4906,7 @@ async function main() {
     pages.push(...await seedInformationForm(prisma));
     pages.push(...await seedDebriefPages(prisma));
     await seedBudgetSheet(prisma);
+    await seedLeaderDirectory(prisma);
     await seedEventStaffing(prisma);
     await seedInspections(prisma);
     pages.push(...await seedEventTemplatePages(prisma));

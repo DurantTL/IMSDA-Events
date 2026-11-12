@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { Save } from "lucide-react";
+import { ExactValue } from "@/components/exact-value";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { FormMessage, notSavedMessage, restoreFocusAfterSave, savedMessage } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
@@ -58,6 +60,7 @@ export function LeaderDirectoryChoices({ initialChoices, email, hasPhone, direct
     choices.listed && choices.sharePhone && hasPhone ? "your phone" : null,
   ].filter(Boolean).join(" and ");
   const dirty = choices.listed !== saved.listed || choices.shareEmail !== saved.shareEmail || choices.sharePhone !== saved.sharePhone;
+  useUnsavedChangesGuard(dirty, "You have unsaved leader directory choices. Leave this page and discard them?");
 
   return (
     <form aria-busy={state === "saving"} className="public-manage-contact-card" onSubmit={save}>
@@ -77,7 +80,7 @@ export function LeaderDirectoryChoices({ initialChoices, email, hasPhone, direct
       </label>
       <label className={styles.check}>
         <input checked={choices.shareEmail} disabled={!choices.listed} onChange={(event) => change({ shareEmail: event.target.checked })} type="checkbox" />
-        <span>Share my email{email ? <> (<span translate="no">{email}</span>)</> : null}</span>
+        <span>Share my email{email ? <> (<ExactValue>{email}</ExactValue>)</> : null}</span>
       </label>
       <label className={styles.check}>
         <input checked={choices.sharePhone} disabled={!choices.listed} onChange={(event) => change({ sharePhone: event.target.checked })} type="checkbox" />
