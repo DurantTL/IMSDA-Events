@@ -11605,6 +11605,9 @@ model ScoredActivity {
   /// BANDS mode: `[{ "label": "Blue", "thresholdHundredths": 9000 }, ...]`, best band first.
   ribbonBands    Json               @default("[]")
   sortOrder      Int                @default(0)
+  /// Set on the two inspection events the optional Inspections tool makes (#1896): "campsite" or "uniform". Null for every
+  /// other scored event. One of each per event, so switching the tool on again never duplicates them.
+  inspectionKind String?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
@@ -11612,6 +11615,7 @@ model ScoredActivity {
   scores ActivityScore[]
 
   @@unique([eventId, normalizedName])
+  @@unique([eventId, inspectionKind])
   @@index([eventId, sortOrder])
 }
 
