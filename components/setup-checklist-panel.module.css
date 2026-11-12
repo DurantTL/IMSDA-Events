@@ -1,0 +1,29 @@
+.finished {
+  margin: 8px 0 0;
+}
+
+.finishedSummary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--touch-target, 44px);
+  padding: 0 10px;
+  border-radius: var(--radius-sm, 10px);
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.finishedSummary:focus-visible {
+  outline: 3px solid var(--imsda-navy);
+  outline-offset: 2px;
+}
+
+.finishedSteps {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
