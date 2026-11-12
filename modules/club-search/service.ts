@@ -59,8 +59,8 @@ export const clubSearchRateLimitKey = (viewer: ClubSearchViewer) => (viewer.kind
 const MAX_CLUBS = 20;
 const take = CLUB_SEARCH_GROUP_LIMIT + 1;
 
-function group<T>(rows: T[], seeAllHref: string | null) {
-  const more = rows.length > CLUB_SEARCH_GROUP_LIMIT;
+function group<T>(rows: T[], seeAllHref: string | null, moreRead = false) {
+  const more = moreRead || rows.length > CLUB_SEARCH_GROUP_LIMIT;
   return { items: rows.slice(0, CLUB_SEARCH_GROUP_LIMIT), more, seeAllHref: more ? seeAllHref : null };
 }
 
@@ -86,17 +86,18 @@ export async function searchClubPortal(viewer: ClubSearchViewer, rawQuery: strin
   const rosterStates = await Promise.all(clubs.map(async (club) => (club.roster ? { club, state: (await getRosterAccessState(club.organizationId, now)).state } : { club, state: "NO_ROSTER" as const })));
   const openClubs = rosterStates.filter((entry) => entry.state === "OPEN").map((entry) => entry.club);
 
-  const memberRows: ClubSearchMember[] = openClubs.length === 0 ? [] : await findMembers(openClubs, terms, clubs.length > 1, clubYearFor(now));
+  const members = openClubs.length === 0 ? { rows: [], more: false } : await findMembers(openClubs, terms, clubs.length > 1, clubYearFor(now));
   const onlyClub = openClubs.length === 1 ? openClubs[0]! : null;
 
   return {
     query,
     clubs: group(clubRows, null),
-    members: group(memberRows, onlyClub ? clubRosterSearchHref(onlyClub.organizationId, query) : null),
+    // "More" counts the rows read, before same-name rows are joined, so a joined pair never hides that more people match.
+    members: group(members.rows, onlyClub ? clubRosterSearchHref(onlyClub.organizationId, query) : null, members.more),
   };
 }
 
-async function findMembers(openClubs: { organizationId: string; name: string }[], terms: string[], labelClub: boolean, clubYear: string): Promise<ClubSearchMember[]> {
+async function findMembers(openClubs: { organizationId: string; name: string }[], terms: string[], labelClub: boolean, clubYear: string): Promise<{ rows: ClubSearchMember[]; more: boolean }> {
   const names = new Map(openClubs.map((club) => [club.organizationId, club.name]));
   const rows = await getPrisma().clubRosterMember.findMany({
     where: {
@@ -116,7 +117,7 @@ async function findMembers(openClubs: { organizationId: string; name: string }[]
   });
   // Two people with the same name in one club open the same roster search, so they are one row (keys and arrow keys stay unique).
   const seen = new Set<string>();
-  return rows.flatMap((row) => {
+  const joined = rows.flatMap((row) => {
     if (!row.person) return [];
     const name = memberDisplayName(row.person);
     const href = clubRosterSearchHref(row.organizationId, name);
@@ -124,4 +125,5 @@ async function findMembers(openClubs: { organizationId: string; name: string }[]
     seen.add(href);
     return [{ name, club: labelClub ? names.get(row.organizationId) ?? null : null, href }];
   });
+  return { rows: joined, more: rows.length > CLUB_SEARCH_GROUP_LIMIT };
 }

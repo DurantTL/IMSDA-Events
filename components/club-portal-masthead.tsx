@@ -1,5 +1,4 @@
 import { clubMastheadModel, ClubPortalMastheadView } from "@/components/club-portal-masthead-view";
-import type { ClubSearchPage } from "@/components/club-search-model";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { accountSignOutMode } from "@/modules/access/workspace-contexts";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
@@ -18,7 +17,7 @@ import { currentStaffActingContext } from "@/modules/organizations/staff-act-as"
  * `actingAs` is the club access actor's own answer; the act-as context is a
  * second signal for the same thing.
  */
-export async function ClubPortalMasthead({ role, actingAs, searchPages }: { role: ClubRole; actingAs: boolean; searchPages?: readonly ClubSearchPage[] }) {
+export async function ClubPortalMasthead({ role, actingAs }: { role: ClubRole; actingAs: boolean }) {
   const [{ account, via, sessionId }, staffSession, acting] = await Promise.all([getCurrentAttendee(), getCurrentSession(), currentStaffActingContext()]);
   const isActing = actingAs || Boolean(acting);
   const secondStepPending = Boolean(account && via === "attendee" && (await accountNeedsSecondStep(account.id, sessionId)) !== "OK");
@@ -30,5 +29,5 @@ export async function ClubPortalMasthead({ role, actingAs, searchPages }: { role
     clubCount: clubs.length,
     signOut: accountSignOutMode({ hasAttendeeAccount: Boolean(account), hasStaffSession: Boolean(staffSession.user), actingAsClubRole: isActing }),
   });
-  return <ClubPortalMastheadView model={model} role={role} formsHelpContact={await getFormsHelpContact()} searchPages={searchPages} />;
+  return <ClubPortalMastheadView model={model} role={role} formsHelpContact={await getFormsHelpContact()} />;
 }

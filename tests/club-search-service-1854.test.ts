@@ -320,6 +320,18 @@ describe("searchClubPortal: more access shapes", () => {
     expect(new Set(result.members.items.map((m) => m.href)).size).toBe(result.members.items.length);
   });
 
+  it("keeps See all when joining same-name rows leaves five or fewer of the rows read", async () => {
+    database.members = [
+      member("e1", "org_alpha", "Sam", "Aaberg"), member("e2", "org_alpha", "Sam", "Aaberg"),
+      ...["Bravo", "Charlie", "Delta", "Echo", "Foxtrot"].map((last, i) => member(`e${i + 3}`, "org_alpha", "Sam", last)),
+    ];
+    const result = await searchClubPortal(viewer, "sam", NOW);
+    expect(result.members.items.length).toBeLessThanOrEqual(CLUB_SEARCH_GROUP_LIMIT);
+    expect(new Set(result.members.items.map((m) => m.href)).size).toBe(result.members.items.length);
+    expect(result.members.more).toBe(true);
+    expect(result.members.seeAllHref).toBe(clubRosterSearchHref("org_alpha", "sam"));
+  });
+
   it("gives a Clubs Administrator acting as director only the act-as club", async () => {
     const acting = { kind: "ACTING", actAsId: "act_9", organizationId: "org_alpha" } as const;
     mocks.currentStaffActingContext.mockResolvedValue({ userId: "usr_1", staffSessionId: "ss_1", actAsId: "act_9", role: "CLUB_DIRECTOR", organizationId: "org_alpha", viaClubsAdministrator: true, expiresAt: new Date(NOW.getTime() + 3_600_000) });

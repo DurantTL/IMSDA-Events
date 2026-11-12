@@ -59,16 +59,4 @@
   .account > :global(.club-masthead-identity) {
     flex-basis: 100%;
   }
-
-  /* With the search button beside it (club-portal-search.tsx) the name still has the whole first line, less the button. */
-  .account[data-has-search] > :global(.club-masthead-identity) {
-    flex-basis: calc(100% - 56px);
-  }
-}
-
-/* Beside the search button a long name wraps to two lines (the row stays as tall as its buttons) instead of pushing the last button onto a new row. */
-@media (min-width: 641px) and (max-width: 1199px) {
-  .account[data-has-search] > :global(.club-masthead-identity) {
-    max-width: 12rem;
-  }
 }

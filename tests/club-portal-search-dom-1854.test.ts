@@ -80,4 +80,28 @@ describe("ClubPortalSearch", () => {
     await act(async () => { input().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });
     expect(nav.push).toHaveBeenCalledWith("/account/clubs/o1/roster");
   });
+
+  it("closes the open panel when focus moves to something outside it", async () => {
+    const { createElement: h } = await import("react");
+    mounted = await mount(h("div", null, h(ClubPortalSearch, { pages }), h("button", { id: "after", type: "button" }, "Next")));
+    const button = mounted.container.querySelector("button[aria-controls]") as HTMLButtonElement;
+    const wrap = () => mounted.container.querySelector("#club-portal-search-input-wrap")!;
+    await click(button);
+    await act(async () => { input().focus(); });
+    expect(wrap().getAttribute("data-open")).toBe("true");
+    await act(async () => { mounted.container.querySelector<HTMLButtonElement>("#after")!.focus(); });
+    expect(wrap().getAttribute("data-open")).toBe("false");
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("closes the panel when Escape hands focus back to the button", async () => {
+    mounted = await mount(createElement(ClubPortalSearch, { pages }));
+    const button = mounted.container.querySelector("button[aria-controls]") as HTMLButtonElement;
+    const wrap = () => mounted.container.querySelector("#club-portal-search-input-wrap")!;
+    await act(async () => { button.focus(); });
+    await click(button);
+    await act(async () => { input().focus(); });
+    await act(async () => { button.focus(); });
+    expect(wrap().getAttribute("data-open")).toBe("false");
+  });
 });

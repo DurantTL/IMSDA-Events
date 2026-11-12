@@ -11,10 +11,8 @@ import type { FormsHelpContact } from "@/modules/system-admin/forms-help-contact
  * portals: the "Your account" drop-down (it replaces a separate My account button), Forms help and Sign out. `leading`
  * is for what only one portal has, such as the club's Switch club.
  */
-export function PortalMastheadActions({ identity, search, leading, formsHelpContact, signOut, accountMenu = true }: {
+export function PortalMastheadActions({ identity, leading, formsHelpContact, signOut, accountMenu = true }: {
   identity: ReactNode;
-  /** The club portal's search (#1854): its icon button (up to 1199px) or box, right after who is signed in. */
-  search?: ReactNode;
   leading?: ReactNode;
   formsHelpContact?: FormsHelpContact;
   signOut: AccountSignOutMode;
@@ -22,9 +20,8 @@ export function PortalMastheadActions({ identity, search, leading, formsHelpCont
   accountMenu?: boolean;
 }) {
   return (
-    <div className={styles.account} data-has-search={search ? "true" : undefined}>
+    <div className={styles.account}>
       {identity}
-      {search}
       {leading}
       {accountMenu && <AccountWorkspaceMenu />}
       {formsHelpContact && <FormsHelp className={styles.action} contact={formsHelpContact} />}
