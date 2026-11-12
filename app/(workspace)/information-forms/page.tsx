@@ -50,7 +50,8 @@ export default async function InformationFormsPage({ searchParams }: { searchPar
   if (!form) notFound();
   const listHref = informationListHref(config);
   // "Back to All forms" only when the address came from the All forms list; it grants nothing (#1571).
-  const hubBack = parseFormsHubReturn(returnTo);
+  // Only a system administrator can open All forms, so only they get the link back to it (#1571).
+  const hubBack = user?.globalRole === "SYSTEM_ADMIN" ? parseFormsHubReturn(returnTo) : null;
   return (
     <section className="page-stack">
       <PageHeader title="Information forms" {...(hubBack ? { back: hubBack } : {})} />

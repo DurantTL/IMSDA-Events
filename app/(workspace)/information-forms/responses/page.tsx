@@ -35,7 +35,8 @@ export default async function EventInformationFormResponsesPage({ searchParams }
   const { user } = await getCurrentSession();
   const config = eventInformationConfig(event, user?.globalRole === "SYSTEM_ADMIN");
   // "Back to All forms" only when the address came from the All forms list; it grants nothing (#1571).
-  const hubBack = parseFormsHubReturn(returnTo);
+  // Only a system administrator can open All forms, so only they get the link back to it (#1571).
+  const hubBack = user?.globalRole === "SYSTEM_ADMIN" ? parseFormsHubReturn(returnTo) : null;
   const base = `/information-forms/responses?event=${encodeURIComponent(event.id)}&form=${encodeURIComponent(formId)}${hubBack ? `&returnTo=${encodeURIComponent(hubBack.href)}` : ""}`;
   return (
     <InformationFormResponsesView

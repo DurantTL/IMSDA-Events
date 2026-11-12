@@ -199,4 +199,11 @@ describe("target pages wire the back link", () => {
     expect(read("app/(workspace)/information-forms/page.tsx")).toContain('permissions.includes("MANAGE_FORMS")');
     expect(read("app/(workspace)/information-forms/responses/page.tsx")).toContain('permissions.includes("MANAGE_FORMS")');
   });
+
+  it("shows Back to All forms only to a system administrator on pages other staff can open", () => {
+    expect(read("app/(workspace)/information-forms/page.tsx")).toContain('const hubBack = user?.globalRole === "SYSTEM_ADMIN" ? parseFormsHubReturn(returnTo) : null;');
+    expect(read("app/(workspace)/information-forms/responses/page.tsx")).toContain('const hubBack = user?.globalRole === "SYSTEM_ADMIN" ? parseFormsHubReturn(returnTo) : null;');
+    expect(read("app/(workspace)/admin/club-forms/[templateKey]/page.tsx")).toContain('const hubBack = user.globalRole === "SYSTEM_ADMIN" ? parseFormsHubReturn(');
+    expect(read("app/(workspace)/more/club-forms/page.tsx")).toContain("const hubBack = viewer?.systemAdmin ? parseFormsHubReturn(params.returnTo) : null;");
+  });
 });

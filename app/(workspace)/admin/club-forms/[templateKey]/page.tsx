@@ -29,7 +29,8 @@ export default async function ClubFormBuilderPage({ params, searchParams }: { pa
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const { templateKey } = await params;
   // "Back to All forms" only when the address came from the All forms list; it grants nothing (#1571).
-  const hubBack = parseFormsHubReturn((await searchParams)?.returnTo);
+  // Only a system administrator can open All forms, so only they get the link back to it (#1571).
+  const hubBack = user.globalRole === "SYSTEM_ADMIN" ? parseFormsHubReturn((await searchParams)?.returnTo) : null;
   const view = await getClubFormBuilderView(templateKey).catch((error: unknown) => {
     if (error instanceof ClubFormError && error.code === "TEMPLATE_NOT_FOUND") return null;
     throw error;

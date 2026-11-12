@@ -44,8 +44,9 @@ export default async function StaffClubFormsPage({
   const params = await searchParams;
   const { event, form, club } = params;
   // "Back to All forms" only when the address came from the All forms list; it grants nothing (#1571).
-  const hubBack = parseFormsHubReturn(params.returnTo);
   const viewer = await resolveStaffViewer();
+  // Only a system administrator can open All forms, so only they get the link back to it.
+  const hubBack = viewer?.systemAdmin ? parseFormsHubReturn(params.returnTo) : null;
   if (!viewer) {
     // The page draws its own title (#1573), so the restricted state keeps the page's one h1 too.
     return (
