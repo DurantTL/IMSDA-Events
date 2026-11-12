@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   assignmentFindMany: vi.fn(),
   attendeeFindMany: vi.fn(),
   membershipFindMany: vi.fn(),
+  grantFindFirst: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -12,6 +13,7 @@ vi.mock("@/lib/prisma", () => ({
     eventStaffingAssignment: { findMany: mocks.assignmentFindMany },
     registrationAttendee: { findMany: mocks.attendeeFindMany },
     eventMembership: { findMany: mocks.membershipFindMany },
+    areaCoordinatorGrant: { findFirst: mocks.grantFindFirst },
   }),
 }));
 
@@ -35,6 +37,7 @@ beforeEach(() => {
   mocks.assignmentFindMany.mockResolvedValue([row()]);
   mocks.attendeeFindMany.mockResolvedValue([{ eventId: "event-1", personId: "person-1" }]);
   mocks.membershipFindMany.mockResolvedValue([]);
+  mocks.grantFindFirst.mockResolvedValue({ id: "grant-1" });
 });
 
 describe("an assigned person sees their own assignment (#1678)", () => {
@@ -45,6 +48,7 @@ describe("an assigned person sees their own assignment (#1678)", () => {
       { person: { normalizedEmail: "sam.sample@example.test" } },
       { person: { attendeeAccountLinks: { some: { accountId: "acct-sam" } } } },
       { user: { attendeeAccountId: "acct-sam" } },
+      { attendeeAccountId: "acct-sam" },
     ]);
     // Never by name, and never with a way to widen it to another person.
     expect(JSON.stringify(where)).not.toMatch(/firstName|lastName|displayName/);
@@ -82,8 +86,16 @@ describe("an assigned person sees their own assignment (#1678)", () => {
     expect(mocks.membershipFindMany.mock.calls.at(-1)![0].where).toMatchObject({ status: "ACTIVE" });
   });
 
+  it("shows an Area Coordinator their own lead job by account id, only while their grant is active", async () => {
+    mocks.assignmentFindMany.mockResolvedValue([row({ id: "asg-3", personId: null, attendeeAccountId: "acct-sam", role: "LEAD" })]);
+    expect((await listOwnAssignments(sam)).map((own) => own.roleLabel)).toEqual(["Lead"]);
+    expect(mocks.grantFindFirst.mock.calls[0]![0].where).toMatchObject({ attendeeAccountId: "acct-sam", revokedAt: null });
+    mocks.grantFindFirst.mockResolvedValue(null);
+    expect(await listOwnAssignments(sam)).toEqual([]);
+  });
+
   it("asks for nothing when the account has no email on record", async () => {
     await listOwnAssignments({ id: "acct-x", verifiedEmail: "  " });
-    expect(mocks.assignmentFindMany.mock.calls[0]![0].where.OR).toHaveLength(2);
+    expect(mocks.assignmentFindMany.mock.calls[0]![0].where.OR).toHaveLength(3);
   });
 });

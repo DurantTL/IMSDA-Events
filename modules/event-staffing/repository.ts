@@ -2,6 +2,7 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { isAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   StaffingError,
@@ -51,8 +52,10 @@ const activitySelect = {
       role: true,
       personId: true,
       userId: true,
+      attendeeAccountId: true,
       person: { select: { firstName: true, lastName: true } },
       user: { select: { displayName: true } },
+      attendeeAccount: { select: { displayName: true } },
     },
   },
 } satisfies Prisma.EventStaffingActivitySelect;
@@ -62,23 +65,33 @@ type ActivityRow = Prisma.EventStaffingActivityGetPayload<{ select: typeof activ
 type Client = Prisma.TransactionClient | ReturnType<typeof getPrisma>;
 
 /** Which of these people are still registered (or still staff) for the event. A cancelled registration or a removed staff member is not. */
-async function activeAssignees(client: Client, eventId: string, rows: ReadonlyArray<{ personId: string | null; userId: string | null }>) {
+async function activeAssignees(client: Client, eventId: string, rows: ReadonlyArray<{ personId: string | null; userId: string | null; attendeeAccountId?: string | null }>) {
   const personIds = [...new Set(rows.flatMap((row) => (row.personId ? [row.personId] : [])))];
   const userIds = [...new Set(rows.flatMap((row) => (row.userId ? [row.userId] : [])))];
-  const [people, staff] = await Promise.all([
+  const accountIds = [...new Set(rows.flatMap((row) => (row.attendeeAccountId ? [row.attendeeAccountId] : [])))];
+  const now = new Date();
+  const [people, staff, coordinators] = await Promise.all([
     personIds.length === 0 ? [] : client.registrationAttendee.findMany({
       where: { eventId, personId: { in: personIds }, registration: { eventId, status: { in: [...ACTIVE_REGISTRATION_STATUSES] } } },
       select: { personId: true },
     }),
     userIds.length === 0 ? [] : client.eventMembership.findMany({ where: { eventId, userId: { in: userIds }, status: "ACTIVE" }, select: { userId: true } }),
+    accountIds.length === 0 ? [] : client.areaCoordinatorGrant.findMany({
+      where: { attendeeAccountId: { in: accountIds }, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      select: { attendeeAccountId: true },
+    }),
   ]);
-  return { people: new Set(people.map((row) => row.personId)), users: new Set(staff.map((row) => row.userId)) };
+  return { people: new Set(people.map((row) => row.personId)), users: new Set(staff.map((row) => row.userId)), accounts: new Set(coordinators.map((row) => row.attendeeAccountId)) };
 }
 
-function toView(row: ActivityRow, active: { people: Set<string>; users: Set<string> }): ActivityView {
+function toView(row: ActivityRow, active: { people: Set<string>; users: Set<string>; accounts: Set<string> }): ActivityView {
   const assignments: AssignmentView[] = row.assignments.map((assignment) => {
     if (assignment.personId && assignment.person) {
       return { id: assignment.id, role: assignment.role, kind: "person", assigneeId: assignment.personId, ...assignmentName(assignment.person), active: active.people.has(assignment.personId) };
+    }
+    if (assignment.attendeeAccountId) {
+      const accountName = assignment.attendeeAccount?.displayName ?? "";
+      return { id: assignment.id, role: assignment.role, kind: "account", assigneeId: assignment.attendeeAccountId, name: accountName, sortedName: accountName, active: active.accounts.has(assignment.attendeeAccountId) };
     }
     const name = assignment.user?.displayName ?? "";
     return { id: assignment.id, role: assignment.role, kind: "user", assigneeId: assignment.userId ?? "", name, sortedName: name, active: Boolean(assignment.userId && active.users.has(assignment.userId)) };
@@ -117,11 +130,11 @@ async function loadActivity(client: Client, eventId: string, activityId: string)
 export type PickerPerson = {
   /** "person:<id>" or "user:<id>": what a picker option carries back to the server. */
   key: string;
-  kind: "person" | "user";
+  kind: "person" | "user" | "account";
   id: string;
   /** "Last, First" (staff: their display name). */
   name: string;
-  /** What the person is here: their attendee type, or "Event staff". No age, birth date or contact detail. */
+  /** What the person is here: their attendee type, "Event staff", or "Area Coordinator". No age, birth date or contact detail. */
   detail: string;
 };
 
@@ -131,7 +144,8 @@ export type PickerPerson = {
  */
 export async function listPickerPeople(eventId: string): Promise<{ people: PickerPerson[]; truncated: boolean }> {
   const prisma = getPrisma();
-  const [attendees, staff] = await Promise.all([
+  const now = new Date();
+  const [attendees, staff, coordinators] = await Promise.all([
     prisma.registrationAttendee.findMany({
       where: { eventId, registration: { eventId, status: { in: [...ACTIVE_REGISTRATION_STATUSES] } } },
       distinct: ["personId"],
@@ -140,6 +154,10 @@ export async function listPickerPeople(eventId: string): Promise<{ people: Picke
       select: { personId: true, attendeeType: true, person: { select: { firstName: true, lastName: true } } },
     }),
     prisma.eventMembership.findMany({ where: { eventId, status: "ACTIVE" }, select: { userId: true, user: { select: { displayName: true } } } }),
+    prisma.areaCoordinatorGrant.findMany({
+      where: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }], attendeeAccount: { status: "ACTIVE" } },
+      select: { attendeeAccountId: true, attendeeAccount: { select: { displayName: true } } },
+    }),
   ]);
   const people: PickerPerson[] = [];
   for (const attendee of attendees.slice(0, MAX_PICKER_PEOPLE)) {
@@ -148,6 +166,10 @@ export async function listPickerPeople(eventId: string): Promise<{ people: Picke
   }
   for (const member of staff) {
     if (member.user.displayName.trim()) people.push({ key: `user:${member.userId}`, kind: "user", id: member.userId, name: member.user.displayName.trim(), detail: "Event staff" });
+  }
+  for (const grant of coordinators) {
+    const name = grant.attendeeAccount.displayName.trim();
+    if (name) people.push({ key: `account:${grant.attendeeAccountId}`, kind: "account", id: grant.attendeeAccountId, name, detail: "Area Coordinator" });
   }
   people.sort((a, b) => a.name.localeCompare(b.name) || a.key.localeCompare(b.key));
   return { people, truncated: attendees.length > MAX_PICKER_PEOPLE };
@@ -222,6 +244,13 @@ async function assertOnEvent(tx: Prisma.TransactionClient, eventId: string, assi
     if (!registered) throw notOnEvent;
     return;
   }
+  if (assignee.kind === "account") {
+    // Lead only (the request schema says so too): an account holding an active Area Coordinator grant, the same check the access gate uses.
+    if (!(await isAreaCoordinator(assignee.id))) {
+      throw new StaffingError("NOT_ON_EVENT", "Only an active Area Coordinator can be chosen from the Area Coordinators list.");
+    }
+    return;
+  }
   const member = await tx.eventMembership.findFirst({ where: { eventId, userId: assignee.id, status: "ACTIVE" }, select: { id: true } });
   if (!member) throw notOnEvent;
 }
@@ -234,13 +263,14 @@ export async function addAssignment(actor: StaffingActor, eventId: string, input
       const activity = await loadActivity(tx, eventId, input.activityId);
       const conflict = assignmentConflict(activity, { role: input.role, assignee: input.assignee });
       if (conflict) throw new StaffingError(conflict.code, conflict.message);
+      if (input.assignee.kind === "account" && input.role !== "LEAD") throw new StaffingError("CONFLICT", "An Area Coordinator can be an activity's lead, not a helper or lifeguard.");
       await assertOnEvent(tx, eventId, input.assignee);
       let replacedLead = false;
       if (input.role === "LEAD") {
         replacedLead = (await tx.eventStaffingAssignment.deleteMany({ where: { activityId: input.activityId, eventId, role: "LEAD" } })).count > 0;
       }
       const created = await tx.eventStaffingAssignment.create({
-        data: { eventId, activityId: input.activityId, role: input.role, ...(input.assignee.kind === "person" ? { personId: input.assignee.id } : { userId: input.assignee.id }) },
+        data: { eventId, activityId: input.activityId, role: input.role, ...(input.assignee.kind === "person" ? { personId: input.assignee.id } : input.assignee.kind === "user" ? { userId: input.assignee.id } : { attendeeAccountId: input.assignee.id }) },
         select: { id: true },
       });
       await audit(tx, actor, eventId, {
@@ -264,7 +294,7 @@ export async function addAssignment(actor: StaffingActor, eventId: string, input
 export async function removeAssignment(actor: StaffingActor, eventId: string, assignmentId: string): Promise<ActivityView> {
   await assertStaffingAccess(actor, eventId, "write");
   return getPrisma().$transaction(async (tx) => {
-    const found = await tx.eventStaffingAssignment.findFirst({ where: { id: assignmentId, eventId }, select: { id: true, activityId: true, role: true, personId: true, userId: true } });
+    const found = await tx.eventStaffingAssignment.findFirst({ where: { id: assignmentId, eventId }, select: { id: true, activityId: true, role: true, personId: true, userId: true, attendeeAccountId: true } });
     if (!found) throw new StaffingError("ASSIGNMENT_NOT_FOUND", "That assignment could not be found. It may already be removed.");
     await tx.eventStaffingAssignment.delete({ where: { id: assignmentId } });
     await audit(tx, actor, eventId, {
@@ -272,7 +302,7 @@ export async function removeAssignment(actor: StaffingActor, eventId: string, as
       summary: "Took a person off a staffing sheet activity.",
       entityType: "EventStaffingAssignment",
       entityId: assignmentId,
-      metadata: { activityId: found.activityId, assignmentId, role: found.role, assigneeKind: found.personId ? "person" : "user", assigneeId: found.personId ?? found.userId },
+      metadata: { activityId: found.activityId, assignmentId, role: found.role, assigneeKind: found.personId ? "person" : found.userId ? "user" : "account", assigneeId: found.personId ?? found.userId ?? found.attendeeAccountId },
     });
     return loadActivity(tx, eventId, found.activityId);
   });

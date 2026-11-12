@@ -37,6 +37,12 @@ describe("gaps on the staffing sheet (#1678)", () => {
     expect(summarizeStaffing([activity("Surprise"), canoe, frisbee])).toMatchObject({ activityCount: 3, activitiesWithGaps: 3 });
   });
 
+  it("uses the field's own words and the singular for one", () => {
+    const one = activity("Canoe", { tltsNeeded: 1, lifeguardsNeeded: 1, helpersNeeded: 1, assignments: [person("LEAD", "Sam Sample")] });
+    expect(activityGaps(one).map((gap) => gap.text)).toEqual(["Canoe: 0 of 1 TLT", "Canoe: 0 of 1 lifeguard", "Canoe: 0 of 1 adult helper"]);
+    expect(activityGaps(activity("Frisbee", { helpersNeeded: 3, assignments: [person("LEAD", "Sam Sample")] })).map((gap) => gap.text)).toEqual(["Frisbee: 0 of 3 adult helpers"]);
+  });
+
   it("has no gap once everything is filled, and more than needed is not a gap", () => {
     const full = activity("Catapult", { helpersNeeded: 1, assignments: [person("LEAD", "Sam Sample"), person("HELPER", "Pat Example"), person("HELPER", "Lee Sample")] });
     expect(activityGaps(full)).toEqual([]);
@@ -45,7 +51,7 @@ describe("gaps on the staffing sheet (#1678)", () => {
 
   it("counts nobody who is no longer registered", () => {
     const stale = activity("Canoe", { lifeguardsNeeded: 1, assignments: [person("LEAD", "Sam Sample", { active: false }), person("LIFEGUARD", "Pat Example", { active: false })] });
-    expect(activityGaps(stale).map((gap) => gap.text)).toEqual(["Canoe: no lead", "Canoe: 0 of 1 lifeguards"]);
+    expect(activityGaps(stale).map((gap) => gap.text)).toEqual(["Canoe: no lead", "Canoe: 0 of 1 lifeguard"]);
   });
 
   it("counts TLT rows when the table holds them, so tag-based assignment can be added later", () => {
@@ -71,6 +77,13 @@ describe("what may be saved", () => {
     const base = { activityId: "act-1", assignee: { kind: "person", id: "p1" } };
     for (const role of ASSIGNABLE_ROLES) expect(assignmentInputSchema.safeParse({ ...base, role }).success).toBe(true);
     expect(assignmentInputSchema.safeParse({ ...base, role: "TLT" }).success).toBe(false);
+  });
+
+  it("lets an Area Coordinator's account be the lead only", () => {
+    const base = { activityId: "act-1", assignee: { kind: "account", id: "acct-1" } };
+    expect(assignmentInputSchema.safeParse({ ...base, role: "LEAD" }).success).toBe(true);
+    expect(assignmentInputSchema.safeParse({ ...base, role: "HELPER" }).success).toBe(false);
+    expect(assignmentInputSchema.safeParse({ ...base, role: "LIFEGUARD" }).success).toBe(false);
   });
 
   it("takes an assignee as a kind and an id only, nothing else", () => {

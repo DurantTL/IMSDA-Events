@@ -57,6 +57,8 @@ export function EventStaffingSheet({ endpoint, eventName, initialActivities, peo
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
   const [assignMessage, setAssignMessage] = useState<Message | null>(null);
+  // The result of adding or removing a person, shown on the activity it belongs to.
+  const [activityNotice, setActivityNotice] = useState<(Message & { activityId: string }) | null>(null);
   const [printMode, setPrintMode] = useState<"list" | "activities">("list");
   const formId = useId();
   useUnsavedChangesGuard((draft !== null && JSON.stringify(draft) !== baseline) || Boolean(assigning?.key));
@@ -94,6 +96,7 @@ export function EventStaffingSheet({ endpoint, eventName, initialActivities, peo
     setBusy(true);
     setMessage(null);
     setAssignMessage(null);
+    setActivityNotice(null);
     try {
       const response = await fetch(`${endpoint}/${path}`, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const result = await response.json().catch(() => ({})) as T & { message?: string };
@@ -161,7 +164,7 @@ export function EventStaffingSheet({ endpoint, eventName, initialActivities, peo
     if (!result?.activity) return;
     replaceActivity(result.activity);
     setAssigning(null);
-    setMessage({ tone: "success", text: savedMessage(assigning.role === "LEAD" ? "Lead set." : "Person added.") });
+    setActivityNotice({ activityId: result.activity.id, tone: "success", text: savedMessage(assigning.role === "LEAD" ? "Lead set." : "Person added.") });
   }
 
   async function removePerson(person: AssignmentView) {
@@ -170,7 +173,7 @@ export function EventStaffingSheet({ endpoint, eventName, initialActivities, peo
     replaceActivity(result.activity);
     setConfirmingPerson(null);
     setDialogError("");
-    setMessage({ tone: "success", text: savedMessage("Person removed.") });
+    setActivityNotice({ activityId: result.activity.id, tone: "success", text: savedMessage("Person removed.") });
   }
 
   const roleName = (role: StaffingRole) => ROLE_LABELS[role];
@@ -237,12 +240,13 @@ export function EventStaffingSheet({ endpoint, eventName, initialActivities, peo
                       <button className="secondary-button" disabled={busy} onClick={() => { setDialogError(""); setConfirmingActivity(activity); }} type="button">Delete<span className="sr-only">: {activity.name}</span></button>
                     </div>
                   )}
+                  {activityNotice?.activityId === activity.id && assigning?.activityId !== activity.id && <div className={styles.noPrint}><FormMessage message={activityNotice.text} tone={activityNotice.tone} /></div>}
                   {canEdit && assigning?.activityId === activity.id && (
                     <form noValidate className={`${styles.form} ${styles.noPrint}`} onSubmit={(event) => void addPerson(event)} aria-labelledby={`${formId}-assign-title`}>
                       <h5 className={styles.heading} id={`${formId}-assign-title`}>Add a person to {activity.name}</h5>
                       <div className={styles.fields}>
                         <label className={styles.field}>Role
-                          <select value={assigning.role} onChange={(event) => setAssigning({ ...assigning, role: event.target.value as AssignDraft["role"] })}>
+                          <select value={assigning.role} onChange={(event) => setAssigning({ ...assigning, role: event.target.value as AssignDraft["role"], key: assigning.key.startsWith("account:") && event.target.value !== "LEAD" ? "" : assigning.key })}>
                             {ASSIGNABLE_ROLES.map((role) => <option key={role} value={role}>{roleName(role)}</option>)}
                           </select>
                           {assigning.role === "LEAD" && <span className={styles.help}>A new lead replaces the current lead.</span>}
@@ -250,9 +254,14 @@ export function EventStaffingSheet({ endpoint, eventName, initialActivities, peo
                         <label className={styles.field}>Person
                           <select value={assigning.key} onChange={(event) => setAssigning({ ...assigning, key: event.target.value })}>
                             <option value="">Choose a person</option>
-                            {free.map((person) => <option key={person.key} value={person.key}>{person.name} ({person.detail})</option>)}
+                            {free.filter((person) => person.kind !== "account").map((person) => <option key={person.key} value={person.key}>{person.name} ({person.detail})</option>)}
+                            {assigning.role === "LEAD" && free.some((person) => person.kind === "account") && (
+                              <optgroup label="Area Coordinators">
+                                {free.filter((person) => person.kind === "account").map((person) => <option key={person.key} value={person.key}>{person.name}</option>)}
+                              </optgroup>
+                            )}
                           </select>
-                          <span className={styles.help}>People registered for this event and its staff. TLTs are counted as a number needed for now.</span>
+                          <span className={styles.help}>People registered for this event and its staff; Area Coordinators can be chosen as the lead. TLTs are counted as a number needed for now.</span>
                           {pickerTruncated && <span className={styles.help}>This event has more people than fit in this list.</span>}
                         </label>
                       </div>

@@ -36,10 +36,14 @@ CREATE TABLE "EventStaffingAssignment" (
     "role" "EventStaffingRole" NOT NULL,
     "personId" TEXT,
     "userId" TEXT,
+    "attendeeAccountId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "EventStaffingAssignment_pkey" PRIMARY KEY ("id"),
-    CONSTRAINT "EventStaffingAssignment_one_assignee_check" CHECK (("personId" IS NOT NULL) <> ("userId" IS NOT NULL))
+    CONSTRAINT "EventStaffingAssignment_one_assignee_check" CHECK (
+        (("personId" IS NOT NULL)::int + ("userId" IS NOT NULL)::int + ("attendeeAccountId" IS NOT NULL)::int) = 1
+    ),
+    CONSTRAINT "EventStaffingAssignment_account_lead_check" CHECK ("attendeeAccountId" IS NULL OR "role" = 'LEAD')
 );
 
 -- CreateIndex
@@ -50,6 +54,12 @@ CREATE UNIQUE INDEX "EventStaffingAssignment_activityId_personId_key" ON "EventS
 
 -- CreateIndex
 CREATE UNIQUE INDEX "EventStaffingAssignment_activityId_userId_key" ON "EventStaffingAssignment"("activityId", "userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "EventStaffingAssignment_activityId_attendeeAccountId_key" ON "EventStaffingAssignment"("activityId", "attendeeAccountId");
+
+-- CreateIndex
+CREATE INDEX "EventStaffingAssignment_eventId_attendeeAccountId_idx" ON "EventStaffingAssignment"("eventId", "attendeeAccountId");
 
 -- CreateIndex
 CREATE INDEX "EventStaffingAssignment_eventId_personId_idx" ON "EventStaffingAssignment"("eventId", "personId");
@@ -74,6 +84,9 @@ ALTER TABLE "EventStaffingAssignment" ADD CONSTRAINT "EventStaffingAssignment_ac
 
 -- AddForeignKey
 ALTER TABLE "EventStaffingAssignment" ADD CONSTRAINT "EventStaffingAssignment_personId_fkey" FOREIGN KEY ("personId") REFERENCES "Person"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "EventStaffingAssignment" ADD CONSTRAINT "EventStaffingAssignment_attendeeAccountId_fkey" FOREIGN KEY ("attendeeAccountId") REFERENCES "AttendeeAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "EventStaffingAssignment" ADD CONSTRAINT "EventStaffingAssignment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

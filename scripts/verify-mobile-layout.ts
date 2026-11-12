@@ -1263,14 +1263,19 @@ async function seedBudgetSheet(prisma: PrismaClient): Promise<void> {
   }
 }
 
-/** Event staffing (#1678) switched on for the club weekend, with two synthetic activities (one with a lead and a lifeguard, one with nobody), so the audited pages show gaps and people and not only the switch. */
+/** Event staffing (#1678) switched on for the club weekend, with two synthetic activities (Canoe with a lead, Surprise with nobody), so the audited pages show gaps and people and not only the switch. The lead is one synthetic registered attendee made here, because the seeded club event has no registrations. */
 async function seedEventStaffing(prisma: PrismaClient): Promise<void> {
   await prisma.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "event-staffing" }], skipDuplicates: true });
   if (await prisma.eventStaffingActivity.count({ where: { eventId: clubEventId } }) > 0) return;
   const canoe = await prisma.eventStaffingActivity.create({ data: { eventId: clubEventId, name: "Canoe", description: "Sample paddling activity", location: "Sample Lake", timeText: "Friday 2 p.m.", tltsNeeded: 3, lifeguardsNeeded: 4, helpersNeeded: 1, position: 1 } });
   await prisma.eventStaffingActivity.create({ data: { eventId: clubEventId, name: "Surprise", position: 2 } });
-  const attendee = await prisma.registrationAttendee.findFirst({ where: { eventId: clubEventId, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } }, select: { personId: true } });
-  if (attendee) await prisma.eventStaffingAssignment.create({ data: { eventId: clubEventId, activityId: canoe.id, role: "LEAD", personId: attendee.personId } });
+  const person = await prisma.person.upsert({ where: { normalizedEmail: "staffing-lead@example.test" }, update: {}, create: { firstName: "Sam", lastName: "Sample", normalizedEmail: "staffing-lead@example.test" } });
+  let attendee = await prisma.registrationAttendee.findFirst({ where: { eventId: clubEventId, personId: person.id, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } }, select: { personId: true } });
+  if (!attendee) {
+    const registration = await prisma.registration.create({ data: { eventId: clubEventId, accountHolderPersonId: person.id, confirmationCode: `STAFFING-${Date.now()}`, status: "CONFIRMED", totalAmount: 0 } });
+    attendee = await prisma.registrationAttendee.create({ data: { eventId: clubEventId, registrationId: registration.id, personId: person.id, attendeeType: "Adult", profileSnapshot: {} }, select: { personId: true } });
+  }
+  await prisma.eventStaffingAssignment.create({ data: { eventId: clubEventId, activityId: canoe.id, role: "LEAD", personId: attendee.personId } });
 }
 
 /** A System deeper page with a back link (#1274): the editor of a seeded event template. Reads only; nothing is created. */

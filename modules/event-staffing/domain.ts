@@ -26,7 +26,8 @@ export const ASSIGNABLE_ROLES = ["LEAD", "HELPER", "LIFEGUARD"] as const satisfi
 
 export const ROLE_LABELS: Record<StaffingRole, string> = { LEAD: "Lead", HELPER: "Adult helper", LIFEGUARD: "Lifeguard", TLT: "TLT" };
 /** Used in a gap: "2 of 4 lifeguards". */
-const ROLE_PLURALS: Record<Exclude<StaffingRole, "LEAD">, string> = { HELPER: "helpers", LIFEGUARD: "lifeguards", TLT: "TLTs" };
+const ROLE_NOUNS: Record<Exclude<StaffingRole, "LEAD">, [string, string]> = { HELPER: ["adult helper", "adult helpers"], LIFEGUARD: ["lifeguard", "lifeguards"], TLT: ["TLT", "TLTs"] };
+const roleNoun = (role: Exclude<StaffingRole, "LEAD">, count: number) => ROLE_NOUNS[role][count === 1 ? 0 : 1];
 
 /** Registrations that count as "registered for the event": the same active states the budget sheet and the reports use. */
 export const ACTIVE_REGISTRATION_STATUSES = ["SUBMITTED", "CONFIRMED"] as const;
@@ -58,10 +59,14 @@ export type ActivityInput = z.infer<typeof activityInputSchema>;
 export const activityUpdateSchema = activityInputSchema.extend({ id: z.string().min(1).max(64) }).strict();
 export const activityDeleteSchema = z.object({ id: z.string().min(1).max(64) }).strict();
 
-/** Who is being assigned: a registered person or an event staff user, by id. The server checks they belong to the event. */
+/**
+ * Who is being assigned, by id: a registered person, an event staff user, or an Area Coordinator's account (lead only). The
+ * server checks they belong to the event, or hold an active Area Coordinator grant.
+ */
 export const assigneeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("person"), id: z.string().min(1).max(64) }).strict(),
   z.object({ kind: z.literal("user"), id: z.string().min(1).max(64) }).strict(),
+  z.object({ kind: z.literal("account"), id: z.string().min(1).max(64) }).strict(),
 ]);
 export type Assignee = z.infer<typeof assigneeSchema>;
 
@@ -69,7 +74,7 @@ export const assignmentInputSchema = z.object({
   activityId: z.string().min(1).max(64),
   role: z.enum(ASSIGNABLE_ROLES, { error: "Choose lead, adult helper or lifeguard." }),
   assignee: assigneeSchema,
-}).strict();
+}).strict().refine((input) => input.assignee.kind !== "account" || input.role === "LEAD", { message: "An Area Coordinator can be an activity's lead, not a helper or lifeguard.", path: ["role"] });
 export type AssignmentInput = z.infer<typeof assignmentInputSchema>;
 
 export const assignmentDeleteSchema = z.object({ id: z.string().min(1).max(64) }).strict();
@@ -81,8 +86,8 @@ export type StaffingSettingsInput = z.infer<typeof staffingSettingsSchema>;
 export type AssignmentView = {
   id: string;
   role: StaffingRole;
-  kind: "person" | "user";
-  /** The person's id or the staff user's id, so a picker can leave out people already on the activity. */
+  kind: "person" | "user" | "account";
+  /** The person's, staff user's or coordinator account's id, so a picker can leave out people already on the activity. */
   assigneeId: string;
   /** First Last (staff: their display name). */
   name: string;
@@ -141,7 +146,7 @@ export function activityGaps(activity: ActivityView): StaffingGap[] {
   }
   for (const row of roleCounts(activity)) {
     if (row.assigned < row.needed) {
-      gaps.push({ activityId: activity.id, activityName: activity.name, role: row.role, needed: row.needed, assigned: row.assigned, text: `${activity.name}: ${row.assigned} of ${row.needed} ${ROLE_PLURALS[row.role]}`, shortText: `${row.assigned} of ${row.needed} ${ROLE_PLURALS[row.role]}` });
+      gaps.push({ activityId: activity.id, activityName: activity.name, role: row.role, needed: row.needed, assigned: row.assigned, text: `${activity.name}: ${row.assigned} of ${row.needed} ${roleNoun(row.role, row.needed)}`, shortText: `${row.assigned} of ${row.needed} ${roleNoun(row.role, row.needed)}` });
     }
   }
   return gaps;

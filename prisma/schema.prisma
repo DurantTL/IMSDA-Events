@@ -1244,6 +1244,7 @@ model AttendeeAccount {
   /// Clubs this account directs. Explicit staff grants only — never inferred.
   clubDirectorGrants                ClubDirectorGrant[]
   areaCoordinatorGrant              AreaCoordinatorGrant?
+  eventStaffingAssignments          EventStaffingAssignment[]        @relation("EventStaffingAssignmentAccount")
   coordinatedLocations              EventLocation[]                  @relation("EventLocationCoordinator")
   grantedClubRoles                  ClubDirectorGrant[]              @relation("ClubDirectorGrantGrantedByAccount")
   acceptedClubInvites               ClubInvite[]                     @relation("ClubInviteAcceptedAccount")
@@ -2133,8 +2134,8 @@ model EventStaffingActivity {
   @@index([eventId, position])
 }
 
-/// One person in one role on one activity (#1678): a registered person (`personId`) or an event staff user (`userId`), never both
-/// and never neither (database check). At most one LEAD per activity and one row per person per activity (unique indexes).
+/// One person in one role on one activity (#1678): a registered person (`personId`), an event staff user (`userId`), or an
+/// Area Coordinator's attendee account (`attendeeAccountId`, LEAD only), exactly one of the three (database check). At most one LEAD per activity and one row per person per activity (unique indexes).
 model EventStaffingAssignment {
   id         String            @id @default(cuid())
   eventId    String
@@ -2142,17 +2143,21 @@ model EventStaffingAssignment {
   role       EventStaffingRole
   personId   String?
   userId     String?
+  attendeeAccountId String?
   createdAt  DateTime          @default(now())
 
   event    Event                 @relation("EventStaffingAssignments", fields: [eventId], references: [id], onDelete: Cascade)
   activity EventStaffingActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
   person   Person?               @relation(fields: [personId], references: [id], onDelete: Cascade)
   user     User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attendeeAccount AttendeeAccount? @relation("EventStaffingAssignmentAccount", fields: [attendeeAccountId], references: [id], onDelete: Cascade)
 
   @@unique([activityId, personId])
   @@unique([activityId, userId])
+  @@unique([activityId, attendeeAccountId])
   @@index([eventId, personId])
   @@index([eventId, userId])
+  @@index([eventId, attendeeAccountId])
   @@index([activityId, role])
 }
 

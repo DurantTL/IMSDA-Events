@@ -7,6 +7,7 @@
  *   it, only coordinators and staff with Configure event change it, Kitchen staff and other accounts cannot read it;
  * - only a person registered (submitted or confirmed) for THIS event, or on its active staff, can be put on an activity; a
  *   cancelled, waitlisted or other-event registration, and a person who is neither, are refused and nothing is written;
+ * - an Area Coordinator with an active grant can be an activity's lead and nothing else; revoked, expired and non-coordinator accounts are refused;
  * - one lead per activity (a new lead replaces the old), one row per person per activity, the database's own checks hold;
  * - activities and assignments are audited with ids and counts only; another event's rows are never touched;
  * - gaps are worked out on the rows (no lead, 2 of 4 lifeguards, 0 of 3 TLTs), and a cancelled person counts for nothing;
@@ -41,11 +42,11 @@ const P = `sf1678_${randomUUID().slice(0, 8)}`;
 const ids = {
   event: `${P}_event`, other: `${P}_other`, unpublished: `${P}_unpub`, general: `${P}_gen`,
   admin: `${P}_admin`, eventAdmin: `${P}_eadmin`, manager: `${P}_mgr`, readOnly: `${P}_ro`, kitchen: `${P}_kit`, stranger: `${P}_stranger`, helperStaff: `${P}_hstaff`,
-  ac: `${P}_ac`, revoked: `${P}_revoked`, plain: `${P}_plain`, samAccount: `${P}_sam`,
+  ac: `${P}_ac`, expired: `${P}_expired`, revoked: `${P}_revoked`, plain: `${P}_plain`, samAccount: `${P}_sam`,
   sam: `${P}_psam`, pat: `${P}_ppat`, lee: `${P}_plee`, gone: `${P}_pgone`, wait: `${P}_pwait`, away: `${P}_paway`, nobody: `${P}_pnobody`,
 };
 const userIds = [ids.admin, ids.eventAdmin, ids.manager, ids.readOnly, ids.kitchen, ids.stranger, ids.helperStaff];
-const accountIds = [ids.ac, ids.revoked, ids.plain, ids.samAccount];
+const accountIds = [ids.ac, ids.expired, ids.revoked, ids.plain, ids.samAccount];
 const personIds = [ids.sam, ids.pat, ids.lee, ids.gone, ids.wait, ids.away, ids.nobody];
 const eventIds = [ids.event, ids.other, ids.unpublished, ids.general];
 const asUser = (id: string, name: string, globalRole: "SYSTEM_ADMIN" | null = null) => ({ id, email: `${id}@example.test`, displayName: name, globalRole }) as AuthenticatedUser;
@@ -96,6 +97,7 @@ async function main() {
   await cleanup();
   await prisma.attendeeAccount.createMany({ data: [
     { id: ids.ac, email: `${P}-ac@example.test`, displayName: "Sample Coordinator", status: "ACTIVE" },
+    { id: ids.expired, email: `${P}-expired@example.test`, displayName: "Expired Coordinator", status: "ACTIVE" },
     { id: ids.revoked, email: `${P}-revoked@example.test`, displayName: "Former Coordinator", status: "ACTIVE" },
     { id: ids.plain, email: `${P}-plain@example.test`, displayName: "Sample Attendee", status: "ACTIVE" },
     { id: ids.samAccount, email: `${P}-sam@example.test`, displayName: "Sam Sample", status: "ACTIVE", emailVerifiedAt: new Date() },
@@ -193,7 +195,7 @@ async function main() {
   await refused(() => addAssignment(ac, ids.event, { activityId: foreign.id, role: "LEAD", assignee: { kind: "person", id: ids.sam } }), "an activity of another event takes nobody", "ACTIVITY_NOT_FOUND");
   assert(await prisma.eventStaffingAssignment.count({ where: { eventId: ids.event } }) === 0, "no refusal wrote a row");
   const picker = await listPickerPeople(ids.event);
-  const pickerNames = picker.people.map((person) => person.name).sort().join("|");
+  const pickerNames = picker.people.filter((person) => person.kind !== "account").map((person) => person.name).sort().join("|");
   assert(pickerNames === ["Cancelled, Gone", "Example, Pat", "Sample, Lee", "Sample, Sam", "Hal Helper", "Staffing Event Admin", "Staffing Manager", "Staffing Read Only", "Staffing Kitchen"].sort().join("|"), `the picker lists this event's registered people and staff only (${pickerNames})`);
 
   // Assign: lead, helpers, lifeguard; a new lead replaces the old one; the database's own checks hold.
@@ -251,6 +253,29 @@ async function main() {
   await refused(() => removeAssignment(ac, ids.event, "no-such-assignment"), "a missing assignment is refused", "ASSIGNMENT_NOT_FOUND");
   assert(await prisma.auditLog.count({ where: { eventId: ids.event, action: "EVENT_STAFFING_UNASSIGNED" } }) === 1, "taking a person off is audited");
 
+  // An Area Coordinator can be an activity's lead, and only the lead.
+  const archery = await createActivity(ac, ids.event, { name: "Archery", description: "", location: "", timeText: "", tltsNeeded: 0, lifeguardsNeeded: 0, helpersNeeded: 0 });
+  const asAc = (accountId: string, role: "LEAD" | "HELPER" | "LIFEGUARD") => addAssignment(ac, ids.event, { activityId: archery.id, role, assignee: { kind: "account", id: accountId } });
+  await refused(() => asAc(ids.ac, "HELPER"), "a coordinator cannot be a helper");
+  await refused(() => asAc(ids.ac, "LIFEGUARD"), "a coordinator cannot be a lifeguard");
+  await refused(() => asAc(ids.revoked, "LEAD"), "a revoked coordinator cannot be chosen", "NOT_ON_EVENT");
+  await prisma.areaCoordinatorGrant.create({ data: { attendeeAccountId: ids.expired, grantedByUserId: ids.admin, expiresAt: new Date(Date.now() - 60_000) } });
+  await refused(() => asAc(ids.expired, "LEAD"), "an expired coordinator grant cannot be chosen", "NOT_ON_EVENT");
+  await refused(() => asAc(ids.plain, "LEAD"), "an account with no grant cannot be chosen", "NOT_ON_EVENT");
+  assert((await listPickerPeople(ids.event)).people.filter((person) => person.kind === "account" && person.id.startsWith(P)).map((person) => person.id).join() === ids.ac, "the picker lists only active coordinators in its own group");
+  const led = await asAc(ids.ac, "LEAD");
+  assert(led.assignments.length === 1 && led.assignments[0]!.kind === "account" && led.assignments[0]!.active && led.assignments[0]!.name === "Sample Coordinator", "an active coordinator is the lead");
+  await refused(async () => prisma.eventStaffingAssignment.create({ data: { eventId: ids.event, activityId: archery.id, role: "HELPER", attendeeAccountId: ids.ac } }), "the database refuses a coordinator account as a helper");
+  const acOwn = await listOwnAssignments({ id: ids.ac, verifiedEmail: `${P}-ac@example.test` });
+  assert(acOwn.length === 1 && acOwn[0]!.activityName === "Archery" && acOwn[0]!.roleLabel === "Lead", "the coordinator sees their own lead job");
+  const acAudit = await prisma.auditLog.findFirst({ where: { eventId: ids.event, action: "EVENT_STAFFING_ASSIGNED", entityId: led.assignments[0]!.id } });
+  assert(acAudit && !JSON.stringify(acAudit).includes("Sample Coordinator") && (acAudit.metadata as { assigneeKind?: string }).assigneeKind === "account", "audited by id only");
+  await prisma.areaCoordinatorGrant.update({ where: { attendeeAccountId: ids.ac }, data: { revokedAt: new Date() } });
+  assert((await loadStaffingSheet(ids.event)).find((entry) => entry.id === archery.id)!.assignments[0]!.active === false, "a lead whose grant ended counts for nothing");
+  assert((await listOwnAssignments({ id: ids.ac, verifiedEmail: `${P}-ac@example.test` })).length === 0, "and no longer shows on their own list");
+  await prisma.areaCoordinatorGrant.update({ where: { attendeeAccountId: ids.ac }, data: { revokedAt: null } });
+  await deleteActivity(ac, ids.event, archery.id);
+
   // Switching off hides it and keeps the rows.
   await applyStaffingSettings(ac, ids.event, { enabled: false });
   await refused(() => assertStaffingAccess(ac, ids.event, "read"), "hidden once off", "MODULE_OFF");
@@ -259,7 +284,7 @@ async function main() {
   await applyStaffingSettings(ac, ids.event, { enabled: true });
   assert((await loadStaffingSheet(ids.event)).length === 2, "switching back on shows them again");
   await deleteActivity(ac, ids.event, surprise.id);
-  assert(await prisma.auditLog.count({ where: { eventId: ids.event, action: "EVENT_STAFFING_ACTIVITY_DELETED" } }) === 1 && (await loadStaffingSheet(ids.event)).length === 1, "a delete removes the activity and is audited");
+  assert(await prisma.auditLog.count({ where: { eventId: ids.event, action: "EVENT_STAFFING_ACTIVITY_DELETED" } }) === 2 && (await loadStaffingSheet(ids.event)).length === 1, "a delete removes the activity and is audited");
 
   console.log("Event staffing verified.");
 }

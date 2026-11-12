@@ -10,7 +10,8 @@ import { ACTIVE_REGISTRATION_STATUSES, ROLE_LABELS, STAFFING_MODULE_KEY, type St
  * assignments that account owns:
  *   - a registered person whose email is the account's verified email (the same match "My registrations" uses), or who is
  *     linked to the account by a recorded person link;
- *   - an event staff user linked to the account (`User.attendeeAccountId`).
+ *   - an event staff user linked to the account (`User.attendeeAccountId`);
+ *   - the account itself, when an Area Coordinator was chosen as an activity's lead (while the grant is active).
  * An assignment shows only while the event is a published club event with Event staffing on, and the person is still registered
  * (submitted or confirmed) or still on the staff. Nothing else on the account changes.
  */
@@ -36,6 +37,8 @@ export async function listOwnAssignments(account: { id: string; verifiedEmail: s
         ...(email ? [{ person: { normalizedEmail: email } }] : []),
         { person: { attendeeAccountLinks: { some: { accountId: account.id } } } },
         { user: { attendeeAccountId: account.id } },
+        // An Area Coordinator chosen as an activity's lead, matched by their own account.
+        { attendeeAccountId: account.id },
       ],
     },
     orderBy: [{ event: { startsAt: "asc" } }, { createdAt: "asc" }, { id: "asc" }],
@@ -46,6 +49,7 @@ export async function listOwnAssignments(account: { id: string; verifiedEmail: s
       role: true,
       personId: true,
       userId: true,
+      attendeeAccountId: true,
       event: { select: { name: true } },
       activity: { select: { name: true, location: true, timeText: true, description: true } },
     },
@@ -53,17 +57,22 @@ export async function listOwnAssignments(account: { id: string; verifiedEmail: s
   if (rows.length === 0) return [];
   const personKeys = rows.flatMap((row) => (row.personId ? [{ eventId: row.eventId, personId: row.personId }] : []));
   const userKeys = rows.flatMap((row) => (row.userId ? [{ eventId: row.eventId, userId: row.userId }] : []));
-  const [registered, staff] = await Promise.all([
+  const hasAccountRows = rows.some((row) => row.attendeeAccountId);
+  const now = new Date();
+  const [registered, staff, grant] = await Promise.all([
     personKeys.length === 0 ? [] : prisma.registrationAttendee.findMany({
       where: { registration: { status: { in: [...ACTIVE_REGISTRATION_STATUSES] } }, OR: personKeys },
       select: { eventId: true, personId: true },
     }),
     userKeys.length === 0 ? [] : prisma.eventMembership.findMany({ where: { status: "ACTIVE", OR: userKeys }, select: { eventId: true, userId: true } }),
+    hasAccountRows
+      ? prisma.areaCoordinatorGrant.findFirst({ where: { attendeeAccountId: account.id, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }, select: { id: true } })
+      : null,
   ]);
   const registeredKeys = new Set(registered.map((row) => `${row.eventId}:${row.personId}`));
   const staffKeys = new Set(staff.map((row) => `${row.eventId}:${row.userId}`));
   return rows
-    .filter((row) => (row.personId ? registeredKeys.has(`${row.eventId}:${row.personId}`) : staffKeys.has(`${row.eventId}:${row.userId}`)))
+    .filter((row) => (row.attendeeAccountId ? grant !== null : row.personId ? registeredKeys.has(`${row.eventId}:${row.personId}`) : staffKeys.has(`${row.eventId}:${row.userId}`)))
     .map((row) => ({
       id: row.id,
       eventName: row.event.name,
