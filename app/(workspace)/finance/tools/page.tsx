@@ -16,11 +16,11 @@ export const dynamic = "force-dynamic";
  */
 export default async function MoreMoneyToolsPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const { event: requested } = await searchParams;
-  const { event, permissions } = await resolveEventContext(requested);
+  const { event, permissions, user } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
     return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can open the finance tools." whoToAsk="your event administrator" />;
   }
-  const viewer = { permissions };
+  const viewer = { permissions, isSystemAdmin: user.globalRole === "SYSTEM_ADMIN" };
   const values = await loadMoneyToolMetrics(viewer, event.id);
   return <AdminHub view={buildMoneyToolsView(viewer, event.id, values)} />;
 }

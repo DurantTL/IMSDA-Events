@@ -42,12 +42,20 @@ const defaultWindowDays = 90;
 /**
  * Completed Square payments this database never recorded, for the staff screen
  * that attaches them by hand. Read-only.
+ *
+ * Scoped to one event: a payment is listed only when it resolves to a
+ * registration of that event. Payments that name no registration (no
+ * confirmation code, no match, or more than one match) cannot be tied to any
+ * event, so they are listed only when `includeUnattributed` is set, which
+ * callers do for system administrators.
  */
 export async function listUnmatchedSquarePayments(
   options: {
+    eventId: string;
+    includeUnattributed?: boolean;
     days?: number;
     configuration?: SquareRuntimeConfiguration;
-  } = {},
+  },
 ): Promise<{
   findings: SquareReconciliationFinding[];
   examined: number;
@@ -70,8 +78,31 @@ export async function listUnmatchedSquarePayments(
     configuration,
     { beginTime },
   );
+  const actionable = report.findings.filter(isActionable);
+  const registrationIds = [
+    ...new Set(
+      actionable.flatMap((finding) =>
+        finding.registrationId ? [finding.registrationId] : [],
+      ),
+    ),
+  ];
+  const owned = new Set(
+    registrationIds.length === 0
+      ? []
+      : (
+          await getPrisma().registration.findMany({
+            where: { id: { in: registrationIds }, eventId: options.eventId },
+            select: { id: true },
+          })
+        ).map((row) => row.id),
+  );
+  const findings = actionable.filter((finding) =>
+    finding.registrationId
+      ? owned.has(finding.registrationId)
+      : options.includeUnattributed === true,
+  );
   return {
-    findings: report.findings.filter(isActionable),
+    findings,
     examined: report.examined,
     unreachableSquare: report.unreachableSquare,
     environment: report.environment,

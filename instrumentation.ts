@@ -28,10 +28,12 @@ export const onRequestError: Instrumentation.onRequestError = async (
   context,
 ) => {
   const { logError } = await import("@/lib/logger");
+  const { redactTokenPath } = await import("@/lib/token-path");
   const correlationId = request.headers["x-correlation-id"];
 
   logError("Unhandled server error", error, {
-    path: request.path,
+    // No query string, and any private link token in the path is hidden.
+    path: redactTokenPath(request.path.split(/[?#]/)[0] ?? ""),
     method: request.method,
     routePath: context.routePath,
     routeType: context.routeType,

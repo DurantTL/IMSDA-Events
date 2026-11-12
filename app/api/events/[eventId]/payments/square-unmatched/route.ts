@@ -64,7 +64,7 @@ async function getHandler(
 ) {
   try {
     const { eventId } = await context.params;
-    await requirePermission(
+    const access = await requirePermission(
       await getCurrentSession(),
       eventId,
       "MANAGE_FINANCE",
@@ -72,6 +72,8 @@ async function getHandler(
     );
     const days = Number(new URL(request.url).searchParams.get("days") ?? 90);
     const result = await listUnmatchedSquarePayments({
+      eventId,
+      includeUnattributed: access.user.globalRole === "SYSTEM_ADMIN",
       days: Number.isFinite(days) ? days : 90,
     });
     return Response.json(result, { headers: noStoreHeaders });

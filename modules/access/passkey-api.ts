@@ -31,7 +31,7 @@ export async function requireOwnStaffSession() {
  * recovery code, one existing-passkey answer, or the current password. More
  * than one at once is refused rather than guessed at.
  */
-const changeProofSchema = z.object({
+export const changeProofSchema = z.object({
   code: z.string().trim().min(1).max(32).optional(),
   password: z.string().min(1).max(128).optional(),
   passkey: passkeyVerificationSchema.shape.response.optional(),

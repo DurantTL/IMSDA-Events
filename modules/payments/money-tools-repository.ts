@@ -18,7 +18,7 @@ import { neededMoneyMetrics, type MoneyMetricKey, type MoneyMetricValues, type M
  * as "Unavailable". The caller has already checked MANAGE_FINANCE; each metric reuses the count the card's own page reads.
  * Nothing here writes.
  */
-type Context = { eventId: string; now: Date; shared: Map<string, Promise<unknown>> };
+type Context = { eventId: string; isSystemAdmin: boolean; now: Date; shared: Map<string, Promise<unknown>> };
 
 /** One read shared by the metrics that come from it (a failure of it makes each of them unavailable). */
 function shared<T>(context: Context, key: string, read: () => Promise<T>): Promise<T> {
@@ -71,8 +71,8 @@ const readers: Record<MoneyMetricKey, (context: Context) => Promise<number>> = {
   // The Unmatched Square payments page's own list, read the same way (#1747), so the chip and that page always agree.
   // It gets a few seconds at most, so this card can never hold up the page: not configured, unreachable or too slow throws,
   // and the card says "Unavailable", never "OK".
-  unmatchedSquare: () => withTimeout(async () => {
-    const { findings, unreachableSquare } = await listUnmatchedSquarePayments();
+  unmatchedSquare: ({ eventId, isSystemAdmin }) => withTimeout(async () => {
+    const { findings, unreachableSquare } = await listUnmatchedSquarePayments({ eventId, includeUnattributed: isSystemAdmin });
     if (unreachableSquare) throw new Error("Square could not be reached");
     return findings.length;
   }, squareTimeoutMs),
@@ -82,7 +82,7 @@ const readers: Record<MoneyMetricKey, (context: Context) => Promise<number>> = {
 
 /** The values for one event and viewer. A metric that failed is `null`; a metric no shown card needs is not read. */
 export async function loadMoneyToolMetrics(viewer: MoneyToolsViewer, eventId: string, now = new Date()): Promise<MoneyMetricValues> {
-  const context: Context = { eventId, now, shared: new Map() };
+  const context: Context = { eventId, isSystemAdmin: viewer.isSystemAdmin === true, now, shared: new Map() };
   const entries = await Promise.all(
     neededMoneyMetrics(viewer).map(async (key): Promise<[MoneyMetricKey, number | null]> => {
       try {

@@ -99,6 +99,7 @@ export function SquarePaymentMatching({
   windowDays,
   squareUnreachable,
   unavailable,
+  canMatchUnattributed = false,
 }: {
   eventId: string;
   registrations: RegistrationRecord[];
@@ -107,6 +108,8 @@ export function SquarePaymentMatching({
   windowDays: number;
   squareUnreachable: boolean;
   unavailable: string | null;
+  /** True for a system administrator, who also sees payments that name no registration. */
+  canMatchUnattributed?: boolean;
 }) {
   const [outstanding, setOutstanding] = useState(findings);
   const [attached, setAttached] = useState<string[]>([]);
@@ -228,6 +231,13 @@ export function SquarePaymentMatching({
             carries nothing IMAdventist can match on, so it is attached here by
             hand. Nothing is recorded until you choose the registration.
           </p>
+          {!canMatchUnattributed && (
+            <p>
+              Payments that name no registration are matched by a system
+              administrator. Ask one if you are expecting a payment that is not
+              listed here.
+            </p>
+          )}
         </div>
         <span className="count-badge">
           <CreditCard aria-hidden="true" size={17} />{" "}
