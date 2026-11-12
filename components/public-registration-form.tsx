@@ -57,7 +57,7 @@ import {
   PublicMerchandiseStep,
   type MerchandiseSelection,
 } from "@/components/public-merchandise-step";
-import type { PublicMerchandiseOffer } from "@/modules/merchandise/registration-order-domain";
+import type { PublicMerchandiseOffer } from "@/modules/merchandise/registration-order-schema";
 import {
   chosenNights,
   defaultLodgingChoice,
@@ -672,7 +672,7 @@ export function PublicRegistrationForm({
     () => (merchandiseActive && !joiningWaitlist ? merchandiseLines(merchandise, merchandiseSelection) : []),
     [joiningWaitlist, merchandise, merchandiseActive, merchandiseSelection],
   );
-  const merchandiseSubmission = merchandiseChosen.map((line) => ({ variantId: line.variantId, quantity: line.quantity }));
+  const merchandiseSubmission = merchandiseChosen.map((line) => ({ variantId: line.variantId, quantity: line.quantity, shownUnitPriceCents: line.unitPriceCents }));
   const [error, setError] = useState("");
   const [rosterAnnouncement, setRosterAnnouncement] = useState("");
   const [submitting, setSubmitting] = useState(false);

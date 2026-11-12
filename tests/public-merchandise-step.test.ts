@@ -7,7 +7,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: 
 import { PublicRegistrationForm } from "@/components/public-registration-form";
 import { PublicMerchandiseStep, merchandiseLines, merchandiseNotChargedNotice } from "@/components/public-merchandise-step";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
-import type { PublicMerchandiseOffer } from "@/modules/merchandise/registration-order-domain";
+import type { PublicMerchandiseOffer } from "@/modules/merchandise/registration-order-schema";
 import { buttonByText, choose, click, mount, typeInto, type Mounted } from "./helpers/dom-render";
 
 /** Synthetic form, people and merchandise only. */
@@ -47,7 +47,7 @@ afterEach(async () => { await mounted?.unmount(); mounted = null; vi.unstubAllGl
 
 describe("merchandise selection helpers", () => {
   it("ignores sold-out sizes and zero quantities", () => {
-    expect(merchandiseLines(offer, { v_m: 2, v_l: 4 })).toEqual([{ productName: "Camp Shirt", variantLabel: "Medium", variantId: "v_m", quantity: 2, lineTotalCents: 5000 }]);
+    expect(merchandiseLines(offer, { v_m: 2, v_l: 4 })).toEqual([{ productName: "Camp Shirt", variantLabel: "Medium", variantId: "v_m", quantity: 2, unitPriceCents: 2500, lineTotalCents: 5000 }]);
     expect(merchandiseLines(null, { v_m: 2 })).toEqual([]);
   });
 });
@@ -90,7 +90,7 @@ describe("individual registration form with merchandise", () => {
     await act(async () => { await Promise.resolve(); });
     const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>;
     expect(calls).toHaveLength(1);
-    expect(JSON.parse(String(calls[0]![1].body)).merchandise).toEqual([{ variantId: "v_m", quantity: 2 }]);
+    expect(JSON.parse(String(calls[0]![1].body)).merchandise).toEqual([{ variantId: "v_m", quantity: 2, shownUnitPriceCents: 2500 }]);
     await act(async () => { await Promise.resolve(); });
     expect(container.textContent).toContain("Merchandise order");
     expect(container.textContent).toContain("$50.00");

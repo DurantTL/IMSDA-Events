@@ -1,50 +1,20 @@
-import { z } from "zod";
 import {
   projectMerchandiseCatalog,
   type MerchandiseProjectionInput,
 } from "@/modules/merchandise/catalog-domain";
+import {
+  defaultMerchandiseMaxQuantity,
+  type PublicMerchandiseOffer,
+  type RegistrationMerchandiseSummary,
+  type RequestedMerchandiseLine,
+} from "@/modules/merchandise/registration-order-schema";
 import {
   buildMerchandiseOrderDraft,
   type MerchandiseCatalog,
   type MerchandiseOrderDraft,
 } from "@/modules/merchandise/domain";
 
-/** The largest quantity a size's picker offers when staff set no maximum. The server accepts up to the schema limit. */
-export const defaultMerchandiseMaxQuantity = 10;
-
-/** What the individual registration form sends for merchandise: variant ids and quantities only, never a price. */
-export const registrationMerchandiseSchema = z
-  .array(z.object({
-    variantId: z.string().trim().min(1).max(100),
-    quantity: z.number().int().min(1).max(1000),
-  }).strict())
-  .max(50);
-
-export type RequestedMerchandiseLine = { variantId: string; quantity: number };
-
-export type PublicMerchandiseOffer = {
-  products: Array<{
-    id: string;
-    name: string;
-    description: string | null;
-    variants: Array<{
-      id: string;
-      label: string;
-      priceCents: number;
-      minQuantity: number;
-      /** What the picker offers; the server still checks stock. Never a stock count. */
-      maxQuantity: number;
-      soldOut: boolean;
-    }>;
-  }>;
-};
-
-export type RegistrationMerchandiseSummary = {
-  lines: Array<{ productName: string; variantLabel: string; quantity: number; lineTotalCents: number }>;
-  totalCents: number;
-};
-
-export type RegistrationMerchandiseErrorCode = "VARIANT_UNAVAILABLE" | "SOLD_OUT" | "INVALID_QUANTITY" | "DUPLICATE_VARIANT";
+export type RegistrationMerchandiseErrorCode = "VARIANT_UNAVAILABLE" | "SOLD_OUT" | "INVALID_QUANTITY" | "DUPLICATE_VARIANT" | "PRICE_CHANGED";
 
 export class RegistrationMerchandiseError extends Error {
   constructor(public readonly code: RegistrationMerchandiseErrorCode, message: string) {
@@ -137,9 +107,13 @@ export function planRegistrationMerchandiseOrder(
     }
     const name = `${entry.product.name} ${entry.variant.label}`;
     const availability = entry.variant.availability;
-    if (!Number.isSafeInteger(line.quantity) || line.quantity < availability.minQuantity || (availability.maxQuantity !== null && line.quantity > availability.maxQuantity)) {
-      const range = availability.maxQuantity === null ? `at least ${availability.minQuantity}` : `${availability.minQuantity} to ${availability.maxQuantity}`;
-      throw new RegistrationMerchandiseError("INVALID_QUANTITY", `${name}: choose ${range}, or remove it.`);
+    if (line.shownUnitPriceCents !== undefined && line.shownUnitPriceCents !== availability.priceCents) {
+      throw new RegistrationMerchandiseError("PRICE_CHANGED", `the price of ${name} changed. Review it and submit again.`);
+    }
+    // The picker and the server agree: with no staff maximum, the default maximum applies.
+    const maxQuantity = availability.maxQuantity ?? defaultMerchandiseMaxQuantity;
+    if (!Number.isSafeInteger(line.quantity) || line.quantity < availability.minQuantity || line.quantity > maxQuantity) {
+      throw new RegistrationMerchandiseError("INVALID_QUANTITY", `${name}: choose ${availability.minQuantity} to ${maxQuantity}, or remove it.`);
     }
     const remaining = remainingStock(availability, soldFor(sold, line.variantId));
     if (remaining !== null && line.quantity > remaining) {
@@ -173,7 +147,7 @@ export function planRegistrationMerchandiseOrder(
     clientRequestId: `registration:${input.registrationId}`,
     feeCents: 0,
     taxCents: 0,
-    lines: input.lines,
+    lines: input.lines.map(({ variantId, quantity }) => ({ variantId, quantity })),
   }, draftCatalog);
 }
 

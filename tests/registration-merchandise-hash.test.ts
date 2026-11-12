@@ -15,6 +15,11 @@ describe("submission hash with merchandise", () => {
     expect(submissionHash({ ...withRoster, merchandise: [] })).toBe(submissionHash(withRoster));
   });
 
+  it("includes the shown price, so a different shown price is a different submission", () => {
+    const line = { variantId: "v1", quantity: 1 };
+    expect(submissionHash({ ...base, merchandise: [{ ...line, shownUnitPriceCents: 2500 }] })).not.toBe(submissionHash({ ...base, merchandise: [{ ...line, shownUnitPriceCents: 3000 }] }));
+  });
+
   it("changes when merchandise is chosen, regardless of line order", () => {
     const a = { variantId: "v1", quantity: 1 };
     const b = { variantId: "v2", quantity: 2 };

@@ -31,7 +31,10 @@ describe("recordRegistrationMerchandiseOrder", () => {
     const tx = makeTx();
     const summary = await recordRegistrationMerchandiseOrder(tx as never, input);
     expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
-    expect(String((tx.$queryRaw.mock.calls[0] as unknown[])[0] && JSON.stringify(tx.$queryRaw.mock.calls[0]))).toMatch(/FOR UPDATE/);
+    const lockQuery = JSON.stringify(tx.$queryRaw.mock.calls[0]);
+    expect(lockQuery).toMatch(/FOR UPDATE/);
+    expect(lockQuery).toMatch(/eventId/);
+    expect(lockQuery).toContain("event_1");
     expect(catalogMock.getMerchandiseCatalogForProjection).toHaveBeenCalledWith("event_1", {}, tx);
     expect(tx.merchandiseOrder.create).toHaveBeenCalledTimes(1);
     const data = (tx.merchandiseOrder.create.mock.calls[0] as unknown as [{ data: Record<string, unknown> & { lines: { create: Array<Record<string, unknown>> } } }])[0].data;
@@ -47,7 +50,10 @@ describe("recordRegistrationMerchandiseOrder", () => {
   it("counts units already on pending or paid orders and refuses without creating", async () => {
     const tx = makeTx(4);
     await expect(recordRegistrationMerchandiseOrder(tx as never, input)).rejects.toBeInstanceOf(RegistrationMerchandiseError);
-    expect(tx.merchandiseOrderLine.groupBy).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ order: { status: { in: ["PENDING", "PAID"] } } }) }));
+    expect(tx.merchandiseOrderLine.groupBy).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ order: {
+      status: { in: ["PENDING", "PAID"] },
+      OR: [{ registrationId: null }, { registration: { status: { not: "CANCELLED" } } }],
+    } }) }));
     expect(tx.merchandiseOrder.create).not.toHaveBeenCalled();
   });
 

@@ -71,7 +71,7 @@ async function makeEvent(name: string, options: { capacity?: number; waitlist?: 
 }
 
 const emailFor = (tag: string) => `${P}.${tag}@example.test`;
-function input(fixture: Fixture, tag: string, merchandise?: Array<{ variantId: string; quantity: number }>, idempotencyKey = randomUUID()): PublicRegistrationInput {
+function input(fixture: Fixture, tag: string, merchandise?: Array<{ variantId: string; quantity: number; shownUnitPriceCents?: number }>, idempotencyKey = randomUUID()): PublicRegistrationInput {
   return { versionId: fixture.versionId, idempotencyKey, responses: { first_name: tag, last_name: surname, email: emailFor(tag), registration_type: "Adult" }, website: "", ...(merchandise ? { merchandise } : {}) } as PublicRegistrationInput;
 }
 
@@ -147,6 +147,18 @@ async function main() {
   await prisma.merchandiseOrder.updateMany({ where: { registrationId: registration.id }, data: { status: "CANCELLED" } });
   assert((await getPublicRegistrationExperience(main.slug, formSlug))?.merchandise?.products[0]?.variants.find((v) => v.label === "Medium")?.soldOut === false, "a cancelled order frees its stock");
 
+  // A cancelled registration's pending order no longer holds stock, but stays on the staff list, marked and not counted.
+  await prisma.merchandiseOrder.updateMany({ where: { registrationId: registration.id }, data: { status: "PENDING" } });
+  assert((await getPublicRegistrationExperience(main.slug, formSlug))?.merchandise?.products[0]?.variants.find((v) => v.label === "Medium")?.soldOut === true, "a pending order holds the last medium again");
+  await prisma.registration.update({ where: { id: registration.id }, data: { status: "CANCELLED" } });
+  assert((await getPublicRegistrationExperience(main.slug, formSlug))?.merchandise?.products[0]?.variants.find((v) => v.label === "Medium")?.soldOut === false, "a cancelled registration releases its order's stock");
+  const cancelledList = await listMerchandiseOrders(main.eventId);
+  assert(cancelledList.orders.some((o) => o.id === order.id && !o.registrationActive), "the order stays listed, marked as having a cancelled registration");
+  assert(!cancelledList.totals.some((row) => row.variantLabel === "Large" && row.quantity >= 2), "its units are left out of the totals");
+  const stale = await caught(submitPublicRegistration(main.slug, formSlug, input(main, "stale", [{ variantId: main.variants.large, quantity: 1, shownUnitPriceCents: 100 }])));
+  assert(stale instanceof PublicRegistrationError && stale.message.includes("price of Camp Shirt Large changed"), "a stale shown price is refused");
+  assert((await caught(submitPublicRegistration(main.slug, formSlug, input(main, "toomany", [{ variantId: main.variants.large, quantity: 6 }])))) instanceof PublicRegistrationError, "a quantity over the maximum is refused");
+
   // A waitlisted registration orders nothing, and says so.
   const waitEvent = await makeEvent("wait", { capacity: 1, waitlist: true });
   await submitPublicRegistration(waitEvent.slug, formSlug, input(waitEvent, "first"));
@@ -157,7 +169,7 @@ async function main() {
   // The staff list is scoped to its event.
   const list = await listMerchandiseOrders(main.eventId);
   assert(list.orders.length === 2 && list.orders.every((o) => o.confirmationCode), "the staff list shows this event's orders");
-  assert(list.totals.every((row) => row.productName !== "Camp Shirt" || row.variantLabel !== "Medium"), "a cancelled order is left out of the totals");
+  assert(list.totals.every((row) => row.variantLabel !== "Medium"), "a cancelled registration's order is left out of the totals");
   assert((await listMerchandiseOrders(waitEvent.eventId)).orders.length === 0, "another event's list is separate");
 
   console.log("Registration merchandise verification passed.");

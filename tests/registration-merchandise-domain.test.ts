@@ -4,8 +4,8 @@ import {
   buildPublicMerchandiseOffer,
   planRegistrationMerchandiseOrder,
   RegistrationMerchandiseError,
-  registrationMerchandiseSchema,
 } from "@/modules/merchandise/registration-order-domain";
+import { registrationMerchandiseSchema } from "@/modules/merchandise/registration-order-schema";
 import { publicRegistrationInputSchema } from "@/modules/forms/public-domain";
 
 /** Synthetic catalog only. */
@@ -29,7 +29,7 @@ function catalog(variants: ReturnType<typeof variant>[], over: Partial<Merchandi
   };
 }
 const ctx = { eventId: "event_1", registrationId: "reg_1", purchaserSnapshot: { name: "Avery Guest" } };
-const plan = (c: MerchandiseProjectionInput, lines: Array<{ variantId: string; quantity: number }>, sold: Record<string, number> = {}) =>
+const plan = (c: MerchandiseProjectionInput, lines: Array<{ variantId: string; quantity: number; shownUnitPriceCents?: number }>, sold: Record<string, number> = {}) =>
   planRegistrationMerchandiseOrder(c, sold, { ...ctx, lines }, NOW);
 function codeOf(fn: () => unknown) {
   try { fn(); } catch (error) { return error instanceof RegistrationMerchandiseError ? error.code : `other:${String(error)}`; }
@@ -112,6 +112,19 @@ describe("planning a registration merchandise order", () => {
   it("refuses a variant named twice", () => {
     const c = catalog([variant("v1", "Medium")]);
     expect(codeOf(() => plan(c, [{ variantId: "v1", quantity: 1 }, { variantId: "v1", quantity: 1 }]))).toBe("DUPLICATE_VARIANT");
+  });
+
+  it("applies the default maximum of 10 when staff set none", () => {
+    const c = catalog([variant("v1", "Medium")]);
+    expect(plan(c, [{ variantId: "v1", quantity: 10 }]).lines[0]!.quantity).toBe(10);
+    expect(codeOf(() => plan(c, [{ variantId: "v1", quantity: 11 }]))).toBe("INVALID_QUANTITY");
+  });
+
+  it("refuses a stale shown price with its own code, and accepts a matching one", () => {
+    const c = catalog([variant("v1", "Medium")]);
+    expect(codeOf(() => plan(c, [{ variantId: "v1", quantity: 1, shownUnitPriceCents: 2000 }]))).toBe("PRICE_CHANGED");
+    expect(() => plan(c, [{ variantId: "v1", quantity: 1, shownUnitPriceCents: 2000 }])).toThrow("the price of Camp Shirt Medium changed. Review it and submit again.");
+    expect(plan(c, [{ variantId: "v1", quantity: 1, shownUnitPriceCents: 2500 }]).totalCents).toBe(2500);
   });
 
   it("says plainly which size is sold out", () => {

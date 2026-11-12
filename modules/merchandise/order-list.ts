@@ -5,8 +5,6 @@ import { AccessDeniedError, requirePermission, type Session } from "@/modules/ac
 import { findActiveMembership } from "@/modules/events/repository";
 import { merchandiseTotalsBySize, staffOrderFromRecord } from "@/modules/merchandise/order-list-domain";
 
-const orderListLimit = 500;
-
 /** Merchandise orders hold purchaser names and are money-adjacent: configuration access plus registration or finance access. */
 export async function requireMerchandiseOrderAccess(session: Session, eventId: string) {
   const access = await requirePermission(session, eventId, "CONFIGURE_EVENT", findActiveMembership);
@@ -23,21 +21,22 @@ export function canViewMerchandiseOrders(permissions: ReadonlyArray<string>) {
   return permissions.includes("CONFIGURE_EVENT") && (permissions.includes("MANAGE_REGISTRATION") || permissions.includes("MANAGE_FINANCE"));
 }
 
-/** Read-only, newest first. Every query is scoped to the event. */
+/** Read-only, newest first (the page sorts and pages it). Every query is scoped to the event. */
 export async function listMerchandiseOrders(eventId: string) {
   const records = await getPrisma().merchandiseOrder.findMany({
     where: { eventId },
     orderBy: { createdAt: "desc" },
-    take: orderListLimit,
     select: {
       id: true,
       createdAt: true,
       status: true,
       totalCents: true,
       purchaserSnapshot: true,
+      registrationId: true,
+      registration: { select: { status: true } },
       lines: { where: { eventId }, orderBy: { createdAt: "asc" }, select: { productNameSnapshot: true, variantLabelSnapshot: true, quantity: true, lineTotalCents: true } },
     },
   });
   const orders = records.map(staffOrderFromRecord);
-  return { eventId, orders, totals: merchandiseTotalsBySize(orders), truncated: records.length === orderListLimit };
+  return { eventId, orders, totals: merchandiseTotalsBySize(orders) };
 }

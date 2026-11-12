@@ -6,12 +6,13 @@ import {
   buildPublicMerchandiseOffer,
   planRegistrationMerchandiseOrder,
   summarizeMerchandiseDraft,
-  type PublicMerchandiseOffer,
-  type RegistrationMerchandiseSummary,
-  type RequestedMerchandiseLine,
 } from "@/modules/merchandise/registration-order-domain";
+import type { PublicMerchandiseOffer, RegistrationMerchandiseSummary, RequestedMerchandiseLine } from "@/modules/merchandise/registration-order-schema";
 
 const countedStatuses = ["PENDING", "PAID"] as const;
+
+/** An order holds stock while it has no registration link (a staff order) or its registration is not cancelled. */
+const activeRegistrationOrder = [{ registrationId: null }, { registration: { status: { not: "CANCELLED" as const } } }];
 
 /** Units on PENDING or PAID orders, by variant id. */
 async function soldByVariant(client: Prisma.TransactionClient, variantIds: string[]) {
@@ -19,7 +20,7 @@ async function soldByVariant(client: Prisma.TransactionClient, variantIds: strin
   if (variantIds.length === 0) return sold;
   const rows = await client.merchandiseOrderLine.groupBy({
     by: ["variantId"],
-    where: { variantId: { in: variantIds }, order: { status: { in: [...countedStatuses] } } },
+    where: { variantId: { in: variantIds }, order: { status: { in: [...countedStatuses] }, OR: activeRegistrationOrder } },
     _sum: { quantity: true },
   });
   for (const row of rows) if (row.variantId) sold.set(row.variantId, row._sum.quantity ?? 0);
@@ -52,7 +53,8 @@ export async function recordRegistrationMerchandiseOrder(
 ): Promise<RegistrationMerchandiseSummary> {
   const variantIds = [...new Set(input.lines.map((line) => line.variantId))];
   // Locked in a fixed order so concurrent orders for overlapping sizes cannot deadlock.
-  await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "MerchandiseProductVariant" WHERE "id" IN (${Prisma.join([...variantIds].sort())}) ORDER BY "id" FOR UPDATE`);
+  // Only this event's variants are locked; an id from another event is left alone and then refused as unavailable.
+  await tx.$queryRaw(Prisma.sql`SELECT v."id" FROM "MerchandiseProductVariant" v JOIN "MerchandiseProduct" p ON p."id" = v."productId" WHERE v."id" IN (${Prisma.join([...variantIds].sort())}) AND p."eventId" = ${input.eventId} ORDER BY v."id" FOR UPDATE OF v`);
   const catalog = await getMerchandiseCatalogForProjection(input.eventId, {}, tx);
   const sold = await soldByVariant(tx, variantIds);
   const draft = planRegistrationMerchandiseOrder(catalog, sold, {

@@ -7,19 +7,21 @@ export type StaffMerchandiseOrder = {
   purchaserName: string;
   status: MerchandiseOrderStatusValue;
   statusWord: string;
+  /** False when the order's registration was cancelled: it stays listed but is not counted in the totals. */
+  registrationActive: boolean;
   totalCents: number;
   lines: Array<{ productName: string; variantLabel: string; quantity: number; lineTotalCents: number }>;
 };
 
 export type MerchandiseTotalsRow = { productName: string; variantLabel: string; quantity: number };
 
-type OrderLike = Pick<StaffMerchandiseOrder, "status" | "lines">;
+type OrderLike = Pick<StaffMerchandiseOrder, "status" | "lines"> & { registrationActive?: boolean };
 
-/** Units by product and size, leaving out cancelled and refunded orders. */
+/** Units by product and size, leaving out cancelled and refunded orders and orders whose registration was cancelled. */
 export function merchandiseTotalsBySize(orders: ReadonlyArray<OrderLike>): MerchandiseTotalsRow[] {
   const totals = new Map<string, MerchandiseTotalsRow>();
   for (const order of orders) {
-    if (order.status === "CANCELLED" || order.status === "REFUNDED") continue;
+    if (order.status === "CANCELLED" || order.status === "REFUNDED" || order.registrationActive === false) continue;
     for (const line of order.lines) {
       const key = `${line.productName}\u0000${line.variantLabel}`;
       const row = totals.get(key) ?? { productName: line.productName, variantLabel: line.variantLabel, quantity: 0 };
@@ -41,6 +43,8 @@ export function staffOrderFromRecord(order: {
   status: MerchandiseOrderStatusValue;
   totalCents: number;
   purchaserSnapshot: unknown;
+  registrationId: string | null;
+  registration: { status: string } | null;
   lines: Array<{ productNameSnapshot: string; variantLabelSnapshot: string; quantity: number; lineTotalCents: number }>;
 }): StaffMerchandiseOrder {
   return {
@@ -50,6 +54,8 @@ export function staffOrderFromRecord(order: {
     purchaserName: snapshotText(order.purchaserSnapshot, "name") ?? "Unknown",
     status: order.status,
     statusWord: merchandiseOrderStatusWords[order.status],
+    // No registration link (a staff order) counts; a deleted or cancelled registration does not.
+    registrationActive: order.registrationId === null ? order.registration === null : order.registration !== null && order.registration.status !== "CANCELLED",
     totalCents: order.totalCents,
     lines: order.lines.map((line) => ({ productName: line.productNameSnapshot, variantLabel: line.variantLabelSnapshot, quantity: line.quantity, lineTotalCents: line.lineTotalCents })),
   };

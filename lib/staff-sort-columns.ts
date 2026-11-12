@@ -14,6 +14,9 @@ export const AREA_CLUB_FORMS_SORT_COLUMNS = ["form", "subject", "submitted"] as 
 /** Event manager's registered clubs (/more/clubs). */
 export const EVENT_CLUBS_SORT_COLUMNS = ["club", "going", "sterling", "registration"] as const;
 
+/** Merchandise orders on /more/merchandise. */
+export const MERCHANDISE_ORDERS_SORT_COLUMNS = ["date", "registration", "purchaser", "total", "status"] as const;
+
 /** Honors rosters: people in a class, totals by club, everyone on the site, one club's schedule. */
 export const HONOR_CLASS_SORT_COLUMNS = ["name", "club", "age", "type"] as const;
 export const HONOR_TOTALS_SORT_COLUMNS = ["club", "youth", "staff", "adults"] as const;
@@ -42,6 +45,7 @@ const SORT_WORDS: Record<string, string | { label: string; kind: SortKind }> = {
   tents: { label: "tents", kind: "number" }, trailers: { label: "trailers", kind: "number" }, canopy: { label: "kitchen canopy", kind: "number" }, sqft: { label: "total sq ft", kind: "number" },
   campNextTo: "camp next to", pf: { label: "Pathfinders", kind: "number" }, tlt: { label: "TLT", kind: "number" }, child: { label: "children", kind: "number" }, total: { label: "total", kind: "number" },
   dutyAreas: "duty areas", activities: "activities", campsite: "assigned campsite", duty: "assigned duty", activity: "assigned activity", baptism: "baptism interest", bible: "Bible read-through",
+  date: { label: "date", kind: "date" }, purchaser: "purchaser", status: "status",
   role: "role", choice: "choice or quantity", count: { label: "count", kind: "number" }, option: "option", first: { label: "first choices", kind: "number" }, second: { label: "second choices", kind: "number" },
   attendee: "attendee", holder: "account holder", group: "group", volunteer: "volunteer", answer: "answer", phone: "phone",
 };

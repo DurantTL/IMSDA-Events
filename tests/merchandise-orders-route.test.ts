@@ -8,7 +8,7 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ merchandiseOrder: { findMan
 
 import { GET } from "@/app/api/events/[eventId]/merchandise/orders/route";
 import { canViewMerchandiseOrders } from "@/modules/merchandise/order-list";
-import { merchandiseTotalsBySize } from "@/modules/merchandise/order-list-domain";
+import { merchandiseTotalsBySize, staffOrderFromRecord } from "@/modules/merchandise/order-list-domain";
 
 const eventId = "event_1";
 const call = (id = eventId) => GET(new Request(`https://events.imsda.test/api/events/${id}/merchandise/orders`), { params: Promise.resolve({ eventId: id }) });
@@ -47,12 +47,13 @@ describe("GET merchandise orders", () => {
     dependencies.findMany.mockResolvedValue([{
       id: "order_1", createdAt: new Date("2027-03-01T12:00:00Z"), status: "PENDING", totalCents: 5000,
       purchaserSnapshot: { name: "Avery Guest", email: "guest@example.test", confirmationCode: "REG-ABC" },
+      registrationId: "reg_1", registration: { status: "SUBMITTED" },
       lines: [{ productNameSnapshot: "Camp Shirt", variantLabelSnapshot: "Medium", quantity: 2, lineTotalCents: 5000 }],
     }]);
     const response = await call();
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.orders[0]).toMatchObject({ confirmationCode: "REG-ABC", purchaserName: "Avery Guest", statusWord: "Pending payment", totalCents: 5000 });
+    expect(body.orders[0]).toMatchObject({ confirmationCode: "REG-ABC", purchaserName: "Avery Guest", statusWord: "Pending payment", totalCents: 5000, registrationActive: true });
     expect(body.totals).toEqual([{ productName: "Camp Shirt", variantLabel: "Medium", quantity: 2 }]);
     expect(dependencies.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { eventId } }));
     expect(JSON.stringify(body)).not.toContain("guest@example.test");
@@ -66,6 +67,18 @@ describe("order list helpers", () => {
       { status: "PENDING", lines: line(1) }, { status: "PAID", lines: line(2) },
       { status: "CANCELLED", lines: line(5) }, { status: "REFUNDED", lines: line(7) },
     ])).toEqual([{ productName: "Camp Shirt", variantLabel: "Medium", quantity: 3 }]);
+  });
+
+  it("lists an order whose registration was cancelled but leaves it out of the totals", () => {
+    const line = [{ productName: "Camp Shirt", variantLabel: "Medium", quantity: 4, lineTotalCents: 0 }];
+    expect(merchandiseTotalsBySize([
+      { status: "PENDING", registrationActive: false, lines: line },
+      { status: "PENDING", registrationActive: true, lines: line },
+    ])).toEqual([{ productName: "Camp Shirt", variantLabel: "Medium", quantity: 4 }]);
+    const record = { id: "o", createdAt: new Date("2027-03-01T12:00:00Z"), status: "PENDING" as const, totalCents: 1, purchaserSnapshot: {}, lines: [] };
+    expect(staffOrderFromRecord({ ...record, registrationId: "r", registration: { status: "CANCELLED" } }).registrationActive).toBe(false);
+    expect(staffOrderFromRecord({ ...record, registrationId: "r", registration: { status: "CONFIRMED" } }).registrationActive).toBe(true);
+    expect(staffOrderFromRecord({ ...record, registrationId: null, registration: null }).registrationActive).toBe(true);
   });
 
   it("needs configuration plus registration or finance permission", () => {

@@ -1,8 +1,8 @@
 "use client";
 
-import { formatCents } from "@/modules/payments/format-cents";
+import { Money } from "@/components/exact-value";
 import styles from "./public-merchandise-step.module.css";
-import type { PublicMerchandiseOffer } from "@/modules/merchandise/registration-order-domain";
+import type { PublicMerchandiseOffer } from "@/modules/merchandise/registration-order-schema";
 
 export const merchandiseNotChargedNotice = "Merchandise is not charged with your registration. The event team will tell you how to pay for it.";
 
@@ -13,7 +13,9 @@ export function merchandiseLines(offer: PublicMerchandiseOffer | null, selection
   if (!offer) return [];
   return offer.products.flatMap((product) => product.variants.flatMap((variant) => {
     const quantity = selection[variant.id] ?? 0;
-    return quantity > 0 && !variant.soldOut ? [{ productName: product.name, variantLabel: variant.label, variantId: variant.id, quantity, lineTotalCents: quantity * variant.priceCents }] : [];
+    return quantity > 0 && !variant.soldOut
+      ? [{ productName: product.name, variantLabel: variant.label, variantId: variant.id, quantity, unitPriceCents: variant.priceCents, lineTotalCents: quantity * variant.priceCents }]
+      : [];
   }));
 }
 
@@ -30,8 +32,9 @@ export function PublicMerchandiseStep({ offer, selection, issues = [], onChange 
 }) {
   const subtotal = merchandiseSubtotalCents(offer, selection);
   return (
-    <section className={styles.section} data-testid="merchandise-step" aria-labelledby="public_merchandise_title">
-      <h3 id="public_merchandise_title">Merchandise (optional)</h3>
+    <section className="public-registration-review-card" data-testid="merchandise-step" aria-labelledby="public_merchandise_title">
+      <p className="public-registration-eyebrow">Optional</p>
+      <h3 id="public_merchandise_title">Merchandise</h3>
       <p className={styles.lead}>{merchandiseNotChargedNotice}</p>
       {issues.length > 0 ? <div role="alert">{issues.map((issue) => <p className={styles.error} key={issue.message}>{issue.message}</p>)}</div> : null}
       {offer.products.map((product) => (
@@ -40,20 +43,18 @@ export function PublicMerchandiseStep({ offer, selection, issues = [], onChange 
           {product.description ? <p className={styles.description}>{product.description}</p> : null}
           <div className={styles.sizes}>
             {product.variants.map((variant) => {
-              const id = `merchandise_${variant.id}`;
               const options = Array.from({ length: Math.min(variant.maxQuantity, 50) + 1 }, (_, quantity) => quantity).filter((quantity) => quantity === 0 || quantity >= variant.minQuantity);
               return (
                 <div className={styles.size} key={variant.id}>
                   <span className={styles.sizeName}>
                     {variant.label}
-                    <small>{formatCents(variant.priceCents)} each</small>
+                    <small><Money cents={variant.priceCents} /> each</small>
                   </span>
                   {variant.soldOut ? (
                     <span className={styles.soldOut}>Sold out</span>
                   ) : (
                     <select
-                      id={id}
-                      className={styles.select}
+                      className={`field-select ${styles.select}`}
                       aria-label={`${product.name} ${variant.label} quantity`}
                       value={selection[variant.id] ?? 0}
                       onChange={(event) => {
@@ -72,7 +73,7 @@ export function PublicMerchandiseStep({ offer, selection, issues = [], onChange 
           </div>
         </div>
       ))}
-      <p className={styles.subtotal}><span>Merchandise subtotal</span><span translate="no">{formatCents(subtotal)}</span></p>
+      <p className={styles.subtotal}><span>Merchandise subtotal</span><Money cents={subtotal} /></p>
     </section>
   );
 }

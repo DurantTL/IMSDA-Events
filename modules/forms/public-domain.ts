@@ -17,7 +17,7 @@ import {
   type RegistrationFormField,
 } from "@/modules/forms/definition";
 
-import { registrationMerchandiseSchema } from "@/modules/merchandise/registration-order-domain";
+import { registrationMerchandiseSchema } from "@/modules/merchandise/registration-order-schema";
 import { registrationLodgingSchema } from "@/modules/lodging/preferences-domain";
 
 const publicAttendeeInputSchema = z.object({
