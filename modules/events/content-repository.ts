@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 
 import { getPrisma } from "@/lib/prisma";
 import { customHtmlAssetIds, sanitizeCustomHtml } from "@/modules/events/content-html";
+import { keepHeaderImageInLibrary } from "@/modules/events/image-library";
 import {
   blockAssetIds,
   hasBlockData,
@@ -332,6 +333,12 @@ export async function replaceEventContent(
       );
     }
     throw error;
+  }
+  // Every header image is kept in the shared library (#1913). After the save has committed; never fails it.
+  for (const entry of prepared) {
+    if (entry.section.kind !== "HERO") continue;
+    const hero = entry.data as { assetId?: string; alt?: string } | null;
+    if (hero?.assetId) await keepHeaderImageInLibrary(eventId, hero.assetId, hero.alt ?? "");
   }
   return listEventContentSections(eventId);
 }

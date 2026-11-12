@@ -914,6 +914,8 @@ model User {
   notificationSettingUpdates NotificationSetting[]    @relation("NotificationSettingUpdatedBy")
   adminAlertFeedReceipts     AdminAlertFeedReceipt[]
   uploadedEventAssets       EventAsset[]              @relation("EventAssetUploadedBy")
+  createdEventImageLibraryImages EventImageLibraryImage[] @relation("EventImageLibraryCreatedBy")
+  retiredEventImageLibraryImages EventImageLibraryImage[] @relation("EventImageLibraryRetiredBy")
   uploadedMessageFiles      MessageFile[]             @relation("MessageFileUploadedBy")
   appliedProgramAssignments ProgramAssignmentRun[]    @relation("ProgramAssignmentAppliedBy")
   clubAssignmentUpdates     ClubEventAssignment[]     @relation("ClubEventAssignmentUpdatedBy")
@@ -1632,16 +1634,50 @@ model EventAsset {
   checksum         String
   storageKey       String   @unique
   uploadedByUserId String?
+  /// The shared image library entry this file was copied from (#1913); null for an ordinary upload.
+  libraryImageId   String?
   createdAt        DateTime @default(now())
 
   event      Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
   uploadedBy User?              @relation("EventAssetUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  libraryImage EventImageLibraryImage? @relation("EventAssetLibraryImage", fields: [libraryImageId], references: [id], onDelete: SetNull)
   links      EventContentLink[]
   blockRefs  EventContentSectionAsset[]
   merchandiseArtworkProducts MerchandiseProduct[] @relation("MerchandiseProductArtwork")
   badgeBackgroundEvents      Event[]              @relation("EventBadgeBackground")
 
   @@index([eventId, createdAt])
+  @@index([libraryImageId])
+}
+
+/// A header image kept in the shared library (#1913). The library holds its own copy of the file (own `storageKey`), so
+/// deleting an event or one of its uploads never breaks it. The source event's title and start are snapshots, so searching
+/// by event name or date keeps working after the event changes. Retiring hides the image from the picker only.
+model EventImageLibraryImage {
+  id                  String    @id @default(cuid())
+  displayName         String
+  contentType         String
+  byteSize            Int
+  checksum            String    @unique
+  storageKey          String    @unique
+  /// Suggested alt text; may be empty.
+  altText             String    @default("")
+  tags                String[]  @default([])
+  sourceEventId       String?
+  sourceEventTitle    String    @default("")
+  sourceEventStartsAt DateTime?
+  createdByUserId     String?
+  createdAt           DateTime  @default(now())
+  retiredAt           DateTime?
+  retiredByUserId     String?
+
+  sourceEvent Event?        @relation("EventImageLibrarySource", fields: [sourceEventId], references: [id], onDelete: SetNull)
+  createdBy   User?         @relation("EventImageLibraryCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  retiredBy   User?         @relation("EventImageLibraryRetiredBy", fields: [retiredByUserId], references: [id], onDelete: SetNull)
+  copies      EventAsset[]  @relation("EventAssetLibraryImage")
+
+  @@index([createdAt])
+  @@index([sourceEventId])
 }
 
 /// One of the six "Find your place" tiles on the public homepage (#1251). Exactly six rows, one per `position` (1 to 6),
@@ -1901,6 +1937,7 @@ model Event {
   contentSections                     EventContentSection[]
   emergencyPlan                       EmergencyPlan?
   assets                              EventAsset[]
+  imageLibraryImages                  EventImageLibraryImage[] @relation("EventImageLibrarySource")
   messageFiles                        MessageFile[]
   registrations                       Registration[]
   attendees                           RegistrationAttendee[]
