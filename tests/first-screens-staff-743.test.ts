@@ -102,8 +102,11 @@ describe("Check-in opens on Search and Scan", () => {
   });
 });
 
-describe("Registrations: search, then Start registration, then Actions", () => {
-  const render = (props: { canEdit: boolean; canEmail: boolean; canReviewPeopleMatches?: boolean }) => renderToStaticMarkup(createElement(PeopleWorkspace, {
+describe("Registrations: header with Start registration and Actions, then search (#1574)", () => {
+  // The titled header is drawn by the page (the page-title guard reads the title from the page file), so these read it.
+  const page = readFileSync("app/(workspace)/people/page.tsx", "utf8");
+  const header = page.slice(page.indexOf("<PageHeader"), page.indexOf("<PeopleWorkspace")).replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+  const render = (props: { canEdit: boolean; canEmail: boolean }) => renderToStaticMarkup(createElement(PeopleWorkspace, {
     eventId: "event-1",
     eventSlug: "synthetic-retreat",
     eventTimezone: "America/Chicago",
@@ -112,45 +115,42 @@ describe("Registrations: search, then Start registration, then Actions", () => {
     ...props,
   }));
 
-  it("orders the search box, the one primary button, and the Actions menu", () => {
+  it("orders the title, the one primary button and the Actions menu in the page header, above the list", () => {
+    expect(page).toContain("title={staffPageTitles.registrations}");
+    expect(header.indexOf("primary=")).toBeLessThan(header.indexOf("actions="));
+    expect(page.indexOf("<PageHeader")).toBeLessThan(page.indexOf("<PeopleWorkspace"));
+    expect(header).toContain("primary={canEdit ?");
+    expect(page).toContain('const canEdit = permissions.includes("MANAGE_REGISTRATION")');
+    expect(header.match(/primary-button/g)).toHaveLength(1);
+    expect(header).toContain("Start registration");
+  });
+
+  it("the list itself draws no heading, no filled button and no second Actions menu", () => {
     const html = render({ canEdit: true, canEmail: true });
-    expect(before(html, "Search people", "Start registration")).toBe(true);
-    expect(before(html, "Start registration", 'class="actions-menu"')).toBe(true);
-    // Exactly one filled primary button on the screen.
-    expect(html.match(/class="primary-button/g)).toHaveLength(1);
-  });
-
-  it("offers the cross-event duplicate-people queue in the Actions menu to system administrators only", () => {
-    const menuOf = (html: string) => html.slice(html.indexOf('class="actions-menu"'), html.indexOf("</details>", html.indexOf('class="actions-menu"')));
-    expect(menuOf(render({ canEdit: true, canEmail: true }))).not.toContain("/people/matches");
-    expect(menuOf(render({ canEdit: true, canEmail: true, canReviewPeopleMatches: true }))).toContain('href="/people/matches"');
-  });
-
-  it("groups exports, the review queues link and bulk email under one Actions menu", () => {
-    const html = render({ canEdit: true, canEmail: true });
-    const menu = html.slice(html.indexOf('class="actions-menu"'), html.indexOf("</details>", html.indexOf('class="actions-menu"')));
-    expect(menu).toContain("Actions");
-    // The queues are cards on one page now (#1574), so the menu has one item for them.
-    expect(menu).toContain("Review queues");
-    expect(menu).toContain('href="/people/review-queues?event=');
-    for (const gone of ["Find duplicates", "Directory review", "Teams waiting for a club", "Staff invitations", "Responsible adults"]) expect(menu).not.toContain(gone);
-    expect(menu).toContain("Download CSV");
-    expect(menu).toContain("Email selected");
-    // Nothing is ticked, so bulk email is present but cannot be used.
-    expect(menu).toMatch(/<button[^>]*disabled[^>]*>[\s\S]*Email selected/);
-    // None of those sit outside the menu any more.
-    const outside = html.replace(menu, "");
-    expect(outside).not.toContain("Review queues");
-    expect(outside).not.toContain("Download CSV");
-  });
-
-  it("leaves out what the viewer cannot use, and keeps the Actions menu for the exports", () => {
-    const html = render({ canEdit: false, canEmail: false });
+    expect(html).not.toContain("<h1");
     expect(html).not.toContain("Start registration");
-    expect(html).not.toContain("Directory review");
-    expect(html).not.toContain("Email selected");
-    expect(html).toContain("Download CSV");
     expect(html).not.toContain("primary-button");
+    expect(html).not.toContain('class="actions-menu"');
+    expect(before(html, "Search people", "expected")).toBe(true);
+  });
+
+  it("offers the cross-event duplicate-people queue and Imports only behind their gates", () => {
+    expect(header).toMatch(/canReviewPeopleMatches && <li><a href="\/people\/matches"/);
+    expect(page).toContain('const canReviewPeopleMatches = user?.globalRole === "SYSTEM_ADMIN"');
+    expect(header).toMatch(/permissions\.includes\("MANAGE_IMPORTS"\) && <li><a href=\{`\/imports\?event=/);
+  });
+
+  it("groups the attendee list, review queues and the CSV under the one Actions menu, and bulk email stays in the selection bar", () => {
+    expect(header).toContain("Review queues");
+    expect(header).toContain("/people/review-queues?event=");
+    for (const gone of ["Find duplicates", "Directory review", "Teams waiting for a club", "Staff invitations", "Responsible adults"]) expect(header).not.toContain(gone);
+    expect(header).toContain("Download CSV");
+    expect(header).not.toContain("Email selected");
+    // Ticking rows shows the selection bar with Email selected (unchanged).
+    const html = render({ canEdit: true, canEmail: true });
+    expect(html).toContain("selection-bar");
+    expect(render({ canEdit: false, canEmail: false })).not.toContain("selection-bar");
+    expect(render({ canEdit: false, canEmail: false })).not.toContain("Email selected");
   });
 
   it("the Actions menu is an outlined disclosure, so it never adds a second filled button", () => {

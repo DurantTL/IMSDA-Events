@@ -4,20 +4,26 @@ import {
   SEEDED_HELP_TAGS,
   SEEDED_POSITION_TYPES,
   TLT_EXPORT_HEADERS,
+  TLT_OPPORTUNITY_TAG_KEYS,
+  TLT_SHIRT_SIZES,
+  TLT_SHIRT_TYPES,
   filterTltRows,
   listActionSchema,
   parseTltFilters,
   profileUpdateSchema,
   sortTltRows,
+  summarizeOpportunityAnswers,
+  suggestionAcceptSchema,
   tltAgeLabel,
   tltExportTable,
+  tltShirtLabel,
   type TltDirectoryRow,
 } from "@/modules/tlt-directory/domain";
 
 const row = (overrides: Partial<TltDirectoryRow>): TltDirectoryRow => ({
   personId: "p1", rosterMemberId: "m1", name: "Casey Sample", clubId: "c1", clubName: "Test Pathfinders", church: "Sample Church", age: 15, reportedAge: null,
-  grade: "10th grade", tltYear: 2, positionTypeId: "pos1", positionName: "Outreach", status: "ACTIVE", tags: [{ id: "t1", name: "Setup" }], ...overrides,
-});
+  grade: "10th grade", tltYear: 2, positionTypeId: "pos1", positionName: "Outreach", status: "ACTIVE", tags: [{ id: "t1", name: "Setup" }], suggestedTags: [], shirt: null, ...overrides,
+} as TltDirectoryRow);
 
 const rows = [
   row({}),
@@ -107,12 +113,82 @@ describe("TLT directory filters, sort and export (#1686)", () => {
     const table = tltExportTable(rows);
     expect(table.headers).toEqual([...TLT_EXPORT_HEADERS]);
     expect(TLT_EXPORT_HEADERS.join(" ").toLowerCase()).not.toMatch(/birth|email|phone|address|guardian|school type|church member/);
-    expect(table.rows[0]).toEqual(["Casey Sample", "Test Pathfinders", "Sample Church", "15", "10th grade", "Year 2", "Outreach", "Active", "Setup"]);
-    expect(table.rows[1]).toEqual(["Avery Example", "Alpha Club", "", "15", "10th grade", "Not set", "", "Not set", ""]);
+    expect(table.rows[0]).toEqual(["Casey Sample", "Test Pathfinders", "Sample Church", "15", "10th grade", "Year 2", "Outreach", "Active", "Setup", "", "", ""]);
+    expect(table.rows[1]).toEqual(["Avery Example", "Alpha Club", "", "15", "10th grade", "Not set", "", "Not set", "", "", "", ""]);
   });
 
   it("shows a reported age labelled, never a date", () => {
     expect(tltAgeLabel({ age: null, reportedAge: 14 })).toBe("Age 14 (reported)");
     expect(tltAgeLabel({ age: null, reportedAge: null })).toBe("Age not recorded");
+  });
+});
+
+describe("TLT Opportunities suggestions and shirt (#1686)", () => {
+  const form = readFileSync("modules/forms/definition.ts", "utf8");
+  const arrayOf = (name: string) => {
+    const body = form.match(new RegExp(`const ${name} = \\[([\\s\\S]*?)\\];`))![1]!;
+    return [...body.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((match) => match[1]!);
+  };
+
+  it("maps every TLT Opportunities choice onto a seeded tag, and nothing else", () => {
+    const options = [
+      ...form.match(/const tltSetupOpportunity = "([^"]*)"/)!.slice(1),
+      ...form.match(/const tltOfficeOpportunity = "([^"]*)"/)!.slice(1),
+      ...form.match(/const tltPraiseTeamOpportunity = "([^"]*)"/)!.slice(1),
+      ...arrayOf("tltLeadershipOpportunities"),
+    ];
+    const mapped = Object.keys(TLT_OPPORTUNITY_TAG_KEYS);
+    expect(mapped).toHaveLength(21);
+    for (const option of mapped) expect(options, option).toContain(option);
+    for (const key of Object.values(TLT_OPPORTUNITY_TAG_KEYS)) expect(SEEDED_HELP_TAGS.map((tag) => tag.seedKey)).toContain(key);
+  });
+
+  it("keeps the shirt lists the same as the form's", () => {
+    expect([...TLT_SHIRT_TYPES]).toEqual(arrayOf("tltShirtTypes"));
+    expect([...TLT_SHIRT_SIZES]).toEqual(arrayOf("tltShirtSizes"));
+  });
+
+  const answer = (overrides: Partial<Parameters<typeof summarizeOpportunityAnswers>[0][number]>) => ({
+    personId: "p1", opportunities: null, attendeeCount: 1, needShirt: null, shirtType: null, shirtSize: null, ...overrides,
+  });
+
+  it("suggests the mapped tags once each, from every submission, and ignores unknown choices", () => {
+    const summary = summarizeOpportunityAnswers([
+      answer({ opportunities: ["Town Crier", "Clean up Sunday morning", "Friday night trash removal before sunset", "Something typed by hand"] }),
+      answer({ opportunities: ["Be on the praise team", "Town Crier"] }),
+    ]).get("p1")!;
+    expect(summary.seedKeys).toEqual(["town-crier", "trash-cleanup", "praise-team"]);
+  });
+
+  it("gives choices only to a one-person registration, since they are answered for the registration", () => {
+    expect(summarizeOpportunityAnswers([answer({ opportunities: ["Town Crier"], attendeeCount: 2 })]).get("p1")!.seedKeys).toEqual([]);
+    expect(summarizeOpportunityAnswers([answer({ opportunities: "Town Crier" })]).get("p1")!.seedKeys).toEqual([]);
+    expect(summarizeOpportunityAnswers([answer({ opportunities: ["constructor", "__proto__"] })]).get("p1")!.seedKeys).toEqual([]);
+  });
+
+  it("takes the shirt from the newest answer that has one, with fixed-list values only", () => {
+    const rows = [
+      answer({ needShirt: null }),
+      answer({ needShirt: "Yes", shirtType: "Polo", shirtSize: "Adult M" }),
+      answer({ needShirt: "No" }),
+    ];
+    expect(summarizeOpportunityAnswers(rows).get("p1")!.shirt).toEqual({ needed: true, type: "Polo", size: "Adult M" });
+    expect(summarizeOpportunityAnswers([answer({ needShirt: "Yes", shirtType: "<b>Hoodie</b>", shirtSize: "Youth S" })]).get("p1")!.shirt).toEqual({ needed: true, type: null, size: null });
+    expect(summarizeOpportunityAnswers([answer({ needShirt: "No", shirtType: "Polo", shirtSize: "Adult M" })]).get("p1")!.shirt).toEqual({ needed: false, type: null, size: null });
+  });
+
+  it("words the shirt and adds three CSV columns", () => {
+    expect(tltShirtLabel(null)).toBe("No answer yet");
+    expect(tltShirtLabel({ needed: false, type: null, size: null })).toBe("No shirt needed");
+    expect(tltShirtLabel({ needed: true, type: "Polo", size: "Adult M" })).toBe("Polo, Adult M");
+    expect(TLT_EXPORT_HEADERS.slice(-3)).toEqual(["TLT shirt", "Shirt type", "Shirt size"]);
+    const table = tltExportTable([row({ shirt: { needed: true, type: "T-Shirt", size: "Adult L" }, suggestedTags: [{ id: "t9", name: "Games" }] })]);
+    expect(table.rows[0]!.slice(-3)).toEqual(["Yes", "T-Shirt", "Adult L"]);
+    expect(JSON.stringify(table)).not.toContain("Games");
+  });
+
+  it("accepts only a person and a tag", () => {
+    expect(suggestionAcceptSchema.safeParse({ personId: "p1", tagId: "t1" }).success).toBe(true);
+    expect(suggestionAcceptSchema.safeParse({ personId: "p1", tagId: "t1", name: "Free text" }).success).toBe(false);
   });
 });

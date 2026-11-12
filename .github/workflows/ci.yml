@@ -256,6 +256,8 @@ jobs:
       - run: npm run test:event-debrief
       # Real-database check of the optional Budget sheet (#1682): off by default, who may switch it, who reads and who changes cost lines, each change audited with amounts only, the auto-filled figures equal to the source functions' output, and last year's sheet on a copied event.
       - run: npm run test:event-budget
+      # Real-database check of the optional Event staffing sheet (#1678): off by default, who may switch it, who reads and who changes activities, only people registered for the event or on its staff can be assigned, one lead per activity, gaps worked out on the rows, each change audited with ids and counts only, the CSV with names and roles only, and each assigned person seeing only their own assignments.
+      - run: npm run test:event-staffing
       - run: npm run test:honor-class-requirements
       # Real-database check of the Honors Weekend class waitlist (#831): join order, offers to the
       # next in line (one director emailed per offer), accept once, an unaccepted offer passing on

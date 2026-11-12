@@ -87,12 +87,19 @@ describe("launcher grouping", () => {
 
   it("does not let a module being on grant a card the role cannot open", () => {
     const keys = keysOf(cardsFor({ permissions: ["VIEW_EVENT"], clubOversight: false, clubFormsAccess: false, enabled: eventModuleKeys.filter((key) => key !== "emergency-plans") }));
-    expect(keys).toEqual([]);
+    expect(keys).toEqual(["event-staffing"]);
+  });
+
+  it("lists Event staffing for event staff with the event view only while its module is on, never for kitchen-only staff (#1678)", () => {
+    const readOnly = { permissions: ["VIEW_EVENT"] as EventPermission[], clubOversight: false, clubFormsAccess: false };
+    expect(keysOf(cardsFor({ ...readOnly, enabled: eventModuleKeys }))).toContain("event-staffing");
+    expect(keysOf(cardsFor({ ...readOnly, enabled: eventModuleKeys.filter((key) => key !== "event-staffing") }))).not.toContain("event-staffing");
+    expect(keysOf(cardsFor({ permissions: ["MANAGE_KITCHEN_COUNTS"], clubOversight: false, clubFormsAccess: false, enabled: eventModuleKeys }))).not.toContain("event-staffing");
   });
 
   it("lists the emergency plan for read-only event staff only while its module is on (#114)", () => {
     const readOnly = { permissions: ["VIEW_EVENT"] as EventPermission[], clubOversight: false, clubFormsAccess: false };
-    expect(keysOf(cardsFor({ ...readOnly, enabled: eventModuleKeys }))).toEqual(["emergency-plans"]);
+    expect(keysOf(cardsFor({ ...readOnly, enabled: eventModuleKeys }))).toEqual(["emergency-plans", "event-staffing"]);
     expect(keysOf(cardsFor({ ...readOnly, enabled: [] }))).toEqual([]);
     // The shell passes the always-on state when none was loaded, which leaves the card off.
     expect(keysOf(cardsFor({ ...readOnly, enabled: alwaysOnModuleKeys }))).toEqual([]);

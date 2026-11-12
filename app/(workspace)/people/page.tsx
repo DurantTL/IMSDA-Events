@@ -33,6 +33,10 @@ import { countPendingTeams } from "@/modules/general-link-registrations/reposito
 import { staffPageTitles } from "@/components/staff-navigation";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { StaffContextualHelp } from "@/components/contextual-help-slot";
+import { PageHeader } from "@/components/page-header";
+import { ExportLink } from "@/components/export-link";
+import listStyles from "@/components/people-list.module.css";
+import { ClipboardCheck, CopyCheck, Download, ExternalLink, FileUp, ListChecks } from "lucide-react";
 
 export const metadata: Metadata = { title: staffPageTitles.registrations };
 
@@ -63,6 +67,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   const offPageRegistrationId = searchResult && registration && !searchResult.registrationIds.includes(registration) ? [registration] : [];
   // Teams from the general registration link that wait for a club (#931): said at the top, for someone who can resolve them.
   const pendingTeamCount = permissions.includes("MANAGE_REGISTRATION") ? await countPendingTeams(event.id) : 0;
+  const canEdit = permissions.includes("MANAGE_REGISTRATION");
   // The cross-event duplicate-people queue is for system administrators only, the same rule its page applies.
   const canReviewPeopleMatches = user?.globalRole === "SYSTEM_ADMIN";
   const [loaded, flagged, responsibleByAttendee, optOutRows, suppressionMarks] = await Promise.all([
@@ -107,7 +112,24 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   if (filter) searchParamsForLinks.set("filter", filter);
   return <>
       <AdminPageHeader path="/people" eventId={event.id} />
-    <PeopleWorkspace helpSlot={<StaffContextualHelp guideId="find-a-registration" event={requested} />} filtersAfterSearch={<>
+    <section className="page-stack">
+    <PageHeader
+      title={staffPageTitles.registrations}
+      description={<>A registration is one sign-up with everyone it covers. For one row per person, open the <a className={listStyles.descLink} href={`/people/attendees?event=${encodeURIComponent(event.id)}`}>Attendee list</a>.</>}
+      primary={canEdit ? <a className="primary-button" href={`/events/${event.slug}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" size={17} /> Start registration</a> : undefined}
+      extra={<div className={listStyles.helpSlot}><StaffContextualHelp guideId="find-a-registration" event={requested} /></div>}
+      actions={<>
+        {/* Attendee list and Imports left the sidebar (#964); this page reaches them. The list needs the same permission as this page. */}
+        <li><a href={`/people/attendees?event=${encodeURIComponent(event.id)}`}><ListChecks aria-hidden="true" size={16} /> Attendee list</a></li>
+        {permissions.includes("MANAGE_IMPORTS") && <li><a href={`/imports?event=${encodeURIComponent(event.id)}`}><FileUp aria-hidden="true" size={16} /> Imports</a></li>}
+        {/* Find duplicates, Directory review, Teams waiting for a club, Staff invitations and Responsible adults are cards on one page now (#1574). */}
+        <li><a href={`/people/review-queues?event=${encodeURIComponent(event.id)}`}><ClipboardCheck aria-hidden="true" size={16} /> Review queues</a></li>
+        {/* The cross-event identity queue lives beside the event's own review queues, not in the sidebar; the page checks the role again. */}
+        {canReviewPeopleMatches && <li><a href="/people/matches"><CopyCheck aria-hidden="true" size={16} /> Possible duplicate people (all events)</a></li>}
+        <li><ExportLink href={`/api/events/${event.id}/exports/registrations${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink></li>
+      </>}
+    />
+    <PeopleWorkspace filtersAfterSearch={<>
     <OperationsSearchBar
       basePath="/people"
       carry={{ filter }}
@@ -118,6 +140,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
     />
     <LocationFilter basePath="/people" locations={locations} params={searchResult ? searchParamsForLinks : { event: event.id, filter, [CHOICE_FILTER_QUESTION_PARAM]: choice?.question.id, [CHOICE_FILTER_VALUE_PARAM]: choice?.value ?? undefined }} selectedId={locationId} />
     <ChoiceAnswerFilter eventId={event.id} view={choiceView} carry={{ filter, location: locationId ?? undefined }} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canExport={permissions.includes("VIEW_REPORTS") && permissions.includes("VIEW_SENSITIVE_DATA")} />
-    </>} key={`${event.id}:${choice?.question.id ?? ""}:${choice?.value ?? ""}:${searchResult?.queryString ?? ""}`} eventId={event.id} eventSlug={event.slug} eventTimezone={event.timezone} waitlistEnabled={event.waitlistEnabled} initialRegistrations={registrations} canEdit={permissions.includes("MANAGE_REGISTRATION")} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canImport={permissions.includes("MANAGE_IMPORTS")} initialFilter={filter} initialRegistrationId={registration} backgroundFlaggedAttendeeIds={[...flagged]} announcementOptOuts={announcementOptOuts} emailSuppressions={suppressionMarks} responsibleAdults={responsibleAdults} matchingPersonFilter={Boolean(choice?.value)} locationId={locationId} pageScoped={Boolean(searchResult)} serverFiltered={Boolean(searchResult) || Boolean(locationId) || Boolean(choice?.value)} serverQuery={searchQuery.text} openOnlyRegistration={openOnlyRegistration} resultOrderText={searchResult ? describeSearchOrder(searchResult) : undefined} pendingTeamCount={pendingTeamCount} canReviewPeopleMatches={canReviewPeopleMatches} />
+    </>} key={`${event.id}:${choice?.question.id ?? ""}:${choice?.value ?? ""}:${searchResult?.queryString ?? ""}`} eventId={event.id} eventSlug={event.slug} eventTimezone={event.timezone} waitlistEnabled={event.waitlistEnabled} initialRegistrations={registrations} canEdit={permissions.includes("MANAGE_REGISTRATION")} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} initialFilter={filter} initialRegistrationId={registration} backgroundFlaggedAttendeeIds={[...flagged]} announcementOptOuts={announcementOptOuts} emailSuppressions={suppressionMarks} responsibleAdults={responsibleAdults} matchingPersonFilter={Boolean(choice?.value)} locationId={locationId} pageScoped={Boolean(searchResult)} serverFiltered={Boolean(searchResult) || Boolean(locationId) || Boolean(choice?.value)} serverQuery={searchQuery.text} openOnlyRegistration={openOnlyRegistration} resultOrderText={searchResult ? describeSearchOrder(searchResult) : undefined} pendingTeamCount={pendingTeamCount} />
+    </section>
   </>;
 }

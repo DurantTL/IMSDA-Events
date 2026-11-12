@@ -138,6 +138,7 @@ export function ClubYearEndConference({ reportYear, initialRows, initialQuery = 
               {...search.inputProps}
               autoComplete="off"
               onChange={(event) => { search.inputProps.onChange(event); resetPage(); }}
+              className={styles.search}
               placeholder="Find a club, church or director"
               type="search"
             />

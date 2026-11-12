@@ -49,7 +49,7 @@ const clubsCapablePatterns: readonly RegExp[] = [
   /^\/admin\/honors(\/|$)/,
   /^\/admin\/club-supplies(\/|$)/,
   /^\/admin\/club-forms(\/|$)/,
-  /^\/admin\/organizations\/[^/]+\/(club|honors|directors|profile)(\/|$)/,
+  /^\/admin\/organizations\/[^/]+\/(club|honors|directors|profile|church-clubs)(\/|$)/,
   /^\/admin\/people(\/|$)/,
 ];
 
@@ -115,7 +115,7 @@ function clubsAreaKey(pathname: string): string | null {
   const group = href ? clubsAdminGroups.find((candidate) => candidate.items.some((item) => item.href === href)) : null;
   if (group) return clubsGroupTab[group.key];
   // A club's own pages are not in the sidebar; they belong to the club list.
-  if (/^\/admin\/organizations\/[^/]+\/(club|honors|directors|profile)(\/|$)/.test(pathname)) return "all-clubs";
+  if (/^\/admin\/organizations\/[^/]+\/(club|honors|directors|profile|church-clubs)(\/|$)/.test(pathname)) return "all-clubs";
   return null;
 }
 
@@ -187,7 +187,7 @@ export function adminBackLink(
   match = /^\/admin\/organizations\/([^/]+)\/(directors|profile)(\/|$)/.exec(pathname);
   if (match) return clubsView || options.viaParent ? clubPage(match[1]) : clubList;
   if (/^\/admin\/organizations\/[^/]+\/pastor(\/|$)/.test(pathname)) return { href: "/admin/organizations/directory", label: "Back to the directory" };
-  if (/^\/admin\/organizations\/[^/]+\/(billing|location)(\/|$)/.test(pathname)) return clubList;
+  if (/^\/admin\/organizations\/[^/]+\/(billing|location|church-clubs)(\/|$)/.test(pathname)) return clubList;
   if (/^\/admin\/organizations\/map-locations(\/|$)/.test(pathname)) return { href: "/admin/organizations/directory", label: "Back to Organization directory" };
   if (/^\/admin\/organizations\/(directory|import)(\/|$)/.test(pathname)) return { href: "/admin/organizations", label: "Back to Clubs and churches" };
   // The club imports are views of the Club directory (#1589), in both views.

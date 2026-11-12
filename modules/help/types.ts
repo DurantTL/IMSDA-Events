@@ -5,7 +5,7 @@ import type { EventPermission } from "@/modules/access/permissions";
  * reads the database, a session or an event. A guide never holds an event name,
  * an attendee, a private link or a person's name.
  */
-export type HelpWorkspace = "System" | "Event";
+export type HelpWorkspace = "System" | "Clubs" | "Event";
 
 /**
  * Who sees a guide in the hub and in search. It decides visibility only; the
@@ -16,6 +16,8 @@ export type GuideAudience =
   | { kind: "everyone" }
   /** System administrators only. */
   | { kind: "system" }
+  /** System administrators and active Clubs Administrators (the people `hasClubsAdministration` lets in). */
+  | { kind: "clubs" }
   /** Staff who hold the permission the guide's working page needs (system administrators hold every one). */
   | { kind: "event-permission"; permission: EventPermission };
 
@@ -23,9 +25,10 @@ export type GuideAudience =
 export type HelpDestination = {
   id: string;
   label: string;
-  /** The page's route path, no query string. The event is added for the viewer. */
+  /** The page's route path. System and Event paths carry no query string (the event is added for the viewer); a Clubs path may name a view (`?view=`) or a section (`#section`). */
   path: string;
-  scope: "System" | "Event";
+  /** `Clubs` pages open for a system administrator or an active Clubs Administrator, with no event needed. */
+  scope: "System" | "Clubs" | "Event";
   /** Event destinations: the permission the page needs. */
   permission?: EventPermission;
 };
@@ -58,6 +61,10 @@ export type HelpGuide = {
   lastReviewed: string;
   /** An optional synthetic screenshot (#1259), a file under `public/`. Shown as "Example with sample data". */
   screenshot?: GuideScreenshot;
+  /** A step-by-step guide with a real-screen picture for each step (#1882). `steps` holds the same sentences as text. */
+  walkthrough?: { steps: readonly WalkthroughStep[] };
+  /** Ids of the walkthrough guides that show this guide's task step by step. Shown as "See it step by step" links. */
+  walkthroughIds?: readonly string[];
 };
 
 export type GuideScreenshot = {
