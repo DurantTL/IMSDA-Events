@@ -23,6 +23,7 @@ export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
   { pattern: "/more/issued-assets/closeout" },
   { pattern: "/more/merchandise" },
   { pattern: "/more/tags" },
+  { pattern: "/more/event-settings" },
   { pattern: "/admin/club-supplies/conference-orders" },
   { pattern: "/admin/club-supplies" },
   { pattern: "/more/event-patches" },

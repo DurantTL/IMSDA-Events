@@ -143,7 +143,7 @@ export function EventLocationsPanel({
       <div className="section-heading">
         <div>
           <p className="eyebrow">Sites</p>
-          <h2 id="event-locations-title">Locations</h2>
+          <h2 id="event-locations-title" tabIndex={-1}>Locations</h2>
           <p>
             For an event held at more than one site. With no locations the event works as usual. With one or more,
             every new club registration must pick one. Dates left blank use the event&apos;s own dates.

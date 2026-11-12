@@ -1,0 +1,6 @@
+/* Event settings on a phone and tablet (#1586): the settings form, then the one Save bar, then Publish readiness as a separate review. */
+@media (max-width: 980px) {
+  .main { order: 1; }
+  .savebar { order: 2; }
+  .side { order: 3; }
+}

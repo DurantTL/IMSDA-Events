@@ -21,6 +21,8 @@ import { getEventSettings } from "@/modules/events/repository";
 import { eventAllowsArchiveDownload } from "@/modules/reporting/event-archive";
 import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { PageHeader } from "@/components/page-header";
+import { EventClubOptionsGroup } from "@/components/event-club-options-group";
 
 export const metadata: Metadata = { title: staffPageTitles.eventSettings };
 
@@ -32,7 +34,12 @@ export default async function EventSettingsPage({
   const { event: requested, calendarDates } = await searchParams;
   const { event, membership, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("CONFIGURE_EVENT")) {
-    return <AccessRestricted title="Event settings are restricted" detail="Only event administrators can change public details, capacity, registration dates, waitlist behavior, and publishing." whoToAsk="your event administrator" />;
+    return (
+      <>
+        <PageHeader title={staffPageTitles.eventSettings} />
+        <AccessRestricted title="Event settings are restricted" detail="Only event administrators can change public details, capacity, registration dates, waitlist behavior, and publishing." whoToAsk="your event administrator" />
+      </>
+    );
   }
   const { user } = await getCurrentSession();
   const [settings, archiveFacts, locations, coordinators, teamSettings, generalLink, linkNotice, platform, emailSettings] = await Promise.all([getEventSettings(event.id), findEventArchiveFacts(event.id), listEventLocations(event.id), listActiveAreaCoordinators(), getTeamSettings(event.id), getGeneralLinkSettings(event.id), getCalendarLinkNotice(event.id), getPlatformSettings(), loadEventEmailSettings(getPrisma(), event.id)]);
@@ -48,14 +55,18 @@ export default async function EventSettingsPage({
         // Where each value comes from (#1258): the defaults a new event is seeded from, and the event's sender against the central one. Names and addresses only.
         platformDefaults={{ defaultTimezone: platform.defaultTimezone, defaultAttendeeEditPolicy: platform.defaultAttendeeEditPolicy }}
         emailSender={emailSettings ? { senderName: emailSettings.senderName, replyToOverride: emailSettings.replyToOverride, central: { name: emailSettings.central.name, replyTo: emailSettings.central.replyTo } } : undefined} />
-      {settings.audience === "CLUB" && <EventTeamSettingsPanel key={`teams-${event.id}`} eventId={event.id} initialSettings={teamSettings} />}
-      {settings.audience === "CLUB" && generalLink && (
-        <EventGeneralLinkPanel
-          key={`general-link-${event.id}`}
-          eventId={event.id}
-          initialSettings={generalLink}
-          publicUrl={generalLinkUrl(getServerEnv().APP_BASE_URL, settings.slug)}
-        />
+      {settings.audience === "CLUB" && (
+        <EventClubOptionsGroup>
+          <EventTeamSettingsPanel key={`teams-${event.id}`} eventId={event.id} initialSettings={teamSettings} />
+          {generalLink && (
+            <EventGeneralLinkPanel
+              key={`general-link-${event.id}`}
+              eventId={event.id}
+              initialSettings={generalLink}
+              publicUrl={generalLinkUrl(getServerEnv().APP_BASE_URL, settings.slug)}
+            />
+          )}
+        </EventClubOptionsGroup>
       )}
     </>
   );
