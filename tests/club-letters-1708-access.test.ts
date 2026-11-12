@@ -106,7 +106,7 @@ beforeEach(() => {
   mocks.createClubLetter.mockResolvedValue({ id: "letter-1" });
   mocks.deleteClubLetter.mockResolvedValue(undefined);
   mocks.updateClubLetter.mockResolvedValue({ id: "letter-1" });
-  mocks.loadClubLetterSheets.mockImplementation(async (_id: string, capabilities: { editProfile: boolean }, templateId: string) => (capabilities.editProfile && templateId === "letter-1" ? { kind: "LETTER", title: "Welcome", sheets: [{ personId: "p1", text: "Dear Ann," }] } : null));
+  mocks.loadClubLetterSheets.mockImplementation(async (_id: string, capabilities: { editProfile: boolean }, templateId: string) => (capabilities.editProfile && templateId === "letter-1" ? { kind: "LETTER", title: "Welcome", sheets: [{ personId: "p1", name: "Ann Example", text: "Dear Ann," }] } : null));
   mocks.loadClubLetters.mockImplementation(async (_id: string, capabilities: { editProfile: boolean }) => (capabilities.editProfile ? list : null));
 });
 
@@ -354,7 +354,7 @@ describe("the print page", () => {
     mocks.loadClubLetterSheets.mockResolvedValue({
       kind: "CERTIFICATE",
       title: "Thanks",
-      sheets: [{ personId: "p1", text: "<script>alert(1)</script> Ann\nExample" }, { personId: "p2", text: "Zed Sample" }],
+      sheets: [{ personId: "p1", name: "Ann Example", text: "<script>alert(1)</script> Ann\nExample" }, { personId: "p2", name: "Zed Sample", text: "Zed Sample" }],
     });
     const html = renderToStaticMarkup((await PrintPage(printParams())) as ReactElement);
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt; Ann");
@@ -362,6 +362,7 @@ describe("the print page", () => {
     expect(html.match(/<section/g)).toHaveLength(2);
     expect(html).toContain("certificate");
     expect(html).toContain("2 pages");
+    expect(html).toContain("Thanks for Ann Example");
   });
 
   it("shows the sheets to staff acting as this club's director", async () => {

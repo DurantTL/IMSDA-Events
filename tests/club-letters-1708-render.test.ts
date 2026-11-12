@@ -15,8 +15,8 @@ const letters = [
   { id: "cert-1", kind: "CERTIFICATE" as const, title: "Thanks", body: "{full_name}", updatedAt: "2026-11-10T12:00:00.000Z" },
 ];
 const people = [
-  { personId: "p1", firstName: "Ann", lastName: "Example" },
-  { personId: "p2", firstName: "Zed", lastName: "Sample" },
+  { personId: "p1", firstName: "Ann", lastName: "Example", typeLabel: "Youth" },
+  { personId: "p2", firstName: "Zed", lastName: "Sample", typeLabel: "Staff" },
 ];
 
 let mounted: Mounted | null = null;
@@ -100,6 +100,22 @@ describe("the add form", () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/attendee/clubs/club-1/letters");
     expect(JSON.parse(init.body as string)).toEqual({ kind: "CERTIFICATE", title: "Thanks", body: "Thank you {full_name}" });
+  });
+});
+
+describe("the unsaved guard and error summary", () => {
+  it("shows a linked summary on a failed submit", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    mounted = await mount(createElement(ClubLetters, { organizationId: "club-1", letters: [], people }));
+    await submitForm(mounted.container.querySelector("form")!);
+    const summary = mounted.container.querySelector<HTMLElement>('.form-error-summary[role="alert"]')!;
+    expect(summary.textContent).toContain("Title: Enter a title.");
+    expect(summary.textContent).toContain("Text: Enter the text of the letter.");
+  });
+
+  it("tells people apart by roster type in the checklist", async () => {
+    mounted = await mount(createElement(ClubLetters, { organizationId: "club-1", letters, people }));
+    expect(mounted.container.textContent).toContain("Ann Example · Youth");
   });
 });
 

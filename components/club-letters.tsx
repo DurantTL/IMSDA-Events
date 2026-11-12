@@ -6,8 +6,10 @@ import { useState, type FormEvent } from "react";
 import { Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { formatPersonName } from "@/lib/person-name";
 import {
   CLUB_LETTER_KINDS,
@@ -58,17 +60,31 @@ function LetterForm({
   const [failed, setFailed] = useState("");
   const [saved, setSaved] = useState("");
   const base = `/api/attendee/clubs/${encodeURIComponent(organizationId)}/letters`;
+  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
+  const dirty = kind !== (letter?.kind ?? "LETTER") || title !== (letter?.title ?? "") || body !== (letter?.body ?? "");
+  useUnsavedChangesGuard(dirty, "You have an unsaved letter. Leave this page and discard it?");
+  const labels: Record<FieldKey, string> = { title: "Title", body: "Text" };
+  const fieldId = (key: string) => `${idBase}-${key}`;
+
+  function report(found: Partial<Record<FieldKey, string>>) {
+    setErrors(found);
+    showSummary((Object.keys(found) as FieldKey[]).map((key) => ({ targetId: fieldId(key), message: summaryMessage(labels[key], found[key]!) })));
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setFailed("");
     setSaved("");
+    clearSummary();
     const found: Partial<Record<FieldKey, string>> = {};
     if (!title.trim()) found.title = "Enter a title.";
     if (!body.trim()) found.body = "Enter the text of the letter.";
     else if (placeholderProblem(body)) found.body = placeholderProblem(body)!;
-    setErrors(found);
-    if (Object.keys(found).length > 0) return;
+    if (Object.keys(found).length > 0) {
+      report(found);
+      return;
+    }
+    setErrors({});
     setBusy(true);
     try {
       await request(letter ? `${base}/${encodeURIComponent(letter.id)}` : base, { method: letter ? "PATCH" : "POST", body: JSON.stringify({ kind, title, body }) });
@@ -84,16 +100,17 @@ function LetterForm({
           if ((key === "title" || key === "body") && !mapped[key]) mapped[key] = issue.message ?? "Check this field.";
         }
       }
-      if (Object.keys(mapped).length > 0) setErrors(mapped);
+      if (Object.keys(mapped).length > 0) report(mapped);
       else setFailed(notSavedMessage(caught instanceof Error ? caught.message : "That could not be saved."));
     } finally {
       setBusy(false);
     }
   }
 
-  const id = (key: string) => `${idBase}-${key}`;
+  const id = fieldId;
   return (
     <form className={styles.form} noValidate onSubmit={(event) => void submit(event)}>
+      {summaryItems.length > 0 ? <FormErrorSummary items={summaryItems} ref={summaryRef} /> : null}
       <div className={styles.field}>
         <label htmlFor={id("kind")}>Type</label>
         <select id={id("kind")} onChange={(event) => setKind(event.target.value as ClubLetterKindValue)} value={kind}>
@@ -102,12 +119,12 @@ function LetterForm({
       </div>
       <div className={styles.field}>
         <label htmlFor={id("title")}>Title</label>
-        <input id={id("title")} {...fieldErrorProps(id("title-error"), errors.title)} maxLength={LETTER_TITLE_MAX} onChange={(event) => { setTitle(event.target.value); setErrors((c) => ({ ...c, title: undefined })); }} value={title} />
+        <input id={id("title")} {...fieldErrorProps(id("title-error"), errors.title)} maxLength={LETTER_TITLE_MAX} onChange={(event) => { setTitle(event.target.value); setErrors((c) => ({ ...c, title: undefined })); clearSummaryField(id("title")); }} value={title} />
         <FieldError id={id("title-error")}>{errors.title}</FieldError>
       </div>
       <div className={styles.field}>
         <label htmlFor={id("body")}>Text</label>
-        <textarea id={id("body")} {...fieldErrorProps(id("body-error"), errors.body, id("body-help"))} maxLength={LETTER_BODY_MAX} onChange={(event) => { setBody(event.target.value); setErrors((c) => ({ ...c, body: undefined })); }} value={body} />
+        <textarea id={id("body")} {...fieldErrorProps(id("body-error"), errors.body, id("body-help"))} maxLength={LETTER_BODY_MAX} onChange={(event) => { setBody(event.target.value); setErrors((c) => ({ ...c, body: undefined })); clearSummaryField(id("body")); }} value={body} />
         <small className={styles.help} id={id("body-help")}>Plain text. Put a placeholder such as {"{first_name}"} where each person&apos;s details go.</small>
         <FieldError id={id("body-error")}>{errors.body}</FieldError>
       </div>
@@ -156,7 +173,7 @@ function LetterCard({ organizationId, letter }: { organizationId: string; letter
       <ConfirmDialog
         busy={busy}
         busyLabel="Deleting…"
-        confirmLabel="Delete letter"
+        confirmLabel={`Delete ${letter.kind === "CERTIFICATE" ? "certificate" : "letter"}`}
         destructive
         error={error}
         onCancel={() => setConfirming(false)}
@@ -208,7 +225,7 @@ function PrintStep({ organizationId, letters, people }: { organizationId: string
                         onChange={(event) => setPicked((current) => (event.target.checked ? [...current, person.personId] : current.filter((item) => item !== person.personId)))}
                         type="checkbox"
                       />
-                      {formatPersonName(person)}
+                      {formatPersonName(person)}<span className={styles.meta}>{` · ${person.typeLabel}`}</span>
                     </label>
                   </li>
                 );

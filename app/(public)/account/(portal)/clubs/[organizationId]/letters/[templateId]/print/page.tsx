@@ -41,7 +41,7 @@ export default async function ClubLetterPrintPage({
             <p className={`${styles.meta} ${styles.printTools}`}>{`${result.title}: ${result.sheets.length} ${result.sheets.length === 1 ? "page" : "pages"}. In the print window, choose Save as PDF to keep a file.`}</p>
             <div className={styles.sheets}>
               {result.sheets.map((sheet) => (
-                <section aria-label={`${result.title}`} className={`${styles.sheet} ${certificate ? styles.certificate : ""}`} key={sheet.personId}>
+                <section aria-label={`${result.title} for ${sheet.name}`} className={`${styles.sheet} ${certificate ? styles.certificate : ""}`} key={sheet.personId}>
                   <p className={styles.sheetBody}>{sheet.text}</p>
                 </section>
               ))}

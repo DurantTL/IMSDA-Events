@@ -1,5 +1,6 @@
 import "server-only";
 
+import { formatPersonName } from "@/lib/person-name";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { isClubFeatureEnabled } from "@/modules/club-features/repository";
@@ -15,7 +16,7 @@ import {
   type ClubLetterView,
 } from "@/modules/club-letters/domain";
 import type { ClubLetterInput } from "@/modules/club-letters/schemas";
-import { clubYearFor } from "@/modules/club-rosters/domain";
+import { clubRosterAttendeeTypeLabels, clubYearFor } from "@/modules/club-rosters/domain";
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
 /**
@@ -34,7 +35,7 @@ export class ClubLetterError extends Error {
   }
 }
 
-export type ClubLetterPerson = { personId: string; firstName: string; lastName: string };
+export type ClubLetterPerson = { personId: string; firstName: string; lastName: string; typeLabel: string };
 
 export type ClubLetterList = {
   clubYear: string;
@@ -47,7 +48,7 @@ export type ClubLetterSheets = {
   kind: ClubLetterKindValue;
   title: string;
   /** One filled-in text per person kept, in last-name order. */
-  sheets: Array<{ personId: string; text: string }>;
+  sheets: Array<{ personId: string; name: string; text: string }>;
 };
 
 /** Whether this viewer and club may use letters: the one check the page, the links and the route handlers share. */
@@ -71,12 +72,12 @@ async function activeRosterPeople(organizationId: string, now: Date, onlyIds?: s
       status: "ACTIVE",
       personId: onlyIds ? { in: onlyIds } : { not: null },
     },
-    select: { personId: true, person: { select: { firstName: true, lastName: true } } },
+    select: { personId: true, attendeeType: true, person: { select: { firstName: true, lastName: true } } },
   });
   const byPerson = new Map<string, ClubLetterPerson>();
   for (const member of members) {
     if (member.personId && member.person && !byPerson.has(member.personId)) {
-      byPerson.set(member.personId, { personId: member.personId, firstName: member.person.firstName, lastName: member.person.lastName });
+      byPerson.set(member.personId, { personId: member.personId, firstName: member.person.firstName, lastName: member.person.lastName, typeLabel: clubRosterAttendeeTypeLabels[member.attendeeType] });
     }
   }
   return [...byPerson.values()].sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName) || a.personId.localeCompare(b.personId));
@@ -123,6 +124,7 @@ export async function loadClubLetterSheets(
     title: template.title,
     sheets: kept.map((person) => ({
       personId: person.personId,
+      name: formatPersonName(person),
       text: fillInLetter(template.body, { firstName: person.firstName, lastName: person.lastName, clubName: club?.name ?? "", clubYear, date: now }),
     })),
   };
@@ -141,8 +143,12 @@ function auditActor(actor: ClubLetterActor) {
     };
 }
 
-async function requireFeature(organizationId: string) {
-  if (!(await isClubFeatureEnabled(organizationId, CLUB_LETTERS_FEATURE_KEY))) {
+async function requireFeature(tx: Pick<ReturnType<typeof getPrisma>, "clubOptionalFeature">, organizationId: string) {
+  const on = await tx.clubOptionalFeature.findUnique({
+    where: { organizationId_featureKey: { organizationId, featureKey: CLUB_LETTERS_FEATURE_KEY } },
+    select: { id: true },
+  });
+  if (!on) {
     throw new ClubLetterError("FEATURE_OFF", "That page could not be found.");
   }
 }
@@ -150,7 +156,7 @@ async function requireFeature(organizationId: string) {
 /** Saves a new template. Needs the feature on and room under the limit. Audited with the club, kind and title. */
 export async function createClubLetter(organizationId: string, input: ClubLetterInput, actor: ClubLetterActor): Promise<ClubLetterView> {
   return getPrisma().$transaction(async (tx) => {
-    await requireFeature(organizationId);
+    await requireFeature(tx, organizationId);
     const existing = await tx.clubLetterTemplate.count({ where: { organizationId } });
     if (!canAddLetter(existing)) {
       throw new ClubLetterError("LIMIT_REACHED", `A club can keep at most ${LETTERS_PER_CLUB_MAX} letters and certificates. Delete one first.`);
@@ -166,7 +172,7 @@ export async function createClubLetter(organizationId: string, input: ClubLetter
       entityType: "ClubLetterTemplate",
       entityId: created.id,
       summary: `Added a ${input.kind === "CERTIFICATE" ? "certificate" : "letter"} template for the club.`,
-      metadata: { organizationId, kind: created.kind, title: created.title, ...who.metadata },
+      metadata: { organizationId, kind: created.kind, ...who.metadata },
     }, tx);
     return toView(created);
   });
@@ -175,7 +181,7 @@ export async function createClubLetter(organizationId: string, input: ClubLetter
 /** Changes one of this club's templates. Needs the feature on. Audited. */
 export async function updateClubLetter(organizationId: string, templateId: string, input: ClubLetterInput, actor: ClubLetterActor): Promise<ClubLetterView> {
   return getPrisma().$transaction(async (tx) => {
-    await requireFeature(organizationId);
+    await requireFeature(tx, organizationId);
     const changed = await tx.clubLetterTemplate.updateMany({
       where: { id: templateId, organizationId },
       data: { kind: input.kind, title: input.title, body: input.body },
@@ -190,7 +196,7 @@ export async function updateClubLetter(organizationId: string, templateId: strin
       entityType: "ClubLetterTemplate",
       entityId: row.id,
       summary: `Changed a ${row.kind === "CERTIFICATE" ? "certificate" : "letter"} template for the club.`,
-      metadata: { organizationId, kind: row.kind, title: row.title, ...who.metadata },
+      metadata: { organizationId, kind: row.kind, ...who.metadata },
     }, tx);
     return toView(row);
   });
@@ -199,7 +205,7 @@ export async function updateClubLetter(organizationId: string, templateId: strin
 /** Deletes one of this club's templates. Needs the feature on. Audited with the same details as the add. */
 export async function deleteClubLetter(organizationId: string, templateId: string, actor: ClubLetterActor): Promise<void> {
   await getPrisma().$transaction(async (tx) => {
-    await requireFeature(organizationId);
+    await requireFeature(tx, organizationId);
     const row = await tx.clubLetterTemplate.findFirst({ where: { id: templateId, organizationId }, select: { id: true, kind: true, title: true } });
     if (!row) throw new ClubLetterError("LETTER_NOT_FOUND", "That letter could not be found.");
     const removed = await tx.clubLetterTemplate.deleteMany({ where: { id: row.id, organizationId } });
@@ -211,7 +217,7 @@ export async function deleteClubLetter(organizationId: string, templateId: strin
       entityType: "ClubLetterTemplate",
       entityId: row.id,
       summary: `Deleted a ${row.kind === "CERTIFICATE" ? "certificate" : "letter"} template from the club.`,
-      metadata: { organizationId, kind: row.kind, title: row.title, ...who.metadata },
+      metadata: { organizationId, kind: row.kind, ...who.metadata },
     }, tx);
   });
 }

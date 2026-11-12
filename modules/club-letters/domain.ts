@@ -10,7 +10,6 @@
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
 export const CLUB_LETTERS_FEATURE_KEY = "fill-in-letters";
-export const CLUB_LETTERS_PATH = "letters";
 
 export const CLUB_LETTER_KINDS = ["LETTER", "CERTIFICATE"] as const;
 export type ClubLetterKindValue = (typeof CLUB_LETTER_KINDS)[number];

@@ -92,15 +92,16 @@ describe("the list", () => {
   it("holds this club's templates and this club year's active roster, once each, by last name", async () => {
     mocks.prisma.clubLetterTemplate.findMany.mockResolvedValue([row()]);
     mocks.prisma.clubRosterMember.findMany.mockResolvedValue([
-      { personId: "p2", person: { firstName: "Zed", lastName: "Sample" } },
-      { personId: "p1", person: { firstName: "Ann", lastName: "Example" } },
-      { personId: "p1", person: { firstName: "Ann", lastName: "Example" } },
+      { personId: "p2", attendeeType: "STAFF", person: { firstName: "Zed", lastName: "Sample" } },
+      { personId: "p1", attendeeType: "YOUTH", person: { firstName: "Ann", lastName: "Example" } },
+      { personId: "p1", attendeeType: "YOUTH", person: { firstName: "Ann", lastName: "Example" } },
     ]);
     const list = await loadClubLetters("club-1", director, now);
     expect(mocks.prisma.clubLetterTemplate.findMany.mock.calls[0]![0].where).toEqual({ organizationId: "club-1" });
     expect(mocks.prisma.clubRosterMember.findMany.mock.calls[0]![0].where).toEqual({ organizationId: "club-1", clubYear: "2026-27", status: "ACTIVE", personId: { not: null } });
     expect(list!.letters).toEqual([{ id: "letter-1", kind: "LETTER", title: "Welcome", body: row().body, updatedAt: "2026-11-12T12:00:00.000Z" }]);
     expect(list!.people.map((person) => person.lastName)).toEqual(["Example", "Sample"]);
+    expect(list!.people.map((person) => person.typeLabel)).toEqual(["Youth", "Staff"]);
   });
 });
 
@@ -114,7 +115,7 @@ describe("creating", () => {
       action: "CLUB_LETTER_CREATED",
       entityType: "ClubLetterTemplate",
       entityId: "letter-1",
-      metadata: { organizationId: "club-1", kind: "LETTER", title: "Welcome", actorAttendeeAccountId: "account-1" },
+      metadata: { organizationId: "club-1", kind: "LETTER", actorAttendeeAccountId: "account-1" },
     });
     expect(mocks.writeAuditLog.mock.calls[0]![0]).not.toHaveProperty("actorUserId");
   });
@@ -163,6 +164,11 @@ describe("changing", () => {
 });
 
 describe("deleting", () => {
+  it("keeps the typed title out of the audit entry", async () => {
+    await createClubLetter("club-1", input, account);
+    expect(JSON.stringify(mocks.writeAuditLog.mock.calls[0]![0])).not.toContain("Welcome");
+  });
+
   it("deletes the club's own template and audits it", async () => {
     mocks.prisma.clubLetterTemplate.findFirst.mockResolvedValue({ id: "letter-1", kind: "CERTIFICATE", title: "Thanks" });
     await deleteClubLetter("club-1", "letter-1", account);
@@ -170,7 +176,7 @@ describe("deleting", () => {
     expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({
       action: "CLUB_LETTER_DELETED",
       entityId: "letter-1",
-      metadata: { organizationId: "club-1", kind: "CERTIFICATE", title: "Thanks", actorAttendeeAccountId: "account-1" },
+      metadata: { organizationId: "club-1", kind: "CERTIFICATE", actorAttendeeAccountId: "account-1" },
     });
   });
 
@@ -191,8 +197,8 @@ describe("deleting", () => {
 describe("printing", () => {
   it("fills in one page per person kept, asking the roster only for the people named, this year, active", async () => {
     mocks.prisma.clubRosterMember.findMany.mockResolvedValue([
-      { personId: "p2", person: { firstName: "Zed", lastName: "Sample" } },
-      { personId: "p1", person: { firstName: "Ann", lastName: "Example" } },
+      { personId: "p2", attendeeType: "STAFF", person: { firstName: "Zed", lastName: "Sample" } },
+      { personId: "p1", attendeeType: "YOUTH", person: { firstName: "Ann", lastName: "Example" } },
     ]);
     const result = await loadClubLetterSheets("club-1", director, "letter-1", "p1,p2,outsider", now);
     expect(mocks.prisma.clubLetterTemplate.findFirst.mock.calls[0]![0].where).toEqual({ id: "letter-1", organizationId: "club-1" });
@@ -201,8 +207,8 @@ describe("printing", () => {
     });
     expect(result!.kind).toBe("LETTER");
     expect(result!.sheets).toEqual([
-      { personId: "p1", text: "Dear Ann Example of Test Pathfinders" },
-      { personId: "p2", text: "Dear Zed Sample of Test Pathfinders" },
+      { personId: "p1", name: "Ann Example", text: "Dear Ann Example of Test Pathfinders" },
+      { personId: "p2", name: "Zed Sample", text: "Dear Zed Sample of Test Pathfinders" },
     ]);
   });
 
