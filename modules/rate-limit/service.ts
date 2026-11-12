@@ -1068,6 +1068,27 @@ export async function checkClubStaffTrainingRateLimit(
 }
 
 /**
+ * A club leader adding, changing or deleting a fill-in letter or certificate (#1708): per client, per signed-in leader
+ * (an attendee account, or a staff user acting as director), and per club. Generous: this is data entry, and the limits
+ * only stop scripted hammering.
+ */
+export async function checkClubLettersRateLimit(
+  request: Request,
+  actorKey: string,
+  organizationId: string,
+) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const actor = hashRateLimitIdentifier("club-letters-actor", actorKey, configuration);
+  const club = hashRateLimitIdentifier("club-letters-club", organizationId, configuration);
+  return evaluate([
+    { policy: "club-letters.write.client", limit: 120, windowSeconds: oneHour, identifierHashes: [client] },
+    { policy: "club-letters.write.actor", limit: 120, windowSeconds: oneHour, identifierHashes: [actor] },
+    { policy: "club-letters.write.club", limit: 400, windowSeconds: oneDay, identifierHashes: [club] },
+  ], configuration);
+}
+
+/**
  * Per-operation budgets for a club form's private link (#610), per 15
  * minutes. The token is a 256-bit secret, so these exist to stop scripted
  * guessing and hammering, not to slow a parent filling in a form: `read` is

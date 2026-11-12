@@ -2971,6 +2971,7 @@ model Organization {
   clubOptionalFeatures ClubOptionalFeature[]
   masterGuideCandidates MasterGuideCandidate[]
   staffTrainingRecords ClubStaffTrainingRecord[]
+  clubLetterTemplates  ClubLetterTemplate[]
   id                   String           @id @default(cuid())
   scholarshipContributions ScholarshipContribution[]
   scholarshipAwards    ScholarshipAward[]
@@ -6543,6 +6544,32 @@ model MasterGuideCandidate {
 
   @@unique([organizationId, personId])
   @@index([status])
+}
+
+/// What a ClubLetterTemplate is: a letter, or a certificate (a centered, larger layout).
+enum ClubLetterKind {
+  LETTER
+  CERTIFICATE
+}
+
+/// A fill-in letter or certificate a club's director or deputy wrote (#1708, optional feature `fill-in-letters`).
+/// `body` is plain text with {first_name}-style placeholders that are filled in from the roster when printed
+/// (`modules/club-letters/domain.ts`); nothing is emailed. Exactly one of the two creator columns is set: the attendee
+/// account of a director or deputy, or the staff user acting as the club's director (#442).
+model ClubLetterTemplate {
+  id                 String         @id @default(cuid())
+  organizationId     String
+  kind               ClubLetterKind
+  title              String
+  body               String
+  createdByAccountId String?
+  createdByUserId    String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
 
 /// A club-owned, named roster export format (#490): which columns, in what

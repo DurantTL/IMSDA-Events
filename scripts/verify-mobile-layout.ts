@@ -108,6 +108,8 @@ const selfTest = process.env.MOBILE_LAYOUT_SELF_TEST === "1";
 const P = "mobilecheck";
 const eventId = "evt_wr26";
 const clubEventId = `${P}_club_event`;
+const clubLetterId = `${P}_club_letter`;
+const clubCertificateId = `${P}_club_certificate`;
 const clubEventSlug = `${P}-club-weekend`;
 const clubA = `${P}_club_a`;
 const clubB = `${P}_club_b`;
@@ -320,6 +322,10 @@ const pages: PageSpec[] = [
   { ...club("master-guide", "/master-guide"), expectText: /Master Guide tracking/ },
   // Optional staff training records (#1697): switched on for the club by this script's seed.
   club("staff-training", "/staff-training"),
+  // Optional fill-in letters and certificates (#1708): switched on for the club, with a letter and a certificate, by this script's seed.
+  { ...club("letters", "/letters"), expectText: /Letters and certificates/ },
+  club("letter-print", `/letters/${clubLetterId}/print?people=${P}_person_a_07,${P}_person_a_14`),
+  club("certificate-print", `/letters/${clubCertificateId}/print?people=${P}_person_a_07`),
   // Area Coordinator.
   { ...area("overview", "/account/area-clubs/overview"), flow: "portal-navigation" },
   area("clubs", "/account/area-clubs/clubs"),
@@ -1584,6 +1590,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   await prisma.masterGuideCandidate.deleteMany({ where: orgs });
   await prisma.clubOptionalFeature.deleteMany({ where: orgs });
   await prisma.clubStaffTrainingRecord.deleteMany({ where: orgs });
+  await prisma.clubLetterTemplate.deleteMany({ where: orgs });
   const accountIds = [`${P}_account_director`, `${P}_account_registrar`, `${P}_account_reporter`, `${P}_account_area`, `${P}_account_attendee`, `${P}_account_history`];
   // The message files' bytes (#824) live on disk, outside the database; their keys are read before the rows go.
   const messageFileKeys = (await prisma.messageFile.findMany({ where: { eventId: blocksEventId }, select: { storageKey: true } }))
@@ -1842,6 +1849,18 @@ async function seedSynthetic(prisma: PrismaClient) {
     update: {},
     create: { organizationId: clubA, featureKey: "staff-training-records" },
   });
+  // #1708: fill-in letters are switched on for the audit club with a letter and a certificate, so the letters page and both print views can be audited (undone in cleanupSynthetic).
+  await prisma.clubOptionalFeature.upsert({
+    where: { organizationId_featureKey: { organizationId: clubA, featureKey: "fill-in-letters" } },
+    update: {},
+    create: { organizationId: clubA, featureKey: "fill-in-letters" },
+  });
+  for (const [id, kind, title, body] of [
+    [clubLetterId, "LETTER", "Welcome letter", "Dear {first_name},\n\nWelcome to {club_name} for {club_year}. We are glad to have {full_name} with us.\n\n{date}"],
+    [clubCertificateId, "CERTIFICATE", "Certificate of thanks", "Certificate of thanks\n\n{full_name}\n\nThank you for your help this year in {club_name}.\n{date}"],
+  ] as const) {
+    await prisma.clubLetterTemplate.upsert({ where: { id }, update: {}, create: { id, organizationId: clubA, kind, title, body } });
+  }
   // #1229: the director's Forms page has both groups (a family form and a club form), the TLT Application as an open application, and its public page is open.
   await prisma.clubFormTemplate.updateMany({ where: { key: { in: ["off_premises_permission_slip", "club_tlt_application"] } }, data: { enabled: true } });
 

@@ -9,7 +9,7 @@
 
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
-export const CLUB_OPTIONAL_FEATURE_KEYS = ["roster-health-flags", "staff-training-records", "master-guide-tracking"] as const;
+export const CLUB_OPTIONAL_FEATURE_KEYS = ["roster-health-flags", "staff-training-records", "master-guide-tracking", "fill-in-letters"] as const;
 export type ClubOptionalFeatureKey = (typeof CLUB_OPTIONAL_FEATURE_KEYS)[number];
 
 export const clubOptionalFeatureDefinitions: Record<ClubOptionalFeatureKey, { title: string; description: string }> = {
@@ -20,6 +20,10 @@ export const clubOptionalFeatureDefinitions: Record<ClubOptionalFeatureKey, { ti
   "master-guide-tracking": {
     title: "Master Guide tracking",
     description: "Keeps a list of your Master Guide candidates with their start date, mentor and where they are in the approval chain: the club approves, then an Area Coordinator. A candidate must be 16 or older to start and 18 or older for the club to approve. It never shows a birth date.",
+  },
+  "fill-in-letters": {
+    title: "Fill-in letters and certificates",
+    description: "Lets your director and deputy write letter or certificate templates that fill in each member's name, then print them or save them as PDF from the browser. It adds a Letters page to your club. Nothing is emailed or sent.",
   },
   "staff-training-records": {
     title: "Staff training records",
