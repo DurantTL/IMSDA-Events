@@ -1,3 +1,4 @@
+import { ordinal } from "@/modules/event-scoring/domain";
 import { isEmail } from "@/lib/field-validation";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { REPORT_DUE_DAY, formatDueDate, monthNotDueForClub, reportDueDate, reportMonthLabel } from "@/modules/club-reports/domain";
@@ -14,6 +15,9 @@ import { REPORT_DUE_DAY, formatDueDate, monthNotDueForClub, reportDueDate, repor
 
 /** The reminder is due from this day of the month, in conference time: the day after the record is due (`REPORT_DUE_DAY`). */
 export const MONTHLY_RECORD_REMINDER_DAY = REPORT_DUE_DAY + 1;
+
+/** "11th": the reminder day as people read it, always from `REPORT_DUE_DAY`. */
+export const MONTHLY_RECORD_REMINDER_DAY_TEXT = ordinal(MONTHLY_RECORD_REMINDER_DAY);
 
 export type ReminderWindow = {
   /** The conference calendar date, "YYYY-MM-DD". */

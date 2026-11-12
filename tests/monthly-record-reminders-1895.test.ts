@@ -43,9 +43,29 @@ vi.mock("@/lib/prisma", () => {
         state.reports.find((row) => row.organizationId === where.organizationId_reportMonth.organizationId && row.reportMonth === where.organizationId_reportMonth.reportMonth) ?? null,
     },
     monthlyRecordReminderLog: {
-      findMany: async ({ where, take }: { where?: { reportMonth?: string }; take?: number }) =>
-        state.logs.filter((row) => !where?.reportMonth || row.reportMonth === where.reportMonth).sort((a, b) => (b.sentAt as Date).getTime() - (a.sentAt as Date).getTime()).slice(0, take ?? 1000),
-      count: async ({ where }: { where: { reportMonth: string } }) => state.logs.filter((row) => row.reportMonth === where.reportMonth).length,
+      findMany: async ({ where, orderBy, skip, take }: { where?: { reportMonth?: string }; orderBy?: Array<Record<string, unknown>>; skip?: number; take?: number }) => {
+        const nameOf = (id: unknown) => String(state.clubs.find((club) => club.id === id)?.name ?? "");
+        const value = (row: Row, spec: Record<string, unknown>): string | number => {
+          const [field] = Object.entries(spec)[0]!;
+          if (field === "organization") return nameOf(row.organizationId);
+          const raw = row[field];
+          return raw instanceof Date ? raw.getTime() : (raw as string | number);
+        };
+        const rows = state.logs.filter((row) => !where?.reportMonth || row.reportMonth === where.reportMonth);
+        if (orderBy) {
+          rows.sort((a, b) => {
+            for (const spec of orderBy) {
+              const [field, dir] = Object.entries(spec)[0]!;
+              const sign = (field === "organization" ? (dir as { name: string }).name : dir) === "asc" ? 1 : -1;
+              const left = value(a, spec); const right = value(b, spec);
+              if (left !== right) return sign * (left < right ? -1 : 1);
+            }
+            return 0;
+          });
+        }
+        return rows.slice(skip ?? 0, (skip ?? 0) + (take ?? rows.length)).map((row) => ({ ...row, organization: { name: nameOf(row.organizationId) } }));
+      },
+      count: async (args?: { where?: { reportMonth?: string } }) => state.logs.filter((row) => !args?.where?.reportMonth || row.reportMonth === args.where.reportMonth).length,
       createMany: async ({ data, skipDuplicates }: { data: Row[]; skipDuplicates: boolean }) => {
         let count = 0;
         for (const row of data) {
@@ -279,6 +299,16 @@ describe("the switch", () => {
 });
 
 describe("the Area Coordinator summary", () => {
+  it("counts a record submitted and then reopened as submitted, so the numbers add up", async () => {
+    state.reports.push({ organizationId: "club-a", reportMonth: "2026-10", status: "DRAFT", firstSubmittedAt: new Date("2026-11-05T12:00:00Z") });
+    at("2026-11-11T15:00:00Z");
+    await sendDueMonthlyRecordReminders();
+    const body = String(outboxFor("MONTHLY_RECORD_REMINDER_SUMMARY")[0]!.bodyTextSnapshot);
+    expect(body).toContain("Clubs reminded: 1");
+    expect(body).toContain("Clubs submitted: 2");
+    expect(body).toContain("Total clubs: 3");
+  });
+
   it("does not email a disabled or unverified coordinator", async () => {
     state.coordinators.push(
       { attendeeAccountId: "acct-off", attendeeAccount: { displayName: "Off", email: "off@example.test", disabledAt: new Date("2026-06-01T00:00:00Z"), status: "ACTIVE" } },
@@ -305,16 +335,45 @@ describe("the Area Coordinator summary", () => {
 });
 
 describe("the log a Clubs Administrator sees", () => {
+  function seedLog(count: number) {
+    state.clubs.length = 0;
+    for (let index = 0; index < count; index += 1) {
+      const id = `log-club-${String(index).padStart(3, "0")}`;
+      state.clubs.push(club(id, `Club ${String(count - index).padStart(3, "0")}`));
+      state.logs.push({ id: `row-${String(index).padStart(3, "0")}`, organizationId: id, reportMonth: "2026-10", clubYear: "2026-27", recipients: (index % 3) + 1, sentAt: new Date(Date.UTC(2026, 10, 11, 12, 0, index)) });
+    }
+  }
+
+  it("pages and sorts every row, not just the newest 100, with the real total", async () => {
+    seedLog(130);
+    const first = await getMonthlyRecordReminderOverview(new Date("2026-11-20T12:00:00Z"), { page: 1 });
+    expect(first.slice).toMatchObject({ total: 130, page: 1, pageCount: 6, from: 1, to: 25 });
+    expect(first.slice.items[0]!.id).toBe("row-129");
+    const last = await getMonthlyRecordReminderOverview(new Date("2026-11-20T12:00:00Z"), { page: 6 });
+    expect(last.slice).toMatchObject({ page: 6, from: 126, to: 130 });
+    expect(last.slice.items.map((row) => row.id)).toEqual(["row-004", "row-003", "row-002", "row-001", "row-000"]);
+    const byClub = await getMonthlyRecordReminderOverview(new Date("2026-11-20T12:00:00Z"), { sort: { key: "club", dir: "asc" }, page: 6 });
+    expect(byClub.slice.items.at(-1)!.clubName).toBe("Club 130");
+    expect(byClub.slice.items[0]!.clubName).toBe("Club 126");
+  });
+
+  it("clamps a page past the end and ignores an unknown sort column", async () => {
+    seedLog(30);
+    const past = await getMonthlyRecordReminderOverview(new Date("2026-11-20T12:00:00Z"), { page: 99, sort: { key: "bogus" as never, dir: "asc" } });
+    expect(past.slice).toMatchObject({ page: 2, total: 30, from: 26, to: 30 });
+  });
+
   it("lists month, club, how many people and when, and no address or name", async () => {
     at("2026-11-11T15:00:00Z");
     await sendDueMonthlyRecordReminders();
     const overview = await getMonthlyRecordReminderOverview();
     expect(overview).toMatchObject({ clubYear: "2026-27", enabled: true });
-    expect(overview.log.map((row) => [row.reportMonth, row.clubName, row.recipients]).sort()).toEqual([
+    expect(overview.slice).toMatchObject({ total: 2, from: 1, to: 2, page: 1 });
+    expect(overview.slice.items.map((row) => [row.reportMonth, row.clubName, row.recipients]).sort()).toEqual([
       ["2026-10", "Aspen Pathfinders", 2],
       ["2026-10", "Cedar Pathfinders", 1],
     ]);
     expect(JSON.stringify(overview)).not.toContain("example.test");
-    expect(overview.log[0]!.sentAt).toBe("2026-11-11T15:00:00.000Z");
+    expect(overview.slice.items[0]!.sentAt).toBe("2026-11-11T15:00:00.000Z");
   });
 });

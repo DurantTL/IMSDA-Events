@@ -2,7 +2,7 @@ import type { JobRun } from "@/modules/operations/sweep-heartbeat-repository";
 import { REACHABILITY_STALE_AFTER_MS } from "@/modules/operations/reachability";
 import type { DiskSpace } from "@/modules/operations/disk-space";
 import type { Signal } from "./model";
-import { MONTHLY_RECORD_REMINDER_DAY } from "@/modules/club-reports/monthly-reminders-domain";
+import { MONTHLY_RECORD_REMINDER_DAY_TEXT } from "@/modules/club-reports/monthly-reminders-domain";
 
 /**
  * Pure mappers from a stored job run, a disk reading or a stored connection test to report signals (#1357). They hold
@@ -202,7 +202,7 @@ export function monthlyRecordReminderFields(key: string, run: JobRun, readAt: Da
   if (problem) return problem;
   const status = run.summary?.status;
   if (status === "SWITCHED_OFF") return ranFields(key, run, "info", "Switched off by a Clubs Administrator for this club year. Clubs are not being reminded.");
-  if (status === "NOT_DUE") return ranFields(key, run, "ok", `Not due yet. Reminders go out from the ${MONTHLY_RECORD_REMINDER_DAY}th of each month.`);
+  if (status === "NOT_DUE") return ranFields(key, run, "ok", `Not due yet. Reminders go out from the ${MONTHLY_RECORD_REMINDER_DAY_TEXT} of each month.`);
   if (status === "EMAIL_NOT_CONFIGURED") return { ...ranFields(key, run, "attention", "Email isn't set up, so reminders can't go out. Ask a system administrator."), needsSetup: true };
   const c = counts(run, ["reminded", "noRecipient", "failed", "summaries", "delivered"]);
   if (status !== "RAN" || !c) return ranFields(key, run, "watch", COUNTS_MISSING);

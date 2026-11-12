@@ -9,6 +9,8 @@ import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { clubJoinSelect, clubJoinedOn } from "@/modules/club-reports/domain";
 import {
+  REMINDER_LOG_DEFAULT_SORT,
+  REMINDER_LOG_PAGE_SIZE,
   clubOwesRecord,
   planReminders,
   recordIsSubmitted,
@@ -19,6 +21,7 @@ import {
   summaryEmail,
   summaryIdempotencyKey,
   type ReminderClub,
+  type ReminderLogColumn,
   type ReminderGrant,
   type ReminderWindow,
 } from "@/modules/club-reports/monthly-reminders-domain";
@@ -27,6 +30,7 @@ import { processAccountEmailQueue } from "@/modules/communications/email-deliver
 import { getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { directorGrantIsActive } from "@/modules/organizations/director-grants-domain";
 import { clubYearFor } from "@/modules/club-rosters/domain";
+import { clampPage, pageCountFor, type PageSlice } from "@/lib/pagination";
 
 /**
  * The automatic Monthly Record reminder (#1895), run by the scheduled outbox sweep. From the 11th of the month
@@ -237,7 +241,8 @@ async function queueCoordinatorSummary(input: {
     reportMonth: input.window.reportMonth,
     counts: {
       reminded,
-      submitted: input.clubs.filter((club) => recordIsSubmitted(club.status)).length,
+      // A record submitted once and then reopened still counts as submitted, so the three numbers add up.
+      submitted: input.clubs.filter((club) => recordIsSubmitted(club.status) || club.everSubmitted).length,
       total: input.clubs.length,
     },
   });
@@ -276,31 +281,56 @@ async function queueCoordinatorSummary(input: {
 
 // --- The Clubs Administrator view ---------------------------------------------------------------------------------
 
-export const REMINDER_LOG_LIMIT = 100;
-
 export type MonthlyRecordReminderLogRow = { id: string; reportMonth: string; clubId: string; clubName: string; recipients: number; sentAt: string };
 
-/** What a Clubs Administrator sees: the switch for the current club year and the latest reminders (month, club, recipient count, time). No address or name. */
-export async function getMonthlyRecordReminderOverview(now = new Date()) {
+const LOG_ORDER = {
+  month: (dir: "asc" | "desc") => ({ reportMonth: dir }),
+  club: (dir: "asc" | "desc") => ({ organization: { name: dir } }),
+  recipients: (dir: "asc" | "desc") => ({ recipients: dir }),
+  sent: (dir: "asc" | "desc") => ({ sentAt: dir }),
+} as const;
+
+/**
+ * What a Clubs Administrator sees: the switch for the current club year and one page of the log (month, club, recipient
+ * count, time). No address or name. Sorted and paged in the database from a whitelisted column, with the real total.
+ */
+export async function getMonthlyRecordReminderOverview(
+  now = new Date(),
+  options: { sort?: { key: ReminderLogColumn | null; dir: "asc" | "desc" }; page?: number; pageSize?: number } = {},
+) {
   const prisma = getPrisma();
   const clubYear = reminderSwitchClubYear(now);
-  const [enabled, rows] = await Promise.all([
-    switchIsOn(prisma, clubYear),
-    prisma.monthlyRecordReminderLog.findMany({ orderBy: [{ sentAt: "desc" }, { id: "asc" }], take: REMINDER_LOG_LIMIT }),
-  ]);
-  const orgs = rows.length === 0
+  const pageSize = options.pageSize ?? REMINDER_LOG_PAGE_SIZE;
+  const key = options.sort?.key && Object.prototype.hasOwnProperty.call(LOG_ORDER, options.sort.key) ? options.sort.key : REMINDER_LOG_DEFAULT_SORT.key;
+  const dir = options.sort?.key ? options.sort.dir : REMINDER_LOG_DEFAULT_SORT.dir;
+  const [enabled, total] = await Promise.all([switchIsOn(prisma, clubYear), prisma.monthlyRecordReminderLog.count()]);
+  const page = clampPage(options.page ?? 1, total, pageSize);
+  const rows = total === 0
     ? []
-    : await prisma.organization.findMany({ where: { id: { in: [...new Set(rows.map((row) => row.organizationId))] } }, select: { id: true, name: true } });
-  const names = new Map(orgs.map((org) => [org.id, org.name]));
-  const log: MonthlyRecordReminderLogRow[] = rows.map((row) => ({
+    : await prisma.monthlyRecordReminderLog.findMany({
+      orderBy: [LOG_ORDER[key](dir), { id: "asc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: { id: true, reportMonth: true, organizationId: true, recipients: true, sentAt: true, organization: { select: { name: true } } },
+    });
+  const items: MonthlyRecordReminderLogRow[] = rows.map((row) => ({
     id: row.id,
     reportMonth: row.reportMonth,
     clubId: row.organizationId,
-    clubName: names.get(row.organizationId) ?? "Club",
+    clubName: row.organization.name,
     recipients: row.recipients,
     sentAt: row.sentAt.toISOString(),
   }));
-  return { clubYear, enabled, log };
+  const start = (page - 1) * pageSize;
+  const slice: PageSlice<MonthlyRecordReminderLogRow> = {
+    items,
+    page,
+    pageCount: pageCountFor(total, pageSize),
+    total,
+    from: items.length ? start + 1 : 0,
+    to: items.length ? start + items.length : 0,
+  };
+  return { clubYear, enabled, slice };
 }
 
 /**

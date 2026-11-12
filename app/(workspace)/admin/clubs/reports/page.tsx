@@ -21,13 +21,11 @@ import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { getMonthlyRecordReminderOverview } from "@/modules/club-reports/monthly-reminders";
 import {
   REMINDER_LOG_DEFAULT_SORT,
-  REMINDER_LOG_PAGE_SIZE,
   REMINDER_LOG_PREFIX,
   REMINDER_LOG_SORT_COLUMNS,
 } from "@/modules/club-reports/monthly-reminders-domain";
 import { isAccountEmailConfigured } from "@/modules/communications/account-email";
-import { serverSort, sortParamNames, sortRows } from "@/lib/list-sort";
-import { paginate } from "@/lib/pagination";
+import { serverSort, sortParamNames } from "@/lib/list-sort";
 
 export const metadata: Metadata = { title: "Review monthly records" };
 export const dynamic = "force-dynamic";
@@ -51,19 +49,15 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
   const toReviewRows = review === REVIEW_FILTER
     ? recordsToReview(await getAreaClubsSummary(clubYear, now, { backgroundChecks: false }), reviewMonth)
     : null;
-  const reminders = await getMonthlyRecordReminderOverview(now);
   const reminderSorting = serverSort("/admin/clubs/reports", search, REMINDER_LOG_SORT_COLUMNS, REMINDER_LOG_DEFAULT_SORT, {
     prefix: REMINDER_LOG_PREFIX,
     hash: "#monthly-record-reminders",
     firstDirection: (column) => (column === "sent" || column === "month" ? "desc" : "asc"),
   });
-  const orderedLog = sortRows(reminders.log, reminderSorting.order.key, reminderSorting.order.dir, {
-    month: (row) => row.reportMonth,
-    club: (row) => row.clubName,
-    recipients: (row) => row.recipients,
-    sent: (row) => row.sentAt,
+  const reminders = await getMonthlyRecordReminderOverview(now, {
+    sort: reminderSorting.order,
+    page: Number(one(search[sortParamNames(REMINDER_LOG_PREFIX).page]) ?? 1) || 1,
   });
-  const reminderSlice = paginate(orderedLog, Number(one(search[sortParamNames(REMINDER_LOG_PREFIX).page]) ?? 1) || 1, REMINDER_LOG_PAGE_SIZE);
   const reminderPageHref = (page: number) => {
     const params = new URLSearchParams();
     for (const [name, value] of Object.entries(search)) if (typeof value === "string") params.set(name, value);
@@ -94,8 +88,9 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
         emailConfigured={isAccountEmailConfigured()}
         enabled={reminders.enabled}
         pageHref={reminderPageHref}
-        sentAtLabels={Object.fromEntries(reminders.log.map((row) => [row.id, formatInConferenceTime(row.sentAt, { dateStyle: "medium", timeStyle: "short" })]))}
-        slice={reminderSlice}
+        sentAtLabels={Object.fromEntries(reminders.slice.items.map((row) => [row.id, formatInConferenceTime(row.sentAt, { dateStyle: "medium", timeStyle: "short" })]))}
+        slice={reminders.slice}
+        isSystemAdmin={user.globalRole === "SYSTEM_ADMIN"}
         sorting={reminderSorting}
       />
     </>

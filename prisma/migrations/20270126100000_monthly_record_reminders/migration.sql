@@ -34,3 +34,6 @@ CREATE INDEX "MonthlyRecordReminderLog_sentAt_idx" ON "MonthlyRecordReminderLog"
 
 -- CreateIndex
 CREATE UNIQUE INDEX "MonthlyRecordReminderLog_organizationId_reportMonth_key" ON "MonthlyRecordReminderLog"("organizationId", "reportMonth");
+
+-- AddForeignKey
+ALTER TABLE "MonthlyRecordReminderLog" ADD CONSTRAINT "MonthlyRecordReminderLog_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;

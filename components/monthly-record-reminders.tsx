@@ -1,13 +1,23 @@
 import { ColumnHeader } from "@/components/column-header";
 import { ListPager } from "@/components/list-pager";
+import { SortOrderNote } from "@/components/list-sort";
+import { SetupHelpPanel } from "@/components/setup-help";
 import { MonthlyRecordReminderSwitch } from "@/components/monthly-record-reminder-switch";
 import { cardCell } from "@/components/table-card-labels";
-import type { ServerSort } from "@/lib/list-sort";
+import { sortOrderText, type ServerSort } from "@/lib/list-sort";
+import { systemSetupFor } from "@/modules/setup-help/system-setup-steps";
 import type { PageSlice } from "@/lib/pagination";
 import { reportMonthLabel } from "@/modules/club-reports/domain";
-import { MONTHLY_RECORD_REMINDER_DAY, type ReminderLogColumn } from "@/modules/club-reports/monthly-reminders-domain";
+import { MONTHLY_RECORD_REMINDER_DAY_TEXT, type ReminderLogColumn } from "@/modules/club-reports/monthly-reminders-domain";
 import type { MonthlyRecordReminderLogRow } from "@/modules/club-reports/monthly-reminders";
 import styles from "./monthly-record-reminders.module.css";
+
+const sortLabels: Record<ReminderLogColumn, { label: string; kind: "text" | "date" | "number" }> = {
+  month: { label: "month", kind: "date" },
+  club: { label: "club", kind: "text" },
+  recipients: { label: "recipients", kind: "number" },
+  sent: { label: "time sent", kind: "date" },
+};
 
 /**
  * The automatic Monthly Record reminder (#1895), for Clubs Administrators and system administrators: the switch for the
@@ -19,6 +29,7 @@ export function MonthlyRecordReminders({
   clubYear,
   enabled,
   emailConfigured,
+  isSystemAdmin,
   slice,
   sorting,
   pageHref,
@@ -27,6 +38,8 @@ export function MonthlyRecordReminders({
   clubYear: string;
   enabled: boolean;
   emailConfigured: boolean;
+  /** A system administrator can fix the email setup, so they get the setup help; anyone else is told who to ask. */
+  isSystemAdmin: boolean;
   slice: PageSlice<MonthlyRecordReminderLogRow>;
   sorting: ServerSort<ReminderLogColumn>;
   pageHref: (page: number) => string;
@@ -37,15 +50,23 @@ export function MonthlyRecordReminders({
     <section aria-labelledby="monthly-reminders-heading" className={styles.card} data-testid="monthly-record-reminders" id="monthly-record-reminders">
       <h2 className={styles.heading} id="monthly-reminders-heading">Monthly Record reminders</h2>
       <p className={styles.note}>
-        {`On the ${MONTHLY_RECORD_REMINDER_DAY}th of each month, the director and deputy of each club that has not submitted last month's record get one email with a link to the record. Area Coordinators get a summary of counts only.`}
+        {`On the ${MONTHLY_RECORD_REMINDER_DAY_TEXT} of each month, the director and deputy of each club that has not submitted last month's record get one email with a link to the record. Area Coordinators get a summary of counts only.`}
       </p>
-      {!emailConfigured && <p className={styles.problem} role="status">Email isn&apos;t set up, so reminders can&apos;t go out. Ask a system administrator.</p>}
+      {!emailConfigured && (isSystemAdmin ? (
+        <div role="status">
+          <p className={styles.problem}>Email isn&apos;t set up, so reminders can&apos;t go out.</p>
+          <SetupHelpPanel context="account email" setup={systemSetupFor("account-email")} />
+        </div>
+      ) : (
+        <p className={styles.problem} role="status">Email isn&apos;t set up, so reminders can&apos;t go out. Ask a system administrator.</p>
+      ))}
       <MonthlyRecordReminderSwitch clubYear={clubYear} enabled={enabled} />
       {slice.total === 0 ? (
         <p className={styles.note}>No reminders have been sent yet.</p>
       ) : (
         <>
           <div className="report-table-wrap">
+            {sorting.order.key && <SortOrderNote>{sortOrderText(sortLabels[sorting.order.key].label, sorting.order.dir, sortLabels[sorting.order.key].kind)}</SortOrderNote>}
             <table className="report-table table-cards" role="table">
               <caption className="sr-only">Reminders sent</caption>
               <thead role="rowgroup">
