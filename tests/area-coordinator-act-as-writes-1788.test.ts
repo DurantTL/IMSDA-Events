@@ -45,6 +45,8 @@ const WRITE_ROUTES: Record<string, { gate: string; actingStaff: "allowed" | "ref
   "tlt-directory/profile/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
   "tlt-directory/lists/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
   "tlt-directory/export/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
+  // Master Guide approval (#1698): the coordinator's own account only.
+  "master-guide/approve/route.ts": { gate: "requireAreaCoordinatorApprover", actingStaff: "refused" },
 };
 
 function routeFiles(dir: string): string[] {
