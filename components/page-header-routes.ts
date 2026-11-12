@@ -43,6 +43,7 @@ export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
   { pattern: "/admin/organizations/import" },
   { pattern: "/admin/organizations/map-locations" },
   { pattern: "/admin/organizations/[organizationId]/billing" },
+  { pattern: "/admin/organizations/[organizationId]/church-clubs" },
   { pattern: "/admin/organizations/[organizationId]/location" },
   { pattern: "/admin/organizations/[organizationId]/pastor" },
   { pattern: "/admin/email" },

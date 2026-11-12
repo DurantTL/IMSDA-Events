@@ -429,6 +429,16 @@ export function OrganizationDirectoryWorkspace({
                     </li>
                     {organization.type === "CHURCH" && (
                       <li>
+                        <Link
+                          aria-label={`Church club summary for ${organization.name}`}
+                          href={`/admin/organizations/${organization.id}/church-clubs`}
+                        >
+                          <Eye aria-hidden="true" size={14} /> Church club summary
+                        </Link>
+                      </li>
+                    )}
+                    {organization.type === "CHURCH" && (
+                      <li>
                         {/* A full page load, not a client-side <Link>: the location
                             page's Content-Security-Policy is the only staff policy
                             that admits the map tiles (#542), and a soft navigation

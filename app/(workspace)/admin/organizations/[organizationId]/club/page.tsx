@@ -49,7 +49,7 @@ export default async function StaffOpenClubPage({
   const view = staffClubYearView(query?.year);
   const club = await getPrisma().organization.findUnique({
     where: { id: organizationId },
-    select: { type: true, name: true, isActive: true, parentOrganization: { select: { name: true } } },
+    select: { type: true, name: true, isActive: true, parentOrganizationId: true, parentOrganization: { select: { name: true, type: true } } },
   });
   if (!club || club.type !== "CLUB") notFound();
   const imports = await listClubImports(organizationId);
@@ -94,6 +94,14 @@ export default async function StaffOpenClubPage({
             <div><dt>Status</dt><dd>{club.isActive ? "Active" : "Inactive"}</dd></div>
             <div><dt>Club year</dt><dd>{view.clubYear}</dd></div>
           </dl>
+          {/* Only this page's viewers (system administrators and Clubs Administrators) hold the gate the church summary uses. */}
+          {club.parentOrganizationId && club.parentOrganization?.type === "CHURCH" && (
+            <p>
+              <Link className="secondary-button" href={`/admin/organizations/${club.parentOrganizationId}/church-clubs${view.clubYear === view.currentClubYear ? "" : `?year=${encodeURIComponent(view.clubYear)}`}`}>
+                Church club summary<span className="sr-only"> for {club.parentOrganization.name}</span>
+              </Link>
+            </p>
+          )}
           <p>This is what the club&apos;s director sees. Nothing can be changed here; showing birth dates is recorded.</p>
         </div>
       </div>

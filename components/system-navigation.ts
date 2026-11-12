@@ -226,6 +226,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/organizations\/map-locations(\/|$)/, "Find map locations"],
   [/^\/admin\/organizations\/[^/]+\/billing(\/|$)/, "Billing contact"],
   [/^\/admin\/organizations\/[^/]+\/pastor(\/|$)/, "Pastor contact"],
+  [/^\/admin\/organizations\/[^/]+\/church-clubs(\/|$)/, "Church club summary"],
   [/^\/admin\/organizations\/[^/]+\/club\/honors(\/|$)/, "Club honors"],
   [/^\/admin\/organizations\/[^/]+\/club(\/|$)/, "Open club"],
   [/^\/admin\/organizations\/[^/]+\/directors(\/|$)/, "Club directors"],
