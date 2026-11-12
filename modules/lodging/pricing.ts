@@ -89,6 +89,11 @@ export type RedemptionFact = {
   maximumDiscountCentsSnapshot: number | null;
   minimumSubtotalCentsSnapshot: number | null;
   sponsored: boolean;
+  /**
+   * The code is restricted to attendee types (#102). Lodging has no attendee, so such a code never discounts the lodging
+   * line and a lodging change moves nothing but the list price.
+   */
+  restricted?: boolean;
 };
 
 /**
@@ -106,7 +111,7 @@ export function promoContextOf(snapshot: Record<string, unknown> | null, redempt
     if (row.key === LODGING_LINE_KEY) lodgingCents += row.amountCents;
     else otherCents += row.amountCents;
   }
-  if (!redemption) return { otherCents, lodgingCents, promo: null };
+  if (!redemption || redemption.restricted) return { otherCents, lodgingCents, promo: null };
   return {
     otherCents,
     lodgingCents,

@@ -195,6 +195,7 @@ export async function loadSourceConfiguration(db: Db, eventId: string): Promise<
       id: promo.id, code: promo.code, normalizedCode: promo.normalizedCode, discountType: promo.discountType,
       discountValue: promo.discountValue, startsOn: promo.startsOn, endsOn: promo.endsOn,
       minimumSubtotalCents: promo.minimumSubtotalCents, maximumUses: promo.maximumUses, maximumDiscountCents: promo.maximumDiscountCents,
+      attendeeTypeCodes: promo.attendeeTypeCodes,
     })),
     meals: await loadMealDefinitions(db, eventId),
     locations: locations.map((location) => ({
@@ -507,6 +508,7 @@ export async function cloneEvent(actorUserId: string, rawInput: unknown) {
               // Copied as they are (#157): the inactive code is the review point.
               minimumSubtotalCents: promo.minimumSubtotalCents, maximumUses: promo.maximumUses,
               maximumDiscountCents: promo.maximumDiscountCents,
+              attendeeTypeCodes: promo.attendeeTypeCodes ?? [],
             },
           });
         }

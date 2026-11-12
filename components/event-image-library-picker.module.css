@@ -1,0 +1,185 @@
+/* Event image library picker (#1913): search, tag filter and a thumbnail grid inside the banner editor. */
+.panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.title {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  font-weight: 800;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.filters label,
+.upload {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.filters input,
+.filters select,
+.upload input,
+.tagForm input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--touch-target, 44px);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-element);
+  background: var(--field-bg);
+  padding: 0 12px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--touch-target, 44px);
+}
+
+.check input {
+  width: 20px;
+  min-height: 0;
+  height: 20px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--paper);
+}
+
+.card[data-retired="true"] {
+  border-style: dashed;
+}
+
+.thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 12 / 5;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--imsda-navy-soft);
+}
+
+.name {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+}
+
+.meta {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.4;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag {
+  border-radius: var(--radius-pill);
+  background: var(--imsda-navy-soft);
+  padding: 2px 10px;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.tagForm {
+  display: grid;
+  gap: 8px;
+}
+
+.tagForm label {
+  display: grid;
+  gap: 4px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.message {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.error {
+  color: var(--coral);
+}
+
+.status {
+  color: var(--muted);
+}
+
+/* The picker sits inside the banner block's .form-stack, whose label (grid) and input (own border) rules would turn
+   the shared search field into two rows inside a double border. Restore the shared one-row look here. */
+.panel :global(.search-field) {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 400;
+}
+
+.panel :global(.search-field) input {
+  min-height: var(--touch-target, 44px);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}

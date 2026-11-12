@@ -35,6 +35,8 @@ export function hasCapacity(field: RegistrationFormField) {
  * price plan, so only Required and Has logic describe it.
  */
 export function deriveFieldChips(field: RegistrationFormField, sectionTitle = "", { information = false }: { information?: boolean } = {}): FieldChip[] {
+  // An Information block (#284) is shown, never answered, so only its show-when rule describes it.
+  if (field.type === "INFORMATION") return hasVisibilityRule(field) ? [{ kind: "logic", label: "Has logic" }] : [];
   if (information) {
     const chips: FieldChip[] = [];
     if (field.required) chips.push({ kind: "required", label: "Required" });
