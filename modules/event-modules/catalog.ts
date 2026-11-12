@@ -22,8 +22,8 @@ export const eventModuleKeys = [
   "attendance-points",
   "debrief",
   "event-budget",
-  "baptism-follow-up",
   "event-staffing",
+  "baptism-follow-up",
 ] as const;
 
 export type EventModuleKey = (typeof eventModuleKeys)[number];
