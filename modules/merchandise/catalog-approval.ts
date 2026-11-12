@@ -46,7 +46,8 @@ export async function approveAndOpenCatalogSales(eventId: string, actorUserId: s
         isEnabled: true,
         isArchived: false,
         product: { eventId, isEnabled: true, isArchived: false },
-        availability: { some: { isActive: true } },
+        // Visible to attendees now or later: not staff-only, and the sales window has not already ended.
+        availability: { some: { isActive: true, attendeeAvailability: { not: "STAFF_ONLY" }, OR: [{ salesEndsAt: null }, { salesEndsAt: { gt: now } }] } },
       },
     });
     if (sellable === 0) throw new MerchandiseCatalogApprovalError("NO_SELLABLE_PRODUCT", "Add an enabled product with at least one enabled, priced size before opening sales.");

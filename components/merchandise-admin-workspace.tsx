@@ -7,7 +7,6 @@ import { staffPageTitles } from "@/components/staff-navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ImagePlus,
-  PackageOpen,
   Plus,
   Save,
   ShoppingBag,
@@ -140,7 +139,7 @@ export function MerchandiseSalesStatus({ canApproveSales, catalog, onApprove, on
       <p className={styles.salesStatusLine}><strong>{merchandiseSalesStatusLine(catalog)}</strong></p>
       {canApproveSales ? (
         <div className={styles.salesStatusActions}>
-          {!(catalog.status === "APPROVED" && catalog.isEnabled) && <button className="primary-button" type="button" onClick={onApprove} disabled={saving}>Approve and open sales</button>}
+          {!(catalog.status === "APPROVED" && catalog.isEnabled) && <button className="secondary-button" type="button" onClick={onApprove} disabled={saving}>Approve and open sales</button>}
           {catalog.status === "APPROVED" && <button className="secondary-button" type="button" onClick={onClose} disabled={saving}>Close sales</button>}
         </div>
       ) : <p className={styles.salesStatusHelp}>A system administrator approves and opens sales.</p>}
@@ -464,13 +463,12 @@ export function MerchandiseAdminWorkspace({ eventId, canApproveSales = false }: 
         title={staffPageTitles.merchandise}
         description="Add the products and variants this event offers, and check what each group of attendees sees."
         primary={<button className="primary-button" type="button" onClick={() => openProductEditor("new")}><Plus size={16} aria-hidden="true" /> Add product</button>}
-        secondary={<button className="secondary-button" type="button" onClick={() => void mutate(merchandiseEndpoint(eventId), "PATCH", { isEnabled: !catalog.isEnabled }, catalog.isEnabled ? "Merchandise disabled for this event." : "Merchandise enabled for this event.")} disabled={saving} aria-pressed={catalog.isEnabled}>{catalog.isEnabled ? "Disable catalog" : "Enable catalog"}</button>}
+        secondary={catalog.status === "APPROVED" ? undefined : <button className="secondary-button" type="button" onClick={() => void mutate(merchandiseEndpoint(eventId), "PATCH", { isEnabled: !catalog.isEnabled }, catalog.isEnabled ? "Merchandise disabled for this event." : "Merchandise enabled for this event.")} disabled={saving} aria-pressed={catalog.isEnabled}>{catalog.isEnabled ? "Disable catalog" : "Enable catalog"}</button>}
       />
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {/* While the archive dialog is open, its own alert shows the error; one announcement, not two. */}
       {error && !archiveTarget && !approvalTarget && !editing && !variantEditing && <div className="inline-notice error" role="alert">{error}</div>}
       <MerchandiseSalesStatus canApproveSales={canApproveSales} catalog={catalog} onApprove={() => openApproval("approve")} onClose={() => openApproval("close")} saving={saving} />
-      {!catalog.isEnabled && <div className="inline-notice warning"><PackageOpen size={17} aria-hidden="true" /><span><strong>Catalog disabled.</strong> Attendees will not see merchandise until you enable it.</span></div>}
 
       <div className={styles.layout}>
         <section className="panel" aria-labelledby="catalog-products-heading">
@@ -553,7 +551,7 @@ export function MerchandiseAdminWorkspace({ eventId, canApproveSales = false }: 
         confirmLabel={approvalTarget === "close" ? "Close sales" : "Approve and open sales"}
         destructive={approvalTarget === "close"}
         error={error}
-        onCancel={() => setApprovalTarget(null)}
+        onCancel={() => { setError(""); setApprovalTarget(null); }}
         onConfirm={() => void confirmApproval()}
         open={approvalTarget !== null}
         title={approvalTarget === "close" ? "Close merchandise sales?" : "Approve and open merchandise sales?"}
@@ -561,7 +559,7 @@ export function MerchandiseAdminWorkspace({ eventId, canApproveSales = false }: 
         <p>
           {approvalTarget === "close"
             ? "Attendees stop seeing merchandise right away. Existing orders stay as they are."
-            : "Prices go live for attendees exactly as shown on this page. Check the products, sizes and prices before you approve."}
+            : "Attendees will see these products and prices when they register. Event staff can still edit products and prices after approval."}
         </p>
       </ConfirmDialog>
 
@@ -571,7 +569,7 @@ export function MerchandiseAdminWorkspace({ eventId, canApproveSales = false }: 
         confirmLabel={archiveTarget ? `Archive ${archiveTarget.kind === "product" ? archiveTarget.product.name : archiveTarget.variant.label}` : "Archive"}
         destructive
         error={error}
-        onCancel={() => setArchiveTarget(null)}
+        onCancel={() => { setError(""); setArchiveTarget(null); }}
         onConfirm={() => void confirmArchive()}
         open={archiveTarget !== null}
         title={archiveTarget

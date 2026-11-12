@@ -11,7 +11,7 @@ import {
   type MerchandiseProjectionInput,
 } from "@/modules/merchandise/catalog-domain";
 
-export type MerchandiseCatalogErrorCode = "CATALOG_NOT_FOUND" | "PRODUCT_NOT_FOUND" | "VARIANT_NOT_FOUND" | "ASSET_NOT_FOUND" | "ASSET_NOT_IMAGE" | "ARCHIVED_REFERENCE";
+export type MerchandiseCatalogErrorCode = "CATALOG_NOT_FOUND" | "PRODUCT_NOT_FOUND" | "VARIANT_NOT_FOUND" | "ASSET_NOT_FOUND" | "ASSET_NOT_IMAGE" | "ARCHIVED_REFERENCE" | "CATALOG_APPROVED";
 export class MerchandiseCatalogOperationError extends Error {
   constructor(public readonly code: MerchandiseCatalogErrorCode, message: string) { super(message); this.name = "MerchandiseCatalogOperationError"; }
 }
@@ -219,6 +219,10 @@ export async function saveCatalog(eventId: string, raw: unknown, actorUserId: st
   const input = merchandiseCatalogInputSchema.parse(raw);
   return getPrisma().$transaction(async (tx) => {
     const before = await tx.merchandiseCatalog.findUnique({ where: { eventId } });
+    // Once approved, only a system administrator opens or closes sales (catalog-approval.ts).
+    if (before?.status === "APPROVED" && ((input.isEnabled !== undefined && input.isEnabled !== before.isEnabled) || (input.status !== undefined && input.status !== before.status))) {
+      throw new MerchandiseCatalogOperationError("CATALOG_APPROVED", "Sales are approved. A system administrator opens and closes sales.");
+    }
     const next = await tx.merchandiseCatalog.upsert({ where: { eventId }, create: { eventId, isEnabled: input.isEnabled ?? false, status: input.status ?? "DRAFT" }, update: { ...(input.isEnabled === undefined ? {} : { isEnabled: input.isEnabled }), ...(input.status === undefined ? {} : { status: input.status }) } });
     await writeAuditLog({ eventId, actorUserId, action: "MERCHANDISE_CATALOG_UPDATED", entityType: "MerchandiseCatalog", entityId: next.id, summary: "Updated merchandise catalog configuration.", metadata: { before: before ? { isEnabled: before.isEnabled, status: before.status } : null, after: { isEnabled: next.isEnabled, status: next.status } } }, tx);
     return getMerchandiseCatalog(eventId, tx);

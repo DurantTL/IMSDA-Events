@@ -16,6 +16,7 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: dependencies.getPrisma }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: dependencies.getCurrentSession }));
 
 import { approveAndOpenCatalogSales, closeCatalogSales, MerchandiseCatalogApprovalError } from "@/modules/merchandise/catalog-approval";
+import { saveCatalog } from "@/modules/merchandise/catalog-repository";
 import { merchandiseCatalogInputSchema } from "@/modules/merchandise/catalog-domain";
 import { MerchandiseSalesStatus, merchandiseSalesStatusLine } from "@/components/merchandise-admin-workspace";
 
@@ -82,6 +83,43 @@ describe("closeCatalogSales", () => {
     const tx = makeTx({ catalog: null });
     expect(await closeCatalogSales("event_1", "usr_admin")).toMatchObject({ changed: false, status: "DRAFT" });
     expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("sellable size rule", () => {
+  it("excludes staff-only sizes and ended sales windows", async () => {
+    const tx = makeTx();
+    await approveAndOpenCatalogSales("event_1", "usr_admin", now);
+    const where = tx.merchandiseProductVariant.count.mock.calls[0][0].where;
+    expect(where.availability.some).toMatchObject({ isActive: true, attendeeAvailability: { not: "STAFF_ONLY" }, OR: [{ salesEndsAt: null }, { salesEndsAt: { gt: now } }] });
+  });
+
+  it("re-approves a catalog that was approved but switched off", async () => {
+    const tx = makeTx({ catalog: { id: "catalog_1", eventId: "event_1", isEnabled: false, status: "APPROVED", approvedAt: now, approvedByUserId: "usr_first" } });
+    expect(await approveAndOpenCatalogSales("event_1", "usr_other", now)).toMatchObject({ changed: true, isEnabled: true, approvedByUserId: "usr_other" });
+    expect(tx.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("staff save on an approved catalog", () => {
+  const approved = { id: "catalog_1", eventId: "event_1", isEnabled: true, status: "APPROVED", updatedAt: now, approvedAt: now, approvedByUserId: "usr_admin" };
+  it("refuses changes to isEnabled or status and writes nothing", async () => {
+    for (const body of [{ isEnabled: false }, { status: "DRAFT" }, { status: "PENDING_APPROVAL" }]) {
+      const tx = makeTx({ catalog: approved });
+      await expect(saveCatalog("event_1", body, "usr_staff")).rejects.toMatchObject({ code: "CATALOG_APPROVED", message: "Sales are approved. A system administrator opens and closes sales." });
+      expect(tx.merchandiseCatalog.upsert).not.toHaveBeenCalled();
+      expect(tx.auditLog.create).not.toHaveBeenCalled();
+    }
+  });
+  it("allows the same values and allows changes on a draft", async () => {
+    const tx = makeTx({ catalog: approved });
+    tx.merchandiseCatalog.findUnique.mockResolvedValue(approved);
+    Object.assign(tx, { merchandiseProduct: { findMany: vi.fn().mockResolvedValue([]) } });
+    await expect(saveCatalog("event_1", { isEnabled: true }, "usr_staff")).resolves.toBeDefined();
+    const draftTx = makeTx({ catalog: { ...approved, status: "DRAFT", isEnabled: false } });
+    Object.assign(draftTx, { merchandiseProduct: { findMany: vi.fn().mockResolvedValue([]) } });
+    await expect(saveCatalog("event_1", { isEnabled: true }, "usr_staff")).resolves.toBeDefined();
+    expect(draftTx.merchandiseCatalog.upsert).toHaveBeenCalled();
   });
 });
 
