@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { PageHeader } from "@/components/page-header";
+import { StaffViewStrip } from "@/components/staff-view-strip";
 import { ColumnHeader } from "@/components/column-header";
 import { cardCell } from "@/components/table-card-labels";
 import { SortOrderNote } from "@/components/list-sort";
@@ -19,6 +19,18 @@ export const metadata: Metadata = { title: "Public analytics" };
 export const dynamic = "force-dynamic";
 
 const pct = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : "No data");
+
+/** The same page for another period: every other address value (table sort) stays; 30 days is the default, so it drops `days`. */
+function periodHref(search: Record<string, string | string[] | undefined>, period: AnalyticsPeriod) {
+  const params = new URLSearchParams();
+  for (const [name, value] of Object.entries(search)) {
+    if (name === "days") continue;
+    for (const entry of Array.isArray(value) ? value : value === undefined ? [] : [value]) params.append(name, entry);
+  }
+  if (period !== 30) params.set("days", String(period));
+  const query = params.toString();
+  return query ? `/admin/analytics?${query}` : "/admin/analytics";
+}
 
 const periodLabels: Record<AnalyticsPeriod, string> = { 30: "Last 30 days", 90: "Last 90 days", 365: "Last 12 months" };
 const periodText: Record<AnalyticsPeriod, string> = { 30: "30 days", 90: "90 days", 365: "12 months" };
@@ -57,7 +69,6 @@ function Table({ caption, head, rows, empty = "Nothing counted yet.", sortBy, se
 }
 
 const rowsOf = (items: MetricRow[], label = (dimension: string) => dimension || "(none)"): TableRow[] => items.map((row) => ({ cells: [label(row.dimension), String(row.count)], values: [label(row.dimension), row.count] }));
-const rate = funnelRate;
 
 /** Aggregate public-site counts for the last 30 days, 90 days or 12 months (#111, #1560). System administrators only. Counts only: nobody's activity is shown. */
 export default async function PublicAnalyticsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -80,11 +91,7 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
         />
         <section aria-labelledby="analytics-intro" className="panel">
           <div className="section-heading"><div><p className="eyebrow">{formatDateRange(summary.from, summary.to)}</p><h2 id="analytics-intro">What is counted</h2></div></div>
-          <nav aria-label="Time period" className={styles.periods}>
-            {analyticsPeriods.map((period) => (
-              <Link aria-current={period === days ? "page" : undefined} className={styles.period} href={period === 30 ? "/admin/analytics" : `/admin/analytics?days=${period}`} key={period}>{periodLabels[period]}</Link>
-            ))}
-          </nav>
+          <StaffViewStrip label="Time period" views={analyticsPeriods.map((period) => ({ key: String(period), label: periodLabels[period], href: periodHref(search, period), current: period === days }))} />
           <p className={`field-help ${styles.help}`}>
             Daily counts only. Nothing here identifies a person, a device, a search or a private event.
             Visitors who send a Global Privacy Control or Do Not Track signal are not counted, and the staff workspace is never measured. Rows older than 400 days are deleted.
@@ -117,14 +124,14 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
             head={["Event", "Page views", "Started", "Completed", "Completed of views", "Completed of started"]}
             rows={summary.funnel.map((row) => ({
               cells: [row.title, String(row.views), String(row.started), String(row.completed), pct(row.completed, row.views), pct(row.completed, row.started)],
-              values: [row.title, row.views, row.started, row.completed, rate(row.completed, row.views), rate(row.completed, row.started)],
+              values: [row.title, row.views, row.started, row.completed, funnelRate(row.completed, row.views), funnelRate(row.completed, row.started)],
             }))}
             search={search}
             sortBy="funnel"
           />
           <p className={`field-help ${styles.help}`}>
             Counts come from separate days&apos; totals, and people can arrive by a direct link, so a rate can pass 100%.
-            Private or unpublished events are never counted.
+            Events are counted only while they are public.
           </p>
           <Table caption="How the events list was searched or filtered (which filter, never what was typed)" head={["Used", "Count"]} rows={rowsOf(summary.directory, (dimension) => dimension || "search")} search={search} sortBy="used" />
         </section>
@@ -136,7 +143,7 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
             caption="Sign-ins by method"
             head={["Method", "Worked", "Failed", "Success rate"]}
             empty="Nothing counted yet. Sign-ins appear here once someone signs in."
-            rows={summary.logins.map((row) => ({ cells: [row.surface, String(row.success), String(row.failure), pct(row.success, row.success + row.failure)], values: [row.surface, row.success, row.failure, rate(row.success, row.success + row.failure)] }))}
+            rows={summary.logins.map((row) => ({ cells: [row.surface, String(row.success), String(row.failure), pct(row.success, row.success + row.failure)], values: [row.surface, row.success, row.failure, funnelRate(row.success, row.success + row.failure)] }))}
             search={search}
             sortBy="method"
           />

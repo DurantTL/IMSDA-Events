@@ -32,10 +32,11 @@ vi.mock("@/modules/access/request-security", () => ({
 }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: async () => "/login" }));
-vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
+vi.mock("next/navigation", () => ({ redirect: mocks.redirect, usePathname: () => "/admin/analytics", useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/modules/calendar/repository", () => ({ conferenceToday: () => "2026-10-28" }));
 vi.mock("@/components/admin-section-header", () => ({ AdminSectionHeaderFor: () => null }));
 
+import { resolveLinkScroll } from "@/components/link-guard";
 import { POST as beacon } from "@/app/api/public-metrics/route";
 import PublicAnalyticsPage from "@/app/(workspace)/admin/analytics/page";
 import {
@@ -232,13 +233,30 @@ describe("the summary and who can see it", () => {
   it("shows the period links and the one funnel table", async () => {
     mocks.groupBy.mockResolvedValue([{ metric: "EVENT_PAGE_VIEW", dimension: "public-camp", _sum: { count: 2 } }]);
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: "SYSTEM_ADMIN" } });
-    const html = renderToStaticMarkup(createElement("div", null, await PublicAnalyticsPage({ searchParams: Promise.resolve({ days: "90" }) })));
+    const html = renderToStaticMarkup(createElement("div", null, await PublicAnalyticsPage({ searchParams: Promise.resolve({ days: "90", funnelSort: "c1", funnelDir: "desc" }) })));
     expect(html).toContain("last 90 days");
     expect(html).toContain('aria-current="page"');
     expect(html).toContain("Last 12 months");
+    // Period links keep the table sort and change only `days`; 30 days drops it.
+    expect(html).toContain('href="/admin/analytics?funnelSort=c1&amp;funnelDir=desc"');
+    expect(html).toContain('href="/admin/analytics?funnelSort=c1&amp;funnelDir=desc&amp;days=365"');
+    expect(html).toContain("Events are counted only while they are public");
     expect(html).toContain("Which event pages lead to registrations");
     expect(html).toContain("Public Camp");
     expect(html).not.toContain("Most viewed public event pages");
+  });
+
+  it("keeps the reader's place when a period link is used", () => {
+    // The strip's links are GuardedLink, which keeps scroll on a same-page address change (#1557).
+    expect(readFileSync("components/staff-view-strip.tsx", "utf8")).toContain("<GuardedLink");
+    expect(resolveLinkScroll("/admin/analytics?days=90", "/admin/analytics", undefined)).toBe(false);
+  });
+
+  it("skips the event name lookup when asked", async () => {
+    mocks.groupBy.mockResolvedValue([{ metric: "EVENT_PAGE_VIEW", dimension: "public-camp", _sum: { count: 2 } }]);
+    const summary = await getAnalyticsSummary("2026-10-28", 30, { eventNames: false });
+    expect(mocks.eventFindMany).not.toHaveBeenCalled();
+    expect(summary.funnel[0].title).toBe("public-camp");
   });
 
   it("is for system administrators only", async () => {

@@ -63,7 +63,7 @@ export type AnalyticsSummary = {
 };
 
 /** The last 30, 90 or 365 days, counts only (system administrators' view). `today` is a conference-calendar date. */
-export async function getAnalyticsSummary(today: string, days: AnalyticsPeriod = defaultAnalyticsPeriod): Promise<AnalyticsSummary> {
+export async function getAnalyticsSummary(today: string, days: AnalyticsPeriod = defaultAnalyticsPeriod, options: { eventNames?: boolean } = {}): Promise<AnalyticsSummary> {
   const from = addDays(today, -(days - 1));
   const rows = await getPrisma().publicMetricDaily.groupBy({
     by: ["metric", "dimension"],
@@ -77,8 +77,8 @@ export async function getAnalyticsSummary(today: string, days: AnalyticsPeriod =
   const totals = Object.fromEntries(metricNames.map((metric) => [metric, total(metric)])) as Record<PublicMetricName, number>;
   const counts = (metric: PublicMetricName) => new Map(by(metric).map((row) => [row.dimension, row.count]));
   const funnelRows = buildEventFunnel(counts("EVENT_PAGE_VIEW"), counts("REGISTRATION_START"), counts("REGISTRATION_COMPLETE"));
-  // One lookup for every title (slug and name only); an event that no longer matches shows its slug.
-  const events = funnelRows.length > 0 ? await getPrisma().event.findMany({ where: { slug: { in: funnelRows.map((row) => row.slug) } }, select: { slug: true, name: true } }) : [];
+  // One lookup for every title (slug and name only; skipped with `eventNames: false`); an event that no longer matches shows its slug.
+  const events = options.eventNames !== false && funnelRows.length > 0 ? await getPrisma().event.findMany({ where: { slug: { in: funnelRows.map((row) => row.slug) } }, select: { slug: true, name: true } }) : [];
   const titles = new Map(events.map((event) => [event.slug, event.name]));
   const success = new Map(by("LOGIN_SUCCESS").map((row) => [row.dimension, row.count]));
   const failure = new Map(by("LOGIN_FAILURE").map((row) => [row.dimension, row.count]));

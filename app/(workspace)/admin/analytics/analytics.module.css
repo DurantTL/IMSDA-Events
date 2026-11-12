@@ -7,6 +7,3 @@
 .table thead th { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .table tbody th { font-weight: 600; }
 .help { margin: 4px 0 0; }
-.periods { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
-.period { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: var(--radius-element); color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; text-decoration: none; }
-.period[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: var(--card); }
