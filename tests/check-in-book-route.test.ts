@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership }));
-vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ event: { findUnique: mocks.findUnique } }) }));
+vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ event: { findUnique: mocks.findUnique }, clubsAdministratorGrant: { findFirst: vi.fn().mockResolvedValue(null) } }) }));
 vi.mock("@/modules/reporting/check-in-book-repository", () => ({ getCheckInBookData: mocks.getCheckInBookData }));
 
 import { GET } from "@/app/api/events/[eventId]/check-in-book/route";
@@ -52,14 +52,13 @@ describe("GET /api/events/[eventId]/check-in-book", () => {
       statuses: ["CONFIRMED", "WAITLISTED"],
       extraFieldKey: "skill_induction",
       location: null,
-      registeredClubsOnly: false,
     });
   });
 
   it("defaults to submitted and confirmed registrations", async () => {
     mocks.findActiveMembership.mockResolvedValue(membership("EVENT_ADMIN"));
     await GET(request(), context);
-    expect(mocks.getCheckInBookData).toHaveBeenCalledWith("event-1", { statuses: ["SUBMITTED", "CONFIRMED"], extraFieldKey: null, location: null, registeredClubsOnly: true });
+    expect(mocks.getCheckInBookData).toHaveBeenCalledWith("event-1", { statuses: ["SUBMITTED", "CONFIRMED"], extraFieldKey: null, location: null });
   });
 
   it("passes ?location= through to narrow the book (#413)", async () => {

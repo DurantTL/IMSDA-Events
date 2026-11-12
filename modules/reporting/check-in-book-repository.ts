@@ -5,7 +5,6 @@ import { resolveLocationFilter, type LocationFilterOption } from "@/modules/even
 import { listRegistrations } from "@/modules/registrations/repository";
 import {
   buildCheckInBook,
-  defaultCheckInBookStatuses,
   checkInBookExtraOptions,
   type CheckInBook,
   type CheckInBookExtraOption,
@@ -30,7 +29,7 @@ export type CheckInBookData = {
  */
 export async function getCheckInBookData(
   eventId: string,
-  options: { statuses: readonly CheckInBookStatus[]; extraFieldKey?: string | null; location?: string | null; /** An event administrator's view: only clubs registered (submitted or confirmed) for the event. */ registeredClubsOnly?: boolean },
+  options: { statuses: readonly CheckInBookStatus[]; extraFieldKey?: string | null; location?: string | null },
 ): Promise<CheckInBookData | null> {
   const prisma = getPrisma();
   const [event, clubRegistrationCount] = await Promise.all([
@@ -54,7 +53,7 @@ export async function getCheckInBookData(
   };
 
   if (mode === "CLUB") {
-    const { clubs, registrations } = await getClubEventRecords(eventId, { statuses: options.registeredClubsOnly ? defaultCheckInBookStatuses : options.statuses, locationId });
+    const { clubs, registrations } = await getClubEventRecords(eventId, { statuses: options.statuses, locationId });
     return {
       book: buildCheckInBook({ event: bookEvent, mode, clubs, registrations, extraFieldKey: options.extraFieldKey, locationLabel }),
       extraOptions: checkInBookExtraOptions(registrations),

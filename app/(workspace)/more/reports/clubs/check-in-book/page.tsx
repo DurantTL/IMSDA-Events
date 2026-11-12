@@ -6,7 +6,7 @@ import { AccessRestricted } from "@/components/access-restricted";
 import { CheckInBookSheets } from "@/components/check-in-book";
 import { LocationFilter } from "@/components/location-filter";
 import { PrintReportButton } from "@/components/print-report-button";
-import { checkInBookStatuses, parseCheckInBookStatuses } from "@/modules/reporting/check-in-book";
+import { checkInBookStatuses, narrowCheckInBookStatuses, parseCheckInBookStatuses } from "@/modules/reporting/check-in-book";
 import { getCheckInBookData } from "@/modules/reporting/check-in-book-repository";
 import { resolveClubReportsAccess } from "@/modules/reporting/club-reports-access";
 import { staffPageTitles } from "@/components/staff-navigation";
@@ -34,8 +34,8 @@ export default async function CheckInBookPage({
       />
     );
   }
-  const statuses = parseCheckInBookStatuses(status);
-  const data = await getCheckInBookData(event.id, { statuses, extraFieldKey: extra, location, registeredClubsOnly });
+  const statuses = narrowCheckInBookStatuses(parseCheckInBookStatuses(status), registeredClubsOnly);
+  const data = await getCheckInBookData(event.id, { statuses, extraFieldKey: extra, location });
   if (!data) return <NotAvailableForEvent reason="This event could not be loaded." />;
 
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
@@ -73,7 +73,7 @@ export default async function CheckInBookPage({
         {data.locationId && <input type="hidden" name="location" value={data.locationId} />}
         <fieldset>
           <legend>Registration status</legend>
-          {checkInBookStatuses.map((value) => (
+          {checkInBookStatuses.filter((value) => !registeredClubsOnly || value === "SUBMITTED" || value === "CONFIRMED").map((value) => (
             <label key={value}>
               <input type="checkbox" name="status" value={value} defaultChecked={statuses.includes(value)} /> {registrationStatusWords[value]}
             </label>

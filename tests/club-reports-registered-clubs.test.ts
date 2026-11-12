@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getCheckInBookData: vi.fn(),
   createDirectorClubPass: vi.fn(),
   isClubRegisteredForEvent: vi.fn(),
+  grant: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -25,7 +26,7 @@ vi.mock("@/modules/club-rosters/event-oversight", () => ({
   resolveClubOversight: vi.fn(),
 }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: vi.fn() }));
-vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({}) }));
+vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ clubsAdministratorGrant: { findFirst: mocks.grant } }) }));
 vi.mock("@/modules/reporting/club-reports-access", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/modules/reporting/club-reports-access")>();
   return { ...actual, requireClubReportsAccess: mocks.requireClubReportsAccess };
@@ -43,12 +44,12 @@ beforeEach(() => {
 });
 
 describe("who is narrowed to registered clubs", () => {
-  it("narrows an event administrator only", () => {
-    expect(limitedToRegisteredClubs({ globalRole: "STAFF" }, { role: "EVENT_ADMIN" })).toBe(true);
-    expect(limitedToRegisteredClubs({ globalRole: "SYSTEM_ADMIN" }, { role: "EVENT_ADMIN" })).toBe(false);
-    expect(limitedToRegisteredClubs({ globalRole: "STAFF" }, { role: "EVENT_ADMIN", viaClubsAdministrator: true })).toBe(false);
-    expect(limitedToRegisteredClubs({ globalRole: "STAFF" }, { role: "REGISTRATION_MANAGER" })).toBe(false);
-    expect(limitedToRegisteredClubs({ globalRole: "STAFF" }, null)).toBe(false);
+  it("narrows an event administrator only", async () => {
+    await expect(limitedToRegisteredClubs({ globalRole: "STAFF" }, { role: "EVENT_ADMIN" })).resolves.toBe(true);
+    await expect(limitedToRegisteredClubs({ globalRole: "SYSTEM_ADMIN" }, { role: "EVENT_ADMIN" })).resolves.toBe(false);
+    await expect(limitedToRegisteredClubs({ globalRole: "STAFF" }, { role: "EVENT_ADMIN", viaClubsAdministrator: true })).resolves.toBe(false);
+    await expect(limitedToRegisteredClubs({ globalRole: "STAFF" }, { role: "REGISTRATION_MANAGER" })).resolves.toBe(false);
+    await expect(limitedToRegisteredClubs({ globalRole: "STAFF" }, null)).resolves.toBe(false);
   });
 
   it("checks the registration only for a narrowed viewer", async () => {
@@ -66,13 +67,13 @@ describe("check-in book export", () => {
   it("gives an event administrator only registered (submitted or confirmed) clubs", async () => {
     mocks.requireClubReportsAccess.mockResolvedValue(access(true));
     await checkInBook(new Request(url), context);
-    expect(mocks.getCheckInBookData.mock.calls[0][1]).toMatchObject({ registeredClubsOnly: true });
+    expect(mocks.getCheckInBookData.mock.calls[0][1]).toMatchObject({ statuses: ["CONFIRMED"] });
   });
 
   it("leaves other viewers' choice of statuses alone", async () => {
     mocks.requireClubReportsAccess.mockResolvedValue(access(false));
     await checkInBook(new Request(url), context);
-    expect(mocks.getCheckInBookData.mock.calls[0][1]).toMatchObject({ registeredClubsOnly: false, statuses: ["CONFIRMED", "WAITLISTED", "CANCELLED"] });
+    expect(mocks.getCheckInBookData.mock.calls[0][1]).toMatchObject({ statuses: ["CONFIRMED", "WAITLISTED", "CANCELLED"] });
   });
 });
 

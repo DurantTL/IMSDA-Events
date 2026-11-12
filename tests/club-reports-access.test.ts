@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ findUnique: vi.fn(), withoutViewReports: false }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ event: { findUnique: mocks.findUnique } }) }));
+vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ event: { findUnique: mocks.findUnique }, clubsAdministratorGrant: { findFirst: vi.fn().mockResolvedValue(null) } }) }));
 // Every built-in EVENT_ADMIN grant includes VIEW_REPORTS, so the oversight
 // fallback is only reachable if that grant ever narrows. `withoutViewReports`
 // simulates exactly that, to exercise the fallback's audience check directly.

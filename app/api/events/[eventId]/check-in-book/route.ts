@@ -1,7 +1,7 @@
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { findActiveMembership } from "@/modules/events/repository";
-import { checkInBookCsv, parseCheckInBookStatuses } from "@/modules/reporting/check-in-book";
+import { checkInBookCsv, narrowCheckInBookStatuses, parseCheckInBookStatuses } from "@/modules/reporting/check-in-book";
 import { getCheckInBookData } from "@/modules/reporting/check-in-book-repository";
 import { locationParam } from "@/modules/event-locations/filter";
 import { requireClubReportsAccess } from "@/modules/reporting/club-reports-access";
@@ -19,8 +19,7 @@ async function getHandler(
     const access = await requireClubReportsAccess(await getCurrentSession(), eventId, findActiveMembership);
     const params = new URL(request.url).searchParams;
     const data = await getCheckInBookData(eventId, {
-      statuses: parseCheckInBookStatuses(params.getAll("status")),
-      registeredClubsOnly: access.registeredClubsOnly,
+      statuses: narrowCheckInBookStatuses(parseCheckInBookStatuses(params.getAll("status")), access.registeredClubsOnly),
       extraFieldKey: params.get("extra"),
       // ?location= narrows the book to one location; without it every location is combined (#413).
       location: locationParam(request),
