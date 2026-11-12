@@ -4,7 +4,7 @@ import { AccessDeniedError } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { createDirectorClubPass } from "@/modules/checkin/club-pass-repository";
 import { findActiveMembership } from "@/modules/events/repository";
-import { requireClubReportsAccess } from "@/modules/reporting/club-reports-access";
+import { canOpenClubForReports, requireClubReportsAccess } from "@/modules/reporting/club-reports-access";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -34,12 +34,14 @@ function privateJson(body: unknown, init?: ResponseInit) {
 async function getHandler(request: Request, context: Context) {
   try {
     const { eventId, organizationId } = await context.params;
-    await requireClubReportsAccess(await getCurrentSession(), eventId, findActiveMembership);
+    const access = await requireClubReportsAccess(await getCurrentSession(), eventId, findActiveMembership);
+    // An event administrator's role is for this event only: the club must be registered for it.
+    const canOpen = await canOpenClubForReports(access, eventId, organizationId);
 
     // Which of the club's teams (#809); omitted on an event without teams.
     // A repeated ?team= names no team.
     const teamKey = singleQueryParam(new URL(request.url).searchParams, "team");
-    const pass = teamKey === null ? null : await createDirectorClubPass(organizationId, eventId, new Date(), teamKey);
+    const pass = teamKey === null || !canOpen ? null : await createDirectorClubPass(organizationId, eventId, new Date(), teamKey);
     if (!pass) {
       return privateJson({
         error: "CLUB_PASS_UNAVAILABLE",

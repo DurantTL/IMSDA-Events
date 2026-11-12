@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership }));
-vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ event: { findUnique: mocks.findUnique } }) }));
+vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ event: { findUnique: mocks.findUnique }, clubsAdministratorGrant: { findFirst: vi.fn().mockResolvedValue(null) } }) }));
 vi.mock("@/modules/reporting/check-in-book-repository", () => ({ getCheckInBookData: mocks.getCheckInBookData }));
 
 import { GET } from "@/app/api/events/[eventId]/check-in-book/route";
