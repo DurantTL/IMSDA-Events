@@ -1,0 +1,197 @@
+.frame {
+  position: relative;
+  min-width: 0;
+}
+
+.map {
+  width: 100%;
+  height: 380px;
+  border-radius: var(--radius-container);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--imsda-navy-soft);
+}
+
+.map :global(.leaflet-container) {
+  width: 100%;
+  height: 100%;
+  font-family: inherit;
+}
+
+@media (max-width: 700px) {
+  .map {
+    height: 280px;
+  }
+}
+
+/* The pin is drawn on the empty divIcon: a navy disc with a gold ring, and an event count when a site hosts
+   several. Leaflet positions the icon element itself with a transform, so only the ::before child is animated. */
+.pin {
+  box-sizing: border-box;
+  background: none;
+  border: 0;
+}
+
+.pin::before {
+  content: attr(data-count);
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--imsda-gold);
+  border-radius: 50%;
+  background: var(--imsda-navy);
+  color: var(--card);
+  font-size: var(--type-public-label);
+  font-weight: 700;
+  box-shadow: var(--shadow);
+}
+
+.pin::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 10px solid var(--imsda-gold);
+}
+
+.pin:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* A short drop when the map first scrolls into view (0.4s, staggered by --drop-delay). */
+.drop::before,
+.drop::after {
+  animation: pin-drop 0.4s ease-out both;
+  animation-delay: var(--drop-delay, 0ms);
+}
+
+@keyframes pin-drop {
+  from {
+    opacity: 0;
+    margin-top: -28px;
+  }
+  to {
+    opacity: 1;
+    margin-top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drop::before,
+  .drop::after {
+    animation: none;
+  }
+}
+
+.popup :global(.leaflet-popup-content) {
+  margin: 12px 16px;
+  font-size: var(--type-public-body);
+  line-height: 1.4;
+}
+
+.popup :global(.leaflet-popup-content-wrapper) {
+  border-radius: var(--radius-container);
+}
+
+.popup :global(.leaflet-popup-close-button) {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  font-size: var(--type-public-title);
+  color: var(--imsda-navy);
+}
+
+.popup :global(.leaflet-popup-close-button:focus-visible),
+.popup a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.map :global(.calendar-map-popup) {
+  max-width: min(260px, 65vw);
+  overflow-wrap: anywhere;
+}
+
+.map :global(.calendar-map-popup) strong {
+  display: block;
+  padding-right: 28px;
+  color: var(--imsda-navy);
+}
+
+.map :global(.calendar-map-popup) ul {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.map :global(.calendar-map-popup) li {
+  display: grid;
+}
+
+.map :global(.calendar-map-popup) a,
+.map :global(.calendar-map-popup) span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.map :global(.calendar-map-popup) a {
+  color: var(--imsda-navy);
+}
+
+.map :global(.calendar-map-popup) small {
+  margin-top: -8px;
+  color: var(--muted);
+  font-size: var(--type-public-label);
+}
+
+.map :global(.leaflet-control-zoom) a {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  color: var(--imsda-navy);
+}
+
+.map :global(.leaflet-control-zoom) a:focus-visible,
+.attribution a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The OpenStreetMap attribution, in the map's corner as the tile usage policy asks, rendered by React. */
+.attribution {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  z-index: 1000;
+  margin: 0;
+  padding: 1px 6px;
+  border-top-left-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--ink);
+  font-size: var(--type-public-label);
+  line-height: 1.5;
+}
+
+.attribution a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: inherit;
+}

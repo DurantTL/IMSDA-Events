@@ -44,6 +44,7 @@ export const settingsFieldBlock: Record<string, SettingsBlockId> = {
   endTime: "basics",
   timezone: "basics",
   location: "basics",
+  mapSiteOrganizationId: "basics",
   capacity: "basics",
   registrationOpensOn: "timing",
   registrationClosesOn: "timing",

@@ -21,6 +21,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { RadioCardGroup } from "@/components/radio-card-group";
+import type { MapSiteOption } from "@/modules/events/map-site-domain";
 import { EventLocationsPanel } from "@/components/event-locations-panel";
 import type { ActiveAreaCoordinator, EventLocationRecord } from "@/modules/event-locations/repository";
 import type { EventSettingsRecord } from "@/modules/events/repository";
@@ -106,6 +107,8 @@ import { staffPageTitles } from "@/components/staff-navigation";
 type EventSettingsWorkspaceProps = {
   mode: "create" | "edit";
   initialEvent: EventSettingsRecord | null;
+  /** Churches and sites with a map location, for the Map pin picker (#1212). Absent hides the picker. */
+  mapSiteOptions?: MapSiteOption[];
   /** The event's locations (#413), edited in their own panel below the form. */
   initialLocations?: EventLocationRecord[];
   areaCoordinators?: ActiveAreaCoordinator[];
@@ -252,6 +255,7 @@ export function EventSettingsWorkspace({
   mode,
   initialEvent,
   initialLocations,
+  mapSiteOptions,
   areaCoordinators,
   canDeleteEvent = false,
   canOpenPlatformSettings = false,
@@ -1050,6 +1054,19 @@ export function EventSettingsWorkspace({
                 <span className="input-with-icon"><UsersRound size={16} aria-hidden="true" /><input {...fieldAria("capacity")} id="event-field-capacity" type="number" min={1} max={100000} value={draft.capacity ?? ""} placeholder="No overall limit" onChange={(event) => update("capacity", event.target.value ? Number(event.target.value) : null)} /></span>
               {fieldNote("capacity")}</label>
             </div>
+            {mapSiteOptions && (
+              <label>
+                Map pin (optional)
+                <select {...fieldAria("mapSiteOrganizationId")} id={settingsFieldDomId("mapSiteOrganizationId")} value={draft.mapSiteOrganizationId ?? ""} onChange={(event) => update("mapSiteOrganizationId", event.target.value || null)}>
+                  <option value="">No map pin</option>
+                  {draft.mapSiteOrganizationId && !mapSiteOptions.some((option) => option.id === draft.mapSiteOrganizationId) && (
+                    <option value={draft.mapSiteOrganizationId}>Current site (no longer listed)</option>
+                  )}
+                  {mapSiteOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                </select>
+                <small className="field-help" style={{ margin: "4px 0 0" }}>The pin uses the map location of the host church or site you pick. Leave it empty to keep this event off the public calendar map.</small>
+              {fieldNote("mapSiteOrganizationId")}</label>
+            )}
           </SettingsBlock>
 
           {mode === "create" && (

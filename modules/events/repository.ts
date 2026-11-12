@@ -20,6 +20,7 @@ import { collectEventReadinessWarnings } from "@/modules/events/readiness-warnin
 import type { EventSettingsInput } from "@/modules/events/schemas";
 import { writeCreationModules, writeDefaultModules } from "@/modules/event-modules/defaults";
 import { afterCreationModules, reprojectDebriefBatches } from "@/modules/event-debriefs/lifecycle";
+import { assertMapSiteUsable } from "@/modules/events/map-site";
 import { eventInstant, keepClockTime } from "@/modules/events/event-times";
 import { creationModuleKeys, type EventModuleKey } from "@/modules/event-modules/catalog";
 import { linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
@@ -162,6 +163,7 @@ export async function getEventSettings(eventId: string) {
         endsAt: true,
         timezone: true,
         location: true,
+        mapSiteOrganizationId: true,
         capacity: true,
         publicInfoUrl: true,
         supportContact: true,
@@ -234,6 +236,7 @@ export async function getEventSettings(eventId: string) {
     endsOn: calendarDateInEventTimeZone(event.endsAt, event.timezone),
     timezone: event.timezone,
     location: event.location,
+    mapSiteOrganizationId: event.mapSiteOrganizationId,
     capacity: event.capacity,
     publicInfoUrl: event.publicInfoUrl,
     supportContact: event.supportContact,
@@ -284,7 +287,9 @@ export async function getEventSettings(eventId: string) {
   };
 }
 
-export type EventSettingsRecord = NonNullable<Awaited<ReturnType<typeof getEventSettings>>>;
+type EventSettingsView = NonNullable<Awaited<ReturnType<typeof getEventSettings>>>;
+/** The settings record; `mapSiteOrganizationId` (#1212) is optional on the type so a record without a map pin reads as none. */
+export type EventSettingsRecord = Omit<EventSettingsView, "mapSiteOrganizationId"> & { mapSiteOrganizationId?: string | null };
 
 export async function createEvent(
   input: EventSettingsInput,
@@ -306,6 +311,7 @@ export async function createEvent(
       create: { id: "platform" },
       select: { defaultAttendeeEditPolicy: true },
     });
+    await assertMapSiteUsable(tx, input.mapSiteOrganizationId);
     const event = await tx.event.create({
       data: {
         name: input.name,
@@ -314,6 +320,7 @@ export async function createEvent(
         endsAt: eventInstant(input.endsOn, input.endTime, input.timezone),
         timezone: input.timezone,
         location: input.location,
+        mapSiteOrganizationId: input.mapSiteOrganizationId ?? null,
         capacity: input.capacity,
         publicInfoUrl: input.publicInfoUrl,
         supportContact: input.supportContact,
@@ -436,6 +443,7 @@ export async function updateEventSettings(
           endsAt: true,
           timezone: true,
           location: true,
+          mapSiteOrganizationId: true,
           capacity: true,
           publicInfoUrl: true,
           supportContact: true,
@@ -493,6 +501,10 @@ export async function updateEventSettings(
     // An update without an audience keeps the stored one (#481 review), so a
     // stale client can't silently reset a CLUB event to GENERAL.
     const audience = input.audience ?? current.audience;
+    // Only a changed pin is checked, so an event whose old site has since been deactivated can still save its other settings (#1212).
+    if (input.mapSiteOrganizationId !== undefined && input.mapSiteOrganizationId !== current.mapSiteOrganizationId) {
+      await assertMapSiteUsable(tx, input.mapSiteOrganizationId);
+    }
     // A church is billed for sponsored promo codes only on a GENERAL,
     // attendee-paid event (#545). Leaving that would bill it twice or strand
     // its lines, so the sponsors must be unlinked first.
@@ -528,6 +540,8 @@ export async function updateEventSettings(
         endsAt: keepClockTime(current.endsAt, current.timezone, input.endsOn, input.timezone),
         timezone: input.timezone,
         location: input.location,
+        // Absent keeps the stored site; null removes the pin (#1212).
+        ...(input.mapSiteOrganizationId !== undefined ? { mapSiteOrganizationId: input.mapSiteOrganizationId } : {}),
         capacity: input.capacity,
         publicInfoUrl: input.publicInfoUrl,
         supportContact: input.supportContact,
