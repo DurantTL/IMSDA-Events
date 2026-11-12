@@ -21,6 +21,7 @@ export const eventModuleKeys = [
   "attendance-points",
   "debrief",
   "event-budget",
+  "baptism-follow-up",
 ] as const;
 
 export type EventModuleKey = (typeof eventModuleKeys)[number];
@@ -204,6 +205,18 @@ export const eventModuleCatalog: readonly EventModuleDefinition[] = [
     offByDefault: true,
     routes: ["/more/budget", "/account/area-clubs/events"],
     features: ["event-budget-sheet"],
+  },
+  {
+    key: "baptism-follow-up",
+    cardKey: "baptism-follow-up",
+    title: "Baptism follow-up",
+    description: "When a club names someone for baptism on its registration, email the event lead and the club's church pastor a short note asking them to follow up. Off until staff turn it on and add an event lead.",
+    appliesTo: "club-audience",
+    launcherGroup: "people-access",
+    alwaysOn: false,
+    offByDefault: true,
+    routes: ["/more/baptism-follow-up"],
+    features: ["baptism-follow-up-notice"],
   },
 ];
 

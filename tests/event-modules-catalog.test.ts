@@ -30,6 +30,7 @@ const cardKeys: Record<EventModuleKey, string> = {
   "attendance-points": "attendance-points",
   debrief: "debrief",
   "event-budget": "event-budget",
+  "baptism-follow-up": "baptism-follow-up",
 };
 
 describe("event module catalog (#741)", () => {
@@ -45,7 +46,7 @@ describe("event module catalog (#741)", () => {
   });
 
   it("applies the club modules only to club-audience events", () => {
-    for (const key of ["honors", "event-patches", "club-assignments", "club-teachers", "event-scoring", "attendance-points", "debrief", "event-budget"] as const) {
+    for (const key of ["honors", "event-patches", "club-assignments", "club-teachers", "event-scoring", "attendance-points", "debrief", "event-budget", "baptism-follow-up"] as const) {
       expect(moduleApplies(key, club)).toBe(true);
       expect(moduleApplies(key, general)).toBe(false);
       expect(moduleApplies(key, rankedGeneral)).toBe(false);

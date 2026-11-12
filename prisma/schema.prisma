@@ -671,6 +671,8 @@ enum MessageTemplateKey {
   CLUB_FORM_SUBMITTED
   /// An information form got a response (#1222): one internal email per address on the form's alert list. The form's name, a time and a staff link; never an answer.
   INFORMATION_FORM_SUBMITTED
+  /// A baptism follow-up notice (#1680): one internal email per recipient (the event lead addresses, the club's church pastor) naming only the new baptism names a club entered, the club, the event and its dates, with a request to follow up. Nothing else about the person.
+  BAPTISM_FOLLOW_UP
   /// A registrant's cancellation request was received (#170). Status only: never the reason, the amount or the outcome.
   CANCELLATION_REQUEST_RECEIVED
   /// A cancellation request changed status (#170). Status only: never the reason, the amount or a staff note.
@@ -1762,6 +1764,7 @@ model AdminAlertFeedReceipt {
 }
 
 model Event {
+  baptismFollowUpSetting BaptismFollowUpSetting?
   id                   String             @id @default(cuid())
   clubTeacherRule      ClubTeacherRule?
   clubTeachers         ClubEventTeacher[]
@@ -1772,6 +1775,7 @@ model Event {
   attendancePointsOverrides AttendancePointsOverride[]
   attendancePointsMarks AttendancePointsMark[]
   clubEventPointAwards ClubEventPointAward[]
+  baptismFollowUps BaptismFollowUp[]
   healthSnapshots      HealthRecordSnapshot[]
   healthSnapshotHolds  HealthSnapshotHold[]
   slug                 String             @unique
@@ -2064,6 +2068,37 @@ model EventModule {
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, moduleKey])
+}
+
+/// The event lead addresses an event's baptism notices go to (#1680): at most three, entered by staff. One row per event; no row
+/// or an empty list means no baptism notice is sent for the event.
+model BaptismFollowUpSetting {
+  eventId    String   @id
+  leadEmails String[] @default([])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+/// One baptism name a club entered for an event that has the Baptism follow-up module on (#1680), kept so a name is
+/// notified once. `normalizedName` is the name in lower case with spacing collapsed; `displayName` is as the club typed it.
+/// `leadNotified` and `pastorNotified` record who the notice was queued for (never an address). Nothing else about the person is stored.
+model BaptismFollowUp {
+  id             String   @id @default(cuid())
+  eventId        String
+  organizationId String
+  normalizedName String
+  displayName    String
+  leadNotified   Boolean  @default(false)
+  pastorNotified Boolean  @default(false)
+  notifiedAt     DateTime @default(now())
+
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([eventId, organizationId, normalizedName])
+  @@index([eventId, notifiedAt])
 }
 
 /// The debrief module's own settings for one event (#1679): the club director evaluation's switch (off by default) and the
@@ -2783,6 +2818,7 @@ model Organization {
   activityScores    ActivityScore[]
   attendancePointsOverrides AttendancePointsOverride[]
   clubEventPointAwards ClubEventPointAward[]
+  baptismFollowUps BaptismFollowUp[]
   clubOptionalFeatures ClubOptionalFeature[]
   id                   String           @id @default(cuid())
   scholarshipContributions ScholarshipContribution[]
@@ -8110,7 +8146,9 @@ model OrganizationBillingContact {
 
 /// A non-billing contact for an organization, today the church pastor (#977). One active row
 /// (effectiveTo NULL) per organization and kind, enforced by a partial unique index the migration
-/// adds. Rows are ended, never deleted or rewritten. Never used to address invoices or any message.
+/// adds. Rows are ended, never deleted or rewritten. Never used to address invoices or any message, with one exception: the
+/// optional Baptism follow-up notice (#1680, Caleb, Nov 12, 2026) emails the active pastor a short note naming the baptism names a club
+/// of that church entered for an event. That path reads the email on the server only.
 model OrganizationContact {
   id              String                  @id @default(cuid())
   organizationId  String

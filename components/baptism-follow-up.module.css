@@ -1,0 +1,13 @@
+.panel { display: grid; gap: 14px; max-width: 560px; }
+.field { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.field textarea { min-height: 110px; padding: 10px 12px; font: inherit; font-weight: 400; }
+.help { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; }
+.error { color: var(--coral); font-weight: 600; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.panel button { min-height: 44px; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.club { border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px 12px; display: grid; gap: 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.clubHead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; }
+.names { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.muted { color: var(--muted); margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.heading { margin: 0 0 8px; font-size: max(var(--type-staff-floor, 0px), 1rem); }
