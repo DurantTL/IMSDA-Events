@@ -29,6 +29,7 @@ import type { ResolvedStation } from "@/modules/checkin-stations/repository";
 import { findPaymentReplay } from "@/modules/payments/payment-replay";
 import { PaymentOperationError, recordManualPayment } from "@/modules/payments/repository";
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
 import { moneyToCents, registrationBalanceCents } from "@/modules/payments/square-domain";
 import {
   SquareMatchOperationError,
@@ -45,7 +46,8 @@ export class StationServiceError extends Error {
       | "SEND_TO_DESK"
       | "BILLED_TO_GROUP"
       | "NOTHING_DUE"
-      | "BALANCE_REASON_REQUIRED",
+      | "BALANCE_REASON_REQUIRED"
+      | "PAYMENT_NOT_LISTED",
   ) {
     super(
       code === "NOT_FOUND"
@@ -58,7 +60,9 @@ export class StationServiceError extends Error {
               ? "This registration is billed to the church or group, so nothing is collected here."
               : code === "BALANCE_REASON_REQUIRED"
                 ? "This registration still has a balance due. Pick a reason before checking anyone in."
-                : "Nothing is due on this registration.",
+                : code === "PAYMENT_NOT_LISTED"
+                  ? "That payment is not listed for this registration. Note it for finance to match later."
+                  : "Nothing is due on this registration.",
     );
     this.name = "StationServiceError";
   }
@@ -76,11 +80,12 @@ function stationLabelFrom(metadata: Record<string, unknown>) {
   return typeof station.label === "string" && station.label.trim() ? station.label.trim() : null;
 }
 
+/** Date and time in the event's own zone, with the zone named. */
 function formatWhen(at: Date, timeZone: string) {
   try {
-    return new Intl.DateTimeFormat("en-US", { timeZone, dateStyle: "medium", timeStyle: "short" }).format(at);
+    return formatInTimeZone(at, timeZone, { dateStyle: "medium", timeStyle: "short" });
   } catch {
-    return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", dateStyle: "medium", timeStyle: "short" }).format(at);
+    return formatInTimeZone(at, "UTC", { dateStyle: "medium", timeStyle: "short" });
   }
 }
 
@@ -131,7 +136,7 @@ export async function stationPaymentHistory(eventId: string, registrationId: str
       OR: [
         { entityType: "Registration", entityId: registrationId, action: { in: [squareNoteAction, balanceReasonAction] } },
         ...(paymentIds.length > 0
-          ? [{ entityType: "Payment", entityId: { in: paymentIds }, action: "MANUAL_PAYMENT_RECORDED" }]
+          ? [{ entityType: "Payment", entityId: { in: paymentIds }, action: { in: ["MANUAL_PAYMENT_RECORDED", "SQUARE_PAYMENT_MANUALLY_MATCHED"] } }]
           : []),
       ],
     },
@@ -141,7 +146,7 @@ export async function stationPaymentHistory(eventId: string, registrationId: str
   });
   const stationByPayment = new Map<string, string | null>();
   for (const log of logs) {
-    if (log.action === "MANUAL_PAYMENT_RECORDED" && log.entityId) {
+    if ((log.action === "MANUAL_PAYMENT_RECORDED" || log.action === "SQUARE_PAYMENT_MANUALLY_MATCHED") && log.entityId) {
       stationByPayment.set(log.entityId, stationLabelFrom(metadataObject(log.metadata)));
     }
   }
@@ -360,11 +365,11 @@ export async function checkInStationFamily(
   // One entry per check-in action, written only when someone was newly checked in, so a replay or a repeat scan
   // does not record the reason twice.
   if (newlyCheckedIn && summary.state === "DUE" && reason) {
-    const registration = await getPrisma().registration.findFirst({
-      where: { id: input.registrationId, eventId },
-      select: { confirmationCode: true },
-    });
     try {
+      const registration = await getPrisma().registration.findFirst({
+        where: { id: input.registrationId, eventId },
+        select: { confirmationCode: true },
+      });
       await writeAuditLog({
         eventId,
         actorUserId: station.starter.id,
@@ -462,41 +467,64 @@ export async function noteStationSquareAppPayment(
   return paymentSummaryFor(eventId, input.registrationId);
 }
 
+/** Today's unmatched Square findings that Square ties to this one registration, and nothing else. */
+async function unmatchedForRegistration(eventId: string, registrationId: string) {
+  const report = await listUnmatchedSquarePayments({ eventId, days: 1 });
+  if (report.unreachableSquare) return null;
+  return report.findings.filter((finding) => finding.registrationId === registrationId);
+}
+
+async function registrationHasPayment(eventId: string, registrationId: string) {
+  const count = await getPrisma().payment.count({ where: { eventId, registrationId, status: "SUCCEEDED" } });
+  return count > 0;
+}
+
 /**
  * Today's unmatched Square payments that Square ties to this one registration, and nothing else: no note, no
  * reference, no order, no unattributed payment. `unavailable` is true when Square is not set up or not reachable,
- * so the screen can fall back to "note it for finance".
+ * so the screen can fall back to "note it for finance". `alreadyHasPayment` is true when the registration already
+ * shows money; those are matched by finance, so no candidates are offered.
  */
 export async function listStationSquareCandidates(
   station: ResolvedStation,
   registrationId: string,
-): Promise<{ candidates: StationSquareCandidate[]; unavailable: boolean }> {
+): Promise<{ candidates: StationSquareCandidate[]; unavailable: boolean; alreadyHasPayment: boolean }> {
   const eventId = station.station.eventId;
   const summary = await requirePayableRegistration(station, registrationId);
-  if (summary.state !== "DUE") return { candidates: [], unavailable: false };
+  if (summary.state !== "DUE") return { candidates: [], unavailable: false, alreadyHasPayment: false };
+  if (await registrationHasPayment(eventId, registrationId)) {
+    return { candidates: [], unavailable: false, alreadyHasPayment: true };
+  }
   try {
-    const report = await listUnmatchedSquarePayments({ eventId, days: 1 });
-    if (report.unreachableSquare) return { candidates: [], unavailable: true };
+    const findings = await unmatchedForRegistration(eventId, registrationId);
+    if (!findings) return { candidates: [], unavailable: true, alreadyHasPayment: false };
+    const registration = await getPrisma().registration.findFirst({
+      where: { id: registrationId, eventId },
+      select: { event: { select: { timezone: true } } },
+    });
+    const timeZone = registration?.event?.timezone || "UTC";
     return {
       unavailable: false,
-      candidates: report.findings
-        .filter((finding) => finding.registrationId === registrationId)
-        .map((finding) => ({
-          providerPaymentId: finding.providerPaymentId,
-          amountCents: finding.amountCents,
-          createdAt: finding.createdAt,
-          overBalance: finding.amountCents > summary.balanceCents,
-        })),
+      alreadyHasPayment: false,
+      candidates: findings.map((finding) => ({
+        providerPaymentId: finding.providerPaymentId,
+        amountCents: finding.amountCents,
+        whenLabel: finding.createdAt
+          ? formatInTimeZone(finding.createdAt, timeZone, { hour: "numeric", minute: "2-digit" })
+          : "",
+        overBalance: finding.amountCents > summary.balanceCents,
+      })),
     };
   } catch (error) {
-    if (error instanceof SquareMatchOperationError) return { candidates: [], unavailable: true };
+    if (error instanceof SquareMatchOperationError) return { candidates: [], unavailable: true, alreadyHasPayment: false };
     throw error;
   }
 }
 
 /**
- * Attaches one listed Square payment to the registration. The duplicate acknowledgement is never sent: a
- * registration that already shows money goes to finance instead.
+ * Attaches one listed Square payment to the registration. The payment must be in today's list for this very
+ * registration, so a posted id cannot attach someone else's payment. The duplicate acknowledgement is never sent:
+ * a registration that already shows money goes to finance instead.
  */
 export async function matchStationSquarePayment(
   station: ResolvedStation,
@@ -504,9 +532,20 @@ export async function matchStationSquarePayment(
 ): Promise<StationPaymentSummary> {
   const eventId = station.station.eventId;
   await requirePayableRegistration(station, input.registrationId);
-  await attachSquarePaymentToRegistration(eventId, input.registrationId, station.starter.id, {
-    providerPaymentId: input.providerPaymentId,
-    note: `Matched at check-in station ${station.station.label.trim() || "(unnamed)"}`,
-  });
+  const findings = await unmatchedForRegistration(eventId, input.registrationId);
+  if (!findings) throw new SquareMatchOperationError("SQUARE_UNREACHABLE", "Square could not be reached.");
+  if (!findings.some((finding) => finding.providerPaymentId === input.providerPaymentId)) {
+    throw new StationServiceError("PAYMENT_NOT_LISTED");
+  }
+  await attachSquarePaymentToRegistration(
+    eventId,
+    input.registrationId,
+    station.starter.id,
+    {
+      providerPaymentId: input.providerPaymentId,
+      note: `Matched at check-in station ${station.station.label.trim() || "(unnamed)"}`,
+    },
+    { auditContext: { station: { id: station.station.id, label: station.station.label } } },
+  );
   return paymentSummaryFor(eventId, input.registrationId);
 }

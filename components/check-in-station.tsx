@@ -50,11 +50,6 @@ async function post<T>(path: string, body: unknown): Promise<{ ok: true; data: T
   }
 }
 
-function formatTime(iso: string) {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
 /**
  * The staff-run check-in station screen (#892). It shows only the scanned registration's names and a Paid or
  * Balance due line. Absent people are unticked before Confirm; held people are never selectable; there is no card
@@ -269,6 +264,7 @@ export function CheckInStationScreen({
           <h2 id="cis-family-title">Registration <span translate="no">{family.confirmationCode}</span></h2>
           {allDone && <p className={styles.cisOk}><CheckCircle2 aria-hidden="true" size={18} /> Everyone on this registration is checked in.</p>}
           <PaymentPanel
+            key={family.registrationId}
             family={family}
             canRecordPayments={canRecordPayments}
             onPayment={({ payment, paymentHistory }) => setFamily((current) => (current
@@ -393,6 +389,7 @@ function PaymentPanel({
   const [noteOpen, setNoteOpen] = useState(false);
   const [candidates, setCandidates] = useState<StationSquareCandidate[] | null>(null);
   const [squareUnavailable, setSquareUnavailable] = useState(false);
+  const [alreadyHasPayment, setAlreadyHasPayment] = useState(false);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [confirmCandidate, setConfirmCandidate] = useState<StationSquareCandidate | null>(null);
   const [squareAmount, setSquareAmount] = useState("");
@@ -463,7 +460,8 @@ function PaymentPanel({
     if (!canRecordPayments) return;
     setLoadingCandidates(true);
     setSquareUnavailable(false);
-    const response = await post<{ candidates: StationSquareCandidate[]; unavailable: boolean }>(
+    setAlreadyHasPayment(false);
+    const response = await post<{ candidates: StationSquareCandidate[]; unavailable: boolean; alreadyHasPayment: boolean }>(
       "/api/check-in-station/square-unmatched",
       { registrationId: family.registrationId },
     );
@@ -475,6 +473,7 @@ function PaymentPanel({
     }
     setCandidates(response.data.candidates);
     setSquareUnavailable(response.data.unavailable);
+    setAlreadyHasPayment(response.data.alreadyHasPayment === true);
   }
 
   function closeSquare() {
@@ -482,7 +481,14 @@ function PaymentPanel({
     setNoteOpen(false);
     setCandidates(null);
     setSquareUnavailable(false);
+    setAlreadyHasPayment(false);
     setConfirmCandidate(null);
+  }
+
+  function openNoteForm() {
+    setNoteOpen(true);
+    // The form mounts on the next render; move focus to its first field then.
+    setTimeout(() => document.getElementById("cis-square-amount")?.focus(), 0);
   }
 
   async function matchPayment(candidate: StationSquareCandidate) {
@@ -603,7 +609,10 @@ function PaymentPanel({
                     {!loadingCandidates && squareUnavailable && (
                       <p className={styles.cisWarn}>Square could not be reached. Note it for finance to match later.</p>
                     )}
-                    {!loadingCandidates && !squareUnavailable && candidates !== null && candidates.length === 0 && (
+                    {!loadingCandidates && alreadyHasPayment && (
+                      <p className={styles.cisWarn}>This registration already shows a payment, so card payments are matched by finance. Note it for finance to match later.</p>
+                    )}
+                    {!loadingCandidates && !squareUnavailable && !alreadyHasPayment && candidates !== null && candidates.length === 0 && (
                       <p className={styles.cisHelp}>No unmatched Square payment for this registration yet.</p>
                     )}
                     {candidates && candidates.length > 0 && (
@@ -612,7 +621,7 @@ function PaymentPanel({
                           <li key={candidate.providerPaymentId} className={styles.cisMatchRow}>
                             <span>
                               <strong>{formatCents(candidate.amountCents)}</strong>
-                              {candidate.createdAt && <span className={styles.cisType}> {formatTime(candidate.createdAt)}</span>}
+                              {candidate.whenLabel && <span className={styles.cisType}> {candidate.whenLabel}</span>}
                               {candidate.overBalance && (
                                 <span className={styles.cisHelp} id={`cis-over-${candidate.providerPaymentId}`}>
                                   More than the balance due (card fee?)
@@ -633,7 +642,7 @@ function PaymentPanel({
                       </ul>
                     )}
                     {!noteOpen && (
-                      <button type="button" className={`secondary-button ${styles.large}`} onClick={() => setNoteOpen(true)} disabled={busy || loadingCandidates}>
+                      <button type="button" className={`secondary-button ${styles.large}`} onClick={openNoteForm} disabled={busy || loadingCandidates}>
                         Not listed? Note it for finance to match later
                       </button>
                     )}

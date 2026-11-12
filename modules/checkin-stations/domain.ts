@@ -215,7 +215,8 @@ export const stationSquareMatchSchema = z.strictObject({
 export type StationSquareCandidate = {
   providerPaymentId: string;
   amountCents: number;
-  createdAt: string | null;
+  /** Time of day in the event's zone, zone named; empty when Square gave none. */
+  whenLabel: string;
   /** More than the balance due, usually the card fee the payer was charged on top. */
   overBalance: boolean;
 };

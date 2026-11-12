@@ -117,7 +117,7 @@ function prismaFor(registration: Record<string, unknown> | null = registrationRo
         where.id.in.filter((id) => ["attendee_1", "attendee_2", "attendee_3"].includes(id)).map((id) => ({ id }))),
     },
     auditLog: { findFirst: vi.fn().mockResolvedValue(note), findMany: vi.fn().mockResolvedValue([]) },
-    payment: { create: vi.fn(), findUnique: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) },
+    payment: { create: vi.fn(), findUnique: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0) },
   };
   mocks.getPrisma.mockReturnValue(prisma);
   return prisma;
@@ -458,6 +458,7 @@ describe("station payment history (#1577)", () => {
     prisma.auditLog.findMany.mockResolvedValue([
       { id: "log_3", action: "CHECK_IN_STATION_BALANCE_REASON", entityId: "registration_1", createdAt: new Date("2026-11-01T16:00:00.000Z"), metadata: { reasonCode: "OTHER", note: "Pastor vouched", station: { id: "s", label: "Gate B" } } },
       { id: "log_2", action: "CHECK_IN_STATION_SQUARE_APP_NOTED", entityId: "registration_1", createdAt: new Date("2026-10-31T18:00:00.000Z"), metadata: { amountCents: 1000, receiptNumber: "R-9", station: { id: "s", label: "Gate B" } } },
+      { id: "log_4", action: "SQUARE_PAYMENT_MANUALLY_MATCHED", entityId: "pay_2", createdAt: new Date("2026-10-30T15:01:00.000Z"), metadata: { providerPaymentId: "sq_secret_ref", staffNote: "private", channel: "CHECK_IN_STATION", station: { id: "s", label: "Gate C" } } },
       { id: "log_1", action: "MANUAL_PAYMENT_RECORDED", entityId: "pay_1", createdAt: new Date("2026-10-31T15:30:00.000Z"), metadata: { amountCents: 2500, station: { id: "s", label: "Front desk tablet" } } },
     ]);
     const history = await stationPaymentHistory("event_1", "registration_1");
@@ -467,10 +468,10 @@ describe("station payment history (#1577)", () => {
       "Check #1042 - $25.00 (refunded $5.00)",
       "Card - $15.00",
     ]);
-    expect(history.map((entry) => entry.stationLabel)).toEqual(["Gate B", "Gate B", "Front desk tablet", null]);
-    expect(history[2].whenLabel).toBe("Oct 31, 2026, 10:30 AM");
+    expect(history.map((entry) => entry.stationLabel)).toEqual(["Gate B", "Gate B", "Front desk tablet", "Gate C"]);
+    expect(history[2].whenLabel).toBe("Oct 31, 2026, 10:30 AM CDT");
     const serialized = JSON.stringify(history);
-    expect(serialized).not.toMatch(/sq_secret_ref|R-9|Casey|user_1/);
+    expect(serialized).not.toMatch(/sq_secret_ref|R-9|Casey|user_1|private/);
     expect(prisma.payment.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { eventId: "event_1", registrationId: "registration_1", status: "SUCCEEDED" },
       take: 10,
@@ -512,9 +513,10 @@ describe("station Square match (#1577)", () => {
     expect(mocks.listUnmatchedSquarePayments).toHaveBeenCalledWith({ eventId: "event_1", days: 1 });
     expect(result).toEqual({
       unavailable: false,
+      alreadyHasPayment: false,
       candidates: [
-        { providerPaymentId: "sq_1", amountCents: 6000, createdAt: "2026-11-01T15:00:00.000Z", overBalance: false },
-        { providerPaymentId: "sq_2", amountCents: 6300, createdAt: "2026-11-01T15:00:00.000Z", overBalance: true },
+        { providerPaymentId: "sq_1", amountCents: 6000, whenLabel: "9:00 AM CST", overBalance: false },
+        { providerPaymentId: "sq_2", amountCents: 6300, whenLabel: "9:00 AM CST", overBalance: true },
       ],
     });
     expect(JSON.stringify(result)).not.toMatch(/cabin|order_1|referenceId|note/);
@@ -523,9 +525,16 @@ describe("station Square match (#1577)", () => {
   it("reports Square as unavailable when it is not set up or cannot be reached", async () => {
     prismaFor();
     mocks.listUnmatchedSquarePayments.mockRejectedValue(new mocks.MockSquareError("SQUARE_NOT_CONFIGURED"));
-    expect(await listStationSquareCandidates(station, "registration_1")).toEqual({ candidates: [], unavailable: true });
+    expect(await listStationSquareCandidates(station, "registration_1")).toEqual({ candidates: [], unavailable: true, alreadyHasPayment: false });
     mocks.listUnmatchedSquarePayments.mockResolvedValue({ findings: [], examined: 0, unreachableSquare: true, environment: "sandbox" });
-    expect(await listStationSquareCandidates(station, "registration_1")).toEqual({ candidates: [], unavailable: true });
+    expect(await listStationSquareCandidates(station, "registration_1")).toEqual({ candidates: [], unavailable: true, alreadyHasPayment: false });
+  });
+
+  it("offers no Match when the registration already shows a payment", async () => {
+    const prisma = prismaFor();
+    prisma.payment.count.mockResolvedValue(1);
+    expect(await listStationSquareCandidates(station, "registration_1")).toEqual({ candidates: [], unavailable: false, alreadyHasPayment: true });
+    expect(mocks.listUnmatchedSquarePayments).not.toHaveBeenCalled();
   });
 
   it("lists nothing for a church-billed registration", async () => {
@@ -534,19 +543,43 @@ describe("station Square match (#1577)", () => {
     expect(mocks.listUnmatchedSquarePayments).not.toHaveBeenCalled();
   });
 
+  const listed = (...findings: Array<Record<string, unknown>>) =>
+    mocks.listUnmatchedSquarePayments.mockResolvedValue({ findings, examined: findings.length, unreachableSquare: false, environment: "sandbox" });
+
+  it("refuses a payment that is not listed for this registration, without attaching", async () => {
+    prismaFor();
+    listed(finding({ providerPaymentId: "sq_other", registrationId: "registration_other" }), finding({ providerPaymentId: "sq_nobody", registrationId: null }));
+    for (const providerPaymentId of ["sq_other", "sq_nobody", "sq_unknown"]) {
+      await expect(matchStationSquarePayment(station, { registrationId: "registration_1", providerPaymentId }))
+        .rejects.toMatchObject({ code: "PAYMENT_NOT_LISTED" });
+    }
+    expect(mocks.attachSquarePaymentToRegistration).not.toHaveBeenCalled();
+  });
+
+  it("refuses when Square cannot be reached to confirm the list", async () => {
+    prismaFor();
+    mocks.listUnmatchedSquarePayments.mockResolvedValue({ findings: [], examined: 0, unreachableSquare: true, environment: "sandbox" });
+    await expect(matchStationSquarePayment(station, { registrationId: "registration_1", providerPaymentId: "sq_1" }))
+      .rejects.toMatchObject({ code: "SQUARE_UNREACHABLE" });
+    expect(mocks.attachSquarePaymentToRegistration).not.toHaveBeenCalled();
+  });
+
   it("attaches without ever acknowledging a duplicate, under the starter", async () => {
     prismaFor();
+    listed(finding({}));
     mocks.attachSquarePaymentToRegistration.mockResolvedValue({});
     await matchStationSquarePayment(station, { registrationId: "registration_1", providerPaymentId: "sq_1" });
     expect(mocks.attachSquarePaymentToRegistration).toHaveBeenCalledWith(
       "event_1", "registration_1", "user_1",
       { providerPaymentId: "sq_1", note: "Matched at check-in station Front desk tablet" },
+      { auditContext: { station: { id: "station_1", label: "Front desk tablet" } } },
     );
     expect(mocks.attachSquarePaymentToRegistration.mock.calls[0][3]).not.toHaveProperty("acknowledgeDuplicate");
   });
 
   it("passes a duplicate refusal through for the route to explain", async () => {
     prismaFor();
+    listed(finding({}));
     mocks.attachSquarePaymentToRegistration.mockRejectedValue(new mocks.MockSquareError("PAYMENT_LIKELY_DUPLICATE"));
     await expect(matchStationSquarePayment(station, { registrationId: "registration_1", providerPaymentId: "sq_1" }))
       .rejects.toMatchObject({ code: "PAYMENT_LIKELY_DUPLICATE" });

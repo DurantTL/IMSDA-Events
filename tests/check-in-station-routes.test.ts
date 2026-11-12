@@ -317,12 +317,12 @@ describe("check-in station API: balance reason and Square match (#1577)", () => 
 
   it("lists candidates for this registration on the lookup rate limit", async () => {
     mocks.resolveStation.mockResolvedValue(financeStation);
-    mocks.listStationSquareCandidates.mockResolvedValue({ candidates: [{ providerPaymentId: "sq_1", amountCents: 6000, createdAt: null, overBalance: false }], unavailable: false });
+    mocks.listStationSquareCandidates.mockResolvedValue({ candidates: [{ providerPaymentId: "sq_1", amountCents: 6000, whenLabel: "", overBalance: false }], unavailable: false, alreadyHasPayment: false });
     const response = await squareUnmatchedPost(post("/api/check-in-station/square-unmatched", { registrationId: "registration_1" }));
     expect(response.status).toBe(200);
     expect(mocks.checkLookupRateLimit).toHaveBeenCalledWith("station_1", 60);
     expect(mocks.listStationSquareCandidates).toHaveBeenCalledWith(financeStation, "registration_1");
-    expect(await response.json()).toEqual({ candidates: [{ providerPaymentId: "sq_1", amountCents: 6000, createdAt: null, overBalance: false }], unavailable: false });
+    expect(await response.json()).toEqual({ candidates: [{ providerPaymentId: "sq_1", amountCents: 6000, whenLabel: "", overBalance: false }], unavailable: false, alreadyHasPayment: false });
   });
 
   it("matches only the named payment and never accepts a duplicate acknowledgement", async () => {
