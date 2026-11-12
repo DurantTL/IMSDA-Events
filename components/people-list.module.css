@@ -74,3 +74,6 @@
   .dialog.dialog .closeX { display: none !important; }
   .phoneMeta.phoneMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 }
+
+/* The Attendee list link in the header sentence reads as a link (#1574). */
+.descLink { color: var(--imsda-purple); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }

@@ -863,7 +863,7 @@ export function PeopleWorkspace({
     <section className="page-stack">
       <PageHeader
         title={staffPageTitles.registrations}
-        description={<>A registration is one sign-up with everyone it covers. For one row per person, open the <a href={`/people/attendees?event=${encodeURIComponent(eventId)}`}>Attendee list</a>.</>}
+        description={<>A registration is one sign-up with everyone it covers. For one row per person, open the <a className={listStyles.descLink} href={`/people/attendees?event=${encodeURIComponent(eventId)}`}>Attendee list</a>.</>}
         primary={canEdit ? <a className="primary-button" href={`/events/${eventSlug}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" size={17} /> Start registration</a> : undefined}
         extra={helpSlot ? <div className={listStyles.helpSlot}>{helpSlot}</div> : undefined}
         actions={<>
