@@ -46,6 +46,36 @@ export const walkthroughCoordinator = {
   lastName: "Sample",
 } as const;
 
+/**
+ * The family walkthroughs' fixtures (#1883): an attendee account with one registration for a sample family event. The registration
+ * has a balance (part paid, part owing), two sample attendees with a choice they can change, a contact the account can update,
+ * and the event has a synthetic cancellation policy, so My registrations shows every action a family can use. Square is not set
+ * up locally, so the card honestly shows the balance and says to contact the event team (there is no Continue payment).
+ */
+export const walkthroughFamily = {
+  id: `${W}_account_family`,
+  email: `${W}.family@example.test`,
+  password: "Sample-Family-Pass-2026!",
+  displayName: "Taylor Sample",
+  firstName: "Taylor",
+  lastName: "Sample",
+  phone: "(515) 555-0140",
+  /** The number the "change a registration" walkthrough types. */
+  newPhone: "(515) 555-0141",
+} as const;
+
+export const walkthroughFamilyEvent = {
+  id: `${W}_family_event`,
+  slug: `${W}-family-retreat`,
+  name: "Sample Family Retreat",
+  registrationId: `${W}_family_registration`,
+  confirmationCode: "WT-FAMILY-1",
+  formId: `${W}_family_form`,
+  formVersionId: `${W}_family_formver`,
+  /** The second sample attendee on the registration (the first is the account holder). */
+  attendeeNames: [["Taylor", "Sample"], ["Riley", "Sample"]] as const,
+} as const;
+
 type AreaClubFixture = {
   id: string;
   name: string;
@@ -131,7 +161,7 @@ export type TemplateState = { key: string; enabled: boolean; requirement: ClubFo
 const walkthroughTemplateKeys = ["pathfinder_membership_application", "off_premises_permission_slip", "club_tlt_application", "can_collecting_report"];
 
 const areaDirectorIds = walkthroughAreaClubs.flatMap((club) => (club.director ? [club.director.id] : []));
-const fixtureAccountIds = [walkthroughIds.director, walkthroughInvitee.id, walkthroughCoordinator.id, ...areaDirectorIds];
+const fixtureAccountIds = [walkthroughIds.director, walkthroughInvitee.id, walkthroughCoordinator.id, walkthroughFamily.id, ...areaDirectorIds];
 const allClubIds = [walkthroughIds.club, ...walkthroughAreaClubs.map((club) => club.id)];
 const allChurchIds = [walkthroughIds.church, ...walkthroughAreaClubs.map((club) => `${club.id}_church`)];
 const supplyNames = [walkthroughSupplyName, "Sample Pathfinder Scarf Slide", "Sample Club Patch"];
@@ -139,6 +169,15 @@ const supplyNames = [walkthroughSupplyName, "Sample Pathfinder Scarf Slide", "Sa
 /** Deletes every walkthrough row, newest dependents first. Safe to run when nothing exists. */
 export async function deleteWalkthroughFixtures(prisma: PrismaClient) {
   const mine = { startsWith: `${W}_` };
+  // The family event first: its registration, payment, cancellation policy and any cancellation request go with the event, and the
+  // sample people (who the registration points at) can then be removed below.
+  if (await prisma.event.findUnique({ where: { id: walkthroughFamilyEvent.id }, select: { id: true } })) {
+    const { removeEventOwnedRows } = await import("../../modules/events/deletion-repository");
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`;
+      await removeEventOwnedRows(tx, walkthroughFamilyEvent.id);
+    }, { timeout: 30_000 });
+  }
   const orgs = { organizationId: { in: allClubIds } };
   const rosterPeople = await prisma.clubRosterMember.findMany({ where: orgs, select: { personId: true } });
   const personIds = [
@@ -352,7 +391,113 @@ export async function createWalkthroughFixtures(prisma: PrismaClient) {
   await prisma.attendeeMfaEnrollment.create({
     data: { accountId: walkthroughCoordinator.id, method: "TOTP", status: "ACTIVE", sealedSecret: sealSecret(authenticatorSecret, "attendee-mfa-totp-secret"), confirmedAt: now },
   });
+
+  await createFamilyFixtures(prisma, now);
   return { authenticatorSecret };
+}
+
+/** The family account, its sample event (with a cancellation policy) and its one registration, part paid. */
+async function createFamilyFixtures(prisma: PrismaClient, now: Date) {
+  const { hashPassword } = await import("../../modules/access/passwords");
+  const { registrationFormDefinitionSchema } = await import("../../modules/forms/definition");
+  const { parseCancellationRules } = await import("../../modules/cancellation-policy/rules");
+  const day = 86_400_000;
+  const iso = (offsetDays: number) => new Date(now.getTime() + offsetDays * day).toISOString().slice(0, 10);
+  const family = walkthroughFamily;
+  const event = walkthroughFamilyEvent;
+
+  await prisma.attendeeAccount.create({
+    data: {
+      id: family.id, email: family.email, displayName: family.displayName, firstName: family.firstName, lastName: family.lastName,
+      status: "ACTIVE", emailVerifiedAt: now,
+      credential: { create: { passwordHash: await hashPassword(family.password) } },
+    },
+  });
+
+  // An open family event. Attendees may change their own permitted choices (TIERED), and the shirt size below is one of them.
+  await prisma.event.create({
+    data: {
+      id: event.id, slug: event.slug, name: event.name, location: "Sample Lakeside Camp",
+      startsAt: new Date(`${iso(45)}T15:00:00Z`), endsAt: new Date(`${iso(47)}T18:00:00Z`), timezone: "America/Chicago",
+      isPublished: true, registrationOpensOn: iso(-20), registrationClosesOn: iso(30),
+      billingMode: "ATTENDEE_PAY", audience: "GENERAL", attendeeEditPolicy: "TIERED", supportContact: `${W}.events@example.test`,
+    },
+  });
+  const field = (id: string, key: string, label: string, type: string, scope: "ATTENDEE" | "REGISTRATION", extra: Record<string, unknown> = {}) =>
+    ({ id: `${W}_family_${id}`, key, label, helpText: "", type, scope, required: false, options: [], ...extra });
+  const definition = registrationFormDefinitionSchema.parse({
+    title: "Sample family registration",
+    description: "Sample form for the help walkthroughs.",
+    confirmationMessage: "Your registration is received.",
+    payment: { enabled: true, currency: "USD", paymentMethodFieldKey: "payment_method", cardOptionValue: "Credit / debit card", percentageBasisPoints: 290, fixedFeeCents: 30, passFeeToRegistrant: true },
+    attendeeRoster: { enabled: true, minAttendees: 1, maxAttendees: 6, attendeeLabel: "Family member", addButtonLabel: "Add" },
+    sections: [
+      { id: `${W}_family_contact`, title: "Contact", description: "", fields: [
+        field("c_first", "primary_contact_first_name", "First name", "TEXT", "REGISTRATION", { required: true }),
+        field("c_last", "primary_contact_last_name", "Last name", "TEXT", "REGISTRATION", { required: true }),
+        field("c_email", "email", "Email", "EMAIL", "REGISTRATION", { required: true }),
+        field("c_method", "payment_method", "Payment method", "RADIO", "REGISTRATION", { required: true, options: ["Pay later", "Credit / debit card"] }),
+      ] },
+      { id: `${W}_family_people`, title: "Family members", description: "", fields: [
+        field("a_first", "first_name", "First name", "TEXT", "ATTENDEE", { required: true }),
+        field("a_last", "last_name", "Last name", "TEXT", "ATTENDEE", { required: true }),
+        field("a_shirt", "shirt_size", "Shirt size", "RADIO", "ATTENDEE", { required: true, options: ["Small", "Medium", "Large"] }),
+      ] },
+    ],
+  });
+  await prisma.registrationForm.create({
+    data: {
+      id: event.formId, eventId: event.id, createdByUserId: "usr_system_admin", name: definition.title, slug: "family", status: "PUBLISHED",
+      versions: { create: { id: event.formVersionId, createdByUserId: "usr_system_admin", versionNumber: 1, status: "PUBLISHED", publishedAt: new Date(), definition } },
+    },
+  });
+
+  // A synthetic cancellation policy: the page shows whatever policy applies, so this only has to be a plain, calculable one.
+  // It is a sample, never a real event's rule.
+  const terms = { refund: { kind: "FULL" }, flatWithholdCents: 0, flatWithholdLabel: "Processing fee", depositTreatment: "REFUND", creditAllowed: false };
+  await prisma.eventCancellationPolicyVersion.create({
+    data: {
+      eventId: event.id, version: 1, effectiveFrom: new Date(now.getTime() - day), rulesSchema: 1,
+      rules: parseCancellationRules({
+        schema: 1,
+        windows: [{ id: "before-event", label: "Before the event", endsOn: iso(40), terms }],
+        afterWindows: { label: "After the last window", terms: { ...terms, refund: { kind: "NONE" } } },
+        noShow: null, allowedScopes: ["FULL_REGISTRATION"],
+        supportedComponents: { categories: [], fieldKeys: [] }, classifications: [], nonrefundable: { categories: [], fieldKeys: [] }, cardFeeTreatment: "REFUNDABLE",
+      }),
+      note: "Synthetic help walkthrough", createdByNameSnapshot: "Help walkthrough",
+    },
+  });
+
+  // The account holder and a second sample family member, on one registration of $120.00 with $40.00 paid (so $80.00 remains).
+  const holder = await prisma.person.create({ data: { id: `${W}_person_family_1`, firstName: family.firstName, lastName: family.lastName, normalizedEmail: family.email, phone: family.phone } });
+  const child = await prisma.person.create({ data: { id: `${W}_person_family_2`, firstName: event.attendeeNames[1][0], lastName: event.attendeeNames[1][1] } });
+  const contact = { firstName: family.firstName, lastName: family.lastName, email: family.email, phone: family.phone };
+  const registration = await prisma.registration.create({
+    data: {
+      id: event.registrationId, eventId: event.id, accountHolderPersonId: holder.id, confirmationCode: event.confirmationCode,
+      status: "CONFIRMED", totalAmount: 120, submittedAt: new Date(now.getTime() - 5 * day), contactSnapshot: contact,
+    },
+  });
+  for (const [index, person] of [holder, child].entries()) {
+    await prisma.registrationAttendee.create({
+      data: {
+        eventId: event.id, registrationId: registration.id, personId: person.id, attendeeType: "ATTENDEE", position: index,
+        profileSnapshot: { firstName: person.firstName, lastName: person.lastName }, formResponses: { shirt_size: index === 0 ? "Medium" : "Small" },
+      },
+    });
+  }
+  await prisma.publicRegistrationSubmission.create({
+    data: {
+      eventId: event.id, formVersionId: event.formVersionId, registrationId: registration.id, idempotencyKey: `${W}_family_key`, requestHash: `${W}_family_hash`,
+      responses: { primary_contact_first_name: family.firstName, primary_contact_last_name: family.lastName, email: family.email, payment_method: "Pay later" },
+      attendeeResponses: [],
+      pricingSnapshot: { lineItems: [{ key: "registration_fee", label: "Family registration", amountCents: 12000 }] },
+    },
+  });
+  await prisma.payment.create({
+    data: { eventId: event.id, registrationId: registration.id, amount: 40, status: "SUCCEEDED", method: "CARD_REFERENCE", externalReference: `${W}-sample-payment`, receivedAt: new Date(now.getTime() - 4 * day) },
+  });
 }
 
 /** The active clubs that are not walkthrough fixtures. A coordinator sees every active club, so these are hidden while the script runs. */
@@ -387,11 +532,11 @@ export async function restoreOtherClubs(prisma: PrismaClient, ids: string[]) {
  * the walkthrough session that follows is minted already second-step verified. Used for the walkthroughs that start
  * after two-step sign-in is set up. It is removed again with the rest of the fixtures.
  */
-export async function enrolPlaceholderTwoStep(prisma: PrismaClient) {
+export async function enrolPlaceholderTwoStep(prisma: PrismaClient, accountId: string = walkthroughIds.director) {
   await prisma.attendeeMfaEnrollment.upsert({
-    where: { accountId: walkthroughIds.director },
+    where: { accountId },
     update: { status: "ACTIVE" },
-    create: { accountId: walkthroughIds.director, method: "TOTP", status: "ACTIVE", sealedSecret: `${W}-placeholder-not-a-secret`, confirmedAt: new Date() },
+    create: { accountId, method: "TOTP", status: "ACTIVE", sealedSecret: `${W}-placeholder-not-a-secret`, confirmedAt: new Date() },
   });
 }
 
@@ -411,8 +556,13 @@ export async function restorePasskeys(prisma: PrismaClient, before: string | nul
   await prisma.platformSettings.update({ where: { id: "platform" }, data: { passkeyRpId: before } });
 }
 
-/** The rate-limit policies a sign-in walkthrough spends: password sign-in, the emailed code (send and verify), the second step and passkeys. */
-export const signInRateLimitPolicies = ["attendee.sign-in", "attendee.roster-unlock", "attendee.passkey"] as const;
+/**
+ * The rate-limit policies a walkthrough spends: password sign-in, the emailed code (send and verify), the second step, passkeys,
+ * the emailed edit code the family "change a registration" walkthrough asks for (ten an hour from one address), and the
+ * registration requests the "ask to cancel" walkthrough sends (the sample registration has one fixed id, so its budget is shared by every run).
+ */
+// These clear every bucket for the policies below, which is safe only because the harness refuses non-local and non-seeded databases.
+export const signInRateLimitPolicies = ["attendee.sign-in", "attendee.roster-unlock", "attendee.passkey", "attendee.edit-step-up", "public.manage."] as const;
 
 /** Clears those local budgets, so repeated runs are not rate limited. Local database only. */
 export async function clearSignInRateLimits(prisma: PrismaClient) {

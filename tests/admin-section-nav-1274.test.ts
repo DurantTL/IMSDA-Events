@@ -173,8 +173,10 @@ describe("back links", () => {
 
   it("sends the System view to Clubs and churches", () => {
     expect(adminBackLink("system", `/admin/organizations/${org}/club`)).toEqual({ href: "/admin/organizations", label: "Back to Clubs and churches" });
-    for (const path of ["/admin/clubs/import", "/admin/clubs/invites", "/admin/clubs/health-import"]) {
-      expect(adminBackLink("system", path), path).toEqual({ href: "/admin/organizations", label: "Back to Clubs and churches" });
+    expect(adminBackLink("system", "/admin/clubs/invites")).toEqual({ href: "/admin/organizations", label: "Back to Clubs and churches" });
+    // The club imports belong to the Club directory in both views (#1589).
+    for (const path of ["/admin/clubs/import", "/admin/clubs/health-import"]) {
+      expect(adminBackLink("system", path), path).toEqual({ href: "/admin/clubs/summary", label: "Back to Club summary" });
     }
   });
 
@@ -271,8 +273,8 @@ describe("the page header picks the section from the viewer's active role", () =
     view("SYSTEM_ADMIN", { systemAdmin: true });
     const systemHtml = await html({ path: "/admin/clubs/import" });
     expect(systemHtml).toContain("System administration");
-    expect(systemHtml).toContain('href="/admin/organizations"');
-    expect(systemHtml).toContain("Back to Clubs and churches");
+    expect(systemHtml).toContain('href="/admin/clubs/summary"');
+    expect(systemHtml).toContain("Back to Club summary");
   });
 
   it("shows the Events header on an event page only to an Events Administrator of that event", async () => {

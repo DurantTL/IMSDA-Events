@@ -245,3 +245,24 @@ export function registrationMoveBlocker(input: {
 /** Staff queue filters (#489 N2). */
 export const staffQueueFilters = ["open", "overdue", "declined", "unmatched", "pending"] as const;
 export type StaffQueueFilter = (typeof staffQueueFilters)[number];
+
+/** The queue's `?view=` (#1589): one of the filters, and anything else (or nothing) is "open". */
+export function parseStaffQueueView(value: unknown): StaffQueueFilter {
+  const first = Array.isArray(value) ? value[0] : value;
+  const text = typeof first === "string" ? first.trim().toLowerCase() : "";
+  return staffQueueFilters.find((filter) => filter === text) ?? "open";
+}
+
+/** The address of a queue view. "open" is the default and stays out of the address. */
+export function staffQueueHref(filter: StaffQueueFilter): string {
+  return filter === "open" ? "/admin/clubs/transfers" : `/admin/clubs/transfers?view=${filter}`;
+}
+
+/** What an empty queue says for each view, so "nothing overdue" is never confused with "nothing at all". */
+export const staffQueueEmptyText: Record<StaffQueueFilter, string> = {
+  open: "No open transfers.",
+  overdue: "No overdue transfers.",
+  declined: "No declined transfers.",
+  unmatched: "No unmatched transfers.",
+  pending: "No transfers pending approval.",
+};

@@ -29,6 +29,7 @@ import { z } from "zod";
 import {
   SCHEDULED_EMAIL_STATUSES,
   SCHEDULED_EMAIL_STATUS_LABELS,
+  SCHEDULED_EMAIL_STORED_TRIGGERS,
   SCHEDULED_EMAIL_TEMPLATE_KEYS,
   SCHEDULED_EMAIL_TEMPLATE_LABELS,
   SCHEDULED_EMAIL_TRIGGERS,
@@ -40,6 +41,7 @@ import {
 import { formatInTimeZone } from "@/modules/calendar/conference-format";
 
 export {
+  SCHEDULED_EMAIL_STORED_TRIGGERS,
   SCHEDULED_EMAIL_STATUSES,
   SCHEDULED_EMAIL_STATUS_LABELS,
   SCHEDULED_EMAIL_TEMPLATE_KEYS,
@@ -95,6 +97,13 @@ export const scheduleRuleSchema = z.discriminatedUnion("trigger", [
   z.strictObject({
     trigger: z.literal("BEFORE_PAYMENT_DUE"),
     daysBefore: z.number().int().min(0).max(365),
+    localTime: localTimeSchema,
+  }),
+  // The debrief's timing (#1679): days after the event's last day. Written only by the debrief module; `daysBefore` is the
+  // stored column that holds the number of days after. Staff cannot save it (`refuseDebriefTiming`).
+  z.strictObject({
+    trigger: z.literal("AFTER_EVENT_END"),
+    daysAfter: z.number().int().min(0).max(30),
     localTime: localTimeSchema,
   }),
 ]);
@@ -199,6 +208,8 @@ export function addCalendarDays(date: string, days: number) {
 export type ScheduleEventFacts = {
   timezone: string;
   startsAt: Date;
+  /** `Event.endsAt`: the event's last moment. Only the debrief's "after the last day" timing reads it. */
+  endsAt?: Date;
   /** `Event.registrationClosesOn`: the last calendar day registration is open, or null. */
   registrationClosesOn: string | null;
   /** `Event.paymentDueOn` (#993): the calendar day balances are due by, or null. */
@@ -249,6 +260,12 @@ export function projectSchedule(rule: ScheduleRule, event: ScheduleEventFacts): 
   } else if (rule.trigger === "BEFORE_EVENT_START") {
     anchorAt = event.startsAt;
     sendDate = addCalendarDays(calendarDateInZone(event.startsAt, event.timezone), -rule.daysBefore);
+  } else if (rule.trigger === "AFTER_EVENT_END") {
+    if (!event.endsAt) throw new ScheduleProjectionError("This event has no end date, so a schedule cannot count after it.");
+    // The event's last day is the calendar date of its end in the event's zone; "N days after" counts calendar days, so the
+    // time of day holds across a clock change. No anchor: the send is after the event, never "after the anchor".
+    anchorAt = event.endsAt;
+    sendDate = addCalendarDays(calendarDateInZone(event.endsAt, event.timezone), rule.daysAfter);
   } else if (rule.trigger === "BEFORE_PAYMENT_DUE") {
     if (!event.paymentDueOn) {
       throw new ScheduleProjectionError("This event has no payment due date, so a schedule cannot count back from it. Set one in Event settings, or choose another trigger.");
@@ -265,7 +282,7 @@ export function projectSchedule(rule: ScheduleRule, event: ScheduleEventFacts): 
     sendDate = addCalendarDays(event.registrationClosesOn, -rule.daysBefore);
   }
   const { instant, behavior } = wallTimeToInstant({ date: sendDate, time: rule.localTime }, event.timezone);
-  if (anchorAt && instant.getTime() >= anchorAt.getTime()) {
+  if (anchorAt && rule.trigger !== "AFTER_EVENT_END" && instant.getTime() >= anchorAt.getTime()) {
     throw new ScheduleProjectionError(
       rule.trigger === "BEFORE_EVENT_START"
         ? "That time is after the event starts. Choose an earlier time or more days before."
@@ -296,15 +313,15 @@ export function assertSendTimeUsable(sendAt: Date, now: Date) {
 
 /** The rule as stored columns, and back, so a stored batch is projected by the same code that reviewed it. */
 export function ruleToColumns(rule: ScheduleRule) {
-  return rule.trigger === "ONE_TIME"
-    ? { trigger: rule.trigger, localDate: rule.localDate, localTime: rule.localTime, daysBefore: null }
-    : { trigger: rule.trigger, localDate: null, localTime: rule.localTime, daysBefore: rule.daysBefore };
+  if (rule.trigger === "ONE_TIME") return { trigger: rule.trigger, localDate: rule.localDate, localTime: rule.localTime, daysBefore: null };
+  if (rule.trigger === "AFTER_EVENT_END") return { trigger: rule.trigger, localDate: null, localTime: rule.localTime, daysBefore: rule.daysAfter };
+  return { trigger: rule.trigger, localDate: null, localTime: rule.localTime, daysBefore: rule.daysBefore };
 }
 
 export function ruleFromColumns(row: { trigger: ScheduledEmailTrigger; localDate: string | null; localTime: string; daysBefore: number | null }): ScheduleRule {
-  return row.trigger === "ONE_TIME"
-    ? { trigger: "ONE_TIME", localDate: row.localDate ?? "", localTime: row.localTime }
-    : { trigger: row.trigger, daysBefore: row.daysBefore ?? 0, localTime: row.localTime };
+  if (row.trigger === "ONE_TIME") return { trigger: "ONE_TIME", localDate: row.localDate ?? "", localTime: row.localTime };
+  if (row.trigger === "AFTER_EVENT_END") return { trigger: "AFTER_EVENT_END", daysAfter: row.daysBefore ?? 0, localTime: row.localTime };
+  return { trigger: row.trigger, daysBefore: row.daysBefore ?? 0, localTime: row.localTime };
 }
 
 /**
@@ -482,9 +499,13 @@ const contentShape = {
 };
 
 function requireAnnouncementText(
-  value: { templateKey: string; announcementTitle: string; announcementBody: string },
+  value: { templateKey: string; announcementTitle: string; announcementBody: string; rule?: { trigger: string } },
   context: z.RefinementCtx,
 ) {
+  // The debrief's timing belongs to the debrief module: staff cannot write a schedule with it (#1679).
+  if (value.rule?.trigger === "AFTER_EVENT_END") {
+    context.addIssue({ code: "custom", path: ["rule"], message: "Choose another timing. The debrief sets its own." });
+  }
   if (value.templateKey !== "EVENT_ANNOUNCEMENT") return;
   if (!value.announcementTitle) context.addIssue({ code: "custom", path: ["announcementTitle"], message: "An announcement needs a title." });
   if (!value.announcementBody) context.addIssue({ code: "custom", path: ["announcementBody"], message: "An announcement needs a message." });

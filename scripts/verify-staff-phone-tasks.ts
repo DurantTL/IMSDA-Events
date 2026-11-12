@@ -5,7 +5,7 @@
  * step cannot be finished. As a system administrator (who holds every workspace):
  *
  *  1. switch workspace through the account menu (labelled dialog, Close, focus in, Tab kept inside, Escape returns focus);
- *  2. find the registration form with the header search "Search pages, clubs, events and churches" (or the More sheet on a phone) and open it;
+ *  2. find the registration form with the header search "Search pages, clubs, events, churches and people" (or the More sheet on a phone) and open it;
  *  3. enter an edit page, change a field, try to leave, get the unsaved-changes guard, stay, then leave;
  *  4. open a record and come back to the list with its search kept;
  *  5. check an attendee in (and undo it, so the run can be repeated);

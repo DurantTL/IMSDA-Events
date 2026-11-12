@@ -580,7 +580,7 @@ export function actionForSurface(
   return { action, handled: true, returnsFocus: !escapeBubbles && (action.type === "clear" || action.type === "restore-focus") };
 }
 
-/* ---- Records in the header search (#1837): clubs, events and churches beside the pages ---- */
+/* ---- Records in the header search (#1837): clubs, events, churches and people beside the pages ---- */
 
 /**
  * One row of the combobox, whatever it is: a page or task, a record the server found, or a "See all results" link. The
@@ -592,7 +592,7 @@ export type ResultEntry = {
   label: string;
   description: string;
   href: string;
-  /** The short word beside the label (the scope, or Club, Event, Church). Never colour alone. */
+  /** The short word beside the label (the scope, or Club, Event, Church, Person). Never colour alone. */
   badge: string;
   /** What a screen reader hears for the badge. */
   badgeSpoken: string;
@@ -603,16 +603,17 @@ export type ResultEntry = {
 export type ResultSection = { id: string; heading: string; start: number; entries: ResultEntry[] };
 
 export const pagesSectionHeading = "Pages and tasks";
-export const recordGroupHeadings: Record<RecordGroupKey, string> = { clubs: "Clubs", events: "Events", churches: "Churches" };
-const recordGroupOrder: readonly RecordGroupKey[] = ["clubs", "events", "churches"];
-const recordSingular: Record<RecordGroupKey, string> = { clubs: "club", events: "event", churches: "church" };
+export const recordGroupHeadings: Record<RecordGroupKey, string> = { clubs: "Clubs", events: "Events", churches: "Churches", people: "People" };
+const recordGroupOrder: readonly RecordGroupKey[] = ["clubs", "events", "churches", "people"];
+const recordSingular: Record<RecordGroupKey, string> = { clubs: "club", events: "event", churches: "church", people: "person" };
 const recordBadges: Record<RecordGroupKey, { badge: string; spoken: string }> = {
   clubs: { badge: "Club", spoken: "Club" },
   events: { badge: "Event", spoken: "Event" },
   churches: { badge: "Church", spoken: "Church" },
+  people: { badge: "Person", spoken: "Person" },
 };
 
-export type RecordGroupKey = "clubs" | "events" | "churches";
+export type RecordGroupKey = "clubs" | "events" | "churches" | "people";
 
 /** "Jul 14, 2027" or "Jul 14, 2027 to Jul 17, 2027", in the event's own time zone (UTC if the zone is not valid). */
 export function formatEventDates(startsAt: string, endsAt: string, timezone: string): string {
@@ -649,12 +650,22 @@ function recordEntries(result: StaffSearchResult): { group: RecordGroupKey; entr
         badge,
         badgeSpoken: spoken,
       }))
-      : result.churches.items.map((church) => ({
+      : group === "churches"
+      ? result.churches.items.map((church) => ({
         key: `church:${church.id}`,
         kind: "record" as const,
         label: church.name,
         description: church.city ?? "Church",
         href: church.href,
+        badge,
+        badgeSpoken: spoken,
+      }))
+      : result.people.items.map((person) => ({
+        key: `person:${person.id}`,
+        kind: "record" as const,
+        label: person.name,
+        description: person.kind,
+        href: person.href,
         badge,
         badgeSpoken: spoken,
       }));
@@ -667,7 +678,7 @@ function recordEntries(result: StaffSearchResult): { group: RecordGroupKey; entr
 
 /**
  * The combobox's rows and, when they are grouped, its sections. Typed words with records on: Pages and tasks, then
- * Clubs, Events and Churches (a group with nothing in it is left out). An empty box: the pages, grouped by scope as
+ * Clubs, Events, Churches and People (a group with nothing in it is left out). An empty box: the pages, grouped by scope as
  * before (`groupDestinationsByScope`). Records off (the More sheet): ranked pages, ungrouped, as before.
  */
 export function buildResultLayout(input: {
@@ -740,15 +751,16 @@ function recordSearchStatusBase(input: {
   const parts: string[] = [];
   if (input.pageCount > 0) parts.push(countWord(input.pageCount, "page", "pages"));
   if (input.result) {
-    const { clubs, events, churches } = input.result;
+    const { clubs, events, churches, people } = input.result;
     if (clubs.items.length > 0) parts.push(countWord(clubs.items.length, "club", "clubs"));
     if (events.items.length > 0) parts.push(countWord(events.items.length, "event", "events"));
     if (churches.items.length > 0) parts.push(countWord(churches.items.length, "church", "churches"));
+    if (people.items.length > 0) parts.push(countWord(people.items.length, "person", "people"));
   }
   const use = "Use the up and down arrow keys, then Enter to open.";
-  const failure = input.failed ? " Clubs, events and churches could not be searched." : "";
-  if (input.pending) return parts.length > 0 ? `${parts.join(", ")} so far. Searching clubs, events and churches. ${use}` : "Searching clubs, events and churches.";
-  if (parts.length === 0) return input.failed ? "Clubs, events and churches could not be searched." : "Nothing matches. Try a different word.";
+  const failure = input.failed ? " Clubs, events, churches and people could not be searched." : "";
+  if (input.pending) return parts.length > 0 ? `${parts.join(", ")} so far. Searching clubs, events, churches and people. ${use}` : "Searching clubs, events, churches and people.";
+  if (parts.length === 0) return input.failed ? "Clubs, events, churches and people could not be searched." : "Nothing matches. Try a different word.";
   return `${parts.join(", ")}.${failure} ${use}`.replace("  ", " ");
 }
 

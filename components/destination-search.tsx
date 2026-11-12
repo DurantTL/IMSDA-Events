@@ -36,7 +36,7 @@ import styles from "@/components/destination-search.module.css";
  * Nothing is sent anywhere as the person types. The key and selection rules are
  * pure functions in `destination-search-model.ts`, where they are unit tested.
  *
- * With `records` on (the staff header, #1837) typed words also ask the server for clubs, events and churches the viewer
+ * With `records` on (the staff header, #1837) typed words also ask the server for clubs, events, churches and people the viewer
  * may open (`/api/staff/search`, debounced, one request at a time). They are listed in groups after the pages, share the
  * one active option and the one focus ring, and open through the same unsaved-changes guard. Nothing is requested for
  * an empty box.
@@ -55,7 +55,7 @@ export function DestinationSearch({
   onNavigated?: () => void;
   /** The More sheet: an Escape with nothing to undo reaches the sheet, which closes. */
   escapeBubbles?: boolean;
-  /** Also search clubs, events and churches on the server (the staff header). The More sheet stays pages-only. */
+  /** Also search clubs, events, churches and people on the server (the staff header). The More sheet stays pages-only. */
   records?: boolean;
 }) {
   const router = useRouter();
@@ -235,7 +235,7 @@ export function DestinationSearch({
       {hasFootNotes && (
         <div className={styles.notes}>
           {moreNotes.map((note) => <p className={styles.note} key={note}>{note}</p>)}
-          {showFailedNote && <p className={styles.note}>Clubs, events and churches could not be searched.</p>}
+          {showFailedNote && <p className={styles.note}>Clubs, events, churches and people could not be searched.</p>}
         </div>
       )}
       </div>
@@ -246,8 +246,8 @@ export function DestinationSearch({
   );
 }
 
-const recordsLabel = "Search pages, clubs, events and churches";
-const recordsPlaceholder = "Search pages, clubs, events, churches";
+const recordsLabel = "Search pages, clubs, events, churches and people";
+const recordsPlaceholder = "Search pages, clubs, events, people";
 
 /** One row of the list: a page or task, a record, or a "See all results" link. */
 function ResultOption({ active, entry, id, onChoose, onHover }: { active: boolean; entry: ResultEntry; id: string; onChoose: () => void; onHover: () => void }) {

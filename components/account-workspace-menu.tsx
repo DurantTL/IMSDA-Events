@@ -44,7 +44,7 @@ export function AccountWorkspaceMenu({ items }: { items?: AccountNavItem[] }) {
         }
       }}
     >
-      <summary className={`${mastheadStyles.action} ${styles.trigger}`}><UserRound aria-hidden="true" size={16} />Your account<ChevronDown aria-hidden="true" size={16} /></summary>
+      <summary aria-label="Your account" className={`${mastheadStyles.action} ${styles.trigger}`}><UserRound aria-hidden="true" size={16} /><span className={mastheadStyles.label}>Your account</span><ChevronDown aria-hidden="true" className={mastheadStyles.label} size={16} /></summary>
       <nav aria-label="Your account destinations" className={styles.panel}>
         <ul className={styles.list}>
           {list.map((item) => <li key={item.href}>

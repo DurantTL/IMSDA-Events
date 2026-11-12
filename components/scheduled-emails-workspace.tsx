@@ -84,13 +84,13 @@ function formFromRecord(record: ScheduledEmailRecord): FormState {
     scheduleId: record.id,
     editing: { id: record.id, revision: record.revision },
     name: record.name,
-    templateKey: record.templateKey,
+    templateKey: record.templateKey as ScheduledEmailTemplateKey,
     announcementTitle: record.announcementTitle,
     announcementBody: record.announcementBody,
     trigger: record.rule.trigger,
     localDate: record.rule.trigger === "ONE_TIME" ? record.rule.localDate : "",
     localTime: record.rule.localTime,
-    daysBefore: record.rule.trigger === "ONE_TIME" ? "7" : String(record.rule.daysBefore),
+    daysBefore: record.rule.trigger === "ONE_TIME" || record.rule.trigger === "AFTER_EVENT_END" ? "7" : String(record.rule.daysBefore),
     roles: query.roles?.length ? query.roles : ["REGISTRATION_CONTACT"],
     search: query.search ?? "",
   };
@@ -439,9 +439,11 @@ export function ScheduledEmailsWorkspace({
       ) : (
         <ul className="scheduled-email-list">
           {schedules.map((schedule) => {
-            const canApprove = schedule.status === "SCHEDULED" || schedule.status === "PAUSED" || (schedule.status === "ACTIVE" && schedule.timingStale && !schedule.claimed);
-            const canEdit = (schedule.status === "SCHEDULED" || schedule.status === "PAUSED" || schedule.status === "ACTIVE") && !schedule.claimed;
-            const canPause = schedule.status === "ACTIVE" && !schedule.claimed;
+            // The debrief's own emails (#1679) are made and timed by the Debrief; staff can only cancel them here.
+            const managed = schedule.managedByDebrief;
+            const canApprove = !managed && (schedule.status === "SCHEDULED" || schedule.status === "PAUSED" || (schedule.status === "ACTIVE" && schedule.timingStale && !schedule.claimed));
+            const canEdit = !managed && (schedule.status === "SCHEDULED" || schedule.status === "PAUSED" || schedule.status === "ACTIVE") && !schedule.claimed;
+            const canPause = !managed && schedule.status === "ACTIVE" && !schedule.claimed;
             const canCancel = schedule.status === "SCHEDULED" || schedule.status === "PAUSED" || schedule.status === "ACTIVE";
             return (
               <li className="panel scheduled-email-card" key={schedule.id}>

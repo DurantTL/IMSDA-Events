@@ -5,7 +5,7 @@ import { BackLink } from "@/components/back-link";
 import { ClubReportForm } from "@/components/club-report-form";
 import { getPrisma } from "@/lib/prisma";
 import { allowedReturnTo } from "@/lib/return-to";
-import { resolveClubOversight } from "@/modules/club-rosters/event-oversight";
+import { canOpenClubRecords, resolveClubOversight } from "@/modules/club-rosters/event-oversight";
 import { formatDueDate, isReportMonth, reportDueDate, reportMonthLabel } from "@/modules/club-reports/domain";
 import { getClubReport, reportPrefill } from "@/modules/club-reports/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
@@ -27,9 +27,11 @@ export default async function EventClubReportPage({
   searchParams: Promise<{ event?: string; from?: string }>;
 }) {
   const [{ organizationId, month }, { event: requested, from }] = await Promise.all([params, searchParams]);
-  const { event, allowed } = await resolveClubOversight(requested);
+  const { event, allowed, systemAdmin } = await resolveClubOversight(requested);
   if (!allowed) return <AccessRestricted title="Club oversight is restricted" detail="Event administrators of this Pathfinder event can view club reports." whoToAsk="your event administrator" />;
   if (!isReportMonth(month)) notFound();
+  // Only clubs registered for this event: the role is for this event only.
+  if (!(await canOpenClubRecords({ eventId: event.id, systemAdmin }, organizationId))) notFound();
   const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true } });
   if (!club || club.type !== "CLUB") notFound();
   const report = await getClubReport(organizationId, month);

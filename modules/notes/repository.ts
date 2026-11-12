@@ -106,18 +106,41 @@ export async function createNote(
   });
 }
 
+function noteBelongsToSubject(
+  note: { registrationId: string | null; attendeeId: string | null; personId: string | null },
+  subject: NoteSubject,
+) {
+  if (subject.registrationId) return note.registrationId === subject.registrationId;
+  if (subject.attendeeId) return note.attendeeId === subject.attendeeId;
+  return note.personId === subject.personId;
+}
+
 export async function addNoteRevision(
   eventId: string,
   noteId: string,
   actorUserId: string,
   rawInput: unknown,
+  access: { subject: NoteSubject; actorPermissions: ReadonlySet<string>; /** For an attendee note: the registration in the URL the attendee must belong to. */ attendeeRegistrationId?: string },
 ) {
   const input = noteRevisionInputSchema.parse(rawInput);
   const existing = await getPrisma().staffNote.findFirst({
     where: { id: noteId, eventId },
     include: { revisions: { orderBy: { sequence: "desc" }, take: 1 } },
   });
-  if (!existing) throw new NoteError("NOT_FOUND", "That note was not found for this event.");
+  if (!existing || !noteBelongsToSubject(existing, access.subject)) {
+    throw new NoteError("NOT_FOUND", "That note was not found for this event.");
+  }
+  if (access.subject.attendeeId && access.attendeeRegistrationId) {
+    const belongs = await getPrisma().registrationAttendee.findFirst({
+      where: { id: access.subject.attendeeId, registrationId: access.attendeeRegistrationId, eventId },
+      select: { id: true },
+    });
+    if (!belongs) throw new NoteError("NOT_FOUND", "That note was not found for this event.");
+  }
+  // The same visibility rule as reading: a note the editor cannot read is not theirs to revise.
+  if (!canReadNote(existing, access.actorPermissions)) {
+    throw new NoteError("FORBIDDEN", "This note is restricted to a permission you do not hold.");
+  }
   const nextSequence = (existing.revisions[0]?.sequence ?? 0) + 1;
 
   return getPrisma().$transaction(async (tx) => {

@@ -130,7 +130,8 @@ describe("unsaved changes guard scan (#1452, rule B6)", () => {
       "components/club-roster-carry-forward.tsx",
       "components/club-supply-stock-workspace.tsx",
       "components/club-team-workspace.tsx",
-      "components/new-club-applications-queue.tsx",
+      "components/staff-application-decision.tsx",
+      "components/staff-private-links.tsx",
       "components/health-record-form.tsx",
       "components/roster-export-builder.tsx",
       // #1468 round 2: attendee and public forms.

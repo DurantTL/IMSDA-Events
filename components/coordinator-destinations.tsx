@@ -232,6 +232,9 @@ export function CoordinatorClubEvents({
               <Link className="secondary-button" href={`/account/area-clubs/events/${encodeURIComponent(event.id)}/attendance-points`}>
                 Attendance points<span className="sr-only">: {event.name}</span>
               </Link>
+              <Link className="secondary-button" href={`/account/area-clubs/events/${encodeURIComponent(event.id)}/debrief`}>
+                Event debrief<span className="sr-only">: {event.name}</span>
+              </Link>
               <Link className="secondary-button" href={`/account/area-clubs/events/${encodeURIComponent(event.id)}/report`}>
                 Attendee report<span className="sr-only">: {event.name}</span>
               </Link>

@@ -7,7 +7,7 @@ import { STAFF_SEARCH_REQUESTS_PER_MINUTE } from "@/modules/staff-search/domain"
 import { searchStaffRecords } from "@/modules/staff-search/service";
 
 /**
- * GET /api/staff/search?q= (#1837): the header search's clubs, events and churches. Signed-in staff only; what each
+ * GET /api/staff/search?q= (#1837): the header search's clubs, events, churches and people. Signed-in staff only; what each
  * group returns is decided in `modules/staff-search/service.ts`. Answers are never cached.
  */
 async function getHandler(request: Request) {

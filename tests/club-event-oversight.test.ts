@@ -4,18 +4,19 @@ const mocks = vi.hoisted(() => ({
   resolveEventContext: vi.fn(),
   eventFindUnique: vi.fn(),
   registrationFindFirst: vi.fn(),
+  registrationFindMany: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     event: { findUnique: mocks.eventFindUnique },
-    clubEventRegistration: { findFirst: mocks.registrationFindFirst },
+    clubEventRegistration: { findFirst: mocks.registrationFindFirst, findMany: mocks.registrationFindMany },
   }),
 }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: mocks.resolveEventContext }));
 
-import { isClubRegisteredForEvent, resolveClubOversight } from "@/modules/club-rosters/event-oversight";
+import { canOpenClubRecords, isClubRegisteredForEvent, resolveClubOversight, restrictToOverseenClubs } from "@/modules/club-rosters/event-oversight";
 
 function context(role: string | null, globalRole = "STAFF") {
   return { event: { id: "event-1" }, user: { id: "user-1", globalRole }, membership: role ? { role } : null, permissions: [] };
@@ -65,5 +66,41 @@ describe("Pathfinder event managers (#387)", () => {
     expect(mocks.registrationFindFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ eventId: "event-1", organizationId: "club-1" }),
     }));
+  });
+});
+
+describe("Monthly records are open only for clubs registered for the event", () => {
+  const eventAdmin = { eventId: "event-1", systemAdmin: false };
+  const systemAdmin = { eventId: "event-1", systemAdmin: true };
+
+  it("reports whether the viewer is a system administrator", async () => {
+    mocks.resolveEventContext.mockResolvedValue(context(null, "SYSTEM_ADMIN"));
+    await expect(resolveClubOversight("event-1")).resolves.toMatchObject({ systemAdmin: true });
+    mocks.resolveEventContext.mockResolvedValue(context("EVENT_ADMIN"));
+    await expect(resolveClubOversight("event-1")).resolves.toMatchObject({ systemAdmin: false });
+  });
+
+  it("opens a registered club's records for an event administrator", async () => {
+    mocks.registrationFindFirst.mockResolvedValue({ id: "reg-1" });
+    await expect(canOpenClubRecords(eventAdmin, "club-1")).resolves.toBe(true);
+  });
+
+  it("keeps an event administrator out of a club that is not registered for the event", async () => {
+    mocks.registrationFindFirst.mockResolvedValue(null);
+    await expect(canOpenClubRecords(eventAdmin, "club-2")).resolves.toBe(false);
+  });
+
+  it("leaves system administrators their current access", async () => {
+    await expect(canOpenClubRecords(systemAdmin, "club-2")).resolves.toBe(true);
+    expect(mocks.registrationFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("lists only registered clubs for an event administrator, and every club for a system administrator", async () => {
+    const clubs = [{ id: "club-1" }, { id: "club-2" }, { id: "club-3" }];
+    mocks.registrationFindMany.mockResolvedValue([
+      { teamKey: "", teamName: null, organization: { id: "club-1", name: "A", parentOrganization: null }, registration: { confirmationCode: "X", _count: { attendees: 1 } } },
+    ]);
+    await expect(restrictToOverseenClubs(eventAdmin, clubs)).resolves.toEqual([{ id: "club-1" }]);
+    await expect(restrictToOverseenClubs(systemAdmin, clubs)).resolves.toEqual(clubs);
   });
 });

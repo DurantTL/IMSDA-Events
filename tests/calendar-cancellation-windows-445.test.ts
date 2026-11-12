@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: vi.fn() }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 

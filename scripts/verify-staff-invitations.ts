@@ -266,6 +266,9 @@ async function main() {
   assert(selections.some((selection) => selection.ageGroup === "CHILD") && selections.some((selection) => selection.ageGroup === "ADULT"), "children are entitled as children");
   assert((await prisma.messageOutbox.count({ where: { eventId } })) === outboxBefore + 2 && (await prisma.messageOutbox.count({ where: { eventId, subjectSnapshot: { contains: "is approved" }, status: "PENDING" } })) === 2, "two confirmations are queued, not sent");
   assert((await prisma.auditLog.count({ where: { eventId, action: "STAFF_REGISTRATION_APPROVED" } })) === 2, "each approval is audited");
+  const { listStaffApprovalsForFinance } = await import("../modules/staff-invitations/finance-approvals");
+  const financeView = await listStaffApprovalsForFinance(eventId);
+  assert(financeView.rows.length === 2 && financeView.rows.every((row) => row.approvedBy !== null && row.decidedAt !== null && row.conferenceMeals > 0), "each approval shows on the finance report with its approver, date and conference-paid meals");
   const again2 = await repo.approveRegistrations(eventId, userId, [ids("ada")]);
   assert(again2.decided === 0 && again2.skipped === 1, "approving again does nothing");
   const attendeesNow = await prisma.registrationAttendee.count({ where: { eventId, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } } });
