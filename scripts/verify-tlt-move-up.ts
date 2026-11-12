@@ -155,9 +155,12 @@ async function main() {
     confirmTltMoveUp({ clubYear, moveIds: [pid("y1")], keepIds: [] }, actor),
     updateTltProfile({ personId: pid("y1"), tltYear: 1, expectedTltYear: 1, positionTypeId: null, status: "ACTIVE", tagIds: [] }, actor),
   ]);
+  // Either order is valid: the move-up first (the save is refused), or the save first (the move-up then moves the TLT,
+  // or skips it). What must never happen is a lost update: the final year is always the start year plus what moved.
   const final = await profile("y1");
-  const saveRefused = results[1].status === "rejected";
-  assert(final.tltYear === (saveRefused ? 2 : 1) && results[0].status === "fulfilled", "a move-up and a save at once never overwrite each other");
+  const movedCount = results[0].status === "fulfilled" ? results[0].value.moved : -1;
+  const saveRefusedCleanly = results[1].status === "fulfilled" || (results[1].reason as { code?: string }).code === "YEAR_CHANGED";
+  assert(movedCount >= 0 && saveRefusedCleanly && final.tltYear === 1 + movedCount, "a move-up and a save at once never overwrite each other");
   await reset();
   await updateTltProfile({ personId: pid("edit"), tltYear: 3, expectedTltYear: 2, positionTypeId: null, status: null, tagIds: [] }, actor);
   await updateTltProfile({ personId: pid("edit"), tltYear: null, expectedTltYear: 3, positionTypeId: null, status: null, tagIds: [] }, actor);
