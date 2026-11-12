@@ -38,6 +38,8 @@ visiting club**, and its director **confirms their own conference's adult screen
 - **Conference lists:** guest clubs are left out of the Area Coordinator club list, club reports, the TLT directory, the roster export,
   the transfer club picker, the people directory's club options and the duplicate-club check. The public club directory already needs an
   active sponsoring church, so it never lists them. The eAdventist import is unchanged.
+- **Transfers:** a guest club takes no part in member transfers. Its roster page offers no transfer request or transfer panel, and
+  the server refuses a request from one (PM recommendation, Nov 12; Caleb may change it).
 
 ## Data and privacy
 
