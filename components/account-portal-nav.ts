@@ -21,6 +21,11 @@ export type AccountPortalNavInput = {
   areaCoordinator: boolean;
   /** A staff member's act-as role, if any. */
   actingRole: "CLUB_DIRECTOR" | "AREA_COORDINATOR" | null;
+  /**
+   * Whether the leader directory (#1707) is open to this account: the conference switch is on and the account is a club
+   * director, deputy or Area Coordinator (`canViewLeaderDirectory`). The page checks again on the server.
+   */
+  leaderDirectory?: boolean;
 };
 
 export function accountPortalNavItems(input: AccountPortalNavInput): AccountNavItem[] {
@@ -40,6 +45,7 @@ export function accountPortalNavItems(input: AccountPortalNavInput): AccountNavI
     ...(input.areaCoordinator || actingAsAreaCoordinator
       ? [{ href: "/account/area-clubs/overview", label: "Club coordination", alsoMatchPrefix: ["/account/area-clubs/", "/account/area/", "/account/area/health", "/account/waitlists"] }]
       : []),
+    ...(input.hasAccount && input.leaderDirectory && !input.actingRole ? [{ href: "/account/leader-directory", label: "Leader directory" }] : []),
     // Portal help (#1259): last, for anyone using the portal. Which guides it lists is decided on its own pages.
     { href: "/account/help", label: "Help", matchChildren: true },
   ];

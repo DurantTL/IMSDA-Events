@@ -27,6 +27,7 @@ vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: asyn
 vi.mock("@/modules/system-admin/area-pause", () => ({ listAreaPauses: mocks.listAreaPauses }));
 vi.mock("@/modules/system-admin/readiness-repository", () => ({ getSystemReadiness: mocks.getSystemReadiness }));
 vi.mock("@/modules/system-admin/platform-settings", () => ({ getPlatformSettings: mocks.getPlatformSettings }));
+vi.mock("@/modules/leader-directory/repository", () => ({ getLeaderDirectorySwitch: async () => ({ enabled: false, setAt: null }) }));
 vi.mock("@/modules/account-merge/account-link", () => ({ isUnifiedSignInEnabled: async () => false }));
 vi.mock("@/modules/account-merge/sign-in-switch", () => ({ getSignInLinkCheck: async () => ({ unlinkedPairs: 0, linkedPairs: 0 }) }));
 vi.mock("@/modules/system-admin/homepage-ministries", () => ({ getHomepageMinistriesForAdmin: async () => ({ ministries: [], updatedAt: null, updatedByName: null }) }));

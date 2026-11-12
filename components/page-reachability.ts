@@ -75,7 +75,7 @@ export function linkedRoutesBySource(): Record<string, Set<string>> {
     ...clubReporterNavItems({ base: clubBase, capabilities: leader }),
     ...areaClubPortalNavItems({ organizationId: "[organizationId]" }),
     ...coordinatorNavItems({ showWaitlists: true, showTlt: true, showMasterGuide: true }),
-    ...accountPortalNavItems({ hasAccount: true, directedClubCount: 2, areaCoordinator: true, actingRole: null }),
+    ...accountPortalNavItems({ hasAccount: true, directedClubCount: 2, areaCoordinator: true, leaderDirectory: true, actingRole: null }),
   ];
   for (const item of items) portal.add(pathOf(item.href));
   return { "hub card or action": hubs, "rail or tab row": tabs, "menu registry or route mapping": menus, "club portal or coordinator menu": portal };
