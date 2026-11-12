@@ -9,13 +9,17 @@
 
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
-export const CLUB_OPTIONAL_FEATURE_KEYS = ["roster-health-flags"] as const;
+export const CLUB_OPTIONAL_FEATURE_KEYS = ["roster-health-flags", "master-guide-tracking"] as const;
 export type ClubOptionalFeatureKey = (typeof CLUB_OPTIONAL_FEATURE_KEYS)[number];
 
 export const clubOptionalFeatureDefinitions: Record<ClubOptionalFeatureKey, { title: string; description: string }> = {
   "roster-health-flags": {
     title: "Roster health flags",
     description: "Lists the people on your roster whose record is over a year old or who are missing an emergency contact, a health record, a photo release or a Sterling Volunteers check, with counts on your club Home. The photo release check covers the Pathfinder Photo and Video Release form linked to the roster. It only says that something is missing; it never shows what is in a record.",
+  },
+  "master-guide-tracking": {
+    title: "Master Guide tracking",
+    description: "Keeps a list of your Master Guide candidates with their start date, mentor and where they are in the approval chain: the club approves, then an Area Coordinator. A candidate must be 16 or older to start and 18 or older for the club to approve. It never shows a birth date.",
   },
 };
 

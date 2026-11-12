@@ -28,8 +28,8 @@ const complete: RosterHealthInput = {
 };
 
 describe("optional club feature keys", () => {
-  it("lists roster health flags and accepts nothing else", () => {
-    expect([...CLUB_OPTIONAL_FEATURE_KEYS]).toEqual(["roster-health-flags"]);
+  it("lists the optional features and accepts nothing else", () => {
+    expect([...CLUB_OPTIONAL_FEATURE_KEYS]).toEqual(["roster-health-flags", "master-guide-tracking"]);
     expect(isClubOptionalFeatureKey("roster-health-flags")).toBe(true);
     expect(isClubOptionalFeatureKey("anything-else")).toBe(false);
     expect(isClubOptionalFeatureKey(undefined)).toBe(false);

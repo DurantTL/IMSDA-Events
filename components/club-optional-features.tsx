@@ -80,6 +80,9 @@ export function ClubOptionalFeatures({ organizationId, initialEnabled }: { organ
             {key === "roster-health-flags" && saved.includes(key) && (
               <p><Link className="secondary-button" href={`/account/clubs/${organizationId}/roster-health`}>Open roster health</Link></p>
             )}
+            {key === "master-guide-tracking" && saved.includes(key) && (
+              <p><Link className="secondary-button" href={`/account/clubs/${organizationId}/master-guide`}>Open Master Guide tracking</Link></p>
+            )}
           </div>
         );
       })}

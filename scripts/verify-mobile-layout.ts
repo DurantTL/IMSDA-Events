@@ -314,6 +314,8 @@ const pages: PageSpec[] = [
   club("health", "/health"),
   // Optional roster health flags (#1709): switched on for the club by this script's seed.
   club("roster-health", "/roster-health"),
+  // Optional Master Guide tracking (#1698): switched on for the club with two synthetic candidates by this script's seed.
+  { ...club("master-guide", "/master-guide"), expectText: /Master Guide tracking/ },
   // Area Coordinator.
   { ...area("overview", "/account/area-clubs/overview"), flow: "portal-navigation" },
   area("clubs", "/account/area-clubs/clubs"),
@@ -324,6 +326,8 @@ const pages: PageSpec[] = [
   { ...area("debrief", `/account/area-clubs/events/${clubEventId}/debrief`), expectText: /Event debrief/ },
   // The optional Budget sheet (#1682): the coordinator's switch, the sheet and its cost lines (switched on in seedBudgetSheet).
   { ...area("budget", `/account/area-clubs/events/${clubEventId}/budget`), expectText: /Budget sheet/ },
+  // Master Guide approvals (#1698): the coordinator's list of candidates the club approved.
+  { ...area("master-guide", "/account/area-clubs/master-guide"), expectText: /Master Guide approvals/ },
   area("team-permissions", "/account/area-clubs/team-permissions"),
   area("new-club-applications", "/account/area-clubs/applications"),
   area("points", "/account/area-clubs/points"),
@@ -1515,6 +1519,7 @@ async function seedLauncherModule(prisma: PrismaClient) {
 async function cleanupSynthetic(prisma: PrismaClient) {
   await prisma.clubFormTemplate.updateMany({ where: { key: "can_collecting_report" }, data: { requirement: "NOT_REQUIRED", requiredRoles: [] } }).catch((error: Error) => console.error(`Could not undo the synthetic Required setting: ${error.message}`));
   const orgs = { organizationId: { in: [clubA, clubB] } };
+  await prisma.masterGuideCandidate.deleteMany({ where: orgs });
   await prisma.clubOptionalFeature.deleteMany({ where: orgs });
   const accountIds = [`${P}_account_director`, `${P}_account_registrar`, `${P}_account_reporter`, `${P}_account_area`, `${P}_account_attendee`, `${P}_account_history`];
   // The message files' bytes (#824) live on disk, outside the database; their keys are read before the rows go.
@@ -1745,6 +1750,26 @@ async function seedSynthetic(prisma: PrismaClient) {
     update: {},
     create: { organizationId: clubA, featureKey: "roster-health-flags" },
   });
+  // #1698: Master Guide tracking is switched on for the audit club with two candidates (one waiting for the club, one waiting for the Area Coordinator), so the club page and the coordinator's approvals can be audited (undone in cleanupSynthetic).
+  await prisma.clubOptionalFeature.upsert({
+    where: { organizationId_featureKey: { organizationId: clubA, featureKey: "master-guide-tracking" } },
+    update: {},
+    create: { organizationId: clubA, featureKey: "master-guide-tracking" },
+  });
+  {
+    const { sealBirthDate } = await import("../modules/club-rosters/birth-dates");
+    for (const [personId, birthDate, status] of [[`${P}_person_a_07`, "1990-03-15", "CLUB_APPROVED"], [`${P}_person_a_14`, "1988-07-02", "IN_PROGRESS"]] as const) {
+      await prisma.clubRosterMember.updateMany({ where: { organizationId: clubA, personId }, data: { sealedBirthDate: sealBirthDate(birthDate) } });
+      await prisma.masterGuideCandidate.upsert({
+        where: { organizationId_personId: { organizationId: clubA, personId } },
+        update: {},
+        create: {
+          organizationId: clubA, personId, startedOn: new Date("2025-11-01T00:00:00Z"), mentorName: "Alex Mobilecheck-Mentor", status,
+          ...(status === "CLUB_APPROVED" ? { clubApprovedAt: new Date("2026-11-01T12:00:00Z") } : {}),
+        },
+      });
+    }
+  }
   // #1229: the director's Forms page has both groups (a family form and a club form), the TLT Application as an open application, and its public page is open.
   await prisma.clubFormTemplate.updateMany({ where: { key: { in: ["off_premises_permission_slip", "club_tlt_application"] } }, data: { enabled: true } });
 

@@ -1509,3 +1509,20 @@ export async function checkClubSearchRateLimit(key: string, limit: number) {
     },
   ], configuration);
 }
+
+/**
+ * Master Guide tracking writes (#1698): adding, changing, removing and approving candidates. Generous for a director
+ * working through a list, per client and per actor, and per club (an Area Coordinator's approvals count against the
+ * candidate's club's key the caller passes, or the coordinator's own).
+ */
+export async function checkMasterGuideWriteRateLimit(request: Request, actorKey: string, scopeKey: string) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const actor = hashRateLimitIdentifier("master-guide-actor", actorKey, configuration);
+  const scope = hashRateLimitIdentifier("master-guide-scope", scopeKey, configuration);
+  return evaluate([
+    { policy: "master-guide.write.client", limit: 120, windowSeconds: oneHour, identifierHashes: [client] },
+    { policy: "master-guide.write.actor", limit: 60, windowSeconds: oneHour, identifierHashes: [actor] },
+    { policy: "master-guide.write.scope", limit: 200, windowSeconds: oneDay, identifierHashes: [scope] },
+  ], configuration);
+}
