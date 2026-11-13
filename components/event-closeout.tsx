@@ -69,7 +69,9 @@ export function EventCloseoutView({ data, canSignOff, canManageFinance, canOpenM
 
       {closed && data.closedMoney.length > 0 ? (
         <p className={`${styles.summary} ${styles.summaryBlocking}`} role="alert" data-testid="closeout-closed-money-notice">
-          Money arrived after this event was closed. It is recorded, but a finance admin must review it. Reopen the event to deal with it, then sign off again.
+          {canSignOff
+            ? "Money arrived after this event was closed. A finance admin must mark it reviewed below. Reopen the event only if something needs to change."
+            : "Money arrived after this event was closed. A finance admin must review it."}
         </p>
       ) : null}
 
@@ -93,13 +95,7 @@ export function EventCloseoutView({ data, canSignOff, canManageFinance, canOpenM
         </ul>
       </section>
 
-      {data.closedMoney.length > 0 ? (
-        <section className={styles.panel} aria-labelledby="closeout-closed-money-heading" id="closeout-closed-money">
-          <h3 className={styles.panelHeading} id="closeout-closed-money-heading">Money recorded while closed ({data.closedMoney.length})</h3>
-          <p className={styles.note}>Square payments and refunds that arrived after the event was closed. Each is recorded and counted in the money report. A finance admin marks each one reviewed, with a note.</p>
-          <ClosedMoneyReview eventId={data.eventId} items={data.closedMoney} canReview={canSignOff} noteMaxLength={CLOSED_MONEY_CLEAR_NOTE_MAX_LENGTH} />
-        </section>
-      ) : null}
+      <ClosedMoneyReview eventId={data.eventId} items={data.closedMoney} canReview={canSignOff} noteMaxLength={CLOSED_MONEY_CLEAR_NOTE_MAX_LENGTH} />
 
       <section className={styles.panel} aria-labelledby="closeout-signoff">
         <h3 className={styles.panelHeading} id="closeout-signoff"><ClipboardCheck aria-hidden="true" size={18} /> Sign-off</h3>

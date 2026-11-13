@@ -80,7 +80,7 @@ cannot be read is never ready: a blocking check that cannot be read stays blocki
 ### Money on a Closed event (Caleb, November 13)
 
 A Closed event takes no new payments or refunds (`modules/events/money-lock.ts`). `assertEventOpenForMoney(tx, eventId, audience)`
-reads the event row `FOR SHARE` inside the caller's own transaction, before the write; the sign-off locks the same row
+reads the event row `FOR KEY SHARE` (it waits on a lifecycle transition's `FOR UPDATE` but not on the `FOR NO KEY UPDATE` locks settings saves take) inside the caller's own transaction, before the write; the sign-off locks the same row
 `FOR UPDATE`, so a payment and a sign-off are ordered. It refuses with `EVENT_CLOSED` (409) when the stored state is Closed
 (an archived event keeps its stored state, so a closed event that was archived stays locked). The staff message says a finance
 admin must reopen the event on the Closeout page; the attendee message says to contact the event office. It guards manual
@@ -90,8 +90,8 @@ called), and an import commit that carries payments or refunds. The station's "p
 
 Square money that arrives anyway (a payment or refund webhook, a card attempt that finishes after the close, a payment taken
 outside the app and matched by its confirmation code, a duplicate charge held as evidence) is never refused: the money already
-moved. It is recorded as usual and, in the same transaction, one `ClosedEventMoneyFlag` row is raised when the event's stored
-state is Closed (unique per payment and per refund, so replays raise nothing; audit rows `CLOSED_EVENT_MONEY_FLAGGED` and
+moved. It is recorded as usual and, in the same transaction, one `ClosedEventMoneyReview` row is raised when the event's stored
+state is Closed (unique per payment and per refund, so replays raise nothing; audit rows `CLOSED_EVENT_MONEY_RAISED` and
 `CLOSED_EVENT_MONEY_CLEARED` hold ids and cents only). An uncleared flag is a blocking check, so the event cannot be signed off
 again until a finance admin (MANAGE_FINANCE or FINALIZE_INVOICES, in any lifecycle state) marks it reviewed with a note of 1 to
 500 characters (`POST .../closeout/review-money`). A flag is cleared, never deleted, and the payment or refund it points at is

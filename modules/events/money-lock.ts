@@ -3,11 +3,12 @@ import type { Prisma } from "@prisma/client";
 /**
  * The money lock on a Closed event (#1515 follow-up). Staff, station, attendee and import paths that create a payment or
  * a refund call `assertEventOpenForMoney` inside their own transaction, before the write. The event row is read
- * `FOR SHARE` there; the closeout sign-off locks the same row `FOR UPDATE`, so a payment and a sign-off are ordered:
+ * `FOR KEY SHARE` there (it waits on the lifecycle transition's `FOR UPDATE`, but not on the `FOR NO KEY UPDATE` locks the
+ * event settings saves take); the closeout sign-off and reopen lock the same row `FOR UPDATE`, so a payment and a sign-off are ordered:
  * either the payment commits first (and the sign-off sees it) or it sees the event as Closed and is refused.
  *
- * Square-originated money is never refused (the money already moved); it is recorded and flagged instead
- * (`closed-event-money-flags.ts`).
+ * Square-originated money is never refused (the money already moved); it is recorded and listed for review instead
+ * (`closed-event-money-reviews.ts`).
  */
 
 export type MoneyLockAudience = "staff" | "attendee";
@@ -31,10 +32,10 @@ export function isMoneyLocked(state: string | null | undefined) {
 
 type LockClient = Pick<Prisma.TransactionClient, "$queryRaw">;
 
-/** Reads the stored lifecycle state of the event row with a shared lock, inside the caller's transaction. */
+/** Reads the stored lifecycle state of the event row with a key-share lock, inside the caller's transaction. */
 export async function readEventLifecycleForMoney(client: LockClient, eventId: string) {
   const rows = await client.$queryRaw<Array<{ lifecycleState: string | null }>>`
-    SELECT "lifecycleState"::text AS "lifecycleState" FROM "Event" WHERE "id" = ${eventId} FOR SHARE
+    SELECT "lifecycleState"::text AS "lifecycleState" FROM "Event" WHERE "id" = ${eventId} FOR KEY SHARE
   `;
   return rows[0] ? { lifecycleState: rows[0].lifecycleState } : null;
 }

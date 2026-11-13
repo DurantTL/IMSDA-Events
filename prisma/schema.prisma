@@ -1981,7 +1981,7 @@ model Event {
 
   lifecycleTransitions                EventLifecycleTransition[]
   closeoutSignoffs                    EventCloseoutSignoff[]
-  closedEventMoneyFlags               ClosedEventMoneyFlag[]
+  closedEventMoneyReviews               ClosedEventMoneyReview[]
   closeoutReopenings                  EventCloseoutReopening[]
   /// The calendar items this event was set up from or linked to (#445). Several items can share one registration
   /// event (#1086): different dates or sites of one event, or a snow date.
@@ -4159,7 +4159,7 @@ model Payment {
   registration   Registration    @relation(fields: [registrationId], references: [id], onDelete: Cascade)
   refunds        Refund[]
   paymentAttempt PaymentAttempt?
-  closedEventMoneyFlag ClosedEventMoneyFlag?
+  closedEventMoneyReview ClosedEventMoneyReview?
 
   @@index([eventId, status])
   @@index([registrationId])
@@ -4539,7 +4539,7 @@ model Refund {
 
   event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
   payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  closedEventMoneyFlag ClosedEventMoneyFlag?
+  closedEventMoneyReview ClosedEventMoneyReview?
 
   @@unique([paymentId, externalReference])
   @@unique([paymentId, idempotencyKey])
@@ -12226,7 +12226,7 @@ model VisitingClubRequest {
 /// usual (the money moved); this row only asks the finance office to look at it. One row per payment and per refund, so a
 /// replayed webhook never raises it twice. Cleared, never deleted: `clearedAt`, the name as it was, and a required note.
 /// Ids and cents only. The user is a plain id with no foreign key, like the sign-off.
-model ClosedEventMoneyFlag {
+model ClosedEventMoneyReview {
   id                    String    @id @default(cuid())
   eventId               String
   /// PAYMENT or REFUND.

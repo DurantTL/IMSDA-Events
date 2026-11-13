@@ -62,7 +62,7 @@ export type CloseoutFacts = {
   waitlistWaiting: number | null;
   square: UnmatchedSquareSummary;
   /** Square payments and refunds recorded while the event was Closed that nobody has marked reviewed; null when unreadable. */
-  closedMoneyFlags: { count: number; cents: number } | null;
+  closedMoneyReviews: { count: number; cents: number } | null;
 };
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
@@ -143,11 +143,11 @@ export function buildCloseoutChecklist(facts: CloseoutFacts): CloseoutCheck[] {
     }));
 
   checks.push(countCheck({ id: "closed-event-money", label: "Money recorded while closed", href: `${path("/finance/closeout", eventId)}#closeout-closed-money`, linkLabel: "Review the money", linkAccess: "page" }, {
-    count: facts.closedMoneyFlags?.count ?? null,
-    cents: facts.closedMoneyFlags?.cents ?? null,
+    count: facts.closedMoneyReviews?.count ?? null,
+    cents: facts.closedMoneyReviews?.cents ?? null,
     whenOpen: "blocking",
     what: "Money recorded while the event was closed",
-    open: (count) => `${plural(count, "Square payment or refund", "Square payments and refunds")} (${dollars(facts.closedMoneyFlags!.cents)}) arrived after the event was closed. ${count === 1 ? "It is" : "They are"} recorded, but a finance admin must mark ${count === 1 ? "it" : "each"} reviewed before the event can be signed off again.`,
+    open: (count) => `${plural(count, "Square payment or refund", "Square payments and refunds")} (${dollars(facts.closedMoneyReviews!.cents)}) arrived after the event was closed. ${count === 1 ? "It is" : "They are"} recorded, but a finance admin must mark ${count === 1 ? "it" : "each"} reviewed before the event can be signed off again.`,
     clear: "No money arrived after the event was closed, or every item was reviewed.",
   }));
 

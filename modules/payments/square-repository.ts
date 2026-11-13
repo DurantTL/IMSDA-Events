@@ -57,7 +57,7 @@ import {
 import { authorizeRegistrationAccessToken } from "@/modules/public-access/repository";
 import { logError } from "@/lib/logger";
 import { assertEventOpenForMoney, EventClosedError } from "@/modules/events/money-lock";
-import { flagIfEventClosed } from "@/modules/events/closed-event-money-flags";
+import { raiseClosedMoneyReview } from "@/modules/events/closed-event-money-reviews";
 
 export type PaymentClient = Prisma.TransactionClient | PrismaClient;
 export type PaymentAccess = {
@@ -893,7 +893,7 @@ async function recordDuplicateCharge(
     },
   });
   // Square took this money whatever the event's state: it is recorded above, and flagged here when the event is Closed.
-  await flagIfEventClosed(tx, { eventId: attempt.eventId, kind: "PAYMENT", paymentId: payment.id, amountCents: provider.amountCents, source: "SQUARE_DUPLICATE" });
+  await raiseClosedMoneyReview(tx, { eventId: attempt.eventId, kind: "PAYMENT", paymentId: payment.id, amountCents: provider.amountCents, source: "SQUARE_DUPLICATE" });
   return {
     attempt: updated,
     pendingMessageIds: [],
@@ -1092,7 +1092,7 @@ async function applyProviderPayment(
 
   // Money Square took is never refused: when the event is Closed it stays recorded and is flagged in this transaction.
   if (becameSuccessful) {
-    await flagIfEventClosed(tx, { eventId: attempt.eventId, kind: "PAYMENT", paymentId: payment.id, amountCents: attempt.amountCents, source: source === "CREATE_PAYMENT" ? "SQUARE_CARD" : "SQUARE_WEBHOOK" });
+    await raiseClosedMoneyReview(tx, { eventId: attempt.eventId, kind: "PAYMENT", paymentId: payment.id, amountCents: attempt.amountCents, source: source === "CREATE_PAYMENT" ? "SQUARE_CARD" : "SQUARE_WEBHOOK" });
   }
   const receipt = becameSuccessful
     ? await enqueuePaymentReceiptMessage(tx, {
@@ -1548,7 +1548,7 @@ async function applyExternalSquarePayment(
       },
     },
   });
-  await flagIfEventClosed(tx, { eventId: registration.eventId, kind: "PAYMENT", paymentId: created.id, amountCents: balanceCents, source: "SQUARE_EXTERNAL" });
+  await raiseClosedMoneyReview(tx, { eventId: registration.eventId, kind: "PAYMENT", paymentId: created.id, amountCents: balanceCents, source: "SQUARE_EXTERNAL" });
   const receipt = await enqueuePaymentReceiptMessage(tx, {
     eventId: registration.eventId,
     registrationId: registration.id,
@@ -2061,7 +2061,7 @@ async function applyRefundWebhook(
 
   // A refund Square made is never refused. When it is new (or has just settled) and the event is Closed, it is flagged here.
   if ((!existing || existing.status !== effectiveStatus) && effectiveStatus !== "FAILED") {
-    await flagIfEventClosed(tx, { eventId: payment.eventId, kind: "REFUND", refundId: refund.id, amountCents, source: "SQUARE_REFUND" });
+    await raiseClosedMoneyReview(tx, { eventId: payment.eventId, kind: "REFUND", refundId: refund.id, amountCents, source: "SQUARE_REFUND" });
   }
 
   if (!existing || existing.status !== effectiveStatus) {

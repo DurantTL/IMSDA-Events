@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => {
   class MockSquarePaymentOperationError extends Error {
     constructor(public readonly code: string, message: string, public readonly retryable = false, public readonly details = {}) { super(message); }
   }
-  class MockClosedMoneyFlagError extends Error {
+  class MockClosedMoneyReviewError extends Error {
     constructor(public readonly code: string, message: string) { super(message); }
   }
   return {
@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => {
     PaymentOperationError: MockPaymentOperationError,
     SquareMatchOperationError: MockSquareMatchOperationError,
     SquarePaymentOperationError: MockSquarePaymentOperationError,
-    ClosedMoneyFlagError: MockClosedMoneyFlagError,
+    ClosedMoneyReviewError: MockClosedMoneyReviewError,
     requirePermission: vi.fn(),
     requireEventMembership: vi.fn(),
     effectivePermissions: vi.fn(),
@@ -34,7 +34,7 @@ const mocks = vi.hoisted(() => {
     createAttendeeSquarePayment: vi.fn(),
     getCurrentAttendee: vi.fn(),
     authorizeAttendeeRegistration: vi.fn(),
-    clearClosedMoneyFlag: vi.fn(),
+    clearClosedMoneyReview: vi.fn(),
   };
 });
 
@@ -49,9 +49,9 @@ vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.ge
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership, EventOperationError: class extends Error {} }));
 vi.mock("@/modules/events/lifecycle-repository", () => ({ EventLifecycleError: class extends Error {} }));
 vi.mock("@/modules/events/closeout-repository", () => ({ CloseoutError: class extends Error {} }));
-vi.mock("@/modules/events/closed-event-money-flags", () => ({
-  clearClosedMoneyFlag: mocks.clearClosedMoneyFlag,
-  ClosedMoneyFlagError: mocks.ClosedMoneyFlagError,
+vi.mock("@/modules/events/closed-event-money-reviews", () => ({
+  clearClosedMoneyReview: mocks.clearClosedMoneyReview,
+  ClosedMoneyReviewError: mocks.ClosedMoneyReviewError,
 }));
 vi.mock("@/modules/payments/repository", () => ({
   PaymentOperationError: mocks.PaymentOperationError,
@@ -121,7 +121,7 @@ describe("the money lock helper", () => {
     expect(db.$queryRaw).toHaveBeenCalledTimes(1);
     const sql = (db.$queryRaw.mock.calls[0]![0] as string[]).join("?");
     expect(sql).toMatch(/FROM "Event"/);
-    expect(sql).toMatch(/FOR SHARE/);
+    expect(sql).toMatch(/FOR KEY SHARE/);
   });
 
   it("uses the attendee message for an attendee", async () => {
@@ -197,7 +197,7 @@ describe("EVENT_CLOSED answers 409 with the server message on every money route"
 });
 
 describe("POST /api/events/[eventId]/closeout/review-money", () => {
-  const valid = { flagId: "flag_1", note: "Matches the Square dashboard." };
+  const valid = { reviewId: "review_1", note: "Matches the Square dashboard." };
   const asStaff = (permissions: string[]) => {
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "usr_1" } });
     mocks.requireEventMembership.mockResolvedValue({ user: { id: "usr_1" }, membership: null });
@@ -207,19 +207,19 @@ describe("POST /api/events/[eventId]/closeout/review-money", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.clearClosedMoneyFlag.mockResolvedValue({ id: "flag_1" });
+    mocks.clearClosedMoneyReview.mockResolvedValue({ id: "review_1" });
   });
 
   it("refuses a cross-origin request before anything else", async () => {
     asStaff(["MANAGE_FINANCE"]);
     expect((await call(valid, { origin: "https://evil.example" })).status).toBe(403);
-    expect(mocks.clearClosedMoneyFlag).not.toHaveBeenCalled();
+    expect(mocks.clearClosedMoneyReview).not.toHaveBeenCalled();
   });
 
   it("needs a signed-in account", async () => {
     mocks.requireEventMembership.mockRejectedValue(new mocks.AccessDeniedError("Sign in.", 401, "AUTHENTICATION_REQUIRED"));
     expect((await call(valid)).status).toBe(401);
-    expect(mocks.clearClosedMoneyFlag).not.toHaveBeenCalled();
+    expect(mocks.clearClosedMoneyReview).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -233,29 +233,29 @@ describe("POST /api/events/[eventId]/closeout/review-money", () => {
     const response = await call(valid);
     expect(response.status).toBe(status);
     expect(response.headers.get("cache-control")).toContain("no-store");
-    expect(mocks.clearClosedMoneyFlag).toHaveBeenCalledTimes(status === 200 ? 1 : 0);
+    expect(mocks.clearClosedMoneyReview).toHaveBeenCalledTimes(status === 200 ? 1 : 0);
   });
 
   it("records who reviewed it and the note, with the event from the URL", async () => {
     asStaff(["MANAGE_FINANCE"]);
-    expect(await (await call(valid)).json()).toEqual({ reviewed: true, flagId: "flag_1" });
-    expect(mocks.clearClosedMoneyFlag).toHaveBeenCalledWith({ eventId: "evt_1", flagId: "flag_1", actorUserId: "usr_1", note: "Matches the Square dashboard." });
+    expect(await (await call(valid)).json()).toEqual({ reviewed: true, reviewId: "review_1" });
+    expect(mocks.clearClosedMoneyReview).toHaveBeenCalledWith({ eventId: "evt_1", reviewId: "review_1", actorUserId: "usr_1", note: "Matches the Square dashboard." });
   });
 
   it("validates the body: a flag id and a note of 1 to 500 characters, no extra keys", async () => {
     asStaff(["MANAGE_FINANCE"]);
-    for (const body of [null, {}, { flagId: "flag_1" }, { flagId: "flag_1", note: "   " }, { flagId: "flag_1", note: "x".repeat(501) }, { flagId: "", note: "ok" }, { ...valid, extra: true }]) {
+    for (const body of [null, {}, { reviewId: "review_1" }, { reviewId: "review_1", note: "   " }, { reviewId: "review_1", note: "x".repeat(501) }, { reviewId: "", note: "ok" }, { ...valid, extra: true }]) {
       expect((await call(body)).status, JSON.stringify(body)).toBe(400);
     }
-    expect((await call({ flagId: "flag_1", note: "x".repeat(500) })).status).toBe(200);
-    expect(mocks.clearClosedMoneyFlag).toHaveBeenCalledTimes(1);
+    expect((await call({ reviewId: "review_1", note: "x".repeat(500) })).status).toBe(200);
+    expect(mocks.clearClosedMoneyReview).toHaveBeenCalledTimes(1);
   });
 
   it("answers 404 for an unknown flag and 409 for one already reviewed", async () => {
     asStaff(["MANAGE_FINANCE"]);
-    mocks.clearClosedMoneyFlag.mockRejectedValueOnce(new mocks.ClosedMoneyFlagError("FLAG_NOT_FOUND", "That flag was not found for this event."));
+    mocks.clearClosedMoneyReview.mockRejectedValueOnce(new mocks.ClosedMoneyReviewError("REVIEW_NOT_FOUND", "That flag was not found for this event."));
     expect((await call(valid)).status).toBe(404);
-    mocks.clearClosedMoneyFlag.mockRejectedValueOnce(new mocks.ClosedMoneyFlagError("ALREADY_CLEARED", "That flag was already marked reviewed."));
+    mocks.clearClosedMoneyReview.mockRejectedValueOnce(new mocks.ClosedMoneyReviewError("ALREADY_CLEARED", "That flag was already marked reviewed."));
     const second = await call(valid);
     expect(second.status).toBe(409);
     expect((await second.json()).message).toBe("That flag was already marked reviewed.");

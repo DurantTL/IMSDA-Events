@@ -29,7 +29,7 @@ import { createAttendeeSquarePaymentLink } from "../modules/payments/square-host
 import { attachSquarePaymentToRegistration } from "../modules/payments/square-match-repository";
 import { recordManualPayment, recordRefund } from "../modules/payments/repository";
 import { getCloseoutView, reopenClosedEvent, signOffEvent, CloseoutError } from "../modules/events/closeout-repository";
-import { clearClosedMoneyFlag, ClosedMoneyFlagError } from "../modules/events/closed-event-money-flags";
+import { clearClosedMoneyReview, ClosedMoneyReviewError } from "../modules/events/closed-event-money-reviews";
 import { EVENT_CLOSED_ATTENDEE_MESSAGE, EVENT_CLOSED_STAFF_MESSAGE, EventClosedError } from "../modules/events/money-lock";
 
 loadEnvConfig(process.cwd());
@@ -177,7 +177,7 @@ const counts = async () => ({
   attempts: await prisma.paymentAttempt.count({ where: { eventId } }),
   audit: await prisma.auditLog.count({ where: { eventId, action: { in: ["MANUAL_PAYMENT_RECORDED", "REFUND_RECORDED", "SQUARE_PAYMENT_MANUALLY_MATCHED"] } } }),
 });
-const flags = () => prisma.closedEventMoneyFlag.findMany({ where: { eventId }, orderBy: { createdAt: "asc" } });
+const flags = () => prisma.closedEventMoneyReview.findMany({ where: { eventId }, orderBy: { createdAt: "asc" } });
 
 async function signOff(acknowledgeWarnings = true) {
   const view = await getCloseoutView(eventId, { canReadText: true });
@@ -217,6 +217,8 @@ async function main() {
     // ---- The event is signed off and Closed. ----
     await signOff();
     assert(await stateOf() === "CLOSED", "the sign-off closes the event");
+    const withdrawn = await prisma.squareHostedCheckout.findUniqueOrThrow({ where: { id: hosted.id } });
+    assert(withdrawn.status === "INVALIDATED" && withdrawn.invalidationReason === "EVENT_CLOSED", "the sign-off withdraws the open Pay on Square link");
 
     // ---- 1. Staff, station and attendee paths refuse, and write nothing. ----
     const before = await counts();
@@ -263,10 +265,10 @@ async function main() {
     const refundFlag = raised.find((flag) => flag.kind === "REFUND")!;
     assert(paymentFlag.paymentId === hostedPayment.id && paymentFlag.amountCents === 10_330 && paymentFlag.source === "SQUARE_WEBHOOK" && paymentFlag.clearedAt === null, "the payment flag names the payment and its cents");
     assert(refundFlag.refundId === refund.id && refundFlag.amountCents === 2_000 && refundFlag.source === "SQUARE_REFUND" && refundFlag.clearedAt === null, "the refund flag names the refund and its cents");
-    const flagAudit = await prisma.auditLog.findMany({ where: { eventId, action: "CLOSED_EVENT_MONEY_FLAGGED" } });
+    const flagAudit = await prisma.auditLog.findMany({ where: { eventId, action: "CLOSED_EVENT_MONEY_RAISED" } });
     assert(flagAudit.length === 2, "one audit row per flag, none on replay");
     for (const row of flagAudit) {
-      assert(Object.keys(row.metadata as Record<string, unknown>).sort().join() === "amountCents,flagId,kind,paymentId,refundId,source", "the flag audit row holds ids, kind, source and cents only");
+      assert(Object.keys(row.metadata as Record<string, unknown>).sort().join() === "amountCents,kind,paymentId,refundId,reviewId,source", "the flag audit row holds ids, kind, source and cents only");
       assert(!/Sample|Closed\d|example\.test/.test(JSON.stringify(row)), "no attendee detail in the flag audit row");
     }
     const view = await getCloseoutView(eventId, { canReadText: false });
@@ -277,19 +279,19 @@ async function main() {
     assert(!JSON.stringify(view.closedMoney).match(/Sample|Closed\d|example\.test/), "the list holds no attendee name or contact detail");
 
     // ---- 3. A flag is marked reviewed with a note, in any state, and is kept. ----
-    const noNote = await caught(clearClosedMoneyFlag({ eventId, flagId: paymentFlag.id, actorUserId: finance.userId, note: "   " }));
-    assert(noNote instanceof ClosedMoneyFlagError && noNote.code === "NOTE_REQUIRED", "a note is required");
-    const longNote = await caught(clearClosedMoneyFlag({ eventId, flagId: paymentFlag.id, actorUserId: finance.userId, note: "x".repeat(501) }));
-    assert(longNote instanceof ClosedMoneyFlagError && longNote.code === "NOTE_TOO_LONG", "a note over 500 characters is refused");
-    const dbRefusal = await caught(prisma.closedEventMoneyFlag.update({ where: { id: paymentFlag.id }, data: { clearedAt: new Date() } }));
+    const noNote = await caught(clearClosedMoneyReview({ eventId, reviewId: paymentFlag.id, actorUserId: finance.userId, note: "   " }));
+    assert(noNote instanceof ClosedMoneyReviewError && noNote.code === "NOTE_REQUIRED", "a note is required");
+    const longNote = await caught(clearClosedMoneyReview({ eventId, reviewId: paymentFlag.id, actorUserId: finance.userId, note: "x".repeat(501) }));
+    assert(longNote instanceof ClosedMoneyReviewError && longNote.code === "NOTE_TOO_LONG", "a note over 500 characters is refused");
+    const dbRefusal = await caught(prisma.closedEventMoneyReview.update({ where: { id: paymentFlag.id }, data: { clearedAt: new Date() } }));
     assert(dbRefusal !== null, "the database refuses a clear with no note");
     assert(await stateOf() === "CLOSED", "the event is still Closed");
-    await clearClosedMoneyFlag({ eventId, flagId: paymentFlag.id, actorUserId: finance.userId, note: "Matches the Square dashboard." });
-    const cleared = await prisma.closedEventMoneyFlag.findUniqueOrThrow({ where: { id: paymentFlag.id } });
+    await clearClosedMoneyReview({ eventId, reviewId: paymentFlag.id, actorUserId: finance.userId, note: "Matches the Square dashboard." });
+    const cleared = await prisma.closedEventMoneyReview.findUniqueOrThrow({ where: { id: paymentFlag.id } });
     assert(cleared.clearedAt && cleared.clearedByUserId === finance.userId && cleared.clearedByNameSnapshot === "Pat Finance" && cleared.clearNote === "Matches the Square dashboard.", "the clear records who, when and the note");
-    const again = await caught(clearClosedMoneyFlag({ eventId, flagId: paymentFlag.id, actorUserId: finance.userId, note: "Again" }));
-    assert(again instanceof ClosedMoneyFlagError && again.code === "ALREADY_CLEARED", "a second clear is refused");
-    assert((await prisma.closedEventMoneyFlag.findUniqueOrThrow({ where: { id: paymentFlag.id } })).clearNote === "Matches the Square dashboard.", "who cleared it is never overwritten");
+    const again = await caught(clearClosedMoneyReview({ eventId, reviewId: paymentFlag.id, actorUserId: finance.userId, note: "Again" }));
+    assert(again instanceof ClosedMoneyReviewError && again.code === "ALREADY_CLEARED", "a second clear is refused");
+    assert((await prisma.closedEventMoneyReview.findUniqueOrThrow({ where: { id: paymentFlag.id } })).clearNote === "Matches the Square dashboard.", "who cleared it is never overwritten");
     const clearAudit = await prisma.auditLog.findMany({ where: { eventId, action: "CLOSED_EVENT_MONEY_CLEARED" } });
     assert(clearAudit.length === 1 && !JSON.stringify(clearAudit[0]!.metadata).includes("Matches the Square"), "the clear is audited by ids and cents, without the note");
 
@@ -302,7 +304,7 @@ async function main() {
     const refused = await caught(signOff());
     assert(refused instanceof CloseoutError && refused.code === "BLOCKING_CHECKS", "sign-off is refused while a flag is not marked reviewed");
     assert(await stateOf() === "FINANCIAL_RECONCILIATION", "a refused sign-off leaves the event open");
-    await clearClosedMoneyFlag({ eventId, flagId: refundFlag.id, actorUserId: finance.userId, note: "Refund confirmed in Square." });
+    await clearClosedMoneyReview({ eventId, reviewId: refundFlag.id, actorUserId: finance.userId, note: "Refund confirmed in Square." });
     await signOff();
     assert(await stateOf() === "CLOSED", "sign-off succeeds once every flag is marked reviewed");
     const kept = await flags();

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { useConfirm } from "@/components/use-confirm";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { CodeValue, Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import styles from "@/components/event-closeout.module.css";
 
@@ -51,7 +52,7 @@ export function ClosedMoneyReview({ eventId, items, canReview, noteMaxLength }: 
       const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/closeout/review-money`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ flagId: item.id, note }),
+        body: JSON.stringify({ reviewId: item.id, note }),
       });
       const data = (await response.json().catch(() => null)) as { message?: string } | null;
       if (!response.ok) {
@@ -68,23 +69,31 @@ export function ClosedMoneyReview({ eventId, items, canReview, noteMaxLength }: 
     }
   }
 
+  // The section is only drawn while something is waiting, but the result message stays: clearing the last item (or a 409
+  // that removes the list) must not take "Marked as reviewed." or the error with it.
   return (
-    <div className={styles.form}>
-      <ul className={styles.history} data-testid="closeout-closed-money">
-        {items.map((item) => (
-          <li className={styles.entry} key={item.id} data-flag={item.id}>
-            <p className={styles.entryTitle}>{item.kind === "REFUND" ? "Refund" : "Payment"} of {formatCents(item.amountCents)} on {when(item.createdAt)}</p>
-            <p className={styles.note}>{item.reference ? `Square reference: ${item.reference}` : "No Square reference is stored."}</p>
-            {canReview ? (
-              <div className={styles.actions}>
-                <button className="secondary-button" type="button" onClick={() => review(item)} disabled={busyId !== null} aria-busy={busyId === item.id || undefined}>{busyId === item.id ? "Saving…" : "Mark reviewed"}</button>
-              </div>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+    <>
+      {items.length > 0 ? (
+        <section className={styles.panel} aria-labelledby="closeout-closed-money-heading" id="closeout-closed-money">
+          <h3 className={styles.panelHeading} id="closeout-closed-money-heading">Money recorded while closed ({items.length})</h3>
+          <p className={styles.note}>Square payments and refunds that arrived after the event was closed. Each is recorded and counted in the money report. A finance admin marks each one reviewed, with a note.</p>
+          <ul className={styles.history} data-testid="closeout-closed-money">
+            {items.map((item) => (
+              <li className={styles.entry} key={item.id} data-review={item.id}>
+                <p className={styles.entryTitle}>{item.kind === "REFUND" ? "Refund" : "Payment"} of <Money cents={item.amountCents} /> on {when(item.createdAt)}</p>
+                <p className={styles.note}>{item.reference ? <>Square reference: <CodeValue code={item.reference} /></> : "No Square reference is stored."}</p>
+                {canReview ? (
+                  <div className={styles.actions}>
+                    <button className="secondary-button" type="button" onClick={() => review(item)} disabled={busyId !== null} aria-busy={busyId === item.id || undefined}>{busyId === item.id ? "Saving…" : "Mark reviewed"}</button>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <FormMessage tone={outcome?.tone ?? "success"} message={outcome?.message ?? ""} />
       {confirmDialog}
-    </div>
+    </>
   );
 }
