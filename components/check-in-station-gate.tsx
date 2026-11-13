@@ -82,6 +82,7 @@ export function CheckInStationGate({
     if (!input || busy) return;
     if (input.kind === "name" && input.value.length < GATE_NAME_MIN_LENGTH) {
       setFieldError(GATE_NAME_MESSAGE);
+      setError("");
       setResponse(null);
       inputRef.current?.focus();
       return;
@@ -102,6 +103,8 @@ export function CheckInStationGate({
       setError(result.message);
       return;
     }
+    // A fresh lookup's arrival times win over ones kept from earlier taps (a station can stay open past midnight).
+    setArrivals({});
     setResponse(result.data);
     // A pass is a one-time scan: clear the box for the next one. A typed name stays so it can be refined.
     if (input.kind === "pass") setEntry("");
