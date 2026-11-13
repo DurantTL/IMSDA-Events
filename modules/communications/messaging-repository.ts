@@ -145,7 +145,7 @@ import {
   EVENT_LODGING_SELECT,
   withPerAttendeeQrImages,
 } from "@/modules/communications/message-blocks";
-import { getAttendeeRosterConfig, resolveBillingContactName, resolveResponsibleOrganization } from "@/modules/forms/definition";
+import { choiceDisplayLabel, getAttendeeRosterConfig, resolveBillingContactName, resolveResponsibleOrganization } from "@/modules/forms/definition";
 import type { FormCalculation, RegistrationFormDefinition } from "@/modules/forms/definition";
 import { isLooseEmail } from "@/lib/field-validation";
 import { formatPersonName } from "@/lib/person-name";
@@ -256,7 +256,7 @@ function moneyToCents(value: { toString(): string } | number) {
 }
 
 function summaryValue(value: unknown) {
-  if (Array.isArray(value)) return value.map(String).join(", ");
+  if (Array.isArray(value)) return value.map((entry) => choiceDisplayLabel(String(entry))).join(", ");
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number") return String(value);
   if (typeof value === "string") return value.replace(/\s+/g, " ").trim();

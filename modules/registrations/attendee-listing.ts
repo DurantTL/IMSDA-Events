@@ -1,4 +1,4 @@
-import { DIRECTORY_NOT_LISTED_VALUE, registrationFormDefinitionSchema, type RegistrationFormField } from "@/modules/forms/definition";
+import { DIRECTORY_NOT_LISTED_VALUE, choiceDisplayLabel, registrationFormDefinitionSchema, type RegistrationFormField } from "@/modules/forms/definition";
 import { attendeeAnswerRecord } from "@/modules/registrations/choice-answer-filter";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import { toCsv } from "@/modules/reporting/csv";
@@ -121,7 +121,7 @@ function displayValue(field: RegistrationFormField | undefined, raw: unknown): s
       if (typeof value === "boolean") return value ? "Yes" : "No";
       if (typeof value !== "string" && typeof value !== "number") return "";
       const text = String(value).trim();
-      return field.optionLabels?.[text] ?? text;
+      return field.optionLabels?.[text] ?? choiceDisplayLabel(text);
     })
     .filter(Boolean)
     .join("; ");

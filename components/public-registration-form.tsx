@@ -41,6 +41,7 @@ import { churchInvoiceTerms, invoiceRecipientName, termsMatchPrice } from "@/mod
 import { DateGuidance } from "@/components/date-guidance";
 import { PUBLIC_DATE_GUIDANCE, parseTypedDate } from "@/modules/forms/typed-date";
 import { RegistrationAccountPrompt } from "@/components/registration-account-prompt";
+import { SeminarNotAttendingChoice } from "@/components/seminar-not-attending-choice";
 import { SearchableSelect } from "@/components/searchable-select";
 import { FormsHelpRow } from "@/components/forms-help";
 import { SubmitButton } from "@/components/submit-button";
@@ -100,6 +101,9 @@ import {
   getAvailabilityMode,
   isFieldOptionalByCondition,
   isFieldVisible,
+  isNotAttendingAnswer,
+  isSeminarPreferenceField,
+  SEMINAR_NOT_ATTENDING,
   resolveResponsibleOrganization,
   resolveFieldPrices,
   numberFieldBounds,
@@ -1848,7 +1852,9 @@ export function PublicRegistrationForm({
 
   function renderField(field: RegistrationFormField, context: FieldRenderContext) {
     const issue = issueFor(field, context);
-    const selectedValues = Array.isArray(context.values[field.key]) ? context.values[field.key] as string[] : [];
+    // "Not attending" (#893) is stored as a marker, never as one of the field's choices.
+    const selectedValues = (Array.isArray(context.values[field.key]) ? context.values[field.key] as string[] : []).filter((value) => value !== SEMINAR_NOT_ATTENDING);
+    const notAttending = isNotAttendingAnswer(context.values[field.key]);
     const maximum = field.maxSelections ?? (field.type === "RANKED_CHOICE" ? 2 : field.options.length);
     const excused = isFieldOptionalByCondition(field, context.visibilityResponses);
     const minimum = excused ? 0 : field.minSelections ?? (field.required ? (field.type === "RANKED_CHOICE" ? Math.min(2, maximum) : 1) : 0);
@@ -2020,7 +2026,9 @@ export function PublicRegistrationForm({
     }
 
     function toggleChoice(option: string) {
-      if (selectedValues.includes(option)) {
+      if (notAttending) {
+        context.setValue(field.key, [option]);
+      } else if (selectedValues.includes(option)) {
         context.setValue(field.key, selectedValues.filter((value) => value !== option));
       } else if (selectedValues.length < maximum) {
         context.setValue(field.key, [...selectedValues, option]);
@@ -2155,6 +2163,13 @@ export function PublicRegistrationForm({
               );
             })}
           </div>
+          {isSeminarPreferenceField(field) && (
+            <SeminarNotAttendingChoice
+              id={`${id}_not_attending`}
+              selected={notAttending}
+              onChange={(chosen) => context.setValue(field.key, chosen ? [SEMINAR_NOT_ATTENDING] : [])}
+            />
+          )}
           {fieldSupport(field, context)}
         </fieldset>
       );

@@ -105,7 +105,7 @@ type TransactionalMessageInput = {
   /** Change notices: what was just saved, per seminar field, in ranked order. */
   seminarPreferences?: Array<{
     attendeeName: string;
-    fields: Array<{ label: string; choices: string[] }>;
+    fields: Array<{ label: string; choices: string[]; notAttending?: boolean }>;
   }>;
   /**
    * A broadcast loads every recipient's seminar block in a few queries and
