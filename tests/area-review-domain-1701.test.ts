@@ -114,4 +114,8 @@ describe("what stays locked after a return", () => {
     expect(lockedChanges(stored, incoming, ["ratio"])).toEqual(["Meeting place", "Monthly staff meeting", "Class levels worked on", "Honors worked on"]);
     expect(lockedChanges(stored, incoming, ["ratio", "honors", "classLevel", "staffMeeting"])).toEqual(["Meeting place"]);
   });
+  it("uses the club kind's member noun", () => {
+    expect(lockedChanges({ pathfinderCount: 1 }, { pathfinderCount: 2 }, [], "ADVENTURER")).toEqual(["Number of Adventurers"]);
+    expect(lockedChanges({ pathfinderCount: 1 }, { pathfinderCount: 2 }, [])).toEqual(["Number of Pathfinders"]);
+  });
 });

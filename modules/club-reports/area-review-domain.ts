@@ -1,3 +1,4 @@
+import { clubMemberNounPlural } from "@/modules/organizations/club-kind";
 import { pointItems, type PickedPoints, type PointItemKey, type ReportHonor } from "@/modules/club-reports/domain";
 
 /**
@@ -114,13 +115,13 @@ const sameHonors = (a: LockableRecordFields["honors"], b: LockableRecordFields["
  * returned, the club facts, and the honors list or class levels unless their own item ("honors", "classLevel") is
  * returned. The signature is never compared. Returns the plain names, in form order; empty means the change is allowed.
  */
-export function lockedChanges(stored: LockableRecordFields, incoming: LockableRecordFields, returnedKeys: readonly PointItemKey[]): string[] {
+export function lockedChanges(stored: LockableRecordFields, incoming: LockableRecordFields, returnedKeys: readonly PointItemKey[], clubKind?: string | null): string[] {
   const returned = new Set<string>(returnedKeys);
   const names: string[] = [];
   if (!sameText(stored.meetingPlace, incoming.meetingPlace)) names.push("Meeting place");
   if (!sameText(stored.meetingSchedule, incoming.meetingSchedule)) names.push("Meeting day and time");
   if (!sameCount(stored.averageAttendance, incoming.averageAttendance)) names.push("Average attendance");
-  if (!sameCount(stored.pathfinderCount, incoming.pathfinderCount)) names.push("Number of members");
+  if (!sameCount(stored.pathfinderCount, incoming.pathfinderCount)) names.push(`Number of ${clubMemberNounPlural(clubKind)}`);
   if (!sameCount(stored.tltCount, incoming.tltCount)) names.push("Number of TLTs");
   if (!sameCount(stored.staffCount, incoming.staffCount)) names.push("Number of staff");
   if (!sameText(stored.investitureDate, incoming.investitureDate)) names.push("Investiture date");

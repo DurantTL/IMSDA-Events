@@ -173,7 +173,7 @@ export async function saveClubReport(
 
   const prisma = getPrisma();
   return prisma.$transaction(async (tx) => {
-    const club = await tx.organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true } });
+    const club = await tx.organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true, clubKind: true } });
     if (!club || club.type !== "CLUB") throw new ClubReportError("CLUB_NOT_FOUND", "That club could not be found.");
     const existing = await tx.clubMonthlyReport.findUnique({
       where: { organizationId_reportMonth: { organizationId, reportMonth } },
@@ -202,6 +202,7 @@ export async function saveClubReport(
         { ...existing, classLevels: existing.classLevels as string[], points: (existing.points ?? {}) as PickedPoints, honors: (Array.isArray(existing.honors) ? existing.honors : []) as ReportHonor[] },
         input,
         returned,
+        club.clubKind,
       );
       if (locked.length > 0) throw new ClubReportError("CLUB_REPORT_ITEMS_LOCKED", lockedChangesMessage(locked));
     }

@@ -503,6 +503,20 @@ describe("a return reopens only the returned items", () => {
     expect(db.reports[0]).toMatchObject({ honors: [{ name: "Knots", participants: 4 }], classLevels: ["FRIEND"] });
   });
 
+  it("gives a staff member acting as the director the same refusal, naming the club's noun", async () => {
+    stage("report-club-1", "RETURNED");
+    const actAs = { userId: "staff-1", actAsId: "act-1" };
+    await refusedWith(saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 25, ratio: 25 }, pathfinderCount: 4 }), actAs, now), "Number of Pathfinders");
+    await saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 25, ratio: 25 } }), actAs, now);
+    expect(db.reports[0]).toMatchObject({ points: { staffMeeting: 25, ratio: 25 } });
+  });
+
+  it("still lets staff (not acting as a director) change a locked field past the due date with a return open", async () => {
+    stage("report-club-1", "RETURNED");
+    await saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 0, ratio: 0 }, meetingPlace: "Staff fix" }), { userId: "staff-1" }, now);
+    expect(db.reports[0]).toMatchObject({ meetingPlace: "Staff fix", points: { staffMeeting: 0, ratio: 0 } });
+  });
+
   it("keeps the whole lock with the switch off or no returned item", async () => {
     await lockedMessage(saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 25, ratio: 25 } }), club, now));
     stage("report-club-1", "OK");

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
@@ -121,6 +122,7 @@ export function ClubReportForm({
   /** Shows a summary card with an open button, and the form itself in a dialog (#789). */
   asDialog?: boolean;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [report, setReport] = useState(initial);
   const [points, setPoints] = useState<PickedPoints>(initial?.points ?? {});
@@ -202,6 +204,8 @@ export function ClubReportForm({
       setReport(result.report);
       setDirty(false);
       setCountsRefresh(null);
+      // After a return, a save changes what the page shows (the returned notice and the locked state), so load it again.
+      if (returnedOnly !== undefined || returnedText) router.refresh();
       setNotice(status === "DRAFT" ? savedMessage("Submit it when you are ready.") : `Submitted. ${result.report.totalPoints} points for ${monthLabel}.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The report could not be saved.");

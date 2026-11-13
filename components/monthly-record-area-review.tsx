@@ -21,7 +21,7 @@ export function MonthlyRecordAreaReview({ clubYear, enabled }: { clubYear: strin
         stateTestId="area-review-state"
         stateText={enabled ? `Area Coordinator review is on for ${clubYear}.` : `Area Coordinator review is off for ${clubYear}.`}
       >
-        <p className={styles.note}>Once on, it stays on in later club years until someone turns it off; it starts off until it is first turned on. Turning it off ends any returns in progress; staff then change those records themselves.</p>
+        <p className={styles.note}>This applies to {clubYear} and later club years. It starts off; once turned on it stays on until someone turns it off. Turning it off ends returns on {clubYear} records, and staff then change those records themselves. Earlier years keep their own setting.</p>
       </MonthlyRecordSwitch>
     </section>
   );
