@@ -19,6 +19,12 @@ const profilePhoto = {
     state.rows.set(where.userId, row);
     return row;
   }),
+  updateMany: vi.fn(async ({ where, data }: { where: { userId: string }; data: Row }) => {
+    const existing = state.rows.get(where.userId);
+    if (!existing) return { count: 0 };
+    state.rows.set(where.userId, { ...existing, ...data });
+    return { count: 1 };
+  }),
 };
 // Transactions run one after another, which is what the row lock gives overlapping saves and removals.
 let queue: Promise<unknown> = Promise.resolve();
@@ -96,6 +102,14 @@ describe("profile photo storage (#1640)", () => {
     expect(await partitionFiles()).toHaveLength(0);
     expect(state.rows.get("u1")).toMatchObject({ storageKey: null, thumbStorageKey: null, uploadedAt: null, removedByStaffAt: null });
     expect((await getProfilePhotoState("u1")).hasPhoto).toBe(false);
+  });
+
+  it("anonymization also clears an earlier staff-removal notice and who removed it", async () => {
+    await saveOwnProfilePhoto("u1", await photo());
+    await removeProfilePhotoByStaff("u1", "admin1");
+    state.links = [{ userId: "u1" }];
+    await removeProfilePhotosForPerson("p1");
+    expect(state.rows.get("u1")).toMatchObject({ removedByStaffAt: null, removedByUserId: null });
   });
 
   it("staff removal deletes the files, leaves a notice and writes an audit row without paths or bytes", async () => {

@@ -116,13 +116,19 @@ const clearedFields = { storageKey: null, thumbStorageKey: null, byteSize: null,
  */
 async function clearPhoto(
   userId: string,
-  mode: { kind: "own" } | { kind: "staff"; actorUserId: string },
+  mode: { kind: "own" } | { kind: "erase" } | { kind: "staff"; actorUserId: string },
 ) {
   const keys = await getPrisma().$transaction(async (tx) => {
     const current = await lockPhotoRow(tx, userId, false);
     const hadPhoto = Boolean(current.storageKey || current.thumbStorageKey);
-    // No photo stored: nothing to delete, and a removal notice already on the row stays until a new photo is added.
-    if (!hadPhoto) return null;
+    // No photo stored: nothing to delete, and a removal notice already on the row stays until a new photo is added,
+    // except when the person is anonymized, which clears the notice and who removed it too.
+    if (!hadPhoto) {
+      if (mode.kind === "erase") {
+        await tx.profilePhoto.updateMany({ where: { userId }, data: { removedByStaffAt: null, removedByUserId: null } });
+      }
+      return null;
+    }
     await tx.profilePhoto.update({
       where: { userId },
       data: {
@@ -167,7 +173,7 @@ export async function removeProfilePhotosForPerson(personId: string) {
     const links = await getPrisma().userPersonLink.findMany({ where: { personId }, select: { userId: true } });
     for (const { userId } of links) {
       try {
-        await clearPhoto(userId, { kind: "own" });
+        await clearPhoto(userId, { kind: "erase" });
       } catch (error) {
         logError("Could not remove a profile photo after anonymization", error);
       }

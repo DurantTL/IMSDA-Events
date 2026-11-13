@@ -39,7 +39,8 @@ them on the Staff page). Anyone else gets "not found", the same as a person with
   they add a new one.
 - When a person is anonymized (`modules/people/anonymization.ts`), the photos of staff accounts linked to that person
   through `UserPersonLink` are deleted after the anonymization commits. This is best effort and logged; a file error
-  never fails the anonymization, and a repeat call retries it.
+  never fails the anonymization, and a repeat call retries it. Any earlier staff-removal notice (and who removed
+  the photo) is cleared at the same time.
 - Deleting the staff account deletes the row (cascade). The stored files are not removed by the database cascade; an
   account-deletion flow must call the removal first (there is no such flow yet).
 
