@@ -82,7 +82,6 @@ function registration(
     checkedInCount: 0,
     payments: [],
     adjustments: [],
-    messages: [],
     publicSubmission: null,
   };
 }

@@ -107,6 +107,20 @@ describe("cross-event identity reads write an ids-only audit entry", () => {
     ]);
   });
 
+  it("the person communications surface records ids and counts only", async () => {
+    await auditCrossEventIdentityRead({
+      actorUserId: "usr_admin", surface: "PERSON_COMMUNICATIONS", entityId: "usr_1", resultIds: ["msg_1", "msg_2"],
+      extra: { kind: "staff", staffId: "usr_1", eventIds: ["evt_a"] },
+    });
+    const entry = mocks.writeAuditLog.mock.calls[0][0];
+    expect(entry).toMatchObject({
+      action: PERSON_CROSS_EVENT_READ_ACTION, actorUserId: "usr_admin", entityId: "usr_1",
+      metadata: { surface: "PERSON_COMMUNICATIONS", resultCount: 2, resultIds: ["msg_1", "msg_2"], eventIds: ["evt_a"], truncated: false },
+    });
+    expect(entry.eventId).toBeUndefined();
+    expectIdsOnly(entry);
+  });
+
   it("is written even when nothing is returned", async () => {
     mocks.getPrisma.mockReturnValue({ personMerge: { findMany: vi.fn(async () => []) } });
     expect(await listActivePersonMerges("usr_admin")).toEqual([]);

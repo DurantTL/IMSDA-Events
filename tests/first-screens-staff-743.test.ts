@@ -76,7 +76,6 @@ function registration(index: number): RegistrationRecord {
     balanceCents: 0,
     attendeeCount: 1,
     checkedInCount: 0,
-    messages: [],
     adjustments: [],
   } as unknown as RegistrationRecord;
 }

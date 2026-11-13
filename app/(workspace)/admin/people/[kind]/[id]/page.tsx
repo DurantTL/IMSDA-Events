@@ -13,6 +13,8 @@ import { AdminPageHeader } from "@/components/admin-page-header";
 import styles from "@/components/people-directory.module.css";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
+import { PersonCommunicationsSection } from "@/components/person-communications";
+import { loadPersonCommunications } from "@/modules/system-admin/person-communications";
 import { getPersonDetail, listClubOptions, listEventOptions } from "@/modules/system-admin/people-directory";
 
 export const metadata: Metadata = { title: "People & access" };
@@ -23,7 +25,7 @@ export default async function PersonAccessPage({
   searchParams,
 }: {
   params: Promise<{ kind: string; id: string }>;
-  searchParams: Promise<{ from?: string | string[]; grant?: string | string[] }>;
+  searchParams: Promise<{ from?: string | string[]; grant?: string | string[]; communications?: string | string[] }>;
 }) {
   const viewer = await resolvePeopleViewer();
   if (!viewer.user) redirect(await staffLoginRedirectPath());
@@ -55,6 +57,10 @@ export default async function PersonAccessPage({
   });
   // A system administrator can remove an inappropriate staff photo (#1640); nobody else sees it here.
   const photo = full && person.staffId ? await getProfilePhotoState(person.staffId) : null;
+  // Cross-event history (#179): a system administrator only, loaded (and audited) only when asked for with ?communications=1.
+  const communications = full && query.communications === "1"
+    ? await loadPersonCommunications({ userId: viewer.user.id, scope: viewer.scope, globalRole: viewer.user.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : null }, { kind, id, staffId: person.staffId, accountId: person.accountId })
+    : null;
   const cleanHref = `/admin/people/${kind}/${encodeURIComponent(id)}${from ? `?from=${encodeURIComponent(from)}` : ""}`;
   return (
     <>
@@ -95,6 +101,15 @@ export default async function PersonAccessPage({
           scope={viewer.scope}
           viewerUserId={viewer.user.id}
         />
+        {full ? (
+          <div className={styles.wrap}>
+            <PersonCommunicationsSection
+              closeHref={cleanHref}
+              communications={communications}
+              openHref={`${cleanHref}${cleanHref.includes("?") ? "&" : "?"}communications=1#person-communications-heading`}
+            />
+          </div>
+        ) : null}
       </DetailPage>
     </>
   );
