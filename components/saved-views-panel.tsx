@@ -1,12 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { GuardedLink } from "@/components/guarded-link";
 import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SAVED_VIEW_NAME_MAX, STALE_VIEW_NOTE, type SavedViewItem } from "@/modules/registrations/saved-views-domain";
 import styles from "./saved-views-panel.module.css";
+
+/** More views than this in one group fold the rest behind "Show all". */
+const VISIBLE_PER_GROUP = 8;
 
 /** The address a view opens: the list for this event with the view's own filters. The page checks them again. */
 export function savedViewHref(eventId: string, query: string) {
@@ -41,14 +45,23 @@ export function SavedViewsPanel({
   const [name, setName] = useState("");
   const [shareNew, setShareNew] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Which control is working, so its own label can say so ("Saving…", "Deleting…").
+  const [working, setWorking] = useState<string | null>(null);
+  const [nameError, setNameError] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  // A name typed and not yet saved (rule B6).
+  useUnsavedChangesGuard(name.trim() !== "");
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const own = views.filter((view) => view.isOwn);
   const shared = views.filter((view) => !view.isOwn);
   const base = `/api/events/${encodeURIComponent(eventId)}/registration-views`;
 
-  async function send(url: string, init: RequestInit, failure: string) {
+  async function send(url: string, init: RequestInit, failure: string, key: string) {
     setBusy(true);
+    setWorking(key);
     setMessage(null);
+    setNameError(false);
     try {
       const response = await fetch(url, { ...init, headers: { "Content-Type": "application/json" } });
       if (!response.ok) {
@@ -61,28 +74,42 @@ export function SavedViewsPanel({
       return false;
     } finally {
       setBusy(false);
+      setWorking(null);
     }
+  }
+
+  /** After a change the list is redrawn: put focus on the panel's heading so it is not lost to the page. */
+  function afterChange() {
+    router.refresh();
+    window.requestAnimationFrame(() => headingRef.current?.focus());
   }
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    const ok = await send(base, { method: "POST", body: JSON.stringify({ name, query: currentQuery, shared: canShare && shareNew }) }, "the view couldn't be saved.");
-    if (!ok) return;
+    if (busy || name.trim() === "") return;
+    const ok = await send(base, { method: "POST", body: JSON.stringify({ name, query: currentQuery, shared: canShare && shareNew }) }, "the view couldn't be saved.", "save");
+    if (!ok) {
+      setNameError(true);
+      nameRef.current?.focus();
+      return;
+    }
     setName("");
     setShareNew(false);
     setMessage({ tone: "success", text: savedMessage() });
-    router.refresh();
+    afterChange();
   }
 
   async function toggleShared(view: SavedViewItem) {
+    if (busy) return;
     const next = !view.shared;
-    const ok = await send(`${base}/${encodeURIComponent(view.id)}`, { method: "PATCH", body: JSON.stringify({ shared: next }) }, "sharing couldn't be changed.");
+    const ok = await send(`${base}/${encodeURIComponent(view.id)}`, { method: "PATCH", body: JSON.stringify({ shared: next }) }, "sharing couldn't be changed.", `${view.id}:share`);
     if (!ok) return;
     setMessage({ tone: "success", text: savedMessage(next ? "Event staff can now open this view." : "Only you can see this view now.") });
-    router.refresh();
+    afterChange();
   }
 
   async function remove(view: SavedViewItem) {
+    if (busy) return;
     const confirmed = await confirm({
       title: `Delete ${view.name}`,
       body: view.shared ? "This removes the saved view for everyone on the event. No registrations change." : "This removes the saved view. No registrations change.",
@@ -90,10 +117,10 @@ export function SavedViewsPanel({
       destructive: true,
     });
     if (!confirmed) return;
-    const ok = await send(`${base}/${encodeURIComponent(view.id)}`, { method: "DELETE" }, "the view couldn't be deleted.");
+    const ok = await send(`${base}/${encodeURIComponent(view.id)}`, { method: "DELETE" }, "the view couldn't be deleted.", `${view.id}:delete`);
     if (!ok) return;
     setMessage({ tone: "success", text: "Deleted." });
-    router.refresh();
+    afterChange();
   }
 
   function row(view: SavedViewItem) {
@@ -106,21 +133,21 @@ export function SavedViewsPanel({
         <div className={styles.itemBody}>
           <GuardedLink aria-current={current ? "true" : undefined} aria-describedby={view.stale ? noteId : undefined} className={styles.link} href={savedViewHref(eventId, view.query)}>
             {view.name}
-            {current ? <span className={styles.tag}>Showing now</span> : null}
-            {view.isOwn && view.shared ? <span className={styles.tag}>Shared</span> : null}
+            {current ? <span className="status-chip green">Current view</span> : null}
+            {view.isOwn && view.shared ? <span className="status-chip">Shared</span> : null}
           </GuardedLink>
           {view.ownerName ? <p className={styles.sharedBy}>Shared by {view.ownerName}</p> : null}
           {view.stale ? <p className={styles.note} id={noteId}>{STALE_VIEW_NOTE}</p> : null}
         </div>
         <div className={styles.actions}>
           {mayChangeSharing ? (
-            <button className="secondary-button" disabled={busy} onClick={() => void toggleShared(view)} type="button">
-              {view.shared ? "Stop sharing" : "Share with event staff"}<span className="sr-only">: {view.name}</span>
+            <button aria-disabled={busy || undefined} className="secondary-button" onClick={() => void toggleShared(view)} type="button">
+              {working === `${view.id}:share` ? "Saving…" : view.shared ? "Stop sharing" : "Share with event staff"}<span className="sr-only">: {view.name}</span>
             </button>
           ) : null}
           {mayDelete ? (
-            <button className="secondary-button" disabled={busy} onClick={() => void remove(view)} type="button">
-              Delete<span className="sr-only"> {view.name}</span>
+            <button aria-disabled={busy || undefined} className="secondary-button" onClick={() => void remove(view)} type="button">
+              {working === `${view.id}:delete` ? "Deleting…" : "Delete"}<span className="sr-only"> {view.name}</span>
             </button>
           ) : null}
         </div>
@@ -128,27 +155,42 @@ export function SavedViewsPanel({
     );
   }
 
+  function group(list: SavedViewItem[]) {
+    const rest = list.slice(VISIBLE_PER_GROUP);
+    return (
+      <>
+        <ul className={styles.list}>{list.slice(0, VISIBLE_PER_GROUP).map(row)}</ul>
+        {rest.length > 0 ? (
+          <details className={styles.more}>
+            <summary>Show all {list.length}</summary>
+            <ul className={styles.list}>{rest.map(row)}</ul>
+          </details>
+        ) : null}
+      </>
+    );
+  }
+
   return (
     <section aria-labelledby="saved-views-title" className={styles.panel} data-testid="saved-views">
-      <h2 className={styles.title} id="saved-views-title">Saved views</h2>
+      <h2 className={styles.title} id="saved-views-title" ref={headingRef} tabIndex={-1}>Saved views</h2>
       {views.length === 0 ? <p className={styles.empty}>No saved views yet. Choose some filters, then save them here to open them again.</p> : null}
       {own.length > 0 ? (
         <div className={styles.group}>
           <h3 className={styles.groupTitle}>Your views</h3>
-          <ul className={styles.list}>{own.map(row)}</ul>
+          {group(own)}
         </div>
       ) : null}
       {shared.length > 0 ? (
         <div className={styles.group}>
           <h3 className={styles.groupTitle}>Shared with event staff</h3>
-          <ul className={styles.list}>{shared.map(row)}</ul>
+          {group(shared)}
         </div>
       ) : null}
       {canSave ? (
         <form className={styles.saveForm} onSubmit={(event) => void save(event)}>
           <label className={styles.field}>
             Name for these filters
-            <input autoComplete="off" maxLength={SAVED_VIEW_NAME_MAX} name="viewName" onChange={(event) => setName(event.target.value)} required value={name} />
+            <input aria-describedby={nameError ? "saved-views-message" : undefined} aria-invalid={nameError || undefined} autoComplete="off" maxLength={SAVED_VIEW_NAME_MAX} name="viewName" onChange={(event) => setName(event.target.value)} ref={nameRef} required value={name} />
           </label>
           {canShare ? (
             <label className={styles.check}>
@@ -156,12 +198,12 @@ export function SavedViewsPanel({
               Share with event staff
             </label>
           ) : null}
-          <button aria-busy={busy || undefined} className="primary-button" disabled={busy || name.trim() === ""} type="submit">
-            {busy ? "Saving…" : "Save these filters"}
+          <button aria-busy={busy || undefined} aria-disabled={busy || name.trim() === "" || undefined} className="primary-button" type="submit">
+            {working === "save" ? "Saving…" : "Save these filters"}
           </button>
         </form>
       ) : null}
-      <FormMessage message={message?.text ?? ""} tone={message?.tone ?? "success"} />
+      <div id="saved-views-message"><FormMessage message={message?.text ?? ""} tone={message?.tone ?? "success"} /></div>
       {confirmDialog}
     </section>
   );

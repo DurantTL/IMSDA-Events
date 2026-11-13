@@ -24,6 +24,7 @@ describe("saved view names", () => {
     expect(normalizeSavedViewName("x".repeat(60)).ok).toBe(true);
     expect(normalizeSavedViewName("x".repeat(61)).ok).toBe(false);
     expect(normalizeSavedViewName("bad\u0007name").ok).toBe(false);
+    for (const mark of ["\u200E", "\u200F", "\u202A", "\u202E", "\u2066", "\u2069"]) expect(normalizeSavedViewName(`Name${mark}`).ok).toBe(false);
   });
 });
 

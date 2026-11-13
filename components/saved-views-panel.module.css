@@ -25,14 +25,6 @@
   font-weight: 700;
   overflow-wrap: anywhere;
 }
-.tag {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  padding: 1px 8px;
-  color: var(--muted);
-  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-  font-weight: 600;
-}
 .note, .sharedBy { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.4; overflow-wrap: anywhere; }
 .note { color: var(--coral); }
 .sharedBy { color: var(--muted); }
@@ -52,3 +44,8 @@
 }
 .check input { width: 20px; height: 20px; flex: none; }
 .saveForm button { min-height: var(--touch-target, 44px); }
+.actions button[aria-disabled="true"], .saveForm button[aria-disabled="true"] { cursor: not-allowed; opacity: 0.58; }
+.more { min-width: 0; }
+.more > summary { display: flex; align-items: center; min-height: var(--touch-target, 44px); color: var(--imsda-navy); cursor: pointer; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.more[open] > summary { margin-bottom: 6px; }
+.title:focus-visible { outline-offset: 2px; }

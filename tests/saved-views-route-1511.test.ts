@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => {
     constructor(message: string, public readonly status = 403, public readonly code = "PERMISSION_DENIED") { super(message); }
   }
   class MockSavedViewError extends Error {
-    constructor(public readonly code: "INVALID" | "NOT_FOUND" | "NAME_TAKEN", message: string) { super(message); }
+    constructor(public readonly code: "INVALID" | "NOT_FOUND" | "NAME_TAKEN" | "LIMIT_REACHED", message: string) { super(message); }
   }
   return {
     AccessDeniedError: MockAccessDeniedError,
@@ -91,5 +91,12 @@ describe("permissions come from the server, not the request", () => {
     expect(mocks.createSavedView).not.toHaveBeenCalled();
     await POST(json("POST", { name: "Mine", query: "status=CONFIRMED", shared: true }), create);
     expect(mocks.createSavedView.mock.calls[0]![0].permissions).not.toContain("MANAGE_REGISTRATION");
+  });
+});
+
+describe("a full list", () => {
+  it("answers 409 when a person is at the limit", async () => {
+    mocks.createSavedView.mockRejectedValueOnce(new mocks.SavedViewError("LIMIT_REACHED", "Full."));
+    expect((await POST(json("POST", { name: "More", query: "status=CONFIRMED" }), create)).status).toBe(409);
   });
 });

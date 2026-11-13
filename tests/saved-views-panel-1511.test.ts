@@ -36,7 +36,8 @@ describe("Saved views panel (#1511)", () => {
   it("marks the view that matches the current filters", () => {
     const html = render();
     expect(html.match(/aria-current="true"/g)).toHaveLength(1);
-    expect(html).toContain("Showing now");
+    expect(html).toContain("Current view");
+    expect(html).not.toContain("Showing");
   });
 
   it("says plainly when a view uses a filter that is gone or not available, and still links and deletes it", () => {
@@ -62,6 +63,32 @@ describe("Saved views panel (#1511)", () => {
     expect(render()).toContain("Save these filters");
     expect(render()).toContain("Name for these filters");
     expect(render({ canSave: false })).not.toContain("Save these filters");
+  });
+
+  it("folds a group of more than 8 views behind a native Show all", () => {
+    const many: SavedViewItem[] = Array.from({ length: 10 }, (_, index) => ({ id: `m${index}`, name: `View ${index}`, query: `tag=t${index}`, shared: false, isOwn: true, ownerName: null, stale: false }));
+    const html = render({ views: many });
+    expect(html).toContain("<details");
+    expect(html).toContain("Show all 10");
+    expect(render({ views: many.slice(0, 8) })).not.toContain("Show all");
+  });
+
+  it("uses the shared status chip, keeps buttons focusable and wires focus and the unsaved guard in source", () => {
+    const source = readFileSync("components/saved-views-panel.tsx", "utf8");
+    expect(source).toContain("status-chip");
+    expect(source).not.toMatch(/\sdisabled=\{/);
+    expect(source).toContain("aria-disabled");
+    expect(source).toContain("useUnsavedChangesGuard(name.trim() !== \"\")");
+    expect(source).toContain("aria-invalid");
+    expect(source).toContain("nameRef.current?.focus()");
+    expect(source).toContain("headingRef.current?.focus()");
+    expect(source).toContain("tabIndex={-1}");
+    expect(source).toContain('"Deleting…"');
+  });
+
+  it("offers Save only when the page read every filter, in source", () => {
+    const page = readFileSync("app/(workspace)/people/page.tsx", "utf8");
+    expect(page).toContain("searchParseIssues.length === 0 && retiredAnswerParams.length === 0}");
   });
 
   it("says one plain sentence when there are no views", () => {

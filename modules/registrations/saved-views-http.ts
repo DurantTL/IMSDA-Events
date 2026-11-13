@@ -16,7 +16,7 @@ export function savedViewApiError(error: unknown) {
   if (error instanceof SyntaxError) return Response.json({ error: "INVALID_SAVED_VIEW", message: "That request is not valid." }, { status: 400 });
   if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
   if (error instanceof SavedViewError) {
-    const status = error.code === "NOT_FOUND" ? 404 : error.code === "NAME_TAKEN" ? 409 : 400;
+    const status = error.code === "NOT_FOUND" ? 404 : error.code === "NAME_TAKEN" || error.code === "LIMIT_REACHED" ? 409 : 400;
     return Response.json({ error: error.code, message: error.message }, { status });
   }
   return Response.json({ error: "SAVED_VIEW_REQUEST_FAILED", message: "The saved view request could not be completed." }, { status: 500 });

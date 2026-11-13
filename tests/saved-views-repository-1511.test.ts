@@ -40,6 +40,7 @@ function installPrisma() {
       rows.push(row);
       return row;
     }),
+    count: vi.fn(async ({ where }: { where: Record<string, unknown> }) => rows.filter((row) => matches(row, where)).length),
     updateMany: vi.fn(async ({ where, data }: { where: Record<string, unknown>; data: Partial<Row> }) => {
       const hit = rows.filter((row) => matches(row, where));
       hit.forEach((row) => Object.assign(row, data));
@@ -100,6 +101,17 @@ describe("saving a view", () => {
     await expect(createSavedView(viewerFor("user-b", reader), { name: "Mine", query: "status=DRAFT" })).resolves.toBeTruthy();
   });
 
+  it("refuses a value the page would have rejected, so nothing is stored without it", async () => {
+    await expect(createSavedView(viewerFor("user-a", reader), { name: "Odd", query: "status=PENDING_APPROVAL&sort=name" })).rejects.toMatchObject({ code: "INVALID" });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("keeps at most 50 views per person per event", async () => {
+    for (let index = 0; index < 50; index += 1) seed({ ownerUserId: "user-a", name: `View ${index}` });
+    await expect(createSavedView(viewerFor("user-a", reader), { name: "One more", query: "status=CONFIRMED" })).rejects.toMatchObject({ code: "LIMIT_REACHED" });
+    await expect(createSavedView(viewerFor("user-b", reader), { name: "Fine", query: "status=CONFIRMED" })).resolves.toBeTruthy();
+  });
+
   it("maps a database unique violation to a taken name", async () => {
     const prisma = installPrisma();
     prisma.create.mockRejectedValueOnce(Object.assign(new Error("unique"), { code: "P2002" }));
@@ -147,6 +159,13 @@ describe("sharing", () => {
     const calls = mocks.writeAuditLog.mock.calls.map((call) => call[0]);
     expect(calls.map((call) => call.action)).toEqual(["REGISTRATION_SAVED_VIEW_SHARED", "REGISTRATION_SAVED_VIEW_UNSHARED"]);
     expect(calls[0].metadata).toEqual({ savedViewId: "v1", shared: true, filterKeys: ["tag"] });
+  });
+
+  it("lets an owner without MANAGE_REGISTRATION stop sharing, but not start", async () => {
+    seed({ id: "v1", ownerUserId: "user-a", shared: true, sharedAt: new Date(), sharedByUserId: "user-a" });
+    await setSavedViewShared(viewerFor("user-a", reader), "v1", false);
+    expect(rows[0]?.shared).toBe(false);
+    await expect(setSavedViewShared(viewerFor("user-a", reader), "v1", true)).rejects.toBeInstanceOf(AccessDeniedError);
   });
 
   it("needs MANAGE_REGISTRATION", async () => {

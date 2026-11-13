@@ -9,6 +9,7 @@ import {
   hasSavableContent,
   normalizeSavedViewName,
   normalizeSavedViewQuery,
+  SAVED_VIEWS_PER_PERSON_MAX,
   savedViewFilterKeys,
   type SavedViewItem,
 } from "@/modules/registrations/saved-views-domain";
@@ -23,7 +24,7 @@ import {
  */
 
 export class SavedViewError extends Error {
-  constructor(public readonly code: "INVALID" | "NOT_FOUND" | "NAME_TAKEN", message: string) {
+  constructor(public readonly code: "INVALID" | "NOT_FOUND" | "NAME_TAKEN" | "LIMIT_REACHED", message: string) {
     super(message);
     this.name = "SavedViewError";
   }
@@ -70,6 +71,7 @@ export async function listSavedViews(viewer: SavedViewViewer, catalog: SearchCat
   const rows = await getPrisma().registrationSavedView.findMany({
     where: { eventId: viewer.eventId, OR: [{ ownerUserId: viewer.userId }, { shared: true }] },
     orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+    take: 200,
     select: { id: true, name: true, query: true, shared: true, ownerUserId: true, owner: { select: { displayName: true } } },
   });
   const search = searchViewer(viewer);
@@ -105,6 +107,8 @@ export async function createSavedView(viewer: SavedViewViewer, input: { name: st
     select: { id: true },
   });
   if (existing) throw nameTaken();
+  const kept = await prisma.registrationSavedView.count({ where: { eventId: viewer.eventId, ownerUserId: viewer.userId } });
+  if (kept >= SAVED_VIEWS_PER_PERSON_MAX) throw new SavedViewError("LIMIT_REACHED", `You can keep up to ${SAVED_VIEWS_PER_PERSON_MAX} saved views for this event. Delete one you no longer use first.`);
   const shared = Boolean(input.shared);
   let row;
   try {
@@ -147,9 +151,11 @@ export async function createSavedView(viewer: SavedViewViewer, input: { name: st
   return { id: row.id, name: row.name, query: row.query, shared: row.shared };
 }
 
-/** Shares a view with the event's staff, or stops sharing it. Only its owner can, and only with the right to publish. */
+/** Shares a view with the event's staff, or stops sharing it. Only its owner can; turning sharing on needs the right to publish. */
 export async function setSavedViewShared(viewer: SavedViewViewer, viewId: string, shared: boolean) {
-  requireShare(viewer);
+  // Publishing needs the right to; taking your own view back down only needs to be able to see the list.
+  if (shared) requireShare(viewer);
+  else requireRead(viewer);
   const prisma = getPrisma();
   const row = await prisma.registrationSavedView.findFirst({
     where: { id: viewId, eventId: viewer.eventId, OR: [{ ownerUserId: viewer.userId }, { shared: true }] },

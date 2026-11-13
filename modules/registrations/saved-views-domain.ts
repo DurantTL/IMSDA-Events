@@ -22,6 +22,8 @@ import {
  */
 
 export const SAVED_VIEW_NAME_MAX = 60;
+/** Most views one person keeps per event. */
+export const SAVED_VIEWS_PER_PERSON_MAX = 50;
 
 /** A view's name as people see it: spaces collapsed and trimmed, 1 to 60 characters, no control characters. */
 export function normalizeSavedViewName(raw: string): { ok: true; name: string } | { ok: false; message: string } {
@@ -29,6 +31,8 @@ export function normalizeSavedViewName(raw: string): { ok: true; name: string } 
   if (!name) return { ok: false, message: "Give this view a name." };
   if (name.length > SAVED_VIEW_NAME_MAX) return { ok: false, message: `Use ${SAVED_VIEW_NAME_MAX} characters or fewer for the name.` };
   if (/[\u0000-\u001f\u007f]/.test(name)) return { ok: false, message: "The name has a character that cannot be used." };
+  // Direction-control characters can make a name read as something it is not.
+  if (/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/.test(name)) return { ok: false, message: "The name has a character that cannot be used." };
   return { ok: true, name };
 }
 
