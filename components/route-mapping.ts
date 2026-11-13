@@ -197,6 +197,7 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/more/reports/clubs/team-form/level", "/more/team-results", "components/team-results-workspace.tsx"],
   ["/more/reports/packets", "/more/reports/printouts", "modules/reporting/printouts-model.ts"],
   ["/more/team-results", "/more/clubs", "app/(workspace)/more/clubs/page.tsx"],
+  ["/people/bulk-actions", "/people", "app/(workspace)/people/page.tsx"],
   ["/people/directory-review", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
   ["/people/duplicates", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
   ["/people/pending-teams", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],

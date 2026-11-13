@@ -143,7 +143,8 @@ export async function listAttendeeTagAssignments(eventId: string, attendeeId: st
   return rows.map(serializeAssignment);
 }
 
-export async function applyRegistrationTag(eventId: string, registrationId: string, tagId: string, actorUserId: string) {
+/** `correlationId` ties this write's audit row to a larger operation, such as a reviewed bulk action run (#182). */
+export async function applyRegistrationTag(eventId: string, registrationId: string, tagId: string, actorUserId: string, options: { correlationId?: string } = {}) {
   const prisma = getPrisma();
   const tag = await activeTag(eventId, tagId);
   const registration = await prisma.registration.findFirst({ where: { id: registrationId, eventId }, select: { id: true, confirmationCode: true } });
@@ -162,7 +163,7 @@ export async function applyRegistrationTag(eventId: string, registrationId: stri
     await tx.auditLog.create({
       data: {
         eventId, actorUserId, action: "REGISTRATION_TAG_APPLIED", entityType: "RegistrationTagAssignment", entityId: created.id,
-        correlationId: randomUUID(), summary: `Applied tag ${tag.name} to registration ${registration.confirmationCode}.`,
+        correlationId: options.correlationId ?? randomUUID(), summary: `Applied tag ${tag.name} to registration ${registration.confirmationCode}.`,
         metadata: { registrationId, tagId },
       },
     });
@@ -170,7 +171,7 @@ export async function applyRegistrationTag(eventId: string, registrationId: stri
   });
 }
 
-export async function removeRegistrationTag(eventId: string, registrationId: string, tagId: string, actorUserId: string) {
+export async function removeRegistrationTag(eventId: string, registrationId: string, tagId: string, actorUserId: string, options: { correlationId?: string } = {}) {
   const prisma = getPrisma();
   const existingActive = await prisma.registrationTagAssignment.findFirst({
     where: { eventId, registrationId, tagId, removedAt: null },
@@ -187,7 +188,7 @@ export async function removeRegistrationTag(eventId: string, registrationId: str
     await tx.auditLog.create({
       data: {
         eventId, actorUserId, action: "REGISTRATION_TAG_REMOVED", entityType: "RegistrationTagAssignment", entityId: removed.id,
-        correlationId: randomUUID(), summary: `Removed tag ${existingActive.tag.name} from registration ${existingActive.registration.confirmationCode}.`,
+        correlationId: options.correlationId ?? randomUUID(), summary: `Removed tag ${existingActive.tag.name} from registration ${existingActive.registration.confirmationCode}.`,
         metadata: { registrationId, tagId },
       },
     });

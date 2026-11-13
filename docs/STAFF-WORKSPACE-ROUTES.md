@@ -175,6 +175,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/overview` | Event sidebar | Events (inside an event) | Event home | Event home | More, This event | Event menu | - | `app/(workspace)/overview/page.tsx` |
 | `/people` | Event sidebar | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/page.tsx` |
 | `/people/attendees` | More directory | Events (inside an event) | Registrations | Attendee list | More, This event | Event menu | - | `app/(workspace)/people/attendees/page.tsx` |
+| `/people/bulk-actions` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/bulk-actions/page.tsx` |
 | `/people/directory-review` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/directory-review/page.tsx` |
 | `/people/duplicates` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/duplicates/page.tsx` |
 | `/people/matches` | Page link | Admin | System administration | - | More, Areas | Admin menu | - | `app/(workspace)/people/matches/page.tsx` |
@@ -188,7 +189,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/select-event` | Existing page link | Home | none (Help, Profile and pages no tab lists light Home and no tab) | - | More | Home menu | - | `app/select-event/page.tsx` |
 | `/staff` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/staff/page.tsx` |
 
-179 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
+180 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
 
 ## Query states that move a page to another tab or view
 
