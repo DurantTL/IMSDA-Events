@@ -182,3 +182,29 @@ flag, not guardian authority — guardian authority is declared explicitly
 Legacy rows without `effectiveFrom` are backfilled with the idempotent,
 dry-run-by-default `npm run household-membership:backfill`
 (`household-backfill.ts`).
+
+## Attendee profile conflicts and updates (#1512; code in `modules/attendee-accounts/`)
+
+This edits the signed-in attendee account's own profile columns only. It never links, merges or reads a `Person`.
+
+- **Review after a registration** (`profile-conflicts.ts`, `profile-review-service.ts`, `GET`/`POST /api/attendee/profile/registration-review`):
+  the confirmation shows where the saved profile differs from what was entered (name, phone, shirt size, mailing address,
+  emergency contact). Nothing is pre-checked and nothing changes without the person's click. The new values are always
+  read on the server from the stored registration answers (the latest amendment's snapshot, else the original submission);
+  the request names fields and carries the version it was shown. A version that no longer matches answers 409 and the page
+  asks the person to review again. The profile row is locked while a review is applied, as it is for a profile edit and a
+  staff correction.
+- **Not compared, offered or kept:** dietary and accessibility needs, and email. An empty entered value is never a
+  conflict. Only REGISTRATION-scope answers whose field is registration-scope in the form version are compared; an
+  attendee-scope answer may describe another person (a child, for example).
+- **History** (`AttendeeProfileChange`): values are kept only for first name, last name, phone and shirt size. Address and
+  emergency contact rows keep the field name only (null values); health fields are never recorded. The database enforces
+  both, and a `STAFF_CORRECTION` row must carry a staff user and a reason. Audit log entries carry field names only.
+- **Staff** (`/people/profile-updates`, `POST /api/people/profile-updates`): system administrators only, gated like the
+  possible-duplicates queue and written to the cross-event identity read audit. The list shows values for name, phone and
+  shirt size and only "changed" for anything else. A correction needs a reason, sends the values it was loaded with, and is
+  refused with 409 if the stored values differ.
+
+Left open: staff correction of address and emergency contact is intentionally not offered; attendee-scope answers are not
+compared (a roster answer cannot be tied to the signed-in account); a form whose name fields are attendee-scope offers no
+name conflict.

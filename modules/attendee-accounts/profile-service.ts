@@ -5,6 +5,7 @@ import { phoneToStore } from "@/lib/field-validation";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { formatPersonName } from "@/lib/person-name";
+import { historyEntriesFor } from "@/modules/attendee-accounts/profile-conflicts";
 
 const optionalProfileValue = (maximum: number) => z.string().trim().max(maximum);
 // Same cap the address field uses for each component (modules/forms/address.ts).
@@ -90,15 +91,19 @@ function serializeProfile(profile: StoredProfile, fallback = { firstName: "", la
   };
 }
 
+/** The names the profile form shows for an account that never saved them separately. */
+function displayNameFallback(displayName: string) {
+  const parts = displayName.trim().split(/\s+/);
+  const firstName = parts.shift() ?? "";
+  return { firstName, lastName: parts.join(" ") };
+}
+
 export async function getAttendeeProfile(accountId: string) {
   const profile = await getPrisma().attendeeAccount.findUniqueOrThrow({
     where: { id: accountId },
     select: { ...profileSelect, displayName: true },
   });
-  const displayNameParts = profile.displayName.trim().split(/\s+/);
-  const fallbackFirstName = displayNameParts.shift() ?? "";
-  const fallbackLastName = displayNameParts.join(" ");
-  return serializeProfile(profile, { firstName: fallbackFirstName, lastName: fallbackLastName });
+  return serializeProfile(profile, displayNameFallback(profile.displayName));
 }
 
 export async function updateAttendeeProfile(
@@ -107,9 +112,14 @@ export async function updateAttendeeProfile(
 ) {
   const parsed = attendeeProfileSchema.parse(input);
   return getPrisma().$transaction(async (tx) => {
-    const before = serializeProfile(
-      await tx.attendeeAccount.findUniqueOrThrow({ where: { id: accountId }, select: profileSelect }),
-    );
+    // One change to this profile at a time (a registration review or a staff correction may be saving too).
+    await tx.$queryRaw`SELECT "id" FROM "AttendeeAccount" WHERE "id" = ${accountId} FOR UPDATE`;
+    // Read with the same name fallback the form shows, so a first save does not record a name change nobody saw.
+    const storedBefore = await tx.attendeeAccount.findUniqueOrThrow({
+      where: { id: accountId },
+      select: { ...profileSelect, displayName: true },
+    });
+    const before = serializeProfile(storedBefore, displayNameFallback(storedBefore.displayName));
     // Phones go through the shared check (#871) so what new registrations prefill from is clean. A changed phone
     // must pass and is stored normalised; the stored one, even an old unusable one, may stay as it is. The stored
     // value is read here, never taken from the request.
@@ -140,6 +150,17 @@ export async function updateAttendeeProfile(
       (key) => profile[key] !== undefined && before[key] !== after[key],
     );
     if (changedFields.length > 0) {
+      // History keeps name, phone and shirt size values only; every other field is recorded by name (profile-conflicts.ts).
+      await tx.attendeeProfileChange.createMany({
+        data: historyEntriesFor(
+          changedFields.map((field) => ({ field, oldValue: before[field], newValue: after[field] })),
+        ).map((entry) => ({
+          accountId,
+          ...entry,
+          source: "SELF_EDIT" as const,
+          actorAttendeeAccountId: accountId,
+        })),
+      });
       await writeAuditLog({
         action: "ATTENDEE_PROFILE_UPDATED",
         entityType: "AttendeeAccount",

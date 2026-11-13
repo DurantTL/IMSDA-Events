@@ -179,6 +179,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/people/duplicates` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/duplicates/page.tsx` |
 | `/people/matches` | Page link | Admin | System administration | - | More, Areas | Admin menu | - | `app/(workspace)/people/matches/page.tsx` |
 | `/people/pending-teams` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/pending-teams/page.tsx` |
+| `/people/profile-updates` | Page link | Admin | System administration | - | More, Areas | Admin menu | - | `app/(workspace)/people/profile-updates/page.tsx` |
 | `/people/responsible-adults` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/responsible-adults/page.tsx` |
 | `/people/review-queues` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/review-queues/page.tsx` |
 | `/people/staff-drafts` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/staff-drafts/page.tsx` |

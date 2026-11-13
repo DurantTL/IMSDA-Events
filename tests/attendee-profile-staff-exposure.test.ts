@@ -9,6 +9,10 @@ const columns = /\b(mailingLine1|mailingLine2|mailingCity|mailingRegion|mailingP
 const allowed = new Set([
   "modules/attendee-accounts/profile-service.ts",
   "components/attendee-profile-form.tsx",
+  // The registration profile review (#1512): the attendee's own session only. The pure module names the fields and the
+  // service reads them for the signed-in account; staff code gets name, phone and shirt size only (profile-change-staff.ts).
+  "modules/attendee-accounts/profile-conflicts.ts",
+  "modules/attendee-accounts/profile-review-service.ts",
   // The WR26 import's own registration snapshot, not the attendee account.
   "modules/imports/repository.ts",
   "modules/imports/wr26-bundle.ts",

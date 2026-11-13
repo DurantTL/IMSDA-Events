@@ -131,6 +131,7 @@ export default async function PublicRegistrationPage({
       initialAttendeeResponses={scopedPrefill("ATTENDEE")}
       securityCheck={await securityCheckConfigForPage()}
       disableDrafts={Boolean(account)}
+      attendeeSignedIn={via === "attendee"}
       passkeyOffer={await passkeyOfferForPage()}
       topContent={
         editableCards.length > 0 || autoCards || clubNotice ? (
