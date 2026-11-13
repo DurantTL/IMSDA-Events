@@ -79,6 +79,10 @@ function fixture() {
     registrationAttendee: {
       update: vi.fn().mockResolvedValue({ id: "attendee-1" }),
     },
+    registrationCapacityReservation: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      upsert: vi.fn().mockResolvedValue({}),
+    },
     programAssignmentRun: {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
@@ -436,5 +440,46 @@ describe("tiered attendee answer updates", () => {
     })).rejects.toMatchObject({ code: "INVALID_ANSWER" });
     expect(tx.$queryRaw.mock.calls[0]?.[0].strings.join(" ")).toContain("FOR UPDATE");
     expect(tx.registrationAttendee.update).not.toHaveBeenCalled();
+  });
+
+  it("releases only that person's seminar rows when they move to Not attending (#893)", async () => {
+    const { registration, tx } = fixture();
+    await updateTieredRegistrationAnswersWithClient(tx as never, {
+      notifyApprovers: false,
+      registrationId: registration.id,
+      clientRequestId: "5b0e7e0e-3c1a-4a5e-9c7b-0f6f1f0a8a11",
+      expectedUpdatedAt: registration.updatedAt.toISOString(),
+      attendees: [{ attendeeId: "attendee-1", responses: { session_preferences: ["__not_attending__"] } }],
+      now: new Date("2026-07-30T11:00:00.000Z"),
+      audit: { action: "PRIVATE_LINK_ANSWERS_UPDATED", summary: () => "Changed.", metadata: {} },
+    });
+
+    expect(tx.registrationCapacityReservation.updateMany).toHaveBeenCalledWith({
+      where: {
+        registrationId: "registration-1",
+        registrationAttendeeId: { in: ["attendee-1"] },
+        fieldKey: { in: ["session_preferences"] },
+        releasedAt: null,
+      },
+      data: { releasedAt: new Date("2026-07-30T11:00:00.000Z") },
+    });
+    expect(tx.registrationCapacityReservation.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rewrites that person's rows when they pick other seminars (#893)", async () => {
+    const { registration, tx } = fixture();
+    await updateTieredRegistrationAnswersWithClient(tx as never, {
+      notifyApprovers: false,
+      registrationId: registration.id,
+      clientRequestId: "8d2f4c6a-1b3e-4f5a-8c9d-1e2f3a4b5c6d",
+      expectedUpdatedAt: registration.updatedAt.toISOString(),
+      attendees: [{ attendeeId: "attendee-1", responses: { session_preferences: ["Service", "Prayer"] } }],
+      now: new Date("2026-07-30T11:00:00.000Z"),
+      audit: { action: "PRIVATE_LINK_ANSWERS_UPDATED", summary: () => "Changed.", metadata: {} },
+    });
+
+    expect(tx.registrationCapacityReservation.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.registrationCapacityReservation.upsert.mock.calls.map(([call]) => [call.create.optionValue, call.create.rank]))
+      .toEqual([["Service", 0], ["Prayer", 1]]);
   });
 });

@@ -71,7 +71,7 @@ export default async function ProgramAssignmentRosterPage({
         <ShieldCheck aria-hidden="true" size={19} />
         <p><strong>Immutable roster.</strong> This printout is the exact applied run. Later registrations or form changes do not alter it.</p>
       </div>
-      <p><strong>Not attending:</strong> {roster.notAttending} {roster.notAttending === 1 ? "person" : "people"} chose not to attend and are not placed in any room.</p>
+      <p><strong>Not attending:</strong> {roster.notAttending} {roster.notAttending === 1 ? "person chose not to attend and is" : "people chose not to attend and are"} not placed in any room.</p>
       {[...groups.entries()].map(([option, assignments]) => (
         <section className="panel assignment-roster-group" key={option}>
           <div className="section-heading">

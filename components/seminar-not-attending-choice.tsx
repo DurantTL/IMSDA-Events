@@ -24,7 +24,7 @@ export function SeminarNotAttendingChoice({
       <input id={id} type="checkbox" checked={selected} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
       <span className={styles.text}>
         <strong>{SEMINAR_NOT_ATTENDING_LABEL}</strong>
-        <small>I will not attend a seminar, so I am not asking for a seat.</small>
+        <small>Not attending a seminar in this session. No seminar seat is held.</small>
       </span>
     </label>
   );

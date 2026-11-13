@@ -1,5 +1,7 @@
-.choice {
+/* Doubled so it beats the global `.attendee-answer-ranking > label` grid rule without editing globals.css. */
+.choice.choice {
   display: flex;
+  grid-column: 1 / -1;
   align-items: center;
   gap: 12px;
   min-height: 44px;
@@ -7,7 +9,7 @@
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
-  background: var(--surface, transparent);
+  background: transparent;
   color: var(--ink);
   cursor: pointer;
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
@@ -20,7 +22,7 @@
   margin: 0;
 }
 
-.selected {
+.choice.selected {
   border-color: var(--imsda-purple);
   background: var(--imsda-purple-soft);
 }

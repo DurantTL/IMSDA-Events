@@ -872,6 +872,7 @@ export function operationalReportCsv(
       "First choice",
       "Second choice",
       "Total interest",
+      "People not attending",
     ]];
     for (const field of report.seminars) {
       for (const choice of field.choices) {
@@ -882,10 +883,11 @@ export function operationalReportCsv(
           choice.firstChoice,
           choice.secondChoice,
           choice.totalInterest,
+          "",
         ]);
       }
       // Its own row, so people who are not attending never read as interest in a seminar (#893).
-      rows.push([field.label, scopeLabel(field.scope), "Not attending (people, no seat)", "", "", field.notAttending]);
+      rows.push([field.label, scopeLabel(field.scope), "Not attending (no seat)", "", "", "", field.notAttending]);
     }
     return toCsv(rows);
   }

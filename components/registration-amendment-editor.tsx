@@ -24,6 +24,7 @@ import {
 import { SeminarNotAttendingChoice } from "@/components/seminar-not-attending-choice";
 import {
   isFieldVisible,
+  choiceDisplayLabel,
   isNotAttendingAnswer,
   isSeminarPreferenceField,
   numberFieldBounds,
@@ -181,7 +182,7 @@ function AmendmentField({
         <small>{field.label}</small>
         <strong>
           {Array.isArray(value)
-            ? value.join(", ") || "Not provided"
+            ? value.map((entry) => choiceDisplayLabel(String(entry))).join(", ") || "Not provided"
             : typeof value === "boolean"
               ? value ? "Yes" : "No"
               : isPlainAddressObject(value)

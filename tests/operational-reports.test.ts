@@ -423,7 +423,8 @@ describe("operational reports", () => {
     ]);
     expect(report.seminars[0].totalInterest).toBe(2);
     const csv = operationalReportCsv(report, "seminars");
-    expect(csv).toContain("Not attending (people, no seat)");
+    expect(csv).toContain("Not attending (no seat)");
+    expect(csv).toContain("People not attending");
     expect(csv).not.toContain("__not_attending__");
   });
 });

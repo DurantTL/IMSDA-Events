@@ -8,6 +8,7 @@ import {
   isSeminarPreferenceField,
   prepareTieredAttendeeAnswerUpdate,
 } from "@/modules/attendee-accounts/registration-answer-policy";
+import { syncAttendeeChoiceSelections } from "@/modules/registrations/amendments-repository";
 import { isNotAttendingAnswer } from "@/modules/forms/definition";
 import { enqueueRegistrationUpdatedMessage } from "@/modules/communications/transactional-messages";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
@@ -283,6 +284,20 @@ export async function updateTieredRegistrationAnswersWithClient(
         data: { formResponses: update.responses as Prisma.InputJsonValue },
       });
     }
+    // Choice rows follow the saved answers for just the people and fields that changed (#893), in this transaction.
+    await syncAttendeeChoiceSelections(tx, {
+      eventId: registration.eventId,
+      formId: submission.formVersion.formId,
+      formVersionId: submission.formVersionId,
+      registrationId: registration.id,
+      definition,
+      registrationResponses: recordFromJson(submission.responses),
+      attendees: prepared
+        .filter((update) => update.changedKeys.length > 0)
+        .map((update) => ({ attendeeId: update.attendee.id, responses: update.responses })),
+      fieldKeys: changedFields,
+      now: input.now,
+    });
     // A team registration keeps its event's team rules whoever edits it (#809); nothing is saved if they break.
     let teamMessageIds: string[] = [];
     try {
