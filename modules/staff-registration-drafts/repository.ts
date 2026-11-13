@@ -311,16 +311,17 @@ export async function checkStaffDraft(eventId: string, draftId: string, actorUse
     ...(roster ? { attendees: [] } : {}),
   });
   let outcome: StaffDraftCheckResult;
+  // The required answers only the registrant gives. The check treats them as optional, so they are listed from the form, on success and failure alike.
+  const registrantFills = staffDraftPlan(pinned).sections
+    .flatMap((section) => section.fields)
+    .filter((entry) => !entry.editable && entry.field.required && isFieldVisible(entry.field, input.responses))
+    .map((entry) => entry.field.label);
   try {
-    const registrantFills = staffDraftPlan(pinned).sections
-      .flatMap((section) => section.fields)
-      .filter((entry) => !entry.editable && entry.field.required && isFieldVisible(entry.field, input.responses))
-      .map((entry) => entry.field.label);
     outcome = { ok: true, check: await checkPublicRegistration(event.slug, form.slug, input), registrantFills };
   } catch (error) {
     if (!(error instanceof PublicRegistrationError)) throw error;
     outcome = error.code === "INVALID_SUBMISSION" || error.code === "CAPACITY_REACHED"
-      ? { ok: false, kind: "NEEDS_ANSWERS", message: error.message, lines: staffDraftCheckLines(error.issues, pinned), rosterPending: roster }
+      ? { ok: false, kind: "NEEDS_ANSWERS", message: error.message, lines: withRegistrantFills(staffDraftCheckLines(error.issues, pinned), registrantFills), rosterPending: roster }
       : { ok: false, kind: "UNAVAILABLE", message: error.message };
   }
   await auditDraft(prisma, {
@@ -339,6 +340,11 @@ export async function checkStaffDraft(eventId: string, draftId: string, actorUse
     },
   });
   return outcome;
+}
+
+function withRegistrantFills(lines: StaffDraftCheckLines, registrantFills: string[]): StaffDraftCheckLines {
+  // The check makes registrant-only answers optional, so none of them is an issue here; the form's own list says what they still fill in.
+  return { ...lines, registrantFills };
 }
 
 /**

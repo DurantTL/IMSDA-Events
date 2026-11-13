@@ -1,3 +1,4 @@
+import { formatPersonName } from "@/lib/person-name";
 import { emailAddressSchema } from "@/lib/field-validation";
 import { getAttendeeRosterConfig, isInformationField, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { draftExcludedKeys, sanitizeDraftContent } from "@/modules/forms/public-draft";
@@ -121,7 +122,7 @@ export function staffDraftContact(definition: RegistrationFormDefinition, respon
   if (!identity) return { name: null as string | null, email: null as string | null };
   const email = emailAddressSchema.safeParse(identity.email);
   return {
-    name: `${identity.firstName} ${identity.lastName}`.trim() || null,
+    name: formatPersonName({ firstName: identity.firstName, lastName: identity.lastName }) || null,
     email: email.success && email.data ? email.data : null,
   };
 }

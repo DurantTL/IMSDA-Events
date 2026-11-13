@@ -285,16 +285,16 @@ describe("checking a staff draft (#1510)", () => {
     expect(JSON.stringify(mocks.auditCreate.mock.calls)).not.toContain("avery");
   });
 
-  it("turns the form's problems into a readable list", async () => {
+  it("turns the form's problems into a readable list, and still lists what the registrant fills in", async () => {
+    // The check makes registrant-only answers optional, so only staff-entered answers come back as problems.
     mocks.checkPublicRegistration.mockRejectedValue(new PublicRegistrationError("INVALID_SUBMISSION", "Review the highlighted fields and submit again.", [
       { kind: "validation", code: "INVALID_RESPONSE", fieldId: "fld3", key: "email", path: "responses.email", attendeeIndex: null, message: "Enter a valid email." },
-      { kind: "validation", code: "INVALID_RESPONSE", fieldId: "fld9", key: "waiver", path: "responses.waiver", attendeeIndex: null, message: "Required." },
     ]));
     expect(await checkStaffDraft("event-1", "draft-1", "staff-1")).toEqual({
       ok: false,
       kind: "NEEDS_ANSWERS",
       message: "Review the highlighted fields and submit again.",
-      lines: { staffNeeds: ["Email: Enter a valid email."], registrantFills: ["I agree to the waiver: Required."] },
+      lines: { staffNeeds: ["Email: Enter a valid email."], registrantFills: ["Birth date", "I agree to the waiver"] },
       rosterPending: false,
     });
   });

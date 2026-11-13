@@ -2124,7 +2124,7 @@ export async function submitPublicRegistration(
 /**
  * Runs the whole public submit for `input` and rolls it back (#1510): the same validation, price windows, promo codes,
  * capacity and waitlist decision, in the same kind of Serializable transaction, and then nothing is kept. Nothing after the
- * commit runs (no PDF, notification, message processing or background-check match), because nothing commits. The caller
+ * commit runs (no PDF, notification, message processing or Sterling Volunteers match), because nothing commits. The caller
  * supplies a fresh random idempotency key, so a check never replays or is replayed.
  */
 export async function checkPublicRegistration(

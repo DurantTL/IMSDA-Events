@@ -7,7 +7,8 @@ import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { promoCodeField } from "@/modules/promo-codes/domain";
 import { isFieldVisible, type RegistrationFormDefinition } from "@/modules/forms/definition";
-import { formatCents } from "@/modules/payments/format-cents";
+import { Money } from "@/components/exact-value";
+import { savedMessage } from "@/components/form-message";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import {
   STAFF_DRAFT_FORM_CHANGED,
@@ -155,8 +156,8 @@ export function StaffRegistrationDrafts({
       return false;
     }
     // A withdrawn link is always said, even from the save that runs before a check.
-    if (result.body.linkRevoked) setMessage("Saved. The registrant's earlier link no longer works; send a new one when you are ready.");
-    else if (announce) setMessage("Saved.");
+    if (result.body.linkRevoked) setMessage(savedMessage("The registrant's earlier link no longer works; send a new one when you are ready."));
+    else if (announce) setMessage(savedMessage());
     await refreshList();
     await open(detail.draft.id, true);
     return true;
@@ -367,12 +368,12 @@ export function StaffRegistrationDrafts({
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm === "save-sent"}
-        title="Stop the link already sent?"
+        title="Save changes to a sent draft?"
         confirmLabel="Save changes"
         onCancel={() => setConfirm(null)}
         onConfirm={() => { setConfirm(null); void afterConfirm.current?.(); }}
       >
-        <p>Saving changes stops the link already sent to {detail?.draft.registrantEmail ?? "the registrant"}. You can send a new one after.</p>
+        <p>If any answer changed, the link already sent to {detail?.draft.registrantEmail ?? "the registrant"} stops working. You can send a new one after.</p>
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm === "leave"}
@@ -436,13 +437,13 @@ function CheckView({ result }: { result: CheckResult }) {
           {check.lineItems.map((line) => (
             <li key={`${line.key}-${line.label}`}>
               <span>{line.label}{line.pricingLabel ? ` (${line.pricingLabel})` : ""}</span>
-              <span>{formatCents(line.amountCents)}</span>
+              <Money as="span" cents={line.amountCents} />
             </li>
           ))}
         </ul>
       )}
       {typeof check.totalCents === "number"
-        ? <p className={styles.total}>Estimated total {formatCents(check.totalCents)}</p>
+        ? <p className={styles.total}>Estimated total <Money cents={check.totalCents} /></p>
         : <p className={styles.note}>This event bills the church, so no total is shown.</p>}
       {result.registrantFills.length > 0 && (
         <>
@@ -450,7 +451,7 @@ function CheckView({ result }: { result: CheckResult }) {
           <ul>{result.registrantFills.map((line) => <li key={line}>{line}</li>)}</ul>
         </>
       )}
-      <p className={styles.note}>This is an estimate. Answers the registrant gives, such as a birth date or a payment choice, can change the price. Nothing was saved and nothing was charged.</p>
+      <p className={styles.note}>This is an estimate. Answers the registrant gives, such as a birth date, a payment choice or add-ons like meals, can change the price. Nothing was saved and nothing was charged.</p>
     </div>
   );
 }
