@@ -4,6 +4,7 @@ import { z } from "zod";
 import { phoneToStore } from "@/lib/field-validation";
 import { formatPersonName } from "@/lib/person-name";
 import { getPrisma } from "@/lib/prisma";
+import { clampPage, pageCountFor } from "@/lib/pagination";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { auditCrossEventIdentityRead } from "@/modules/people/identity-read-audit";
 import {
@@ -48,6 +49,8 @@ export type StaffProfileChange = {
   reason: string | null;
 };
 
+export type StaffProfileChangeSlice = { page: number; pageCount: number; total: number; from: number; to: number };
+
 export type StaffCorrectableAccount = {
   accountId: string;
   accountName: string;
@@ -62,20 +65,22 @@ export function parseProfileChangePage(value: unknown): number {
 }
 
 export async function listProfileChangesForStaff(actorUserId: string, requestedPage = 1) {
-  const page = Math.max(1, Math.floor(requestedPage));
   // Attendee-made address and emergency contact changes are never listed: only the value-kept fields, and a staff
   // correction of the personal fields, are read.
-  const fetched = await getPrisma().attendeeProfileChange.findMany({
-    where: {
-      OR: [
-        { field: { in: [...valueKeptFields] } },
-        { source: "STAFF_CORRECTION", field: { in: [...staffPersonalValueFields] } },
-      ],
-    },
+  const where = {
+    OR: [
+      { field: { in: [...valueKeptFields] } },
+      { source: "STAFF_CORRECTION" as const, field: { in: [...staffPersonalValueFields] } },
+    ],
+  };
+  const prisma = getPrisma();
+  const total = await prisma.attendeeProfileChange.count({ where });
+  const page = clampPage(Math.max(1, Math.floor(requestedPage)), total, PROFILE_CHANGE_LIST_LIMIT);
+  const rows = await prisma.attendeeProfileChange.findMany({
+    where,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     skip: (page - 1) * PROFILE_CHANGE_LIST_LIMIT,
-    // One more than a page, to know whether older changes exist.
-    take: PROFILE_CHANGE_LIST_LIMIT + 1,
+    take: PROFILE_CHANGE_LIST_LIMIT,
     select: {
       id: true,
       createdAt: true,
@@ -89,8 +94,6 @@ export async function listProfileChangesForStaff(actorUserId: string, requestedP
       account: { select: { displayName: true, firstName: true, lastName: true, phone: true, shirtSize: true } },
     },
   });
-  const hasOlder = fetched.length > PROFILE_CHANGE_LIST_LIMIT;
-  const rows = fetched.slice(0, PROFILE_CHANGE_LIST_LIMIT);
   // Written before the data is handed back, like the other cross-event identity reads.
   await auditCrossEventIdentityRead({
     actorUserId,
@@ -128,7 +131,15 @@ export async function listProfileChangesForStaff(actorUserId: string, requestedP
       },
     });
   }
-  return { changes, accounts: [...accounts.values()], page, hasOlder, hasNewer: page > 1 };
+  const start = (page - 1) * PROFILE_CHANGE_LIST_LIMIT;
+  const slice = {
+    page,
+    pageCount: pageCountFor(total, PROFILE_CHANGE_LIST_LIMIT),
+    total,
+    from: rows.length ? start + 1 : 0,
+    to: rows.length ? start + rows.length : 0,
+  };
+  return { changes, accounts: [...accounts.values()], page, slice };
 }
 
 const text = (maximum: number) => z.string().trim().max(maximum);

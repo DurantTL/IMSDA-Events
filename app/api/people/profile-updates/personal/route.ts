@@ -41,7 +41,7 @@ function failure(error: unknown, what: string) {
 
 /**
  * One account's current address and emergency contact, for a system administrator who opened the correction (#1512).
- * Never part of a list. The read is audited before the values are returned.
+ * Current values are fetched one account at a time and never bulk-loaded. The read is audited before the values are returned.
  */
 async function getHandler(request: Request) {
   try {

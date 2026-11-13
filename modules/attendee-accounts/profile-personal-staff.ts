@@ -15,11 +15,11 @@ import {
  * System administrator correction of an attendee account's mailing address and emergency contact (#1512, slice 2). The
  * caller has already passed the system administrator gate (`requireSystemAdministrator`); nothing here decides who may call.
  *
- * The current values are never part of a list or page load: they are fetched for one account at a time, on request, and
+ * The current values are not bulk-loaded: they are fetched for one account at a time, on request, and
  * each fetch is written to the cross-event identity read audit before the values are returned. A correction needs a
  * reason and the statement that the person asked for it; both go to the audit log, the values never do. The change
  * history keeps old and new values for these fields on a STAFF_CORRECTION row only (database check, migration
- * 20270178100000).
+ * 20270178100000); the Profile updates list shows those history values to system administrators only.
  */
 
 export type StaffPersonalValues = Record<StaffPersonalValueField, string>;
@@ -63,7 +63,7 @@ export class StaffPersonalCorrectionError extends Error {
 }
 
 function toValues(row: Record<StaffPersonalValueField, string | null>): StaffPersonalValues {
-  return Object.fromEntries(staffPersonalValueFields.map((field) => [field, row[field] ?? ""])) as StaffPersonalValues;
+  return Object.fromEntries(staffPersonalValueFields.map((field) => [field, (row[field] ?? "").trim()])) as StaffPersonalValues;
 }
 
 /** One account's current address and emergency contact, audited before it is returned. */
@@ -91,7 +91,7 @@ export async function applyStaffPersonalCorrection(actorUserId: string, input: S
       select: personalColumns,
     });
     const current = toValues(row);
-    if (staffPersonalValueFields.some((field) => current[field].trim() !== input.expected[field])) {
+    if (staffPersonalValueFields.some((field) => current[field] !== input.expected[field])) {
       throw new StaffPersonalCorrectionError("STALE", "This profile changed since you opened it. Open the correction again.");
     }
     const next: StaffPersonalValues = {

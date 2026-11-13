@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { PhoneInput } from "@/components/phone-input";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
-import { FormMessage, notSavedMessage, restoreFocusAfterSave, savedMessage } from "@/components/form-message";
+import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import styles from "@/components/profile-correction-form.module.css";
 
 type Values = {
@@ -62,9 +63,15 @@ export function ProfilePersonalCorrectionForm({ accountId }: { accountId: string
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string }>({ tone: "success", text: "" });
   const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const detailsRef = useRef<HTMLDetailsElement>(null);
-  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
+  const summaryRef = useRef<HTMLElement>(null);
+  const { ref: errorSummaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
   const buttonId = `${id}-save`;
   const inputId = (key: FieldKey) => `${id}-${key}`;
+
+  useUnsavedChangesGuard(
+    loaded !== null && values !== null
+      && (reason.trim() !== "" || personRequested || fields.some((field) => values[field.key] !== loaded[field.key])),
+  );
 
   function discard() {
     setLoaded(null);
@@ -136,13 +143,14 @@ export function ProfilePersonalCorrectionForm({ accountId }: { accountId: string
       // The values are dropped from the page once saved; opening the correction again loads them afresh.
       discard();
       if (detailsRef.current) detailsRef.current.open = false;
+      // The form is gone, so focus goes to the summary rather than falling to the page.
+      summaryRef.current?.focus();
       setMessage({ tone: "success", text: savedMessage("The old and new values are kept with the reason.") });
       router.refresh();
     } catch {
       setMessage({ tone: "error", text: notSavedMessage("Check your connection and try again.") });
     } finally {
       setBusy(false);
-      restoreFocusAfterSave(buttonId);
     }
   }
 
@@ -159,11 +167,11 @@ export function ProfilePersonalCorrectionForm({ accountId }: { accountId: string
   return (
     <>
     <details className={styles.details} ref={detailsRef} onToggle={onToggle}>
-      <summary className={styles.summary}>Correct address or emergency contact</summary>
+      <summary className={styles.summary} ref={summaryRef}>Correct address or emergency contact</summary>
       {loading ? <p className={styles.loading} role="status">Loading the current details…</p> : null}
       {loaded && values ? (
         <form className={styles.form} noValidate aria-busy={busy} onSubmit={(event) => void submit(event)}>
-          {summaryItems.length > 0 && <FormErrorSummary items={summaryItems} ref={summaryRef} />}
+          {summaryItems.length > 0 && <FormErrorSummary items={summaryItems} ref={errorSummaryRef} />}
           <div className={styles.grid}>
             {fields.map((field) => (
               <label key={field.key} className={styles.label} htmlFor={inputId(field.key)}>
@@ -223,7 +231,7 @@ export function ProfilePersonalCorrectionForm({ accountId }: { accountId: string
             The person asked for this change
           </label>
           <FieldError id={`${inputId("personRequested")}-error`}>{errors.personRequested}</FieldError>
-          <p className={styles.help} id={`${id}-help`}>The reason, the confirmation that the person asked, and the old and new values are kept with the change.</p>
+          <p className={styles.help} id={`${id}-help`}>Don&apos;t type the address or phone number here. The reason, the confirmation that the person asked, and the old and new values are kept with the change.</p>
           <div className={styles.actions}>
             <button id={buttonId} type="submit" className="primary-button" disabled={busy}>{busy ? "Saving…" : "Save correction"}</button>
           </div>

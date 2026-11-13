@@ -222,8 +222,8 @@ This edits the signed-in attendee account's own profile columns only. It never l
   audited. A name, phone or shirt size correction needs a reason, sends the values it was loaded with, and is refused
   with 409 if the stored values differ.
 - **Staff correction of address and emergency contact** (`profile-personal-staff.ts`,
-  `GET`/`POST /api/people/profile-updates/personal`): system administrators only. The current values are not on the
-  page: opening "Correct address or emergency contact" fetches one account's values (private, no-store), and the read
+  `GET`/`POST /api/people/profile-updates/personal`): system administrators only. The current values are not
+  bulk-loaded onto the page (corrected values in history rows are listed for system administrators only): opening "Correct address or emergency contact" fetches one account's values (private, no-store), and the read
   is written to the cross-event identity read audit (surface `ATTENDEE_PROFILE_PERSONAL`) before they are returned.
   A correction needs a reason (5 characters or more) and the checkbox "The person asked for this change", which the
   server requires to be literally true. The profile row is locked, the values sent as `expected` are checked (409

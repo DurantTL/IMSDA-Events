@@ -19,14 +19,14 @@ export default async function ProfileUpdatesPage({ searchParams }: { searchParam
   if (!isDisclosureAllowed("MATCH_CANDIDATE_EVIDENCE", staffIdentityAudience(user), "READ")) redirect("/no-access");
 
   const requestedPage = parseProfileChangePage((await searchParams).page);
-  const { changes, accounts, page, hasOlder, hasNewer } = await listProfileChangesForStaff(user.id, requestedPage);
+  const { changes, accounts, slice } = await listProfileChangesForStaff(user.id, requestedPage);
   return (
     <section className="page-stack">
       <PageHeader
         title="Profile updates"
         description="Recent changes attendees made to their saved profile, and corrections staff made. Name, phone and shirt size show their values, and so does a staff correction of address or emergency contact. Address and emergency contact changes the attendee made themselves are not listed."
       />
-      <ProfileUpdatesReview changes={changes} accounts={accounts} page={page} hasOlder={hasOlder} hasNewer={hasNewer} />
+      <ProfileUpdatesReview changes={changes} accounts={accounts} slice={slice} />
     </section>
   );
 }

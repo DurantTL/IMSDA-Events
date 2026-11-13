@@ -2,8 +2,8 @@ import { EmptyState } from "@/components/empty-state";
 import { ProfileCorrectionForm } from "@/components/profile-correction-form";
 import styles from "@/components/profile-updates-review.module.css";
 import { ProfilePersonalCorrectionForm } from "@/components/profile-personal-correction-form";
-import { PROFILE_CHANGE_LIST_LIMIT, type StaffCorrectableAccount, type StaffProfileChange } from "@/modules/attendee-accounts/profile-change-staff";
-import { NavigationLink as Link } from "@/components/navigation-link";
+import type { StaffCorrectableAccount, StaffProfileChange, StaffProfileChangeSlice } from "@/modules/attendee-accounts/profile-change-staff";
+import { ListPager } from "@/components/list-pager";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 function describeChange(change: StaffProfileChange) {
@@ -16,15 +16,8 @@ function describeChange(change: StaffProfileChange) {
  * does a staff correction of address or emergency contact. The current address and emergency contact are not loaded
  * here: each account's correction fetches them only when it is opened.
  */
-export function ProfileUpdatesReview({ changes, accounts, page, hasOlder, hasNewer }: { changes: StaffProfileChange[]; accounts: StaffCorrectableAccount[]; page: number; hasOlder: boolean; hasNewer: boolean }) {
+export function ProfileUpdatesReview({ changes, accounts, slice }: { changes: StaffProfileChange[]; accounts: StaffCorrectableAccount[]; slice: StaffProfileChangeSlice }) {
   const pageHref = (target: number) => (target <= 1 ? "/people/profile-updates" : `/people/profile-updates?page=${target}`);
-  if (changes.length === 0 && page > 1) {
-    return (
-      <p className={styles.meta}>
-        There are no changes on this page. <Link href={pageHref(1)}>Back to the newest changes</Link>
-      </p>
-    );
-  }
   if (changes.length === 0) {
     return (
       <EmptyState
@@ -43,11 +36,7 @@ export function ProfileUpdatesReview({ changes, accounts, page, hasOlder, hasNew
     <div className={styles.stack}>
       <section className={styles.section} aria-labelledby="profile-changes-heading">
         <h2 id="profile-changes-heading" className={styles.sectionTitle}>Recent changes</h2>
-        <p className={styles.meta}>
-          {hasOlder || hasNewer
-            ? `Page ${page}: up to ${PROFILE_CHANGE_LIST_LIMIT} changes, newest first.`
-            : `All ${changes.length} ${changes.length === 1 ? "change" : "changes"}, newest first.`}
-        </p>
+        <ListPager hrefFor={pageHref} label="Profile change pages" noun="changes" nounOne="change" part="count" slice={slice} />
         <ol className={styles.list}>
           {changes.map((change) => (
             <li key={change.id} className={styles.card}>
@@ -61,12 +50,7 @@ export function ProfileUpdatesReview({ changes, accounts, page, hasOlder, hasNew
             </li>
           ))}
         </ol>
-        {hasOlder || hasNewer ? (
-          <nav className={styles.paging} aria-label="Pages of changes">
-            {hasNewer ? <Link className="secondary-button" href={pageHref(page - 1)}>Newer changes</Link> : null}
-            {hasOlder ? <Link className="secondary-button" href={pageHref(page + 1)}>Older changes</Link> : null}
-          </nav>
-        ) : null}
+        <ListPager hrefFor={pageHref} label="Profile change pages" part="pages" slice={slice} />
       </section>
       <section className={styles.section} aria-labelledby="profile-corrections-heading">
         <h2 id="profile-corrections-heading" className={styles.sectionTitle}>Correct a profile</h2>
