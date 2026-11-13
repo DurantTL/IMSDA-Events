@@ -952,6 +952,7 @@ model User {
   moderatedCommunityPosts   CommunityPost[]           @relation("CommunityPostModeratedBy")
   resolvedCommunityReports  CommunityReport[]         @relation("CommunityReportResolvedBy")
   createdMerchandiseAvailability MerchandiseVariantAvailability[] @relation("MerchandiseAvailabilityCreatedBy")
+  approvedMerchandiseCatalogs    MerchandiseCatalog[]             @relation("MerchandiseCatalogApprovedBy")
   createdMerchandiseOrders       MerchandiseOrder[]               @relation("MerchandiseOrderCreatedBy")
   merchandiseOrderStatusChanges  MerchandiseOrderStatusChange[]   @relation("MerchandiseOrderStatusActor")
   authoredStaffNotes             StaffNote[]                      @relation("StaffNoteAuthor")
@@ -4589,10 +4590,16 @@ model MerchandiseCatalog {
   eventId   String                   @unique
   isEnabled Boolean                  @default(false)
   status    MerchandiseCatalogStatus @default(DRAFT)
+  /// Who approved and opened sales, and when. Set only by the system
+  /// administrator action; cleared when sales are closed (the audit log keeps
+  /// the history).
+  approvedByUserId String?
+  approvedAt       DateTime?
   createdAt DateTime                 @default(now())
   updatedAt DateTime                 @updatedAt
 
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event      Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  approvedBy User? @relation("MerchandiseCatalogApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
 }
 
 /// A merchandise purchase. Deliberately independent of `Registration.status`

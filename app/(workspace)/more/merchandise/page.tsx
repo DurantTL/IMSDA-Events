@@ -7,6 +7,7 @@ import { MerchandiseOrdersPanel } from "@/components/merchandise-orders-panel";
 import { canViewMerchandiseOrders, listMerchandiseOrders } from "@/modules/merchandise/order-list";
 import { MerchandiseAdminWorkspace } from "@/components/merchandise-admin-workspace";
 import { PageHeader } from "@/components/page-header";
+import { getCurrentSession } from "@/modules/access/current-session";
 import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
 
@@ -28,6 +29,7 @@ export default async function MerchandisePage({
       </>
     );
   }
+  const canApproveSales = (await getCurrentSession()).user?.globalRole === "SYSTEM_ADMIN";
   const orderList = canViewMerchandiseOrders(permissions) ? await listMerchandiseOrders(event.id) : null;
   const sorting = serverSort("/more/merchandise", query, MERCHANDISE_ORDERS_SORT_COLUMNS, { key: "date", dir: "desc" });
   const sorted = orderList
@@ -49,7 +51,7 @@ export default async function MerchandisePage({
   };
   return (
     <>
-      <MerchandiseAdminWorkspace eventId={event.id} />
+      <MerchandiseAdminWorkspace canApproveSales={canApproveSales} eventId={event.id} />
       {orderList && <MerchandiseOrdersPanel pageHref={pageHref} slice={slice} sorting={sorting} totals={orderList.totals} />}
     </>
   );

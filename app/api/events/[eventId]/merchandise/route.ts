@@ -8,6 +8,7 @@ import { withRequestContext } from "@/lib/request-context";
 type Context = { params: Promise<{ eventId: string }> };
 function errorResponse(error: unknown) {
   if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
+  if (error instanceof Error && "code" in error && error.code === "CATALOG_APPROVED") return Response.json({ error: error.code, message: error.message }, { status: 409 });
   if (error instanceof SyntaxError) return Response.json({ error: "INVALID_JSON", message: "The request is not valid JSON." }, { status: 400 });
   if (error instanceof Error && ("issues" in error || error.name === "ZodError")) return Response.json({ error: "INVALID_MERCHANDISE_CATALOG", message: error.message }, { status: 400 });
   return Response.json({ error: "MERCHANDISE_CATALOG_FAILED", message: "The merchandise catalog request could not be completed." }, { status: 500 });

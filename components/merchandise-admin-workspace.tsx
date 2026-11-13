@@ -7,7 +7,6 @@ import { staffPageTitles } from "@/components/staff-navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ImagePlus,
-  PackageOpen,
   Plus,
   Save,
   ShoppingBag,
@@ -28,6 +27,7 @@ import { EditorDialog } from "@/components/editor-dialog";
 import { PageHeader } from "@/components/page-header";
 import styles from "./merchandise-admin-workspace.module.css";
 import { EmptyState } from "@/components/empty-state";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 type Artwork = { id: string; url?: string; altText?: string | null; filename?: string };
 type TaxTreatment = "TAXABLE" | "TAX_EXEMPT";
@@ -66,7 +66,15 @@ type Product = {
   artwork?: Artwork | null;
   variants: Variant[];
 };
-type Catalog = { eventId: string; isEnabled: boolean; products: Product[] };
+type Catalog = { eventId: string; isEnabled: boolean; status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED"; approvedAt: string | null; approvedByName: string | null; products: Product[] };
+
+/** "Sales open · approved by Pat Example on Nov 12, 2026, 3:04 PM CST", from the stored approval. */
+export function merchandiseSalesStatusLine(catalog: Pick<Catalog, "isEnabled" | "status" | "approvedAt" | "approvedByName">) {
+  if (catalog.status !== "APPROVED" || !catalog.approvedAt) return "Sales closed · not approved";
+  const when = formatInConferenceTime(catalog.approvedAt, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const who = catalog.approvedByName ? `approved by ${catalog.approvedByName} on ${when}` : `approved on ${when}`;
+  return catalog.isEnabled ? `Sales open · ${who}` : `Sales paused (catalog disabled) · ${who}`;
+}
 
 /** The exact safe DTO an anonymous attendee would receive, fetched from
  * /merchandise/preview rather than re-derived from admin state so the
@@ -125,7 +133,21 @@ function variantPayload(variant: Variant, position: number) {
   };
 }
 
-export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
+export function MerchandiseSalesStatus({ canApproveSales, catalog, onApprove, onClose, saving = false }: { canApproveSales: boolean; catalog: Pick<Catalog, "isEnabled" | "status" | "approvedAt" | "approvedByName">; onApprove: () => void; onClose: () => void; saving?: boolean }) {
+  return (
+    <div className={styles.salesStatus}>
+      <p className={styles.salesStatusLine}><strong>{merchandiseSalesStatusLine(catalog)}</strong></p>
+      {canApproveSales ? (
+        <div className={styles.salesStatusActions}>
+          {!(catalog.status === "APPROVED" && catalog.isEnabled) && <button className="secondary-button" type="button" onClick={onApprove} disabled={saving}>Approve and open sales</button>}
+          {catalog.status === "APPROVED" && <button className="secondary-button" type="button" onClick={onClose} disabled={saving}>Close sales</button>}
+        </div>
+      ) : <p className={styles.salesStatusHelp}>A system administrator approves and opens sales.</p>}
+    </div>
+  );
+}
+
+export function MerchandiseAdminWorkspace({ eventId, canApproveSales = false }: { eventId: string; canApproveSales?: boolean }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [assets, setAssets] = useState<Artwork[]>([]);
   // The preview that was successfully evaluated, tied to the audience it was
@@ -143,6 +165,7 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [approvalTarget, setApprovalTarget] = useState<"approve" | "close" | null>(null);
   const [variantEditing, setVariantEditing] = useState<Variant | "new" | null>(null);
   // Closing asks its own discard question; this adds the warning for links, Back and reload while an editor is open and changed (#1452).
   useUnsavedChangesGuard(editorDirty && (editing !== null || variantEditing !== null), "You have unsaved changes to this catalog item. Leave this page and discard them?");
@@ -168,7 +191,7 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
       throw new Error("Merchandise management is restricted for your event role.");
     }
     if (!catalogResponse.ok) throw new Error(errorMessage(catalogResult, "The merchandise catalog could not be loaded."));
-    setCatalog({ eventId, isEnabled: Boolean(catalogResult.isEnabled), products: catalogResult.products ?? [] });
+    setCatalog({ eventId, isEnabled: Boolean(catalogResult.isEnabled), status: catalogResult.status ?? "DRAFT", approvedAt: catalogResult.approvedAt ?? null, approvedByName: catalogResult.approvedByName ?? null, products: catalogResult.products ?? [] });
     if (assetResponse.ok) setAssets(assetResult.assets ?? []);
     await previewLoad;
   }
@@ -346,6 +369,22 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
     if (ok) setArchiveTarget(null);
   }
 
+  function openApproval(target: "approve" | "close") {
+    setError("");
+    setApprovalTarget(target);
+  }
+
+  async function confirmApproval() {
+    if (!approvalTarget) return;
+    const ok = await mutate(
+      merchandiseEndpoint(eventId, "/approval"),
+      approvalTarget === "approve" ? "POST" : "DELETE",
+      undefined,
+      approvalTarget === "approve" ? "Merchandise approved. Sales are open." : "Merchandise sales closed. Existing orders are unchanged.",
+    );
+    if (ok) setApprovalTarget(null);
+  }
+
   async function archiveVariantAction(variant: Variant) {
     if (!selected) return false;
     return mutate(
@@ -424,12 +463,12 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
         title={staffPageTitles.merchandise}
         description="Add the products and variants this event offers, and check what each group of attendees sees."
         primary={<button className="primary-button" type="button" onClick={() => openProductEditor("new")}><Plus size={16} aria-hidden="true" /> Add product</button>}
-        secondary={<button className="secondary-button" type="button" onClick={() => void mutate(merchandiseEndpoint(eventId), "PATCH", { isEnabled: !catalog.isEnabled }, catalog.isEnabled ? "Merchandise disabled for this event." : "Merchandise enabled for this event.")} disabled={saving} aria-pressed={catalog.isEnabled}>{catalog.isEnabled ? "Disable catalog" : "Enable catalog"}</button>}
+        secondary={catalog.status === "APPROVED" ? undefined : <button className="secondary-button" type="button" onClick={() => void mutate(merchandiseEndpoint(eventId), "PATCH", { isEnabled: !catalog.isEnabled }, catalog.isEnabled ? "Merchandise disabled for this event." : "Merchandise enabled for this event.")} disabled={saving} aria-pressed={catalog.isEnabled}>{catalog.isEnabled ? "Disable catalog" : "Enable catalog"}</button>}
       />
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {/* While the archive dialog is open, its own alert shows the error; one announcement, not two. */}
-      {error && !archiveTarget && !editing && !variantEditing && <div className="inline-notice error" role="alert">{error}</div>}
-      {!catalog.isEnabled && <div className="inline-notice warning"><PackageOpen size={17} aria-hidden="true" /><span><strong>Catalog disabled.</strong> Attendees will not see merchandise until you enable it.</span></div>}
+      {error && !archiveTarget && !approvalTarget && !editing && !variantEditing && <div className="inline-notice error" role="alert">{error}</div>}
+      <MerchandiseSalesStatus canApproveSales={canApproveSales} catalog={catalog} onApprove={() => openApproval("approve")} onClose={() => openApproval("close")} saving={saving} />
 
       <div className={styles.layout}>
         <section className="panel" aria-labelledby="catalog-products-heading">
@@ -508,11 +547,29 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
 
       <ConfirmDialog
         busy={saving}
+        busyLabel={approvalTarget === "close" ? "Closing…" : "Approving…"}
+        confirmLabel={approvalTarget === "close" ? "Close sales" : "Approve and open sales"}
+        destructive={approvalTarget === "close"}
+        error={error}
+        onCancel={() => { setError(""); setApprovalTarget(null); }}
+        onConfirm={() => void confirmApproval()}
+        open={approvalTarget !== null}
+        title={approvalTarget === "close" ? "Close merchandise sales?" : "Approve and open merchandise sales?"}
+      >
+        <p>
+          {approvalTarget === "close"
+            ? "Attendees stop seeing merchandise right away. Existing orders stay as they are."
+            : "Attendees will see these products and prices when they register. Event staff can still edit products and prices after approval."}
+        </p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        busy={saving}
         busyLabel="Archiving…"
         confirmLabel={archiveTarget ? `Archive ${archiveTarget.kind === "product" ? archiveTarget.product.name : archiveTarget.variant.label}` : "Archive"}
         destructive
         error={error}
-        onCancel={() => setArchiveTarget(null)}
+        onCancel={() => { setError(""); setArchiveTarget(null); }}
         onConfirm={() => void confirmArchive()}
         open={archiveTarget !== null}
         title={archiveTarget
