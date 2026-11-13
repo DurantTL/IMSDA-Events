@@ -6,9 +6,11 @@ import { formatPersonName } from "@/lib/person-name";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { gateSterlingStatusForAttendees } from "@/modules/background-checks/repository";
 import { AttendeePassResolutionError } from "@/modules/checkin/attendee-pass-repository";
+import { clubPassTokenPrefix } from "@/modules/checkin/club-pass-token";
 import { resolvePassLookupForEvent } from "@/modules/checkin/pass-lookup";
 import { formatInTimeZone } from "@/modules/calendar/conference-format";
 import {
+  GATE_NAME_OR_PASS_MESSAGE,
   GATE_RESULT_LIMIT,
   gateStateFor,
   stationSummarySuffix,
@@ -18,16 +20,28 @@ import {
 } from "@/modules/checkin-stations/domain";
 import { CheckInStationError, type ResolvedStation } from "@/modules/checkin-stations/repository";
 import { StationServiceError } from "@/modules/checkin-stations/service";
-import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
+import { activeRegistrationStatuses, calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 
 const CLUB_PASS_MESSAGE = "This club pass does not name one person. Search the person's name instead.";
 
-/** "3:42 PM CDT": the time of day in the event's own zone, zone named. */
-function gateTimeLabel(at: Date, timeZone: string) {
+function isToday(at: Date, timeZone: string, now: Date) {
   try {
-    return formatInTimeZone(at, timeZone, { hour: "numeric", minute: "2-digit" });
+    return calendarDateInEventTimeZone(at, timeZone) === calendarDateInEventTimeZone(now, timeZone);
   } catch {
-    return formatInTimeZone(at, "UTC", { hour: "numeric", minute: "2-digit" });
+    return false;
+  }
+}
+
+/** "3:42 PM CDT" in the event's own zone, zone named; with the date ("Oct 1, 3:42 PM CDT") when it was not today. */
+function gateTimeLabel(at: Date, timeZone: string, now = new Date()) {
+  const dated = !isToday(at, timeZone, now);
+  const options = dated
+    ? { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" } as const
+    : { hour: "numeric", minute: "2-digit" } as const;
+  try {
+    return formatInTimeZone(at, timeZone, options);
+  } catch {
+    return formatInTimeZone(at, "UTC", options);
   }
 }
 
@@ -106,6 +120,7 @@ function snapshotName(value: unknown, fallback: string, key: "firstName" | "last
 /** Builds the minimal result rows for these attendee ids, all inside this event's active registrations. */
 async function gateResultsFor(eventId: string, timeZone: string, ids: string[]): Promise<GateResult[]> {
   if (ids.length === 0) return [];
+  const now = new Date();
   const attendees = await getPrisma().registrationAttendee.findMany({
     where: { id: { in: ids }, eventId, registration: { status: { in: [...activeRegistrationStatuses] } } },
     select: {
@@ -130,7 +145,8 @@ async function gateResultsFor(eventId: string, timeZone: string, ids: string[]):
         clubName: attendee.registration.clubRegistration?.organization.name ?? null,
         sterlingCurrent,
         state: gateStateFor(sterlingCurrent),
-        arrivedAtLabel: arrival ? gateTimeLabel(arrival.arrivedAt, timeZone) : null,
+        // Only today's arrival counts at the gate; an earlier day's shows the button again.
+        arrivedAtLabel: arrival && isToday(arrival.arrivedAt, timeZone, now) ? gateTimeLabel(arrival.arrivedAt, timeZone, now) : null,
       } satisfies GateResult,
     };
   });
@@ -141,6 +157,7 @@ async function auditGateLookup(
   station: ResolvedStation,
   method: "PASS" | "NAME",
   attendeeIds: string[],
+  outcome: string,
 ) {
   await writeAuditLog({
     eventId: station.station.eventId,
@@ -154,6 +171,7 @@ async function auditGateLookup(
       channel: "CHECK_IN_STATION",
       station: { id: station.station.id, label: station.station.label },
       method,
+      outcome,
       resultCount: attendeeIds.length,
       attendeeIds,
     },
@@ -179,30 +197,43 @@ export async function gateLookup(
     let scanned: string | null;
     try {
       const resolved = await resolvePassLookupForEvent(eventId, { kind: "pass", value: lookup.value });
-      scanned = ("scannedAttendeeId" in resolved ? resolved.scannedAttendeeId : undefined) ?? (resolved.attendees.length === 1 ? resolved.attendees[0].id : null);
+      // Only a club member's own pass names one person. A club's whole-roster pass never does, even when the roster
+      // happens to hold one person.
+      const isClubPass = lookup.value.trim().startsWith(`${clubPassTokenPrefix}.`);
+      scanned = isClubPass
+        ? null
+        : ("scannedAttendeeId" in resolved ? resolved.scannedAttendeeId : undefined)
+          ?? (resolved.attendees.length === 1 ? resolved.attendees[0].id : null);
     } catch (error) {
       if (error instanceof AttendeePassResolutionError) {
         if (error.code === "REGISTRATION_NOT_ELIGIBLE") {
-          await auditGateLookup(station, method, []);
+          await auditGateLookup(station, method, [], "NOT_ELIGIBLE");
           return { outcome: "NOT_REGISTERED", results: [], moreAvailable: false, message: null };
         }
-        throw new StationServiceError(error.code === "PASS_EXPIRED" ? "PASS_EXPIRED" : "NOT_FOUND");
+        const expired = error.code === "PASS_EXPIRED";
+        await auditGateLookup(station, method, [], expired ? "EXPIRED" : "INVALID");
+        throw new StationServiceError(expired ? "PASS_EXPIRED" : "NOT_FOUND");
       }
       throw error;
     }
     if (!scanned) {
-      await auditGateLookup(station, method, []);
+      await auditGateLookup(station, method, [], "SEARCH_BY_NAME");
       return { outcome: "SEARCH_BY_NAME", results: [], moreAvailable: false, message: CLUB_PASS_MESSAGE };
     }
     ids = [scanned];
   } else {
+    // A confirmation code is not a gate lookup: say so instead of a red "Not registered".
+    if (/\d/.test(lookup.value)) {
+      await auditGateLookup(station, method, [], "NOT_A_NAME");
+      return { outcome: "NAME_OR_PASS_ONLY", results: [], moreAvailable: false, message: GATE_NAME_OR_PASS_MESSAGE };
+    }
     const found = await attendeeIdsMatchingName(eventId, lookup.value);
     moreAvailable = found.length > GATE_RESULT_LIMIT;
     ids = found.slice(0, GATE_RESULT_LIMIT);
   }
 
   const results = await gateResultsFor(eventId, timeZone, ids);
-  await auditGateLookup(station, method, results.map((result) => result.attendeeId));
+  await auditGateLookup(station, method, results.map((result) => result.attendeeId), results.length > 0 ? "MATCHED" : "NO_MATCH");
   return {
     outcome: results.length > 0 ? "MATCHES" : "NOT_REGISTERED",
     results,

@@ -5,7 +5,6 @@
 .modeSwitch .modeButton[aria-pressed="true"]:focus-visible { outline-color: var(--focus-ring); }
 .gate { display: grid; gap: 16px; min-width: 0; }
 .gateCard { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--card); padding: 18px; }
-.gateTitle { margin: 0 0 8px; font-size: max(var(--type-staff-floor, 0px), 1.2rem); line-height: 1.3; }
 .gateRow { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 .gateRow input {
   flex: 1 1 14rem;

@@ -3,6 +3,8 @@
 import { CheckCircle2, ShieldAlert, WifiOff, XCircle } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import {
+  GATE_NAME_MESSAGE,
+  GATE_NAME_MIN_LENGTH,
   classifyGateEntry,
   gateStateLabel,
   gateStateReminder,
@@ -66,6 +68,7 @@ export function CheckInStationGate({
   const [entry, setEntry] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [fieldError, setFieldError] = useState("");
   const [response, setResponse] = useState<GateLookupResponse | null>(null);
   const [arrivals, setArrivals] = useState<Record<string, string>>({});
   const [arriving, setArriving] = useState("");
@@ -77,6 +80,13 @@ export function CheckInStationGate({
     event.preventDefault();
     const input = classifyGateEntry(entry);
     if (!input || busy) return;
+    if (input.kind === "name" && input.value.length < GATE_NAME_MIN_LENGTH) {
+      setFieldError(GATE_NAME_MESSAGE);
+      setResponse(null);
+      inputRef.current?.focus();
+      return;
+    }
+    setFieldError("");
     if (offline || !navigator.onLine) {
       setError(GATE_OFFLINE_MESSAGE);
       return;
@@ -124,22 +134,22 @@ export function CheckInStationGate({
 
   const results = response?.results ?? [];
   return (
-    <section className={styles.gate} aria-labelledby="cis-gate-title">
+    <section className={styles.gate} aria-label="Gate lookup">
       <form className={styles.gateCard} onSubmit={lookup}>
-        <h2 id="cis-gate-title" className={styles.gateTitle}>Gate</h2>
         <label htmlFor="cis-gate-entry"><strong>Search a name or scan a pass</strong></label>
         <div className={styles.gateRow}>
           <input
             id="cis-gate-entry"
             ref={inputRef}
             value={entry}
-            onChange={(event) => setEntry(event.target.value)}
+            onChange={(event) => { setEntry(event.target.value); setFieldError(""); }}
             maxLength={768}
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
             enterKeyHint="search"
-            aria-describedby="cis-gate-help"
+            aria-describedby={fieldError ? "cis-gate-help cis-gate-field-error" : "cis-gate-help"}
+            aria-invalid={fieldError ? true : undefined}
           />
           <button type="submit" className={`primary-button ${styles.gateButton}`} disabled={busy || !entry.trim()}>
             {busy ? "Looking up..." : "Look up"}
@@ -154,8 +164,9 @@ export function CheckInStationGate({
       </form>
 
       <div role="status" aria-live="polite" className={styles.gateResults}>
+        {fieldError && <p id="cis-gate-field-error" className={styles.gateError}>{fieldError}</p>}
         {error && <p className={styles.gateError}>{error}</p>}
-        {response?.outcome === "SEARCH_BY_NAME" && <p className={styles.gateNotice}>{response.message}</p>}
+        {(response?.outcome === "SEARCH_BY_NAME" || response?.outcome === "NAME_OR_PASS_ONLY") && <p className={styles.gateNotice}>{response.message}</p>}
         {response?.outcome === "NOT_REGISTERED" && (
           <article className={`${styles.gateResult} ${stateClass("NOT_REGISTERED")}`}>
             <p className={styles.gateStatus}><StateIcon state="NOT_REGISTERED" /> {gateStateLabel("NOT_REGISTERED")}</p>
@@ -166,7 +177,7 @@ export function CheckInStationGate({
           const arrivedLabel = arrivals[person.attendeeId] ?? person.arrivedAtLabel;
           return (
             <article key={person.attendeeId} className={`${styles.gateResult} ${stateClass(person.state)}`}>
-              <h3 className={styles.gateName} translate="no">{person.displayName}</h3>
+              <h2 className={styles.gateName} translate="no">{person.displayName}</h2>
               {person.clubName && <p className={styles.gateClub} translate="no">{person.clubName}</p>}
               <p className={styles.gateStatus}>
                 <StateIcon state={person.state} /> {gateStateLabel(person.state)}

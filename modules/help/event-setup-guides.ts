@@ -65,7 +65,7 @@ export const eventSetupGuides: readonly HelpGuide[] = [
       "Choose Print attendee passes.",
       "Hand each card to its attendee.",
       "To publish a form or an event, ask an event administrator. Check-in staff cannot.",
-      "Optional: to look up people at the gate, turn on Gate mode in Open as a station on Check-in. It is off by default. A station then shows a Gate view that checks a name or a pass and says Registered, Registered: Sterling not current, or Not registered.",
+      "Optional: to look up people at the gate, turn on Gate mode in Open as a station on Check-in. It is off by default. A station then shows a Gate view that checks a name or a pass and says Registered, Registered: Sterling not current, or Not registered. A station that is already open needs a reload to show the Gate tab after you turn Gate mode on.",
     ],
     verify: ["Arrivals lists the people you expect.", "Name badges shows how many badges and sheets are ready to print."],
     next: "Print the badges and passes before the event starts.",

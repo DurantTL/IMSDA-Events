@@ -32,6 +32,7 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/modules/background-checks/repository", () => ({ gateSterlingStatusForAttendees: mocks.gateSterlingStatusForAttendees }));
 vi.mock("@/modules/checkin/attendee-pass-repository", () => ({ AttendeePassResolutionError: mocks.MockPassError }));
+vi.mock("@/modules/checkin/club-pass-token", () => ({ clubPassTokenPrefix: "imsda-club-pass.v1" }));
 vi.mock("@/modules/checkin/pass-lookup", () => ({ resolvePassLookupForEvent: mocks.resolvePassLookupForEvent }));
 vi.mock("@/modules/checkin-stations/service", () => ({ StationServiceError: mocks.MockServiceError }));
 vi.mock("@/modules/checkin-stations/repository", () => ({ CheckInStationError: mocks.MockStationError }));
@@ -70,6 +71,8 @@ function attendeeRow(id: string, first: string, last: string, club: string | nul
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-02T21:00:00.000Z"));
   db = {
     event: {
       findUnique: vi.fn().mockResolvedValue({ id: "event_1", checkInGateModeEnabled: true, timezone: "America/Chicago" }),
@@ -227,6 +230,21 @@ describe("gate lookup by name (#1684)", () => {
     expect(response.results[0].arrivedAtLabel).toBe("3:42 PM CDT");
   });
 
+  it("says a confirmation code is not a gate lookup instead of showing red", async () => {
+    const response = await gateLookup(station, { kind: "name", value: "CM27-ONE" });
+    expect(response.outcome).toBe("NAME_OR_PASS_ONLY");
+    expect(response.message).toMatch(/not by confirmation code/i);
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog.mock.calls[0][0].metadata).toMatchObject({ method: "NAME", outcome: "NOT_A_NAME", resultCount: 0 });
+  });
+
+  it("shows only today's arrival; an earlier day shows the button again", async () => {
+    db.$queryRaw.mockResolvedValue([{ id: "a1" }]);
+    db.registrationAttendee.findMany.mockResolvedValue([attendeeRow("a1", "Sam", "Rivera", null, new Date("2026-10-01T20:42:00.000Z"))]);
+    const response = await gateLookup(station, { kind: "name", value: "Rivera" });
+    expect(response.results[0].arrivedAtLabel).toBeNull();
+  });
+
   it("audits the lookup with ids and counts, never the typed text or names", async () => {
     db.$queryRaw.mockResolvedValue([{ id: "a1" }]);
     db.registrationAttendee.findMany.mockResolvedValue([attendeeRow("a1", "Sam", "Rivera", null)]);
@@ -270,7 +288,12 @@ describe("gate lookup by pass (#1684)", () => {
     expect(response.results).toHaveLength(1);
   });
 
-  it("asks for a name search on a club pass that names no one", async () => {
+  it("asks for a name search on a club pass that names no one, even a roster of one", async () => {
+    const clubPass = "imsda-club-pass.v1.sample-token.signature";
+    mocks.resolvePassLookupForEvent.mockResolvedValue({ attendees: [{ id: "a1" }] });
+    const single = await gateLookup(station, { kind: "pass", value: clubPass });
+    expect(single).toMatchObject({ outcome: "SEARCH_BY_NAME", results: [] });
+    expect(db.registrationAttendee.findMany).not.toHaveBeenCalled();
     mocks.resolvePassLookupForEvent.mockResolvedValue({ attendees: [{ id: "a1" }, { id: "a2" }] });
     const response = await gateLookup(station, { kind: "pass", value: passValue });
     expect(response).toMatchObject({ outcome: "SEARCH_BY_NAME", results: [] });
@@ -289,6 +312,13 @@ describe("gate lookup by pass (#1684)", () => {
     await expect(gateLookup(station, { kind: "pass", value: passValue })).rejects.toMatchObject({ code: "PASS_EXPIRED" });
     mocks.resolvePassLookupForEvent.mockRejectedValue(new mocks.MockPassError("PASS_UNAVAILABLE", "x"));
     await expect(gateLookup(station, { kind: "pass", value: passValue })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    // Failed scans are audited too, with a coarse outcome and never the token.
+    const audits = mocks.writeAuditLog.mock.calls.map((call) => call[0]);
+    expect(audits.map((entry) => entry.metadata)).toEqual([
+      expect.objectContaining({ method: "PASS", outcome: "EXPIRED", resultCount: 0, attendeeIds: [] }),
+      expect.objectContaining({ method: "PASS", outcome: "INVALID", resultCount: 0, attendeeIds: [] }),
+    ]);
+    expect(JSON.stringify(audits)).not.toContain(passValue);
   });
 
   it("is refused while gate mode is off, even with a valid pass", async () => {
@@ -334,6 +364,12 @@ describe("gate arrival log (#1684)", () => {
       registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } },
     });
     expect(db.checkInGateArrival.create).not.toHaveBeenCalled();
+  });
+
+  it("puts the date on a replayed label from another day", async () => {
+    db.checkInGateArrival.findUnique.mockResolvedValue({ eventId: "event_1", attendeeId: "a1", arrivedAt: new Date("2026-10-01T20:42:00.000Z") });
+    const result = await recordGateArrival(station, input);
+    expect(result.arrivedAtLabel).toBe("Oct 1, 3:42 PM CDT");
   });
 
   it("replays a repeated key without a second row or audit entry", async () => {

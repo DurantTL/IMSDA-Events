@@ -341,6 +341,8 @@ export function stationSummarySuffix(label: string) {
 export const GATE_MODE_OFF_MESSAGE =
   "Gate mode is off for this event. Ask a staff member to turn it on from Check-in.";
 
+export const GATE_NAME_OR_PASS_MESSAGE = "The gate looks people up by name or by pass, not by confirmation code. Type the person's name or scan their pass.";
+
 export const GATE_NAME_MIN_LENGTH = 2;
 export const GATE_NAME_MAX_LENGTH = 80;
 export const GATE_NAME_MESSAGE = `Type at least ${GATE_NAME_MIN_LENGTH} letters of the name.`;
@@ -400,8 +402,8 @@ export type GateResult = {
 };
 
 export type GateLookupResponse = {
-  /** MATCHES has at least one result; SEARCH_BY_NAME means a club pass named no one person. */
-  outcome: "MATCHES" | "NOT_REGISTERED" | "SEARCH_BY_NAME";
+  /** MATCHES has at least one result; SEARCH_BY_NAME means a club pass named no one person; NAME_OR_PASS_ONLY means a confirmation code was typed. */
+  outcome: "MATCHES" | "NOT_REGISTERED" | "SEARCH_BY_NAME" | "NAME_OR_PASS_ONLY";
   results: GateResult[];
   /** More people matched than are listed; the volunteer should type more of the name. */
   moreAvailable: boolean;

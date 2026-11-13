@@ -143,6 +143,7 @@ export function CheckInStationsPanel({
         <button
           type="button"
           role="switch"
+          aria-label="Gate mode"
           aria-checked={gateModeEnabled}
           aria-describedby="cis-gate-help"
           className={`secondary-button ${styles.cisPanelSwitch}`}
