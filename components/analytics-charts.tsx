@@ -184,7 +184,7 @@ export function FunnelBars({ title, steps, summary }: { title: string; steps: re
 export type BarRow = { key: string; label: string; value: number };
 
 /** Ranked horizontal bars (a top-N list). `empty` shows when there are no rows. */
-export function HorizontalBars({ title, valueLabel, rows, summary, empty }: { title: string; valueLabel: string; rows: readonly BarRow[]; summary: string; empty: string }) {
+export function HorizontalBars({ title, valueLabel, rows, summary, empty, nameLabel = "Event" }: { title: string; valueLabel: string; rows: readonly BarRow[]; summary: string; empty: string; /** The first table column heading. */ nameLabel?: string }) {
   const base = safe(useId());
   const titleId = `${base}-title`;
   const descId = `${base}-desc`;
@@ -204,7 +204,7 @@ export function HorizontalBars({ title, valueLabel, rows, summary, empty }: { ti
               </li>
             ))}
           </ol>
-          <DataTable head={["Event", valueLabel]} rows={rows.map((row) => [row.label, number(row.value)])} title={`${title}, most first`} />
+          <DataTable head={[nameLabel, valueLabel]} rows={rows.map((row) => [row.label, number(row.value)])} title={`${title}, most first`} />
         </>
       )}
     </figure>

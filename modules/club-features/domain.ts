@@ -9,7 +9,7 @@
 
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
-export const CLUB_OPTIONAL_FEATURE_KEYS = ["roster-health-flags", "staff-training-records", "master-guide-tracking", "fill-in-letters"] as const;
+export const CLUB_OPTIONAL_FEATURE_KEYS = ["roster-health-flags", "staff-training-records", "master-guide-tracking", "fill-in-letters", "roster-charts"] as const;
 export type ClubOptionalFeatureKey = (typeof CLUB_OPTIONAL_FEATURE_KEYS)[number];
 
 export const clubOptionalFeatureDefinitions: Record<ClubOptionalFeatureKey, { title: string; description: string }> = {
@@ -24,6 +24,10 @@ export const clubOptionalFeatureDefinitions: Record<ClubOptionalFeatureKey, { ti
   "fill-in-letters": {
     title: "Fill-in letters and certificates",
     description: "Lets your director and deputy write letter or certificate templates that fill in each member's name, then print them or save them as PDF from the browser. It adds a Letters page to your club. Nothing is emailed or sent.",
+  },
+  "roster-charts": {
+    title: "Roster charts and birthdays",
+    description: "Adds a Charts page to your club with counts of your active roster by class, school grade and member type, and meeting attendance over the year. Your director and deputy also see age groups and a list of this month's birthdays (month and day only, never the year). Your registrar sees the counts but never ages or birthdays. Nothing is stored or sent.",
   },
   "staff-training-records": {
     title: "Staff training records",
