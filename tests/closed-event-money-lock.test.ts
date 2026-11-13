@@ -253,11 +253,11 @@ describe("POST /api/events/[eventId]/closeout/review-money", () => {
 
   it("answers 404 for an unknown flag and 409 for one already reviewed", async () => {
     asStaff(["MANAGE_FINANCE"]);
-    mocks.clearClosedMoneyReview.mockRejectedValueOnce(new mocks.ClosedMoneyReviewError("REVIEW_NOT_FOUND", "That flag was not found for this event."));
+    mocks.clearClosedMoneyReview.mockRejectedValueOnce(new mocks.ClosedMoneyReviewError("REVIEW_NOT_FOUND", "That item was not found for this event."));
     expect((await call(valid)).status).toBe(404);
-    mocks.clearClosedMoneyReview.mockRejectedValueOnce(new mocks.ClosedMoneyReviewError("ALREADY_CLEARED", "That flag was already marked reviewed."));
+    mocks.clearClosedMoneyReview.mockRejectedValueOnce(new mocks.ClosedMoneyReviewError("ALREADY_CLEARED", "That item was already marked reviewed."));
     const second = await call(valid);
     expect(second.status).toBe(409);
-    expect((await second.json()).message).toBe("That flag was already marked reviewed.");
+    expect((await second.json()).message).toBe("That item was already marked reviewed.");
   });
 });

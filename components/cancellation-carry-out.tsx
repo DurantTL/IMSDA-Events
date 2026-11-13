@@ -25,6 +25,7 @@ const failureWords: Record<string, string> = {
   SQUARE_NOT_CONFIGURED: "Square is not configured for this site.",
   PAYMENT_NOT_REFUNDABLE_IN_SQUARE: "This payment cannot be refunded through Square.",
   REFUND_EXCEEDS_AVAILABLE: "The payment has less left to refund than approved.",
+  EVENT_CLOSED: "This event is closed. A finance admin must reopen it on the Closeout page, then choose Continue.",
 };
 
 function failureText(code: string | null) {

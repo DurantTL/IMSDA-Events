@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { useConfirm } from "@/components/use-confirm";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
@@ -36,6 +36,11 @@ export function ClosedMoneyReview({ eventId, items, canReview, noteMaxLength }: 
   const { ask, confirmDialog } = useConfirm();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome>(null);
+  const messageRef = useRef<HTMLDivElement>(null);
+  // The button that was pressed can disappear with its item, so focus moves to the result instead of the top of the page.
+  useEffect(() => {
+    if (outcome) messageRef.current?.focus();
+  }, [outcome]);
 
   async function review(item: ClosedMoneyItem) {
     if (busyId) return;
@@ -92,7 +97,9 @@ export function ClosedMoneyReview({ eventId, items, canReview, noteMaxLength }: 
           </ul>
         </section>
       ) : null}
-      <FormMessage tone={outcome?.tone ?? "success"} message={outcome?.message ?? ""} />
+      <div ref={messageRef} tabIndex={-1}>
+        <FormMessage tone={outcome?.tone ?? "success"} message={outcome?.message ?? ""} />
+      </div>
       {confirmDialog}
     </>
   );

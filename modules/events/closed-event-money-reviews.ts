@@ -112,12 +112,12 @@ export async function clearClosedMoneyReview(
       where: { id: input.reviewId, eventId: input.eventId },
       select: { id: true, kind: true, paymentId: true, refundId: true, amountCents: true },
     });
-    if (!flag) throw new ClosedMoneyReviewError("REVIEW_NOT_FOUND", "That flag was not found for this event.");
+    if (!flag) throw new ClosedMoneyReviewError("REVIEW_NOT_FOUND", "That item was not found for this event.");
     const cleared = await tx.closedEventMoneyReview.updateMany({
       where: { id: flag.id, clearedAt: null },
       data: { clearedAt: new Date(), clearedByUserId: input.actorUserId, clearedByNameSnapshot: name, clearNote: note },
     });
-    if (cleared.count === 0) throw new ClosedMoneyReviewError("ALREADY_CLEARED", "That flag was already marked reviewed.");
+    if (cleared.count === 0) throw new ClosedMoneyReviewError("ALREADY_CLEARED", "That item was already marked reviewed.");
     await writeAuditLog({
       eventId: input.eventId,
       actorUserId: input.actorUserId,
