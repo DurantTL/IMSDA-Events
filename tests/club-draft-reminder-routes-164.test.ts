@@ -54,7 +54,7 @@ beforeEach(() => {
   mocks.getOverview.mockResolvedValue({ policy: valid, counts: { queued: 0 } });
   mocks.savePolicy.mockImplementation(async (_eventId: string, _actor: string, input: unknown) => {
     clubDraftReminderPolicySchema.parse(input);
-    return { changed: true, found: true, policy: valid };
+    return { changed: true, found: true, eligible: true, policy: valid };
   });
 });
 
@@ -106,8 +106,17 @@ describe("club registration reminder routes", () => {
   });
 
   it("answers 404 for an event that does not exist", async () => {
-    mocks.savePolicy.mockResolvedValueOnce({ changed: false, found: false, policy: valid });
+    mocks.savePolicy.mockResolvedValueOnce({ changed: false, found: false, eligible: false, policy: valid });
     expect((await PUT(put(valid), context)).status).toBe(404);
+  });
+
+  it("answers 409 with a plain message for an event that is not a club event, on read and on save", async () => {
+    mocks.getOverview.mockResolvedValue(null);
+    mocks.savePolicy.mockResolvedValueOnce({ changed: false, found: true, eligible: false, policy: valid });
+    const read = await GET(new Request("https://events.imsda.test/x"), context);
+    const write = await PUT(put(valid), context);
+    expect([read.status, write.status]).toEqual([409, 409]);
+    expect(await write.json()).toMatchObject({ error: "NOT_A_CLUB_EVENT", message: expect.stringMatching(/club events/) });
   });
 
   it("answers 400 to a body that is not JSON", async () => {

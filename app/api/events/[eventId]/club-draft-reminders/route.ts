@@ -17,11 +17,17 @@ async function authorize(eventId: string) {
   return requirePermission(await getCurrentSession(), eventId, "MANAGE_COMMUNICATIONS", findActiveMembership);
 }
 
+function notClubEvent() {
+  return Response.json({ error: "NOT_A_CLUB_EVENT", message: "Reminders for unfinished club registrations are only for published club events." }, { status: 409, headers: NO_STORE });
+}
+
 async function getHandler(_request: Request, context: { params: Promise<{ eventId: string }> }) {
   try {
     const { eventId } = await context.params;
     await authorize(eventId);
-    return Response.json({ overview: await getClubDraftReminderOverview(eventId) }, { headers: NO_STORE });
+    const overview = await getClubDraftReminderOverview(eventId);
+    if (!overview) return notClubEvent();
+    return Response.json({ overview }, { headers: NO_STORE });
   } catch (error) {
     return messagingApiError(error, "Loading the club registration reminders");
   }
@@ -37,6 +43,7 @@ async function putHandler(request: Request, context: { params: Promise<{ eventId
     if (!saved.found) {
       return Response.json({ error: "EVENT_NOT_FOUND", message: "That event could not be found." }, { status: 404, headers: NO_STORE });
     }
+    if (!saved.eligible) return notClubEvent();
     return Response.json({ changed: saved.changed, overview: await getClubDraftReminderOverview(eventId) }, { headers: NO_STORE });
   } catch (error) {
     return messagingApiError(error, "Saving the club registration reminders");

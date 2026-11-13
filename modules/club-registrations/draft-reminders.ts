@@ -10,17 +10,20 @@ import { CLUB_EVENT_GATE } from "@/modules/club-registrations/event-gate";
 import {
   CLUB_DRAFT_REMINDER_OBSOLETE_NOTE,
   CLUB_DRAFT_REMINDER_TEMPLATE_KEY,
+  CLUB_DRAFT_REMINDER_LIMITS,
   clubDraftReminderPolicySchema,
   draftIsStale,
   draftReminderEmail,
   draftReminderIdempotencyKey,
+  draftRegistrationWindow,
+  nextSendWindowStart,
   draftReminderRecipients,
   draftReminderUrl,
   forecastReminders,
   isWithinSendHours,
   nextReminderDue,
   policyFromRow,
-  registrationIsOpen,
+  sendHoursLabel,
   type ClubDraftReminderOverview,
   type ClubDraftReminderPolicyValues,
   type ReminderGrant,
@@ -88,6 +91,7 @@ const eventSelect = {
   registrationOpensOn: true,
   registrationClosesOn: true,
   waitlistEnabled: true,
+  startsAt: true,
   endsAt: true,
 } satisfies Prisma.EventSelect;
 
@@ -120,6 +124,16 @@ async function loadReminderGrants(client: Client, organizationIds: readonly stri
   return byClub;
 }
 
+/** The event's active locations, with their own dates: what the club's page decides a draft's registration window from. */
+async function loadActiveLocations(client: Client, eventId: string) {
+  return client.eventLocation.findMany({
+    where: { eventId, isActive: true },
+    select: { id: true, firstDay: true, lastDay: true, registrationClosesOn: true },
+  });
+}
+
+type DueDraft = { id: string; organizationId: string; draftKey: string; updatedAt: Date; locationId: string | null; clubName: string; attempt: number; closesOn: string | null };
+
 export async function sendDueClubDraftReminders(options: { now?: Date } = {}): Promise<ClubDraftReminderResult> {
   const now = options.now ?? new Date();
   const prisma = getPrisma();
@@ -148,24 +162,25 @@ export async function sendDueClubDraftReminders(options: { now?: Date } = {}): P
         result.skippedEmailOff += 1;
         continue;
       }
-      const registrationOpen = registrationIsOpen(event, now);
-      if (!registrationOpen) continue;
       if (!isWithinSendHours(now, event.timezone)) {
         result.skippedQuietHours += 1;
         continue;
       }
 
       // Drafts that could be due: untouched for the first wait and not yet expired. The exact rule is applied below.
-      const drafts = await prisma.clubRegistrationDraft.findMany({
-        where: {
-          eventId: event.id,
-          updatedAt: { lte: new Date(now.getTime() - policy.firstAfterDays * DAY_MS), gt: new Date(now.getTime() - policy.staleAfterDays * DAY_MS) },
-          organization: { isActive: true },
-        },
-        select: { id: true, organizationId: true, draftKey: true, updatedAt: true, organization: { select: { name: true } } },
-        orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
-        take: DRAFT_READ_LIMIT,
-      });
+      const [drafts, locations] = await Promise.all([
+        prisma.clubRegistrationDraft.findMany({
+          where: {
+            eventId: event.id,
+            updatedAt: { lte: new Date(now.getTime() - policy.firstAfterDays * DAY_MS), gt: new Date(now.getTime() - policy.staleAfterDays * DAY_MS) },
+            organization: { isActive: true },
+          },
+          select: { id: true, organizationId: true, draftKey: true, updatedAt: true, locationId: true, organization: { select: { name: true } } },
+          orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+          take: DRAFT_READ_LIMIT,
+        }),
+        loadActiveLocations(prisma, event.id),
+      ]);
       if (drafts.length === 0) continue;
       const logs = await prisma.clubDraftReminderLog.findMany({
         where: { draftId: { in: drafts.map((draft) => draft.id) } },
@@ -174,47 +189,65 @@ export async function sendDueClubDraftReminders(options: { now?: Date } = {}): P
       const priorByDraft = new Map<string, Array<{ attempt: number; sentAt: Date }>>();
       for (const log of logs) priorByDraft.set(log.draftId, [...(priorByDraft.get(log.draftId) ?? []), { attempt: log.attempt, sentAt: log.sentAt }]);
 
-      const due = drafts.flatMap((draft) => {
-        const decision = nextReminderDue(draft, policy, priorByDraft.get(draft.id) ?? [], now, { registrationOpen });
-        return decision.due ? [{ draft, attempt: decision.attempt }] : [];
-      }).slice(0, budget);
-      if (due.length === 0) continue;
+      // One group per club: a club with several team drafts gets one email per person, not one per draft.
+      const groups = new Map<string, DueDraft[]>();
+      for (const draft of drafts) {
+        const window = draftRegistrationWindow(event, locations, draft.locationId, now);
+        const decision = nextReminderDue(draft, policy, priorByDraft.get(draft.id) ?? [], now, { registrationOpen: window.open });
+        if (!decision.due) continue;
+        const list = groups.get(draft.organizationId) ?? [];
+        list.push({ id: draft.id, organizationId: draft.organizationId, draftKey: draft.draftKey, updatedAt: draft.updatedAt, locationId: draft.locationId, clubName: draft.organization.name, attempt: decision.attempt, closesOn: window.closesOn });
+        groups.set(draft.organizationId, list);
+      }
+      if (groups.size === 0) continue;
 
-      const grantsByClub = await loadReminderGrants(prisma, [...new Set(due.map((entry) => entry.draft.organizationId))], now);
+      const grantsByClub = await loadReminderGrants(prisma, [...groups.keys()], now);
 
-      for (const entry of due) {
-        const recipients = draftReminderRecipients(grantsByClub.get(entry.draft.organizationId) ?? []);
+      for (const [organizationId, group] of groups) {
+        if (budget <= 0) break;
+        const recipients = draftReminderRecipients(grantsByClub.get(organizationId) ?? []);
         if (recipients.length === 0) {
-          result.noRecipient += 1;
+          result.noRecipient += group.length;
           continue;
         }
         budget -= 1;
         try {
           const ids = await prisma.$transaction(async (tx) => {
-            // Re-read inside the transaction: the switch may have been turned off, or the draft submitted, removed or
-            // edited, since the reads above.
+            // Re-read inside the transaction: the switch may have been turned off, or a draft submitted, removed or
+            // edited, since the reads above. Only the drafts still due are claimed.
             const current = await tx.clubDraftReminderPolicy.findUnique({ where: { eventId: event.id }, select: policySelect });
             if (!current?.enabled) return [];
-            const fresh = await tx.clubRegistrationDraft.findUnique({ where: { id: entry.draft.id }, select: { id: true, eventId: true, organizationId: true, updatedAt: true } });
-            if (!fresh || fresh.eventId !== event.id) return [];
-            const priorNow = await tx.clubDraftReminderLog.findMany({ where: { draftId: fresh.id }, select: { attempt: true, sentAt: true } });
-            const decision = nextReminderDue(fresh, policyFromRow(current), priorNow, now, { registrationOpen });
-            if (!decision.due || decision.attempt !== entry.attempt) return [];
-            // The claim. A second run (or a concurrent one that lost the unique write) writes nothing and queues nothing.
+            const currentPolicy = policyFromRow(current);
+            const stillDue: DueDraft[] = [];
+            for (const entry of group) {
+              const fresh = await tx.clubRegistrationDraft.findUnique({ where: { id: entry.id }, select: { id: true, eventId: true, organizationId: true, updatedAt: true, locationId: true } });
+              if (!fresh || fresh.eventId !== event.id) continue;
+              const priorNow = await tx.clubDraftReminderLog.findMany({ where: { draftId: fresh.id }, select: { attempt: true, sentAt: true } });
+              const window = draftRegistrationWindow(event, locations, fresh.locationId, now);
+              const decision = nextReminderDue(fresh, currentPolicy, priorNow, now, { registrationOpen: window.open });
+              if (decision.due && decision.attempt === entry.attempt) stillDue.push({ ...entry, closesOn: window.closesOn });
+            }
+            // The claim, one row per draft and attempt. A second run (or a concurrent one that lost the unique write)
+            // writes nothing and queues nothing for the drafts it lost.
             const correlationId = randomUUID();
-            const claimed = await tx.clubDraftReminderLog.createMany({
-              data: [{ eventId: event.id, organizationId: entry.draft.organizationId, draftId: fresh.id, draftKey: entry.draft.draftKey, attempt: entry.attempt, recipients: recipients.length, sentAt: now, correlationId }],
-              skipDuplicates: true,
-            });
-            if (claimed.count === 0) return [];
+            const claimedDrafts: DueDraft[] = [];
+            for (const entry of stillDue) {
+              const claimed = await tx.clubDraftReminderLog.createMany({
+                data: [{ eventId: event.id, organizationId, draftId: entry.id, draftKey: entry.draftKey, attempt: entry.attempt, recipients: recipients.length, sentAt: now, correlationId }],
+                skipDuplicates: true,
+              });
+              if (claimed.count === 1) claimedDrafts.push(entry);
+            }
+            if (claimedDrafts.length === 0) return [];
+            const closeDates = claimedDrafts.map((entry) => entry.closesOn).filter((date): date is string => date !== null).sort();
             const created: string[] = [];
             for (const recipient of recipients) {
               const content = draftReminderEmail({
                 directorName: recipient.name,
-                clubName: entry.draft.organization.name,
+                clubName: claimedDrafts[0]!.clubName,
                 eventName: event.name,
-                registrationClosesOn: event.registrationClosesOn,
-                registrationUrl: draftReminderUrl(baseUrl, entry.draft.organizationId, event.id),
+                registrationClosesOn: closeDates[0] ?? null,
+                registrationUrl: draftReminderUrl(baseUrl, organizationId, event.id),
               });
               const message = await tx.messageOutbox.create({
                 data: {
@@ -230,13 +263,13 @@ export async function sendDueClubDraftReminders(options: { now?: Date } = {}): P
                   bodyTextSnapshot: content.bodyText,
                   metadata: {
                     trigger: CLUB_DRAFT_REMINDER_TEMPLATE_KEY,
-                    draftId: fresh.id,
-                    organizationId: entry.draft.organizationId,
-                    attempt: entry.attempt,
+                    draftIds: claimedDrafts.map((entry) => entry.id),
+                    organizationId,
+                    attempts: claimedDrafts.map((entry) => entry.attempt),
                     deliveryMode: settings.deliveryMode,
                     realDelivery: true,
                   },
-                  idempotencyKey: draftReminderIdempotencyKey(fresh.id, entry.attempt, recipient.email),
+                  idempotencyKey: draftReminderIdempotencyKey(claimedDrafts, recipient.email),
                   correlationId,
                   status: "PENDING",
                 },
@@ -247,11 +280,11 @@ export async function sendDueClubDraftReminders(options: { now?: Date } = {}): P
             await writeAuditLog({
               eventId: event.id,
               action: "CLUB_DRAFT_REMINDER_QUEUED",
-              entityType: "ClubRegistrationDraft",
-              entityId: fresh.id,
+              entityType: "Organization",
+              entityId: organizationId,
               correlationId,
-              summary: `Queued reminder ${entry.attempt} for an unsubmitted club registration to ${recipients.length} ${recipients.length === 1 ? "person" : "people"}.`,
-              metadata: { eventId: event.id, organizationId: entry.draft.organizationId, draftId: fresh.id, attempt: entry.attempt, recipients: recipients.length },
+              summary: `Queued a reminder about ${claimedDrafts.length} unsubmitted club ${claimedDrafts.length === 1 ? "registration" : "registrations"} to ${recipients.length} ${recipients.length === 1 ? "person" : "people"}.`,
+              metadata: { eventId: event.id, organizationId, draftIds: claimedDrafts.map((entry) => entry.id), attempts: claimedDrafts.map((entry) => entry.attempt), recipients: recipients.length },
             }, tx);
             return created;
           }, { timeout: 30_000, maxWait: 10_000 });
@@ -261,7 +294,7 @@ export async function sendDueClubDraftReminders(options: { now?: Date } = {}): P
           }
         } catch (error) {
           result.failed += 1;
-          logError("A club registration reminder could not be queued", error, { eventId: event.id, organizationId: entry.draft.organizationId });
+          logError("A club registration reminder could not be queued", error, { eventId: event.id, organizationId });
         }
       }
     } catch (error) {
@@ -286,68 +319,84 @@ export async function sendDueClubDraftReminders(options: { now?: Date } = {}): P
 
 function metadataFields(metadata: unknown) {
   const record = metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata as Record<string, unknown> : {};
-  return {
-    draftId: typeof record.draftId === "string" ? record.draftId : null,
-    organizationId: typeof record.organizationId === "string" ? record.organizationId : null,
-  };
+  const ids = Array.isArray(record.draftIds) ? record.draftIds.filter((id): id is string => typeof id === "string") : typeof record.draftId === "string" ? [record.draftId] : [];
+  return { draftIds: ids, organizationId: typeof record.organizationId === "string" ? record.organizationId : null };
 }
 
+/** What delivery does with a queued reminder: go, wait for the send hours, or never go. */
+export type DraftReminderCheck = null | { kind: "OBSOLETE"; note: string } | { kind: "WAIT"; until: Date; note: string };
+
+export const CLUB_DRAFT_REMINDER_WAIT_NOTE = "Waiting for the morning: reminders go out between the send hours only.";
+
 /**
- * Whether a queued reminder is no longer wanted, read as it is now: the event's reminders are off or missing, the draft
- * was submitted or removed (its id is gone) or has expired, registration has closed, or the recipient is no longer an
- * active director or deputy of that club with an active account (a changed contact). Returns the note to record, or
- * `null` when the reminder may go. A failed read throws; the delivery worker then retries instead of sending on a guess.
+ * Whether a queued reminder is still wanted, read as it is now. It is obsolete when the event no longer passes the
+ * club event gate, the club is no longer active, reminders are off or missing, none of its drafts still qualifies (a
+ * draft qualifies while it exists, is not expired and its registration window is open), or the recipient is no longer
+ * an active director or deputy of that club with an active account. Outside the send hours a wanted reminder waits
+ * until the next 9 a.m. where the event is held. A failed read throws; the delivery worker then retries instead of
+ * sending on a guess.
  */
-export async function clubDraftReminderObsoleteReason(
+export async function clubDraftReminderCheck(
   message: { eventId: string | null; recipientEmail: string; metadata: unknown },
   now: Date,
   client: Client = getPrisma(),
-): Promise<string | null> {
-  const { draftId, organizationId } = metadataFields(message.metadata);
-  if (!message.eventId || !draftId || !organizationId) return CLUB_DRAFT_REMINDER_OBSOLETE_NOTE;
-  const [policy, draft] = await Promise.all([
+): Promise<DraftReminderCheck> {
+  const obsolete: DraftReminderCheck = { kind: "OBSOLETE", note: CLUB_DRAFT_REMINDER_OBSOLETE_NOTE };
+  const { draftIds, organizationId } = metadataFields(message.metadata);
+  if (!message.eventId || draftIds.length === 0 || !organizationId) return obsolete;
+  const [policy, event, club, drafts, locations] = await Promise.all([
     client.clubDraftReminderPolicy.findUnique({ where: { eventId: message.eventId }, select: policySelect }),
-    client.clubRegistrationDraft.findUnique({ where: { id: draftId }, select: { eventId: true, organizationId: true, updatedAt: true, event: { select: eventSelect } } }),
+    client.event.findFirst({ where: { id: message.eventId, ...CLUB_EVENT_GATE }, select: eventSelect }),
+    client.organization.findFirst({ where: { id: organizationId, isActive: true }, select: { id: true } }),
+    client.clubRegistrationDraft.findMany({ where: { id: { in: draftIds }, eventId: message.eventId, organizationId }, select: { updatedAt: true, locationId: true } }),
+    loadActiveLocations(client, message.eventId),
   ]);
-  if (!policy?.enabled || !draft) return CLUB_DRAFT_REMINDER_OBSOLETE_NOTE;
-  if (draft.eventId !== message.eventId || draft.organizationId !== organizationId) return CLUB_DRAFT_REMINDER_OBSOLETE_NOTE;
-  if (draftIsStale(draft, policyFromRow(policy).staleAfterDays, now)) return CLUB_DRAFT_REMINDER_OBSOLETE_NOTE;
-  if (!registrationIsOpen(draft.event, now)) return CLUB_DRAFT_REMINDER_OBSOLETE_NOTE;
+  if (!policy?.enabled || !event || !club) return obsolete;
+  const staleAfterDays = policyFromRow(policy).staleAfterDays;
+  const qualifies = drafts.some((draft) => !draftIsStale(draft, staleAfterDays, now) && draftRegistrationWindow(event, locations, draft.locationId, now).open);
+  if (!qualifies) return obsolete;
   const grants = await loadReminderGrants(client, [organizationId], now);
   const recipient = message.recipientEmail.trim().toLowerCase();
-  if (!draftReminderRecipients(grants.get(organizationId) ?? []).some((person) => person.email === recipient)) return CLUB_DRAFT_REMINDER_OBSOLETE_NOTE;
+  if (!draftReminderRecipients(grants.get(organizationId) ?? []).some((person) => person.email === recipient)) return obsolete;
+  if (!isWithinSendHours(now, event.timezone)) return { kind: "WAIT", until: nextSendWindowStart(now, event.timezone), note: CLUB_DRAFT_REMINDER_WAIT_NOTE };
   return null;
 }
 
 // --- The staff view -----------------------------------------------------------------------------------------------
 
-/** The settings and a counts-only preview for staff. Never reads or returns an answer, a name or an address. */
-export async function getClubDraftReminderOverview(eventId: string, now = new Date()): Promise<ClubDraftReminderOverview> {
+/**
+ * The settings and a counts-only preview for staff, or `null` for an event that is not a club event (the sweep only
+ * reminds events that pass `CLUB_EVENT_GATE`). Never reads or returns an answer, a name or an address.
+ */
+export async function getClubDraftReminderOverview(eventId: string, now = new Date()): Promise<ClubDraftReminderOverview | null> {
   const prisma = getPrisma();
-  const [row, event, settings, draftRows, grouped] = await Promise.all([
+  const event = await prisma.event.findFirst({ where: { id: eventId, ...CLUB_EVENT_GATE }, select: eventSelect });
+  if (!event) return null;
+  const [row, settings, draftRows, grouped, locations] = await Promise.all([
     prisma.clubDraftReminderPolicy.findUnique({ where: { eventId }, select: policySelect }),
-    prisma.event.findUnique({ where: { id: eventId }, select: eventSelect }),
     loadEventEmailSettings(prisma, eventId),
-    prisma.clubRegistrationDraft.findMany({ where: { eventId, organization: { isActive: true } }, select: { id: true, updatedAt: true }, orderBy: { updatedAt: "desc" }, take: 2000 }),
+    prisma.clubRegistrationDraft.findMany({ where: { eventId, organization: { isActive: true } }, select: { id: true, updatedAt: true, locationId: true }, orderBy: { updatedAt: "desc" }, take: 2000 }),
     prisma.messageOutbox.groupBy({ by: ["status"], where: { eventId, templateKey: CLUB_DRAFT_REMINDER_TEMPLATE_KEY }, _count: { _all: true } }),
+    loadActiveLocations(prisma, eventId),
   ]);
   const policy = policyFromRow(row);
-  const registrationOpen = event ? registrationIsOpen(event, now) : false;
+  const registrationOpen = draftRegistrationWindow(event, locations, null, now).open;
   const logs = draftRows.length === 0 ? [] : await prisma.clubDraftReminderLog.findMany({ where: { draftId: { in: draftRows.map((draft) => draft.id) } }, select: { draftId: true, attempt: true, sentAt: true } });
   const priorByDraft = new Map<string, Array<{ attempt: number; sentAt: Date }>>();
   for (const log of logs) priorByDraft.set(log.draftId, [...(priorByDraft.get(log.draftId) ?? []), { attempt: log.attempt, sentAt: log.sentAt }]);
   // Previewed as if switched on, so staff see what turning it on would do; the page says whether it is on.
   const forecast = forecastReminders(
-    draftRows.map((draft) => ({ updatedAt: draft.updatedAt, prior: priorByDraft.get(draft.id) ?? [] })),
+    draftRows.map((draft) => ({ updatedAt: draft.updatedAt, prior: priorByDraft.get(draft.id) ?? [], registrationOpen: draftRegistrationWindow(event, locations, draft.locationId, now).open })),
     { ...policy, enabled: true },
     now,
-    { registrationOpen },
   );
   const count = (...statuses: string[]) => grouped.filter((entry) => statuses.includes(entry.status)).reduce((sum, entry) => sum + entry._count._all, 0);
+  const range = (key: keyof typeof CLUB_DRAFT_REMINDER_LIMITS): [number, number] => [CLUB_DRAFT_REMINDER_LIMITS[key].min, CLUB_DRAFT_REMINDER_LIMITS[key].max];
   return {
     policy,
     emailOn: settings?.deliveryMode === "EXTERNAL_EMAIL" && settings.deliveryReason === "ON",
     registrationOpen,
+    sendHours: sendHoursLabel(event.timezone),
     drafts: draftRows.length,
     dueNow: forecast.dueNow,
     upcoming: forecast.upcoming.map((date) => date.toISOString()),
@@ -358,12 +407,7 @@ export async function getClubDraftReminderOverview(eventId: string, now = new Da
       suppressed: count("SUPPRESSED"),
       cancelled: count("CANCELLED"),
     },
-    limits: {
-      firstAfterDays: [1, 14],
-      repeatEveryDays: [1, 14],
-      maxReminders: [1, 3],
-      staleAfterDays: [7, 90],
-    },
+    limits: { firstAfterDays: range("firstAfterDays"), repeatEveryDays: range("repeatEveryDays"), maxReminders: range("maxReminders"), staleAfterDays: range("staleAfterDays") },
   };
 }
 
@@ -376,11 +420,15 @@ export async function saveClubDraftReminderPolicy(eventId: string, actorUserId: 
   const next = clubDraftReminderPolicySchema.parse(input);
   return getPrisma().$transaction(async (tx) => {
     const event = await tx.event.findUnique({ where: { id: eventId }, select: { id: true } });
-    if (!event) return { changed: false as const, found: false as const, policy: policyFromRow(null) };
+    if (!event) return { changed: false as const, found: false as const, eligible: false as const, policy: policyFromRow(null) };
+    // Only a club event is ever reminded (the sweep's own gate), so nothing else gets a policy.
+    if (!await tx.event.findFirst({ where: { id: eventId, ...CLUB_EVENT_GATE }, select: { id: true } })) {
+      return { changed: false as const, found: true as const, eligible: false as const, policy: policyFromRow(null) };
+    }
     const existing = await tx.clubDraftReminderPolicy.findUnique({ where: { eventId }, select: policySelect });
     const before = policyFromRow(existing);
     const same = existing !== null && (Object.keys(next) as Array<keyof ClubDraftReminderPolicyValues>).every((key) => before[key] === next[key]);
-    if (same) return { changed: false as const, found: true as const, policy: before };
+    if (same) return { changed: false as const, found: true as const, eligible: true as const, policy: before };
     await tx.clubDraftReminderPolicy.upsert({
       where: { eventId },
       update: { ...next, updatedByUserId: actorUserId },
@@ -395,6 +443,6 @@ export async function saveClubDraftReminderPolicy(eventId: string, actorUserId: 
       summary: `${next.enabled ? "Reminders for unfinished club registrations are on" : "Reminders for unfinished club registrations are off"} for this event.`,
       metadata: { eventId, before: existing ? before : null, after: next },
     }, tx);
-    return { changed: true as const, found: true as const, policy: next };
+    return { changed: true as const, found: true as const, eligible: true as const, policy: next };
   });
 }

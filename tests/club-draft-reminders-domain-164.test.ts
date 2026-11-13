@@ -7,6 +7,9 @@ import {
   draftReminderIdempotencyKey,
   draftReminderRecipients,
   draftReminderUrl,
+  draftRegistrationWindow,
+  nextSendWindowStart,
+  sendHoursLabel,
   forecastReminders,
   isWithinSendHours,
   nextReminderDue,
@@ -75,7 +78,7 @@ describe("send hours", () => {
 describe("registration still open", () => {
   const event: DraftReminderEvent = {
     isPublished: true, timezone: "America/Chicago", registrationOpensOn: null, registrationClosesOn: "2026-12-01",
-    waitlistEnabled: false, archivedAt: null, lifecycleState: null, endsAt: at("2027-01-10T00:00:00Z"), lastDay: null,
+    waitlistEnabled: false, archivedAt: null, lifecycleState: null, startsAt: at("2027-01-08T00:00:00Z"), endsAt: at("2027-01-10T00:00:00Z"), lastDay: null,
   };
 
   it("is open through the close date in the event's time zone and closed the day after", () => {
@@ -87,6 +90,52 @@ describe("registration still open", () => {
     expect(registrationIsOpen({ ...event, registrationClosesOn: null }, at("2027-01-12T18:00:00Z"))).toBe(false);
     expect(registrationIsOpen({ ...event, archivedAt: at("2026-11-01T00:00:00Z") }, at("2026-11-13T18:00:00Z"))).toBe(false);
     expect(registrationIsOpen({ ...event, isPublished: false }, at("2026-11-13T18:00:00Z"))).toBe(false);
+  });
+});
+
+describe("the registration window of a draft, by the club page's own rules", () => {
+  const event: DraftReminderEvent = {
+    isPublished: true, timezone: "America/Chicago", registrationOpensOn: null, registrationClosesOn: "2026-12-01",
+    waitlistEnabled: false, archivedAt: null, lifecycleState: null, startsAt: at("2027-01-08T00:00:00Z"), endsAt: at("2027-01-10T00:00:00Z"), lastDay: null,
+  };
+  const now = at("2026-12-05T18:00:00Z");
+  const early = { id: "loc-early", firstDay: null, lastDay: null, registrationClosesOn: "2026-12-03" };
+  const late = { id: "loc-late", firstDay: null, lastDay: null, registrationClosesOn: "2026-12-20" };
+
+  it("follows the event's own dates when it has no locations, and quotes the event's close date", () => {
+    expect(draftRegistrationWindow(event, [], null, at("2026-11-20T18:00:00Z"))).toEqual({ open: true, closesOn: "2026-12-01" });
+    expect(draftRegistrationWindow(event, [], null, now)).toEqual({ open: false, closesOn: "2026-12-01" });
+  });
+
+  it("follows the chosen location's own dates, open or closed, and quotes its date", () => {
+    expect(draftRegistrationWindow(event, [early, late], "loc-late", now)).toEqual({ open: true, closesOn: "2026-12-20" });
+    expect(draftRegistrationWindow(event, [early, late], "loc-early", now)).toEqual({ open: false, closesOn: "2026-12-03" });
+  });
+
+  it("with no location chosen, is open while any active location is, and quotes the event's date", () => {
+    expect(draftRegistrationWindow(event, [early, late], null, now).open).toBe(true);
+    expect(draftRegistrationWindow(event, [early], null, now).open).toBe(false);
+    expect(draftRegistrationWindow(event, [early, late], null, now).closesOn).toBe("2026-12-01");
+    // A chosen location that is no longer active is treated as no choice.
+    expect(draftRegistrationWindow(event, [late], "loc-gone", now).open).toBe(true);
+  });
+
+  it("is closed, with no date quoted, when the lifecycle state closes registration", () => {
+    expect(draftRegistrationWindow({ ...event, lifecycleState: "REGISTRATION_CLOSED" } as DraftReminderEvent, [late], "loc-late", now)).toEqual({ open: false, closesOn: null });
+  });
+});
+
+describe("send hours as people read them", () => {
+  it("says the hours and the zone in words", () => {
+    expect(sendHoursLabel("America/Chicago")).toBe("9 a.m. to 7 p.m. Central");
+    expect(sendHoursLabel("America/Los_Angeles")).toBe("9 a.m. to 7 p.m. Pacific");
+  });
+
+  it("finds the next 9 a.m. where the event is held, or now when inside the hours", () => {
+    const inside = at("2026-11-13T17:00:00Z");
+    expect(nextSendWindowStart(inside, "America/Chicago")).toEqual(inside);
+    expect(nextSendWindowStart(at("2026-11-14T02:00:00Z"), "America/Chicago").toISOString()).toBe("2026-11-14T15:00:00.000Z");
+    expect(nextSendWindowStart(at("2026-11-13T14:00:00Z"), "America/Chicago").toISOString()).toBe("2026-11-13T15:00:00.000Z");
   });
 });
 
@@ -142,11 +191,12 @@ describe("the staff forecast", () => {
   it("counts what is due and lists the next dates, nothing else", () => {
     const now = at("2026-11-13T17:00:00Z");
     const forecast = forecastReminders([
-      { updatedAt: at("2026-11-10T12:00:00Z"), prior: [] }, // due
-      { updatedAt: at("2026-11-12T12:00:00Z"), prior: [] }, // due 11-14
-      { updatedAt: at("2026-11-13T12:00:00Z"), prior: [] }, // due 11-15
-      { updatedAt: at("2026-09-01T12:00:00Z"), prior: [] }, // expired
-    ], policy, now, open);
+      { updatedAt: at("2026-11-10T12:00:00Z"), prior: [], registrationOpen: true }, // due
+      { updatedAt: at("2026-11-12T12:00:00Z"), prior: [], registrationOpen: true }, // due 11-14
+      { updatedAt: at("2026-11-13T12:00:00Z"), prior: [], registrationOpen: true }, // due 11-15
+      { updatedAt: at("2026-09-01T12:00:00Z"), prior: [], registrationOpen: true }, // expired
+      { updatedAt: at("2026-11-10T12:00:00Z"), prior: [], registrationOpen: false }, // its location has closed
+    ], policy, now);
     expect(forecast.dueNow).toBe(1);
     expect(forecast.upcoming.map((date) => date.toISOString())).toEqual(["2026-11-14T12:00:00.000Z", "2026-11-15T12:00:00.000Z"]);
     expect(Object.keys(forecast).sort()).toEqual(["dueNow", "upcoming"]);
@@ -168,7 +218,15 @@ describe("who gets it", () => {
   });
 
   it("keys each message by draft, attempt and normalised address", () => {
-    expect(draftReminderIdempotencyKey("draft-1", 2, " Pat@Example.test ")).toBe("club-draft-reminder:draft-1:2:pat@example.test");
+    expect(draftReminderIdempotencyKey([{ id: "draft-1", attempt: 2 }], " Pat@Example.test ")).toBe("club-draft-reminder:draft-1:2:pat@example.test");
+  });
+
+  it("gives a club with several drafts one stable key, whatever the order, that differs by draft set, attempt and address", () => {
+    const a = draftReminderIdempotencyKey([{ id: "d1", attempt: 1 }, { id: "d2", attempt: 1 }, { id: "d3", attempt: 2 }], "pat@example.test");
+    expect(draftReminderIdempotencyKey([{ id: "d3", attempt: 2 }, { id: "d1", attempt: 1 }, { id: "d2", attempt: 1 }], "PAT@example.test")).toBe(a);
+    expect(a).toMatch(/^club-draft-reminder:group:[0-9a-f]{32}:pat@example\.test$/);
+    expect(draftReminderIdempotencyKey([{ id: "d1", attempt: 1 }, { id: "d2", attempt: 1 }], "pat@example.test")).not.toBe(a);
+    expect(draftReminderIdempotencyKey([{ id: "d1", attempt: 1 }, { id: "d2", attempt: 1 }, { id: "d3", attempt: 3 }], "pat@example.test")).not.toBe(a);
   });
 });
 

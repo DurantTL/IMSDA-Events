@@ -46,9 +46,11 @@ export default async function ScheduledEmailsPage({
         initialSchedules={schedules}
         openNew={openNew === "1"}
       />
-      <div className="page-stack">
-        <ClubDraftReminderSettings key={`reminders-${event.id}`} eventId={event.id} eventTimezone={event.timezone} initial={draftReminders} />
-      </div>
+      {draftReminders && (
+        <div className="page-stack">
+          <ClubDraftReminderSettings key={`reminders-${event.id}`} eventId={event.id} eventTimezone={event.timezone} initial={draftReminders} />
+        </div>
+      )}
     </>
   );
 }

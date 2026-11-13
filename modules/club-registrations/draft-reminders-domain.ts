@@ -1,6 +1,10 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { isEmail } from "@/lib/field-validation";
+import { effectiveLocationDates, evaluateLocationPhase, type LocationDateSource } from "@/modules/event-locations/domain";
 import { evaluateEventRegistrationPhase, type EventLifecycleSource } from "@/modules/events/lifecycle";
+import { closesRegistration, effectiveLifecycleState } from "@/modules/events/lifecycle-state";
+import { timeZoneLongName } from "@/modules/calendar/conference-format";
 import { neutralizePlaceholders } from "@/modules/invoices/delivery-domain";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { clubRegistrationPath } from "@/modules/club-registrations/roster-return";
@@ -91,13 +95,51 @@ export function isWithinSendHours(now: Date, timeZone: string) {
   return hour >= QUIET_HOURS.sendFromHour && hour < QUIET_HOURS.sendUntilHour;
 }
 
-export type DraftReminderEvent = Pick<EventLifecycleSource, "isPublished" | "timezone" | "registrationOpensOn" | "registrationClosesOn" | "waitlistEnabled" | "archivedAt" | "lifecycleState" | "endsAt" | "lastDay">;
+/** "9 a.m. to 7 p.m. Central": the send hours as a person reads them, in the event's own zone. */
+export function sendHoursLabel(timeZone: string) {
+  const hour = (value: number) => (value < 12 ? `${value} a.m.` : `${value === 12 ? 12 : value - 12} p.m.`);
+  const zone = timeZoneLongName(timeZone).replace(/ Time$/, "");
+  return `${hour(QUIET_HOURS.sendFromHour)} to ${hour(QUIET_HOURS.sendUntilHour)} ${zone}`;
+}
+
+/** The first moment from `now` that is inside the send hours: `now` itself, or the next 9 a.m. where the event is held. */
+export function nextSendWindowStart(now: Date, timeZone: string) {
+  if (isWithinSendHours(now, timeZone)) return now;
+  const QUARTER = 15 * 60 * 1000;
+  let probe = Math.ceil((now.getTime() + 1) / QUARTER) * QUARTER;
+  for (let step = 0; step < 4 * 48; step += 1, probe += QUARTER) {
+    if (localClockTime(new Date(probe), timeZone) === `${String(QUIET_HOURS.sendFromHour).padStart(2, "0")}:00`) return new Date(probe);
+  }
+  return new Date(now.getTime() + 12 * 60 * 60 * 1000);
+}
+
+export type DraftReminderEvent = Pick<EventLifecycleSource, "isPublished" | "timezone" | "registrationOpensOn" | "registrationClosesOn" | "waitlistEnabled" | "archivedAt" | "lifecycleState" | "lastDay"> & { startsAt: Date; endsAt: Date };
+
+/** An active location of the event, with its own dates. */
+export type DraftReminderLocation = LocationDateSource & { id: string };
 
 /**
- * Whether registration is open for the event right now, judged in the event's own time zone by the same rule the
- * submit path uses: published, not archived, not closed by its lifecycle state, the last day not passed, and the
- * closing date (`registrationClosesOn`) not passed.
+ * Whether a club may still submit this draft, and the closing date its messages may quote, by the rules the club's own
+ * page uses (`clubPhase` and `quotedClosingDate`): a draft at a chosen active location follows that location's dates; a
+ * draft with no location (or one that is no longer active) is open while any active location is, or by the event's own
+ * dates when it has none. A lifecycle state that closes registration closes it whatever the dates say, and no date is
+ * then quoted. Judged in the event's own time zone.
  */
+export function draftRegistrationWindow(
+  event: DraftReminderEvent,
+  activeLocations: readonly DraftReminderLocation[],
+  draftLocationId: string | null,
+  now: Date,
+): { open: boolean; closesOn: string | null } {
+  const chosen = draftLocationId ? activeLocations.find((location) => location.id === draftLocationId) ?? null : null;
+  const phase = chosen || activeLocations.length === 0
+    ? evaluateLocationPhase(event, chosen, now)
+    : activeLocations.some((location) => evaluateLocationPhase(event, location, now) === "OPEN") ? "OPEN" : "CLOSED";
+  const closesOn = closesRegistration(effectiveLifecycleState(event)) ? null : effectiveLocationDates(event, chosen).registrationClosesOn;
+  return { open: phase === "OPEN", closesOn };
+}
+
+/** Whether registration is open for the event itself, with no location in play. */
 export function registrationIsOpen(event: DraftReminderEvent, now: Date) {
   return evaluateEventRegistrationPhase(event, now) === "OPEN";
 }
@@ -177,9 +219,16 @@ export function draftReminderRecipients(grants: readonly ReminderGrant[]): Remin
   return people.sort((a, b) => a.email.localeCompare(b.email));
 }
 
-/** One message per draft, attempt and address: the outbox key that makes a retried queueing a no-op. */
-export function draftReminderIdempotencyKey(draftId: string, attempt: number, email: string) {
-  return `club-draft-reminder:${draftId}:${attempt}:${email.trim().toLowerCase()}`;
+/**
+ * One message per club run, address and set of drafts: the outbox key that makes a retried queueing a no-op. A club with
+ * one draft keeps the plain `draft:attempt` form; a club with several drafts (teams) gets one key from the sorted draft
+ * ids and attempts, stable however the list was ordered.
+ */
+export function draftReminderIdempotencyKey(drafts: ReadonlyArray<{ id: string; attempt: number }>, email: string) {
+  const address = email.trim().toLowerCase();
+  if (drafts.length === 1) return `club-draft-reminder:${drafts[0]!.id}:${drafts[0]!.attempt}:${address}`;
+  const digest = createHash("sha256").update([...drafts].map((draft) => `${draft.id}:${draft.attempt}`).sort().join(",")).digest("hex").slice(0, 32);
+  return `club-draft-reminder:group:${digest}:${address}`;
 }
 
 // --- What it says -------------------------------------------------------------------------------------------------
@@ -226,6 +275,8 @@ export type ClubDraftReminderOverview = {
   /** Whether the event's email really goes out; with it off, reminders are held. */
   emailOn: boolean;
   registrationOpen: boolean;
+  /** The send hours as people read them, for the settings text. */
+  sendHours: string;
   /** Counts only: how many unsubmitted club registrations there are, and what the forecast is for them. */
   drafts: number;
   /** Drafts that would get a reminder on the next run, if reminders were on. */
@@ -248,16 +299,15 @@ export type ReminderForecast = {
 
 /** The counts and dates behind the staff preview: no club, no person and no answer, only numbers and times. */
 export function forecastReminders(
-  drafts: ReadonlyArray<{ updatedAt: Date; prior: readonly PriorReminder[] }>,
+  drafts: ReadonlyArray<{ updatedAt: Date; prior: readonly PriorReminder[]; registrationOpen: boolean }>,
   policy: ClubDraftReminderPolicyValues,
   now: Date,
-  context: { registrationOpen: boolean },
   limit = 3,
 ): ReminderForecast {
   let dueNow = 0;
   const upcoming: Date[] = [];
   for (const draft of drafts) {
-    const decision = nextReminderDue(draft, policy, draft.prior, now, context);
+    const decision = nextReminderDue(draft, policy, draft.prior, now, { registrationOpen: draft.registrationOpen });
     if (decision.due) dueNow += 1;
     else if (decision.reason === "NOT_YET" && !draftIsStale(draft, policy.staleAfterDays, decision.dueAt)) upcoming.push(decision.dueAt);
   }

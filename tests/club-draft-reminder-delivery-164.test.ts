@@ -4,7 +4,7 @@ vi.mock("@/modules/communications/effective-delivery", async () => (await import
 vi.mock("server-only", () => ({}));
 vi.mock("@/modules/lodging/message-currency", () => ({ lodgingMessageStaleReason: vi.fn() }));
 const obsolete = vi.hoisted(() => ({ reason: vi.fn() }));
-vi.mock("@/modules/club-registrations/draft-reminders", () => ({ clubDraftReminderObsoleteReason: obsolete.reason }));
+vi.mock("@/modules/club-registrations/draft-reminders", () => ({ clubDraftReminderCheck: obsolete.reason }));
 
 import { resetServerEnvCache } from "@/lib/env";
 import { processExternalEmailQueue } from "@/modules/communications/email-delivery";
@@ -37,7 +37,7 @@ function store(overrides: Partial<Row> = {}) {
     subjectSnapshot: "Synthetic Club: finish your registration for Synthetic Camporee",
     bodyTextSnapshot: "Hello Avery,\n\nSynthetic Club has started a registration.",
     bodyHtmlSnapshot: null,
-    metadata: { trigger: "CLUB_DRAFT_REMINDER", draftId: "draft-1", organizationId: "org-1", attempt: 1 },
+    metadata: { trigger: "CLUB_DRAFT_REMINDER", draftIds: ["draft-1"], organizationId: "org-1", attempts: [1] },
     status: "PENDING",
     attemptCount: 0,
     availableAt: new Date("2026-07-23T12:00:00.000Z"),
@@ -126,7 +126,8 @@ beforeEach(() => {
   obsolete.reason.mockResolvedValue(null);
 });
 
-const OBSOLETE = "The draft was submitted, removed or expired, or reminders were turned off, so the reminder was not sent.";
+const NOTE = "The draft was submitted, removed or expired, or reminders were turned off, so the reminder was not sent.";
+const OBSOLETE = { kind: "OBSOLETE", note: NOTE };
 
 describe("club registration reminders at delivery (#164)", () => {
   it("cancels a reminder whose draft was submitted or removed, with a plain note and an audit entry that names ids only", async () => {
@@ -137,11 +138,11 @@ describe("club registration reminders at delivery (#164)", () => {
     expect(sendEmail).not.toHaveBeenCalled();
     expect(result.sentIds).toEqual([]);
     expect(state.message.status).toBe("CANCELLED");
-    expect(state.message.lastError).toBe(OBSOLETE);
+    expect(state.message.lastError).toBe(NOTE);
     expect(state.auditRows).toEqual([expect.objectContaining({ action: "CLUB_DRAFT_REMINDER_CANCELLED", metadata: { messageId: "message-1", templateKey: "CLUB_DRAFT_REMINDER" } })]);
     expect(JSON.stringify(state.auditRows)).not.toContain("director@example.test");
     // The check is asked about this message's own event, address and draft.
-    expect(obsolete.reason).toHaveBeenCalledWith(expect.objectContaining({ eventId: "event-1", recipientEmail: "director@example.test", metadata: expect.objectContaining({ draftId: "draft-1" }) }), expect.any(Date));
+    expect(obsolete.reason).toHaveBeenCalledWith(expect.objectContaining({ eventId: "event-1", recipientEmail: "director@example.test", metadata: expect.objectContaining({ draftIds: ["draft-1"] }) }), expect.any(Date));
   });
 
   it("fails closed when the check itself fails: nothing is sent and the message is retried", async () => {
@@ -186,5 +187,17 @@ describe("club registration reminders at delivery (#164)", () => {
     expect(obsolete.reason).toHaveBeenCalledTimes(2);
     expect(sendEmail).not.toHaveBeenCalled();
     expect(state.message.status).toBe("CANCELLED");
+  });
+
+  it("puts a reminder back for the morning, without using up an attempt, when it is outside the send hours", async () => {
+    const until = new Date("2026-07-24T14:00:00.000Z");
+    obsolete.reason.mockResolvedValueOnce({ kind: "WAIT", until, note: "Waiting for the morning: reminders go out between the send hours only." });
+    const state = store();
+    const { sendEmail, done } = run(state);
+    await done;
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(state.message).toMatchObject({ status: "PENDING", availableAt: until, attemptCount: 0, lockToken: null });
+    expect(String(state.message.lastError)).toMatch(/morning/);
+    expect(state.auditRows).toEqual([]);
   });
 });

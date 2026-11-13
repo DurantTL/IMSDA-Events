@@ -11,6 +11,9 @@ const state = vi.hoisted(() => ({
   policies: [] as Array<Record<string, any>>, // eslint-disable-line @typescript-eslint/no-explicit-any
   events: [] as Array<Record<string, any>>, // eslint-disable-line @typescript-eslint/no-explicit-any
   drafts: [] as Array<Record<string, any>>, // eslint-disable-line @typescript-eslint/no-explicit-any
+  locations: [] as Array<Record<string, any>>, // eslint-disable-line @typescript-eslint/no-explicit-any
+  inactiveClubs: [] as string[],
+  notClubEvent: false,
   logs: [] as Array<Record<string, any>>, // eslint-disable-line @typescript-eslint/no-explicit-any
   grants: [] as Array<Record<string, any>>, // eslint-disable-line @typescript-eslint/no-explicit-any
   outbox: [] as Array<Record<string, any>>, // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -55,6 +58,9 @@ vi.mock("@/lib/prisma", () => {
         throw error;
       }
     },
+    eventLocation: { findMany: async ({ where }: { where: { eventId: string } }) => state.locations.filter((location) => location.eventId === where.eventId && location.isActive !== false) },
+    organization: { findFirst: async ({ where }: { where: { id: string } }) => (state.inactiveClubs.includes(where.id) ? null : { id: where.id }) },
+    event: { findFirst: async ({ where }: { where: { id: string } }) => (state.notClubEvent ? null : eventOf(where.id) ?? null) },
     clubDraftReminderPolicy: {
       findMany: async ({ where }: { where: { enabled: boolean } }) => state.policies
         .filter((policy) => policy.enabled === where.enabled && eventOf(policy.eventId))
@@ -62,8 +68,11 @@ vi.mock("@/lib/prisma", () => {
       findUnique: async ({ where }: { where: { eventId: string } }) => state.policies.find((policy) => policy.eventId === where.eventId) ?? null,
     },
     clubRegistrationDraft: {
-      findMany: async ({ where }: { where: { eventId: string; updatedAt: { lte: Date; gt: Date } } }) => state.drafts
-        .filter((draft) => draft.eventId === where.eventId && draft.updatedAt <= where.updatedAt.lte && draft.updatedAt > where.updatedAt.gt && draft.organization.isActive !== false)
+      findMany: async ({ where }: { where: { eventId: string; id?: { in: string[] }; organizationId?: string; updatedAt?: { lte: Date; gt: Date } } }) => state.drafts
+        .filter((draft) => draft.eventId === where.eventId
+          && (!where.id || where.id.in.includes(draft.id))
+          && (!where.organizationId || draft.organizationId === where.organizationId)
+          && (!where.updatedAt || (draft.updatedAt <= where.updatedAt.lte && draft.updatedAt > where.updatedAt.gt && draft.organization.isActive !== false)))
         .map((draft) => ({ ...draft })),
       findUnique: async ({ where }: { where: { id: string } }) => {
         const draft = state.drafts.find((row) => row.id === where.id);
@@ -102,7 +111,7 @@ vi.mock("@/lib/prisma", () => {
   return { getPrisma: () => client };
 });
 
-import { clubDraftReminderObsoleteReason, sendDueClubDraftReminders } from "@/modules/club-registrations/draft-reminders";
+import { clubDraftReminderCheck, sendDueClubDraftReminders } from "@/modules/club-registrations/draft-reminders";
 
 const at = (iso: string) => new Date(iso);
 // 2026-11-13 11:00 in Chicago (CST): inside the send hours.
@@ -110,11 +119,11 @@ const NOON = at("2026-11-13T17:00:00Z");
 
 const event = (overrides: Row = {}) => ({
   id: "event-1", name: "Synthetic Camporee", timezone: "America/Chicago", isPublished: true, archivedAt: null, lifecycleState: null,
-  registrationOpensOn: null, registrationClosesOn: "2026-12-01", waitlistEnabled: false, endsAt: at("2027-01-10T00:00:00Z"), ...overrides,
+  registrationOpensOn: null, registrationClosesOn: "2026-12-01", waitlistEnabled: false, startsAt: at("2027-01-08T00:00:00Z"), endsAt: at("2027-01-10T00:00:00Z"), ...overrides,
 });
 const policy = (overrides: Row = {}) => ({ eventId: "event-1", enabled: true, firstAfterDays: 2, repeatEveryDays: 3, maxReminders: 2, staleAfterDays: 30, ...overrides });
 const draft = (id: string, organizationId: string, updatedAt: Date, overrides: Row = {}) => ({
-  id, eventId: "event-1", organizationId, draftKey: "", updatedAt, organization: { name: `Club ${organizationId}`, isActive: true }, ...overrides,
+  id, eventId: "event-1", organizationId, draftKey: "", locationId: null, updatedAt, organization: { name: `Club ${organizationId}`, isActive: true }, ...overrides,
 });
 const grant = (organizationId: string, email: string, role = "DIRECTOR", account: Row = {}) => ({
   organizationId, role, effectiveFrom: at("2026-01-01T00:00:00Z"), effectiveTo: null, revokedAt: null,
@@ -125,7 +134,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOON);
   Object.assign(state, {
-    policies: [policy()], events: [event()], drafts: [], logs: [], grants: [], outbox: [], audit: [], delivered: [],
+    policies: [policy()], events: [event()], drafts: [], locations: [], inactiveClubs: [], notClubEvent: false, logs: [], grants: [], outbox: [], audit: [], delivered: [],
     emailMode: { deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "ON" }, failOutbox: false, deliverThrows: false, beforeTransaction: null, hideLogs: false, nextId: 1,
   });
   // Club a edited its draft four days ago, so its first reminder is due.
@@ -156,12 +165,12 @@ describe("a due reminder", () => {
     expect(state.outbox.map((row) => row.recipientEmail).sort()).toEqual(["a.deputy@example.test", "a.director@example.test"]);
     for (const row of state.outbox) {
       expect(row).toMatchObject({ eventId: "event-1", templateKey: "CLUB_DRAFT_REMINDER", recipientKind: "CLUB_DIRECTOR", status: "PENDING", senderEmailSnapshot: "events@example.test" });
-      expect(row.metadata).toEqual({ trigger: "CLUB_DRAFT_REMINDER", draftId: "draft-a", organizationId: "club-a", attempt: 1, deliveryMode: "EXTERNAL_EMAIL", realDelivery: true });
+      expect(row.metadata).toEqual({ trigger: "CLUB_DRAFT_REMINDER", draftIds: ["draft-a"], organizationId: "club-a", attempts: [1], deliveryMode: "EXTERNAL_EMAIL", realDelivery: true });
       expect(row.bodyTextSnapshot).toContain("https://events.example.test/account/clubs/club-a/events/event-1");
       expect(row.idempotencyKey).toBe(`club-draft-reminder:draft-a:1:${row.recipientEmail}`);
     }
     expect(state.logs).toEqual([expect.objectContaining({ eventId: "event-1", organizationId: "club-a", draftId: "draft-a", attempt: 1, recipients: 2 })]);
-    expect(state.audit).toEqual([expect.objectContaining({ action: "CLUB_DRAFT_REMINDER_QUEUED", metadata: { eventId: "event-1", organizationId: "club-a", draftId: "draft-a", attempt: 1, recipients: 2 } })]);
+    expect(state.audit).toEqual([expect.objectContaining({ action: "CLUB_DRAFT_REMINDER_QUEUED", entityType: "Organization", metadata: { eventId: "event-1", organizationId: "club-a", draftIds: ["draft-a"], attempts: [1], recipients: 2 } })]);
     expect(JSON.stringify(state.audit)).not.toContain("example.test");
     expect(state.delivered).toEqual([state.outbox.map((row) => row.id)]);
   });
@@ -322,7 +331,7 @@ describe("who is eligible", () => {
     await sendDueClubDraftReminders({ now: NOON });
     state.grants = [grant("club-a", "new.director@example.test")];
     await sendDueClubDraftReminders({ now: new Date(NOON.getTime() + 3 * DAY) });
-    expect(state.outbox.filter((row) => row.metadata.attempt === 2).map((row) => row.recipientEmail)).toEqual(["new.director@example.test"]);
+    expect(state.outbox.filter((row) => row.metadata.attempts[0] === 2).map((row) => row.recipientEmail)).toEqual(["new.director@example.test"]);
   });
 
   it("ignores a draft of an inactive club", async () => {
@@ -331,40 +340,141 @@ describe("who is eligible", () => {
   });
 });
 
-describe("the check at delivery", () => {
-  const message = (overrides: Row = {}) => ({ eventId: "event-1", recipientEmail: "a.director@example.test", metadata: { draftId: "draft-a", organizationId: "club-a", attempt: 1 }, ...overrides });
+describe("a club with several team drafts", () => {
+  beforeEach(() => {
+    state.drafts = ["t1", "t2", "t3"].map((key, index) => draft(`draft-${key}`, "club-a", new Date(NOON.getTime() - (4 + index) * DAY), { draftKey: key }));
+  });
 
-  it("lets a reminder through while the draft exists, is fresh, registration is open and the person is still a director", async () => {
-    expect(await clubDraftReminderObsoleteReason(message(), NOON)).toBeNull();
+  it("gets one email per person, with every draft claimed in the same run", async () => {
+    expect(await sendDueClubDraftReminders({ now: NOON })).toMatchObject({ reminded: 1, failed: 0 });
+    expect(state.outbox.map((row) => row.recipientEmail).sort()).toEqual(["a.deputy@example.test", "a.director@example.test"]);
+    expect(state.logs.map((log) => [log.draftId, log.attempt]).sort()).toEqual([["draft-t1", 1], ["draft-t2", 1], ["draft-t3", 1]]);
+    for (const row of state.outbox) {
+      expect(row.metadata.draftIds.sort()).toEqual(["draft-t1", "draft-t2", "draft-t3"]);
+      expect(row.idempotencyKey).toMatch(/^club-draft-reminder:group:[0-9a-f]{32}:/);
+    }
+    // Run again: all three are claimed, so nothing more, and a repeat counts each draft's own attempt.
+    expect((await sendDueClubDraftReminders({ now: NOON })).reminded).toBe(0);
+    expect(state.outbox).toHaveLength(2);
+  });
+
+  it("keeps each draft's own maximum, so a late draft still gets its own reminders", async () => {
+    await sendDueClubDraftReminders({ now: NOON });
+    // A fourth draft starts later; at the second reminder date the older three are on attempt 2 and the new one on 1.
+    state.drafts.push(draft("draft-t4", "club-a", new Date(NOON.getTime() - 1 * DAY), { draftKey: "t4" }));
+    await sendDueClubDraftReminders({ now: new Date(NOON.getTime() + 3 * DAY) });
+    expect(state.logs.filter((log) => log.draftId === "draft-t4").map((log) => log.attempt)).toEqual([1]);
+    expect(state.logs.filter((log) => log.draftId === "draft-t1").map((log) => log.attempt)).toEqual([1, 2]);
+    // The older three have used both reminders; only the fourth is still due later.
+    await sendDueClubDraftReminders({ now: new Date(NOON.getTime() + 20 * DAY) });
+    expect(state.logs.filter((log) => log.draftId === "draft-t1")).toHaveLength(2);
+  });
+
+  it("counts each draft with nobody to email", async () => {
+    state.grants = [];
+    expect(await sendDueClubDraftReminders({ now: NOON })).toMatchObject({ reminded: 0, noRecipient: 3 });
+  });
+});
+
+describe("locations", () => {
+  const location = (id: string, closes: string | null, overrides: Row = {}) => ({ id, eventId: "event-1", isActive: true, firstDay: null, lastDay: null, registrationClosesOn: closes, ...overrides });
+
+  it("does not remind a draft whose own location has closed even while the event's date is still ahead, and does remind one whose location is open", async () => {
+    state.locations = [location("loc-closed", "2026-11-12"), location("loc-open", "2026-12-20")];
+    state.drafts = [
+      draft("draft-closed", "club-a", new Date(NOON.getTime() - 4 * DAY), { locationId: "loc-closed" }),
+      draft("draft-open", "club-b", new Date(NOON.getTime() - 4 * DAY), { locationId: "loc-open" }),
+    ];
+    state.grants.push(grant("club-b", "b.director@example.test"));
+    await sendDueClubDraftReminders({ now: NOON });
+    expect(state.outbox.map((row) => row.recipientEmail)).toEqual(["b.director@example.test"]);
+    expect(state.outbox[0]!.bodyTextSnapshot).toContain("Registration closes on December 20, 2026.");
+  });
+
+  it("quotes the earliest close date when a club's team drafts are at different locations", async () => {
+    state.locations = [location("loc-a", "2026-12-05"), location("loc-b", "2026-12-20")];
+    state.drafts = [
+      draft("draft-a", "club-a", new Date(NOON.getTime() - 4 * DAY), { locationId: "loc-b", draftKey: "b" }),
+      draft("draft-b", "club-a", new Date(NOON.getTime() - 4 * DAY), { locationId: "loc-a", draftKey: "a" }),
+    ];
+    await sendDueClubDraftReminders({ now: NOON });
+    expect(state.outbox).toHaveLength(2);
+    expect(state.outbox[0]!.bodyTextSnapshot).toContain("Registration closes on December 5, 2026.");
+  });
+
+  it("with no location chosen, reminds while any active location is open", async () => {
+    state.locations = [location("loc-closed", "2026-11-12"), location("loc-open", "2026-12-20")];
+    expect((await sendDueClubDraftReminders({ now: NOON })).reminded).toBe(1);
+  });
+});
+
+describe("the check at delivery", () => {
+  const message = (overrides: Row = {}) => ({ eventId: "event-1", recipientEmail: "a.director@example.test", metadata: { draftIds: ["draft-a"], organizationId: "club-a", attempts: [1] }, ...overrides });
+  const obsolete = { kind: "OBSOLETE" };
+
+  it("lets a reminder through while a draft exists, is fresh, registration is open and the person is still a director", async () => {
+    expect(await clubDraftReminderCheck(message(), NOON)).toBeNull();
     // The address is compared without regard to case or spaces.
-    expect(await clubDraftReminderObsoleteReason(message({ recipientEmail: " A.Director@Example.test " }), NOON)).toBeNull();
+    expect(await clubDraftReminderCheck(message({ recipientEmail: " A.Director@Example.test " }), NOON)).toBeNull();
   });
 
   it("is obsolete once the draft was submitted or removed", async () => {
     state.drafts = [];
-    expect(await clubDraftReminderObsoleteReason(message(), NOON)).toMatch(/submitted, removed or expired/);
+    expect(await clubDraftReminderCheck(message(), NOON)).toMatchObject({ kind: "OBSOLETE", note: expect.stringMatching(/submitted, removed or expired/) });
+  });
+
+  it("is obsolete only when none of a club's drafts still qualifies", async () => {
+    state.drafts = ["t1", "t2"].map((key) => draft(`draft-${key}`, "club-a", new Date(NOON.getTime() - 4 * DAY), { draftKey: key }));
+    const grouped = message({ metadata: { draftIds: ["draft-t1", "draft-t2", "draft-submitted"], organizationId: "club-a" } });
+    expect(await clubDraftReminderCheck(grouped, NOON)).toBeNull();
+    state.drafts = [state.drafts[0]!];
+    expect(await clubDraftReminderCheck(grouped, NOON)).toBeNull();
+    state.drafts = [];
+    expect(await clubDraftReminderCheck(grouped, NOON)).toMatchObject(obsolete);
   });
 
   it("is obsolete once the draft has expired, registration has closed, or reminders were turned off or removed", async () => {
-    expect(await clubDraftReminderObsoleteReason(message(), new Date(NOON.getTime() + 27 * DAY))).not.toBeNull();
+    expect(await clubDraftReminderCheck(message(), new Date(NOON.getTime() + 27 * DAY))).not.toBeNull();
     state.events = [event({ registrationClosesOn: "2026-11-12" })];
-    expect(await clubDraftReminderObsoleteReason(message(), NOON)).not.toBeNull();
+    expect(await clubDraftReminderCheck(message(), NOON)).toMatchObject(obsolete);
     state.events = [event()];
     state.policies = [policy({ enabled: false })];
-    expect(await clubDraftReminderObsoleteReason(message(), NOON)).not.toBeNull();
+    expect(await clubDraftReminderCheck(message(), NOON)).toMatchObject(obsolete);
     state.policies = [];
-    expect(await clubDraftReminderObsoleteReason(message(), NOON)).not.toBeNull();
+    expect(await clubDraftReminderCheck(message(), NOON)).toMatchObject(obsolete);
+  });
+
+  it("follows the draft's own location dates", async () => {
+    state.locations = [{ id: "loc-closed", eventId: "event-1", isActive: true, firstDay: null, lastDay: null, registrationClosesOn: "2026-11-12" }];
+    state.drafts = [draft("draft-a", "club-a", new Date(NOON.getTime() - 4 * DAY), { locationId: "loc-closed" })];
+    expect(await clubDraftReminderCheck(message(), NOON)).toMatchObject(obsolete);
+  });
+
+  it("is obsolete when the club is no longer active or the event no longer passes the club event gate", async () => {
+    state.inactiveClubs = ["club-a"];
+    expect(await clubDraftReminderCheck(message(), NOON)).toMatchObject(obsolete);
+    state.inactiveClubs = [];
+    state.notClubEvent = true;
+    expect(await clubDraftReminderCheck(message(), NOON)).toMatchObject(obsolete);
   });
 
   it("is obsolete for the old address once the contact changed, while the new director's own message is not", async () => {
     state.grants = [grant("club-a", "new.director@example.test")];
-    expect(await clubDraftReminderObsoleteReason(message(), NOON)).not.toBeNull();
-    expect(await clubDraftReminderObsoleteReason(message({ recipientEmail: "new.director@example.test" }), NOON)).toBeNull();
+    expect(await clubDraftReminderCheck(message(), NOON)).toMatchObject(obsolete);
+    expect(await clubDraftReminderCheck(message({ recipientEmail: "new.director@example.test" }), NOON)).toBeNull();
   });
 
   it("is obsolete when the draft belongs to another event or club than the message says, or the message names no draft", async () => {
-    expect(await clubDraftReminderObsoleteReason(message({ eventId: "event-2" }), NOON)).not.toBeNull();
-    expect(await clubDraftReminderObsoleteReason(message({ metadata: { draftId: "draft-a", organizationId: "club-b" } }), NOON)).not.toBeNull();
-    expect(await clubDraftReminderObsoleteReason(message({ metadata: {} }), NOON)).not.toBeNull();
+    expect(await clubDraftReminderCheck(message({ eventId: "event-2" }), NOON)).toMatchObject(obsolete);
+    expect(await clubDraftReminderCheck(message({ metadata: { draftIds: ["draft-a"], organizationId: "club-b" } }), NOON)).toMatchObject(obsolete);
+    expect(await clubDraftReminderCheck(message({ metadata: {} }), NOON)).toMatchObject(obsolete);
+  });
+
+  it("waits for the next 9 a.m. outside the send hours instead of cancelling", async () => {
+    const night = at("2026-11-14T02:00:00Z"); // 8 pm Chicago
+    expect(await clubDraftReminderCheck(message(), night)).toEqual({ kind: "WAIT", until: at("2026-11-14T15:00:00Z"), note: expect.stringMatching(/morning/) });
+    // A reminder that is also obsolete is cancelled, not parked.
+    state.drafts = [];
+    expect(await clubDraftReminderCheck(message(), night)).toMatchObject(obsolete);
   });
 });

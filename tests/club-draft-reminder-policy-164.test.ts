@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** #164: saving the policy writes the change and its audit entry together, with old and new values, and nothing when unchanged. */
-const state = vi.hoisted(() => ({ events: ["event-1"], policy: null as null | Record<string, unknown>, audit: [] as Array<Record<string, unknown>> }));
+const state = vi.hoisted(() => ({ clubEvents: ["event-1"], events: ["event-1", "event-2"], policy: null as null | Record<string, unknown>, audit: [] as Array<Record<string, unknown>> }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/logger", () => ({ logError: () => undefined }));
@@ -12,7 +12,10 @@ vi.mock("@/modules/communications/messaging-repository", () => ({ processQueuedM
 vi.mock("@/lib/prisma", () => {
   const client = {
     $transaction: async (run: (tx: unknown) => Promise<unknown>) => run(client),
-    event: { findUnique: async ({ where }: { where: { id: string } }) => (state.events.includes(where.id) ? { id: where.id } : null) },
+    event: {
+      findUnique: async ({ where }: { where: { id: string } }) => (state.events.includes(where.id) ? { id: where.id } : null),
+      findFirst: async ({ where }: { where: { id: string } }) => (state.clubEvents.includes(where.id) ? { id: where.id } : null),
+    },
     clubDraftReminderPolicy: {
       findUnique: async ({ select }: { select: Record<string, true> }) => (state.policy ? Object.fromEntries(Object.keys(select).map((key) => [key, state.policy![key]])) : null),
       upsert: async ({ update, create }: { update: Record<string, unknown>; create: Record<string, unknown> }) => { state.policy = state.policy ? { ...state.policy, ...update } : create; },
@@ -48,6 +51,12 @@ describe("saving the club registration reminder policy", () => {
     expect(state.audit).toHaveLength(1);
     await expect(saveClubDraftReminderPolicy("event-1", "staff-1", { ...valid, staleAfterDays: 2 })).rejects.toThrow();
     expect(state.audit).toHaveLength(1);
+  });
+
+  it("refuses an event that is not a club event, without writing", async () => {
+    expect(await saveClubDraftReminderPolicy("event-2", "staff-1", valid)).toMatchObject({ found: true, eligible: false, changed: false });
+    expect(state.policy).toBeNull();
+    expect(state.audit).toHaveLength(0);
   });
 
   it("reports a missing event without writing", async () => {
