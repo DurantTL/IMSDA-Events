@@ -13,6 +13,10 @@ const allowed = new Set([
   // service reads them for the signed-in account; staff code gets name, phone and shirt size only (profile-change-staff.ts).
   "modules/attendee-accounts/profile-conflicts.ts",
   "modules/attendee-accounts/profile-review-service.ts",
+  // System administrator correction of one account's address and emergency contact (#1512, slice 2): the read is one
+  // account at a time and audited; the form shows the values only after the administrator opens it.
+  "modules/attendee-accounts/profile-personal-staff.ts",
+  "components/profile-personal-correction-form.tsx",
   // The WR26 import's own registration snapshot, not the attendee account.
   "modules/imports/repository.ts",
   "modules/imports/wr26-bundle.ts",

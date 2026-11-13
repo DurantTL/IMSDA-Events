@@ -7,6 +7,7 @@ import { formatPersonName } from "@/lib/person-name";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
+  accountHolderAttendeeIndex,
   historyEntriesFor,
   profileConflicts,
   profileReviewVersion,
@@ -15,6 +16,7 @@ import {
   type ReviewableField,
   type ReviewableProfile,
 } from "@/modules/attendee-accounts/profile-conflicts";
+import { todayDateValue } from "@/modules/forms/definition";
 import { authorizeAttendeeRegistration } from "@/modules/attendee-accounts/registrations-repository";
 
 /**
@@ -66,8 +68,8 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-/** Keys of the registration-scope fields in a stored form definition. An unreadable definition yields none. */
-function registrationScopeKeys(definition: unknown): Set<string> {
+/** Keys of the fields with the given scope in a stored form definition. An unreadable definition yields none. */
+function scopeKeys(definition: unknown, wanted: "REGISTRATION" | "ATTENDEE"): Set<string> {
   const keys = new Set<string>();
   const sections = record(definition).sections;
   if (!Array.isArray(sections)) return keys;
@@ -76,17 +78,29 @@ function registrationScopeKeys(definition: unknown): Set<string> {
     if (!Array.isArray(fields)) continue;
     for (const field of fields) {
       const { key, scope } = record(field);
-      if (scope === "REGISTRATION" && typeof key === "string") keys.add(key);
+      if (scope === wanted && typeof key === "string") keys.add(key);
     }
   }
   return keys;
 }
 
+export type ReviewAnswers = {
+  /** The registration-scope answers. */
+  registration: Record<string, unknown>;
+  /** The account holder's attendee-scope answers: empty unless exactly one adult attendee is provably the holder. */
+  holder: Record<string, unknown>;
+};
+
 /**
- * The registration's current registration-scope answers: the latest amendment's snapshot, else the original submission's.
- * Attendee-scope answers are left out because they may describe another person on the registration.
+ * The registration's current answers: the latest amendment's snapshot, else the original submission's, for the
+ * registration scope; and, only when exactly one adult attendee is the signed-in account holder, that attendee's
+ * attendee-scope answers.
+ *
+ * Attendee answers are read from the attendees now on the registration (`RegistrationAttendee.formResponses` in
+ * roster order), which is where an amendment writes them, so an attendee who was removed is not considered. Only keys
+ * the stored form version defines at attendee scope are kept. Any other attendee's answers are never returned.
  */
-async function currentRegistrationScopeAnswers(client: AnswerClient, registrationId: string) {
+async function currentAnswers(client: AnswerClient, registrationId: string, verifiedEmail: string): Promise<ReviewAnswers | null> {
   const registration = await client.registration.findUnique({
     where: { id: registrationId },
     select: {
@@ -97,14 +111,22 @@ async function currentRegistrationScopeAnswers(client: AnswerClient, registratio
         take: 1,
         select: { afterSnapshot: true },
       },
+      attendees: { orderBy: [{ position: "asc" }, { id: "asc" }], select: { formResponses: true } },
     },
   });
   const submission = registration?.publicFormSubmission;
   if (!submission) return null;
   const amended = record(record(registration.operations[0]?.afterSnapshot).registrationResponses);
   const answers = Object.keys(amended).length > 0 ? amended : record(submission.responses);
-  const allowed = registrationScopeKeys(submission.formVersion.definition);
-  return Object.fromEntries(Object.entries(answers).filter(([key]) => allowed.has(key)));
+  const definition = submission.formVersion.definition;
+  const registrationKeys = scopeKeys(definition, "REGISTRATION");
+  const attendeeKeys = scopeKeys(definition, "ATTENDEE");
+  const keep = (source: Record<string, unknown>, allowed: Set<string>) =>
+    Object.fromEntries(Object.entries(source).filter(([key]) => allowed.has(key)));
+  const registrationAnswers = keep(answers, registrationKeys);
+  const attendeeAnswers = registration.attendees.map((attendee) => keep(record(attendee.formResponses), attendeeKeys));
+  const holderIndex = accountHolderAttendeeIndex({ verifiedEmail, registrationAnswers, attendeeAnswers, today: todayDateValue() });
+  return { registration: registrationAnswers, holder: holderIndex === null ? {} : attendeeAnswers[holderIndex]! };
 }
 
 type StoredProfileRow = Record<ReviewableField, string | null> & { displayName: string };
@@ -119,8 +141,8 @@ function reviewableProfile(row: StoredProfileRow): ReviewableProfile {
   ) as ReviewableProfile;
 }
 
-function offeredConflicts(profile: ReviewableProfile, answers: Record<string, unknown>, includePersonal: boolean) {
-  return profileConflicts(profile, answers, includePersonal)
+function offeredConflicts(profile: ReviewableProfile, answers: ReviewAnswers, includePersonal: boolean) {
+  return profileConflicts(profile, answers.registration, includePersonal, answers.holder)
     .filter((conflict) => conflict.enteredValue.length <= maxLength[conflict.field]);
 }
 
@@ -139,7 +161,7 @@ export async function getRegistrationProfileReview(
   const owned = await authorizeAttendeeRegistration(account.verifiedEmail, registrationId);
   if (!owned) return null;
   const prisma = getPrisma();
-  const answers = await currentRegistrationScopeAnswers(prisma, owned.registrationId);
+  const answers = await currentAnswers(prisma, owned.registrationId, account.verifiedEmail);
   if (!answers) return { registrationId: owned.registrationId, version: "", conflicts: [] };
   const row = await prisma.attendeeAccount.findUniqueOrThrow({
     where: { id: account.id },
@@ -148,7 +170,7 @@ export async function getRegistrationProfileReview(
   const profile = reviewableProfile(row);
   return {
     registrationId: owned.registrationId,
-    version: profileReviewVersion(profile, answers, includePersonal),
+    version: profileReviewVersion(profile, answers.registration, includePersonal, answers.holder),
     conflicts: offeredConflicts(profile, answers, includePersonal),
   };
 }
@@ -164,7 +186,7 @@ export async function applyRegistrationProfileReview(
   return getPrisma().$transaction(async (tx) => {
     // The profile row is locked before it is read, so the version below is judged against what is really stored.
     await tx.$queryRaw`SELECT "id" FROM "AttendeeAccount" WHERE "id" = ${account.id} FOR UPDATE`;
-    const answers = await currentRegistrationScopeAnswers(tx, owned.registrationId);
+    const answers = await currentAnswers(tx, owned.registrationId, account.verifiedEmail);
     const row = await tx.attendeeAccount.findUniqueOrThrow({
       where: { id: account.id },
       select: { ...profileColumns, displayName: true },
@@ -175,7 +197,7 @@ export async function applyRegistrationProfileReview(
       "Your profile or this registration changed since you looked. Review the differences again.",
     );
     if (!answers) throw stale();
-    if (profileReviewVersion(before, answers, includePersonal) !== input.version) throw stale();
+    if (profileReviewVersion(before, answers.registration, includePersonal, answers.holder) !== input.version) throw stale();
 
     const selected = new Set(input.fields);
     const chosen = offeredConflicts(before, answers, includePersonal).filter((conflict) => selected.has(conflict.field));
@@ -207,6 +229,7 @@ export async function applyRegistrationProfileReview(
             oldValue: before[conflict.field],
             newValue: merged[conflict.field],
           })),
+          "REGISTRATION_REVIEW",
         ).map((entry) => ({
           accountId: account.id,
           ...entry,

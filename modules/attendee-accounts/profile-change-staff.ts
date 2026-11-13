@@ -4,12 +4,15 @@ import { z } from "zod";
 import { phoneToStore } from "@/lib/field-validation";
 import { formatPersonName } from "@/lib/person-name";
 import { getPrisma } from "@/lib/prisma";
+import { clampPage, pageCountFor } from "@/lib/pagination";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { auditCrossEventIdentityRead } from "@/modules/people/identity-read-audit";
 import {
   historyEntriesFor,
+  isStaffPersonalValueField,
   isValueKeptField,
   profileFieldLabel,
+  staffPersonalValueFields,
   valueKeptFields,
   type ValueKeptField,
 } from "@/modules/attendee-accounts/profile-conflicts";
@@ -18,9 +21,10 @@ import {
  * Staff view and correction of attendee profile changes (#1512). The caller has already passed the system
  * administrator gate (`requireSystemAdministrator`); these functions never decide who may call them.
  *
- * Staff see name, phone and shirt size values. For every other field they see only that it changed: the values are not
- * in the history, and the mailing address and emergency contact are never listed for staff. Dietary and accessibility
- * needs are not part of this feature at all.
+ * Staff see name, phone and shirt size values. They also see the old and new values of a STAFF_CORRECTION row for the
+ * mailing address and emergency contact (a system administrator's own correction, `profile-personal-staff.ts`).
+ * Address and emergency contact changes made by the attendee are never listed. Dietary and accessibility needs are
+ * not part of this feature at all.
  */
 
 export const PROFILE_CHANGE_LIST_LIMIT = 100;
@@ -37,7 +41,7 @@ export type StaffProfileChange = {
   accountId: string;
   accountName: string;
   fieldLabel: string;
-  /** Present only for name, phone and shirt size. */
+  /** Present only for name, phone and shirt size, and for a staff correction of address or emergency contact. */
   oldValue: string | null;
   newValue: string | null;
   sourceLabel: string;
@@ -45,17 +49,37 @@ export type StaffProfileChange = {
   reason: string | null;
 };
 
+export type StaffProfileChangeSlice = { page: number; pageCount: number; total: number; from: number; to: number };
+
 export type StaffCorrectableAccount = {
   accountId: string;
   accountName: string;
   current: Record<ValueKeptField, string>;
 };
 
-export async function listProfileChangesForStaff(actorUserId: string) {
-  // Address and emergency contact changes are never listed for staff, so only the value-kept fields are read.
-  const rows = await getPrisma().attendeeProfileChange.findMany({
-    where: { field: { in: [...valueKeptFields] } },
+/** The page number a `?page=` value asks for: a whole number from 1, anything else is the first page. */
+export function parseProfileChangePage(value: unknown): number {
+  const text = Array.isArray(value) ? value[0] : value;
+  const page = typeof text === "string" && /^\d{1,6}$/.test(text) ? Number(text) : 1;
+  return page >= 1 ? page : 1;
+}
+
+export async function listProfileChangesForStaff(actorUserId: string, requestedPage = 1) {
+  // Attendee-made address and emergency contact changes are never listed: only the value-kept fields, and a staff
+  // correction of the personal fields, are read.
+  const where = {
+    OR: [
+      { field: { in: [...valueKeptFields] } },
+      { source: "STAFF_CORRECTION" as const, field: { in: [...staffPersonalValueFields] } },
+    ],
+  };
+  const prisma = getPrisma();
+  const total = await prisma.attendeeProfileChange.count({ where });
+  const page = clampPage(Math.max(1, Math.floor(requestedPage)), total, PROFILE_CHANGE_LIST_LIMIT);
+  const rows = await prisma.attendeeProfileChange.findMany({
+    where,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    skip: (page - 1) * PROFILE_CHANGE_LIST_LIMIT,
     take: PROFILE_CHANGE_LIST_LIMIT,
     select: {
       id: true,
@@ -75,10 +99,11 @@ export async function listProfileChangesForStaff(actorUserId: string) {
     actorUserId,
     surface: "ATTENDEE_PROFILE_CHANGES",
     resultIds: rows.map((row) => row.id),
+    extra: { page },
   });
   const changes: StaffProfileChange[] = rows.map((row) => {
-    // Belt and braces: a value never leaves for a field outside the value-kept list.
-    const keep = isValueKeptField(row.field);
+    // Belt and braces: a value never leaves for any other field, or for a personal field from another source.
+    const keep = isValueKeptField(row.field) || (row.source === "STAFF_CORRECTION" && isStaffPersonalValueField(row.field));
     return {
       id: row.id,
       createdAt: row.createdAt.toISOString(),
@@ -106,7 +131,15 @@ export async function listProfileChangesForStaff(actorUserId: string) {
       },
     });
   }
-  return { changes, accounts: [...accounts.values()], capped: rows.length === PROFILE_CHANGE_LIST_LIMIT };
+  const start = (page - 1) * PROFILE_CHANGE_LIST_LIMIT;
+  const slice = {
+    page,
+    pageCount: pageCountFor(total, PROFILE_CHANGE_LIST_LIMIT),
+    total,
+    from: rows.length ? start + 1 : 0,
+    to: rows.length ? start + rows.length : 0,
+  };
+  return { changes, accounts: [...accounts.values()], page, slice };
 }
 
 const text = (maximum: number) => z.string().trim().max(maximum);

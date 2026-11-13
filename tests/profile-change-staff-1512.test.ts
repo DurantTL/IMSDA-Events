@@ -20,9 +20,10 @@ import { POST } from "@/app/api/people/profile-updates/route";
 import {
   applyStaffProfileCorrection,
   listProfileChangesForStaff,
+  parseProfileChangePage,
 } from "@/modules/attendee-accounts/profile-change-staff";
 
-const attendeeProfileChange = { findMany: vi.fn(), createMany: vi.fn() };
+const attendeeProfileChange = { findMany: vi.fn(), createMany: vi.fn(), count: vi.fn() };
 const attendeeAccount = { findUniqueOrThrow: vi.fn(), update: vi.fn() };
 const tx = { attendeeAccount, attendeeProfileChange, $queryRaw: vi.fn() };
 
@@ -42,6 +43,7 @@ beforeEach(() => {
     $transaction: (callback: (client: typeof tx) => unknown) => callback(tx),
   });
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
+  attendeeProfileChange.count.mockResolvedValue(2);
   tx.$queryRaw.mockResolvedValue([{ id: "acct-1" }]);
   attendeeAccount.findUniqueOrThrow.mockResolvedValue(stored);
   attendeeAccount.update.mockResolvedValue({ id: "acct-1" });
@@ -62,33 +64,85 @@ describe("listProfileChangesForStaff", () => {
     ...overrides,
   });
 
-  it("caps the list, audits the read by id, and shows values only for name, phone and shirt size", async () => {
+  it("pages the list, audits the read by id, and shows values only for name, phone, shirt size and staff-corrected personal fields", async () => {
     attendeeProfileChange.findMany.mockResolvedValue([
       row({}),
       // Even if a value were ever present on an address row, it never reaches staff.
       row({ id: "chg-2", field: "mailingLine1", oldValue: "1 Example Way", newValue: "2 Other Road", registration: { confirmationCode: "REG-TEST000001" }, source: "REGISTRATION_REVIEW" }),
     ]);
     const { changes, accounts } = await listProfileChangesForStaff("usr-admin");
-    expect(attendeeProfileChange.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 100, orderBy: [{ createdAt: "desc" }, { id: "desc" }] }));
-    expect(mocks.auditCrossEventIdentityRead).toHaveBeenCalledWith({ actorUserId: "usr-admin", surface: "ATTENDEE_PROFILE_CHANGES", resultIds: ["chg-1", "chg-2"] });
+    expect(attendeeProfileChange.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 0, take: 100, orderBy: [{ createdAt: "desc" }, { id: "desc" }] }));
+    expect(mocks.auditCrossEventIdentityRead).toHaveBeenCalledWith({ actorUserId: "usr-admin", surface: "ATTENDEE_PROFILE_CHANGES", resultIds: ["chg-1", "chg-2"], extra: { page: 1 } });
     expect(changes[0]).toMatchObject({ fieldLabel: "First name", oldValue: "Avery", newValue: "Averi", sourceLabel: "Edited by the attendee" });
     expect(changes[1]).toMatchObject({ fieldLabel: "Address line 1", oldValue: null, newValue: null, confirmationCode: "REG-TEST000001" });
     expect(JSON.stringify({ changes, accounts })).not.toMatch(/Example Way|Other Road/);
     expect(accounts).toEqual([{ accountId: "acct-1", accountName: "Avery Person", current: stored }]);
   });
 
-  it("never selects the address, emergency contact or health columns, and lists only value-kept fields", async () => {
+  it("never selects the address, emergency contact or health columns, and lists only value-kept fields and staff-corrected personal fields", async () => {
     attendeeProfileChange.findMany.mockResolvedValue([]);
     const result = await listProfileChangesForStaff("usr-admin");
     const query = attendeeProfileChange.findMany.mock.calls[0]![0];
-    expect(query.where).toEqual({ field: { in: ["firstName", "lastName", "phone", "shirtSize"] } });
+    expect(query.where).toEqual({
+      OR: [
+        { field: { in: ["firstName", "lastName", "phone", "shirtSize"] } },
+        {
+          source: "STAFF_CORRECTION",
+          field: {
+            in: [
+              "mailingLine1", "mailingLine2", "mailingCity", "mailingRegion", "mailingPostalCode", "mailingCountry",
+              "emergencyContactName", "emergencyContactPhone", "emergencyContactRelationship",
+            ],
+          },
+        },
+      ],
+    });
     expect(JSON.stringify(query.select)).not.toMatch(/mailing|emergency|dietary|accessibility/i);
-    expect(result.capped).toBe(false);
+    expect(result).toMatchObject({ page: 1, slice: { page: 1, pageCount: 1, total: 2, from: 0, to: 0 } });
+    expect(attendeeProfileChange.count).toHaveBeenCalledWith({ where: query.where });
   });
 
-  it("says when the list is capped", async () => {
+  it("shows old and new values and the reason for a staff correction of address or emergency contact", async () => {
+    attendeeProfileChange.findMany.mockResolvedValue([
+      row({ id: "chg-9", field: "mailingLine1", oldValue: "1 Example Way", newValue: "2 Other Road", source: "STAFF_CORRECTION", reason: "Moved house" }),
+    ]);
+    const { changes } = await listProfileChangesForStaff("usr-admin");
+    expect(changes[0]).toMatchObject({ fieldLabel: "Address line 1", oldValue: "1 Example Way", newValue: "2 Other Road", sourceLabel: "Staff correction", reason: "Moved house" });
+  });
+
+  it("never shows values of an address change from any other source, even if the row held them", async () => {
+    attendeeProfileChange.findMany.mockResolvedValue([
+      row({ field: "emergencyContactName", oldValue: "Casey Contact", newValue: "Pat Contact", source: "SELF_EDIT" }),
+    ]);
+    const { changes } = await listProfileChangesForStaff("usr-admin");
+    expect(changes[0]).toMatchObject({ oldValue: null, newValue: null });
+  });
+
+  it("pages: counts with the same filter, skips earlier pages and reports the slice", async () => {
+    attendeeProfileChange.count.mockResolvedValue(250);
     attendeeProfileChange.findMany.mockResolvedValue(Array.from({ length: 100 }, (_, index) => row({ id: `chg-${index}` })));
-    expect((await listProfileChangesForStaff("usr-admin")).capped).toBe(true);
+    const second = await listProfileChangesForStaff("usr-admin", 2);
+    expect(attendeeProfileChange.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 100, take: 100 }));
+    expect(attendeeProfileChange.count).toHaveBeenCalledWith({ where: attendeeProfileChange.findMany.mock.calls[0]![0].where });
+    expect(second.changes).toHaveLength(100);
+    expect(second.slice).toEqual({ page: 2, pageCount: 3, total: 250, from: 101, to: 200 });
+    expect(mocks.auditCrossEventIdentityRead.mock.calls[0]![0]).toMatchObject({ extra: { page: 2 } });
+    expect(mocks.auditCrossEventIdentityRead.mock.calls[0]![0].resultIds).toHaveLength(100);
+  });
+
+  it("clamps a page past the end to the last page", async () => {
+    attendeeProfileChange.count.mockResolvedValue(150);
+    attendeeProfileChange.findMany.mockResolvedValue([]);
+    const result = await listProfileChangesForStaff("usr-admin", 99);
+    expect(attendeeProfileChange.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 100 }));
+    expect(result.slice.page).toBe(2);
+  });
+
+  it("reads the page number defensively", () => {
+    expect(parseProfileChangePage(undefined)).toBe(1);
+    expect(parseProfileChangePage("3")).toBe(3);
+    expect(parseProfileChangePage(["4", "5"])).toBe(4);
+    for (const bad of ["0", "-2", "abc", "1.5", "", "9999999999"]) expect(parseProfileChangePage(bad)).toBe(1);
   });
 });
 

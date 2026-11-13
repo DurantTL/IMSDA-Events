@@ -1224,7 +1224,8 @@ enum AttendeeProfileChangeSource {
 }
 
 /// One field of an attendee's own saved profile that changed (#1512). Values are kept ONLY for `firstName`,
-/// `lastName`, `phone` and `shirtSize`. A row for any other field (mailing address, emergency contact) stores the field
+/// `lastName`, `phone` and `shirtSize`, plus the mailing address and emergency contact fields on a STAFF_CORRECTION row
+/// (a system administrator's correction). A row for those fields from any other source stores the field
 /// name alone with null values, and dietary and accessibility needs are never recorded here at all. The database
 /// enforces both rules. A staff correction always names the staff user and a reason, so that user cannot be deleted
 /// while the change exists.

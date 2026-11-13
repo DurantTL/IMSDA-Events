@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getPrisma: vi.fn(),
@@ -54,6 +54,12 @@ const definition = {
       { key: "mailing_address", scope: "REGISTRATION" },
       { key: "child_first_name", scope: "ATTENDEE" },
       { key: "emergency_contact_name", scope: "ATTENDEE" },
+      { key: "first_name", scope: "ATTENDEE" },
+      { key: "last_name", scope: "ATTENDEE" },
+      { key: "attendee_phone", scope: "ATTENDEE" },
+      { key: "shirt_size", scope: "ATTENDEE" },
+      { key: "email", scope: "ATTENDEE" },
+      { key: "birth_date", scope: "ATTENDEE" },
     ],
   }],
 };
@@ -63,10 +69,15 @@ const attendeeAccount = { findUniqueOrThrow: vi.fn(), update: vi.fn() };
 const attendeeProfileChange = { createMany: vi.fn() };
 const tx = { registration, attendeeAccount, attendeeProfileChange, $queryRaw: vi.fn() };
 
-function storedAnswers(responses: Record<string, unknown>, amended?: Record<string, unknown>) {
+function storedAnswers(
+  responses: Record<string, unknown>,
+  amended?: Record<string, unknown>,
+  attendees: Array<Record<string, unknown>> = [],
+) {
   registration.findUnique.mockResolvedValue({
     publicFormSubmission: { responses, formVersion: { definition } },
     operations: amended ? [{ afterSnapshot: { registrationResponses: amended } }] : [],
+    attendees: attendees.map((formResponses) => ({ formResponses })),
   });
 }
 
@@ -214,5 +225,78 @@ describe("applyRegistrationProfileReview", () => {
     await expect(applyRegistrationProfileReview(account, { registrationId: "reg-1", fields: ["phone"], version: profileReviewVersion(storedProfile(), bad, true) }))
       .rejects.toThrow();
     expect(attendeeAccount.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("the account holder's attendee answers", () => {
+  const holder = { email: "Avery@Example.test ", birth_date: "1990-05-05", first_name: "Avery", last_name: "Person", attendee_phone: "515-555-0177", shirt_size: "XL" };
+  const child = { first_name: "Riley", last_name: "Person", birth_date: "2015-05-05", shirt_size: "S", attendee_phone: "515-555-0188" };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2027-03-01T18:00:00Z"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("compares the holder's attendee answers and never the child's", async () => {
+    storedAnswers({ first_name: "Avery" }, undefined, [child, holder]);
+    const review = await getRegistrationProfileReview(account, "reg-1");
+    expect(review?.conflicts.map((conflict) => [conflict.field, conflict.enteredValue])).toEqual([
+      ["phone", "515-555-0177"],
+      ["shirtSize", "XL"],
+    ]);
+    expect(JSON.stringify(review)).not.toMatch(/Riley|555-0188/);
+  });
+
+  it("lets a registration answer win over the holder's attendee answer", async () => {
+    storedAnswers({ shirt_size: "L" }, undefined, [holder]);
+    const review = await getRegistrationProfileReview(account, "reg-1");
+    expect(review?.conflicts.map((conflict) => [conflict.field, conflict.enteredValue])).toEqual([
+      ["phone", "515-555-0177"],
+      ["shirtSize", "L"],
+    ]);
+  });
+
+  it("compares nothing from attendees when the holder cannot be told apart", async () => {
+    storedAnswers({ first_name: "Avery" }, undefined, [holder, { ...holder, first_name: "Second" }]);
+    expect((await getRegistrationProfileReview(account, "reg-1"))?.conflicts).toEqual([]);
+  });
+
+  it("keeps only attendee-scope keys from the stored form", async () => {
+    storedAnswers({}, undefined, [{ ...holder, dietary_needs: "Vegan", unlisted_key: "x" }]);
+    expect(JSON.stringify(await getRegistrationProfileReview(account, "reg-1"))).not.toMatch(/Vegan/);
+  });
+
+  it("reads attendees in roster order from the registration's current attendees", async () => {
+    storedAnswers({}, undefined, [holder]);
+    await getRegistrationProfileReview(account, "reg-1");
+    expect(registration.findUnique.mock.calls[0]![0].select.attendees).toEqual({
+      orderBy: [{ position: "asc" }, { id: "asc" }],
+      select: { formResponses: true },
+    });
+  });
+
+  it("makes an open review stale when the holder's attendee answer changes", async () => {
+    storedAnswers({}, undefined, [holder]);
+    const review = await getRegistrationProfileReview(account, "reg-1");
+    storedAnswers({}, undefined, [{ ...holder, shirt_size: "XXL" }]);
+    await expect(applyRegistrationProfileReview(account, { registrationId: "reg-1", fields: ["phone"], version: review!.version }))
+      .rejects.toMatchObject({ code: "STALE" });
+    expect(attendeeAccount.update).not.toHaveBeenCalled();
+  });
+
+  it("applies a chosen holder answer from the stored answers", async () => {
+    storedAnswers({}, undefined, [holder]);
+    const review = await getRegistrationProfileReview(account, "reg-1");
+    const result = await applyRegistrationProfileReview(account, { registrationId: "reg-1", fields: ["shirtSize"], version: review!.version });
+    expect(result.applied).toEqual(["shirtSize"]);
+    expect(attendeeAccount.update.mock.calls[0]![0].data).toEqual({ shirtSize: "XL" });
+  });
+
+  it("stops comparing attendee answers once the holder is no longer an adult on the record", async () => {
+    storedAnswers({}, undefined, [{ ...holder, birth_date: "" }]);
+    expect((await getRegistrationProfileReview(account, "reg-1"))?.conflicts).toEqual([]);
   });
 });
