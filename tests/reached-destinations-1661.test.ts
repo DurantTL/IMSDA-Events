@@ -104,7 +104,12 @@ describe("the registry", () => {
         expect(source, entry.route).toContain("closeoutPermissions.some");
         continue;
       }
-      expect(entry.permissions, entry.route).toHaveLength(1);
+      // Most pages accept one permission; a page that accepts either of two (the Event money report, #1962) checks each by name.
+      if (entry.permissions.length > 1) {
+        expect(entry.permissions, entry.route).toHaveLength(2);
+        for (const permission of entry.permissions) expect(source, entry.route).toContain(`permissions.includes("${permission}")`);
+        continue;
+      }
       expect(source, entry.route).toContain(`!permissions.includes("${entry.permissions[0]}")`);
       // A page that is for one audience says "Not available" on the other.
       if (entry.audience) expect(source, entry.route).toContain(`event.audience !== "${entry.audience}"`);
@@ -178,6 +183,12 @@ describe("search finds each page for a viewer who may open it", () => {
     const routes = routesIn(as("MANAGE_FINANCE"));
     expect(routes).toHaveLength(13);
     expect(routes.filter((route) => !route.startsWith("/finance/") && route !== "/more/ledger-health").sort()).toEqual(["/more/issued-assets/closeout", "/more/kitchen-report/closeout"]);
+  });
+
+  it("shows the Event money report to a reports-only viewer as well (#1962)", () => {
+    expect(routesIn(as("VIEW_REPORTS"))).toContain("/finance/money-report");
+    expect(routesIn(as("MANAGE_FINANCE"))).toContain("/finance/money-report");
+    expect(routesIn(as("VIEW_EVENT"))).not.toContain("/finance/money-report");
   });
 
   it("shows nothing to a restricted viewer", () => {

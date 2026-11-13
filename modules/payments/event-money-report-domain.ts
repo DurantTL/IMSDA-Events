@@ -1,3 +1,4 @@
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 import { activeFinancialStatuses, attendeeBalanceCents, summarizeFinanceTotals } from "@/modules/registrations/finance-view";
 
 /**
@@ -16,7 +17,8 @@ import { activeFinancialStatuses, attendeeBalanceCents, summarizeFinanceTotals }
  * - Reductions: promo codes (the registration-level redemption plus per-person PROMO_CODE adjustments), discounts
  *   (DISCOUNT adjustments) and scholarships (SCHOLARSHIP adjustments), each net of reversals, over active
  *   registrations. Positive lowers what is owed.
- * - Gross charges: net due plus those reductions. Corrections, meal and asset lines stay inside gross charges.
+ * - Gross charges: net due plus those reductions, rebuilt from the recorded discounts. It is an estimate and takes no
+ *   part in the reconciliation. Corrections, meal and asset lines stay inside it.
  * - Church-billed: an active registration of a church-billed (deferred organization invoice) event. Its total is
  *   what the church owes after the event; it is never an attendee balance and is listed on its own line.
  * - Paid: gross SUCCEEDED payments, by method. Refunds: SUCCEEDED refunds of SUCCEEDED payments. Pending, failed and
@@ -183,9 +185,9 @@ export function buildMoneyReport(input: MoneyReportInput): MoneyReport {
   };
 }
 
-/** Unsigned dollars: a leading minus would be read as a formula by spreadsheets. */
+/** Signed dollars as a number: `csvCell` leaves a finite number alone, so a negative figure stays a number and is not read as a formula. */
 function dollars(cents: number) {
-  return (Math.abs(cents) / 100).toFixed(2);
+  return Math.round(cents) / 100;
 }
 
 /**
@@ -199,7 +201,7 @@ export function moneyReportCsvRows(eventName: string, report: MoneyReport, range
     ["Note", rangeNote],
     [],
     ["Figure", "Amount", "What it includes"],
-    ["Gross charges", dollars(charges.grossCents), "Net due plus promo code discounts, discounts and scholarships, over active (submitted or confirmed) registrations. Corrections, meal and asset lines stay inside."],
+    ["Gross charges", dollars(charges.grossCents), "An estimate, not part of the reconciliation: net due plus the promo code discounts, discounts and scholarships recorded on active (submitted or confirmed) registrations. Corrections, meal and asset lines stay inside."],
     ["Promo code discounts", dollars(charges.promoCents), "Registration-level promo code discount plus per-person promo code adjustments, net of reversals."],
     ["Discounts", dollars(charges.discountCents), "Discount adjustments, net of reversals."],
     ["Scholarships", dollars(charges.scholarshipCents), "Scholarship adjustments, net of reversals (pledged and funded)."],
@@ -223,6 +225,6 @@ export function moneyReportCsvRows(eventName: string, report: MoneyReport, range
     ["Check", report.check.ok ? "Adds up" : "DOES NOT ADD UP"],
     [],
     ["Registrations that owe", "Status", "Net due", "Paid (net of refunds)", "Balance"],
-    ...report.owing.map((row): Array<string | number> => [row.confirmationCode, row.status, dollars(row.totalAmountCents), dollars(row.paidCents), dollars(row.balanceCents)]),
+    ...report.owing.map((row): Array<string | number> => [row.confirmationCode, registrationStatusWordOrRaw(row.status), dollars(row.totalAmountCents), dollars(row.paidCents), dollars(row.balanceCents)]),
   ];
 }

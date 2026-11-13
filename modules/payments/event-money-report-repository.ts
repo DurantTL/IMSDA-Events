@@ -2,6 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
+import { formatPersonName } from "@/lib/person-name";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { loadEventLedger } from "@/modules/invoices/ledger-repository";
 import { listRegistrations } from "@/modules/registrations/repository";
@@ -87,7 +88,7 @@ export async function loadEventMoneyReport(eventId: string): Promise<EventMoneyR
 
   const holderNames = new Map<string, string>();
   const rows: MoneyReportRegistration[] = registrations.map((registration) => {
-    holderNames.set(registration.id, `${registration.accountHolder.firstName} ${registration.accountHolder.lastName}`.trim());
+    holderNames.set(registration.id, formatPersonName(registration.accountHolder));
     const own = reductions.get(registration.id);
     return {
       id: registration.id,
@@ -123,17 +124,28 @@ export async function loadEventMoneyReport(eventId: string): Promise<EventMoneyR
   };
 }
 
-/** Square payments not matched to a registration of this event: a count and amount, or `null` when Square could not be read (never zero). */
-export async function loadUnmatchedSquareSummary(eventId: string, isSystemAdmin: boolean): Promise<{ count: number; cents: number } | null> {
+export type UnmatchedSquareSummary =
+  | { state: "ok"; count: number; cents: number }
+  /** Square is not set up on this site: not an outage. */
+  | { state: "notConfigured" }
+  /** Square could not be read in time (or at all). Never shown as zero. */
+  | { state: "unavailable" };
+
+/**
+ * Square payments not matched to a registration of this event. Always scoped to this event, for every viewer: payments
+ * that name no registration are never included here (the match tool lists them for system administrators).
+ */
+export async function loadUnmatchedSquareSummary(eventId: string): Promise<UnmatchedSquareSummary> {
   try {
     return await withTimeout(async () => {
-      const { findings, unreachableSquare } = await listUnmatchedSquarePayments({ eventId, includeUnattributed: isSystemAdmin });
+      const { findings, unreachableSquare } = await listUnmatchedSquarePayments({ eventId, includeUnattributed: false });
       if (unreachableSquare) throw new Error("Square could not be reached");
-      return { count: findings.length, cents: findings.reduce((total, finding) => total + finding.amountCents, 0) };
+      return { state: "ok" as const, count: findings.length, cents: findings.reduce((total, finding) => total + finding.amountCents, 0) };
     }, squareTimeoutMs);
   } catch (error) {
-    if (!isExpectedUnavailable(error)) logError("Event money report: Square payments could not load", error);
-    return null;
+    if (isExpectedUnavailable(error)) return { state: "notConfigured" };
+    logError("Event money report: Square payments could not load", error);
+    return { state: "unavailable" };
   }
 }
 

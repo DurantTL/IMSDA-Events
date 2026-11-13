@@ -80,6 +80,26 @@ describe("event money report (#1962)", () => {
     expect(report.check.ok).toBe(true);
   });
 
+  it("keeps the minus sign on a negative figure and uses the shared status words", () => {
+    // A registration paid more than it owes and then had its total lowered: the reconciliation still shows signed figures.
+    const report = buildMoneyReport({ ...extras, registrations: [row("a", { totalAmountCents: -500, status: "SUBMITTED" }), row("b", { status: "SUBMITTED" })] });
+    const rows = moneyReportCsvRows("Test Event", report, "note");
+    expect(rows.find((line) => line[0] === "Net due")?.[1]).toBe(95);
+    expect(rows.find((line) => line[0] === "Paid: total")?.[1]).toBe(0);
+    const csv = toCsv(rows);
+    expect(csv).toContain('"SYN-b","Submitted","100","0","100"');
+    // The reconciliation of a lone negative-total registration: credit is shown signed where a figure is negative.
+    const negative = moneyReportCsvRows("Test Event", buildMoneyReport({ ...extras, registrations: [row("a", { totalAmountCents: -500, status: "SUBMITTED" })] }), "note");
+    expect(negative.find((line) => line[0] === "Net due")?.[1]).toBe(-5);
+    expect(toCsv(negative)).toContain('"Net due","-5",');
+        expect(csv).not.toContain("SUBMITTED");
+  });
+
+  it("describes gross charges as an estimate outside the reconciliation", () => {
+    const rows = moneyReportCsvRows("Test Event", buildMoneyReport({ ...extras, registrations: [] }), "note");
+    expect(String(rows.find((line) => line[0] === "Gross charges")?.[2])).toContain("An estimate, not part of the reconciliation");
+  });
+
   it("writes a formula-safe CSV with codes and amounts only", () => {
     const report = buildMoneyReport({ ...extras, registrations: [row("a", { confirmationCode: "=SUM(1)" })] });
     const csv = toCsv(moneyReportCsvRows("Test Event", report, "note"));
@@ -87,6 +107,6 @@ describe("event money report (#1962)", () => {
     expect(csv).toContain("Outstanding balance");
     // Only the deliberately hostile confirmation code is guarded; no label or amount starts like a formula.
     expect(csv.match(/"'[+=@-]/g)).toHaveLength(1);
-    expect(csv).toContain("\"Payments received on them\",\"0.00\",\"minus\"");
+    expect(csv).toContain("\"Payments received on them\",\"0\",\"minus\"");
   });
 });

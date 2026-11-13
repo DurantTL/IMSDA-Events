@@ -3,7 +3,7 @@ import { ExportLink } from "@/components/export-link";
 import { Money } from "@/components/exact-value";
 import { withCurrentEvent } from "@/components/staff-navigation";
 import { formatCents } from "@/modules/payments/format-cents";
-import type { EventMoneyReport } from "@/modules/payments/event-money-report-repository";
+import type { EventMoneyReport, UnmatchedSquareSummary } from "@/modules/payments/event-money-report-repository";
 import { moneyMethodLabels, moneyMethods } from "@/modules/payments/event-money-report-domain";
 import styles from "@/components/event-money-report.module.css";
 
@@ -12,8 +12,8 @@ type Props = {
   data: EventMoneyReport;
   /** The Payments page and its filters are for MANAGE_FINANCE; a reports-only viewer sees no links to them and no names. */
   canManageFinance: boolean;
-  /** Square payments not matched to a registration of this event; `null` is "could not be read" and never reads as zero. */
-  unmatchedSquare: { count: number; cents: number } | null;
+  /** Square payments not matched to a registration of this event. "Unavailable" and "not configured" never read as zero. */
+  unmatchedSquare: UnmatchedSquareSummary;
 };
 
 function Line({ label, cents, includes, href, linkLabel, sub }: { label: string; cents: number; includes: string; href?: string; linkLabel?: string; sub?: boolean }) {
@@ -60,7 +60,7 @@ export function EventMoneyReportView({ eventId, data, canManageFinance, unmatche
         <h3 className={styles.panelHeading} id="money-charges">Charges</h3>
         <p className={styles.note}>Active registrations only (submitted or confirmed). Draft, waitlisted and cancelled registrations are never counted as owing.</p>
         <ul className={styles.lines}>
-          <Line label="Gross charges" cents={charges.grossCents} includes="Net due plus the reductions below. Corrections, meal and asset lines stay inside this figure." href={payments("ACTIVE")} />
+          <Line label="Gross charges" cents={charges.grossCents} includes="An estimate, not part of the reconciliation below: net due plus the discounts, promo codes and scholarships recorded on these registrations. Corrections, meal and asset lines stay inside this figure." href={payments("ACTIVE")} />
           <Line sub label="Promo code discounts" cents={charges.promoCents} includes="The promo code used at registration plus per-person promo codes added by staff, net of reversals." href={page("/more/promo-codes")} linkLabel="Open promo codes" />
           <Line sub label="Discounts" cents={charges.discountCents} includes="Discounts staff added to a registration, net of reversals." href={payments("ACTIVE")} />
           <Line sub label="Scholarships" cents={charges.scholarshipCents} includes="Scholarships, pledged and funded, net of reversals." href={page("/finance/scholarship-fund")} linkLabel="Open the scholarship fund" />
@@ -116,13 +116,15 @@ export function EventMoneyReportView({ eventId, data, canManageFinance, unmatche
       <section className={styles.panel} aria-labelledby="money-square">
         <h3 className={styles.panelHeading} id="money-square">Square payments not matched</h3>
         <ul className={styles.lines}>
-          {unmatchedSquare
+          {unmatchedSquare.state === "ok"
             ? <Line label={`${unmatchedSquare.count} not matched to a registration`} cents={unmatchedSquare.cents} includes="Read live from Square for this event. Not counted in any figure above until matched." href={page("/finance/square-payments")} linkLabel="Open the match tool" />
             : (
               <li className={styles.line}>
-                <p className={styles.label}>Unavailable</p>
+                <p className={styles.label}>{unmatchedSquare.state === "notConfigured" ? "Square is not set up" : "Unavailable"}</p>
                 <div className={styles.detail}>
-                  <p className={styles.detailText}>Square could not be read just now, so this is not shown as zero. Try again shortly.</p>
+                  <p className={styles.detailText}>{unmatchedSquare.state === "notConfigured"
+                    ? "Square is not configured for this site. Ask your event administrator or the system administrator to set it up; nothing is shown as zero."
+                    : "Square could not be read just now, so this is not shown as zero. Try again shortly."}</p>
                   {canManageFinance ? <a className={styles.open} href={withCurrentEvent("/finance/square-payments", eventId)}>Open the match tool</a> : null}
                 </div>
               </li>
