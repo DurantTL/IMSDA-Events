@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const sql = readFileSync("prisma/migrations/20270157100000_event_closeout_signoffs/migration.sql", "utf8");
+const sql = readFileSync("prisma/migrations/20270166100000_event_closeout_signoffs/migration.sql", "utf8");
 const statements = sql.replace(/--.*$/gm, "");
 
 describe("event closeout migration (#1515)", () => {
