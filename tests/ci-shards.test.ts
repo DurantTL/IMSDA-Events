@@ -75,8 +75,17 @@ describe("CI database-script shards (#1233)", () => {
     const expected = packageScripts
       .filter((name) => !NOT_IN_CI.has(name))
       .sort();
+    // Same set both ways: every script outside NOT_IN_CI runs in a shard, and
+    // every shard entry names a real package.json script.
     expect([...placements.keys()].sort()).toEqual(expected);
-    expect(expected).toHaveLength(119);
+    // Sanity floor so a parser break cannot pass with an empty list. It is a
+    // floor, not the exact count, so adding a script never needs an edit here.
+    expect(expected.length).toBeGreaterThanOrEqual(100);
+  });
+
+  it("lists only real package.json scripts as not run in CI", () => {
+    const scripts = new Set(packageScripts);
+    for (const name of NOT_IN_CI) expect(scripts.has(name), name).toBe(true);
   });
 
   it("keeps the scripts that need the app in the shard that starts it", () => {
