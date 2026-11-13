@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import { isUnchangedPhone, MAX_PHONE_LENGTH, resolvePhoneChange } from "@/lib/field-validation";
 import { embedProviders, isValidEmbedId } from "@/modules/events/content-embeds";
-import { SCHEDULE_NOT_FUTURE_MESSAGE } from "@/modules/events/content-schedule";
 
 /**
  * A resource tile: a flyer, a schedule, a link back to a ministry page.
@@ -425,9 +424,6 @@ export const eventContentSectionInputSchema = z.object({
   /** Per-kind content for the #816 blocks; checked against the kind's schema below. */
   data: z.record(z.string(), z.unknown()).optional(),
 }).strict().superRefine((value, context) => {
-  if (!value.isPublished && value.scheduledPublishAt && new Date(value.scheduledPublishAt).getTime() <= Date.now()) {
-    context.addIssue({ code: "custom", path: ["scheduledPublishAt"], message: SCHEDULE_NOT_FUTURE_MESSAGE });
-  }
   if (value.kind !== "CUSTOM_HTML" && value.body.length > 8000) {
     context.addIssue({
       code: "custom",
@@ -523,8 +519,11 @@ export const eventContentSectionInputSchema = z.object({
  * Whole-page save. Order comes from the array rather than a per-section field,
  * so reordering cannot leave two sections claiming the same position.
  */
+/** The most sections one event page holds. */
+export const EVENT_CONTENT_SECTION_LIMIT = 30;
+
 export const eventContentInputSchema = z.object({
-  sections: z.array(eventContentSectionInputSchema).max(30),
+  sections: z.array(eventContentSectionInputSchema).max(EVENT_CONTENT_SECTION_LIMIT),
 }).strict().superRefine((value, context) => {
   if (value.sections.filter((section) => section.kind === "HERO").length > 1) {
     context.addIssue({

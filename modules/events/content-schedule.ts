@@ -3,6 +3,7 @@
  * editor, the save check and the tests share one definition.
  */
 
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { zonedLocalToDate } from "@/modules/events/content-countdown";
 
 export const CONTENT_SCHEDULE_TIME_ZONE = "America/Chicago";
@@ -37,15 +38,7 @@ export function centralScheduleLabel(iso: string | null | undefined): string {
   if (!iso) return "";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: CONTENT_SCHEDULE_TIME_ZONE,
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  }).format(date);
+  return formatInConferenceTime(date, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 export const SCHEDULE_NOT_FUTURE_MESSAGE = "Choose a publish time that is still in the future, or clear it.";

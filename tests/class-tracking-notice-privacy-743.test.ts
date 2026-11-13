@@ -107,6 +107,7 @@ describe("club notice privacy across signed-out, attendee, director and coordina
   it("the public event page gives club directors one sign-in instruction (the callout), and no club note reaches the portal (#1005)", () => {
     const users = [
       "app/(public)/events/[eventSlug]/page.tsx",
+      "components/public-event-landing-view.tsx",
       "app/(public)/account/(portal)/layout.tsx",
       "app/(public)/account/(portal)/clubs/[organizationId]/page.tsx",
       "app/(public)/account/(portal)/clubs/[organizationId]/layout.tsx",
@@ -115,7 +116,7 @@ describe("club notice privacy across signed-out, attendee, director and coordina
     ];
     // The card note that repeated the callout is gone; nothing renders it anywhere.
     expect(users.filter((file) => read(file).includes("CLUB_REGISTRATION_CARD_NOTE"))).toEqual([]);
-    expect(read("app/(public)/events/[eventSlug]/page.tsx")).toContain("ClubDirectorSignInNotice");
+    expect(read("components/public-event-landing-view.tsx")).toContain("ClubDirectorSignInNotice");
   });
 
   it("the coordinator's view-only notice lives only in the coordinator layout, and the director layout never shows it", () => {

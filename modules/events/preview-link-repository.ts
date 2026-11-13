@@ -16,6 +16,8 @@ export async function createPreviewLink(eventId: string, actorUserId: string, no
   const token = createOpaqueToken();
   const expiresAt = new Date(now.getTime() + PREVIEW_LINK_LIFETIME_MS);
   await getPrisma().$transaction(async (tx) => {
+    // Two staff members making a link at once take turns on the event's row, so only one link stays active.
+    await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${eventId} FOR UPDATE`;
     const replaced = await tx.eventPagePreviewLink.updateMany({
       where: { eventId, revokedAt: null },
       data: { revokedAt: now, revokedByUserId: actorUserId },

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Copy, Link2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { centralScheduleLabel } from "@/modules/events/content-schedule";
 import styles from "@/components/event-page-publishing.module.css";
 
@@ -14,7 +15,9 @@ type Status = { active: boolean; expiresAt: string | null };
 export function EventPagePreviewLinkPanel({ eventId, dirty }: { eventId: string; dirty: boolean }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [url, setUrl] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"POST" | "DELETE" | null>(null);
+  // A replace or a turn-off asks first: either one ends a link somebody may already have been given.
+  const [confirming, setConfirming] = useState<"POST" | "DELETE" | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -28,7 +31,7 @@ export function EventPagePreviewLinkPanel({ eventId, dirty }: { eventId: string;
   }, [eventId]);
 
   async function call(method: "POST" | "DELETE") {
-    setBusy(true);
+    setBusy(method);
     setError("");
     setNotice("");
     try {
@@ -46,7 +49,8 @@ export function EventPagePreviewLinkPanel({ eventId, dirty }: { eventId: string;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The preview link could not be updated.");
     } finally {
-      setBusy(false);
+      setBusy(null);
+      setConfirming(null);
     }
   }
 
@@ -87,15 +91,31 @@ export function EventPagePreviewLinkPanel({ eventId, dirty }: { eventId: string;
             : "No preview link is on."}
       </p>
       <div className={styles.actions}>
-        <button className="secondary-button" type="button" disabled={busy} onClick={() => void call("POST")}>
-          <Link2 size={15} aria-hidden="true" /> {status?.active ? "Make a new link (turns off the old one)" : "Make a preview link"}
+        <button className="secondary-button" type="button" disabled={busy !== null} onClick={() => (status?.active ? setConfirming("POST") : void call("POST"))}>
+          <Link2 size={15} aria-hidden="true" /> {busy === "POST" ? "Making link…" : status?.active ? "Make a new link (turns off the old one)" : "Make a preview link"}
         </button>
         {status?.active && (
-          <button className="secondary-button" type="button" disabled={busy} onClick={() => void call("DELETE")}>
-            Turn off the link
+          <button className="secondary-button" type="button" disabled={busy !== null} onClick={() => setConfirming("DELETE")}>
+            {busy === "DELETE" ? "Turning off…" : "Turn off the link"}
           </button>
         )}
       </div>
+      <ConfirmDialog
+        busy={busy !== null}
+        busyLabel={busy === "DELETE" ? "Turning off…" : "Making link…"}
+        confirmLabel={confirming === "DELETE" ? "Turn off the link" : "Make a new link"}
+        destructive={confirming === "DELETE"}
+        onCancel={() => setConfirming(null)}
+        onConfirm={() => { if (confirming) void call(confirming); }}
+        open={confirming !== null}
+        title={confirming === "DELETE" ? "Turn off the preview link?" : "Make a new preview link?"}
+      >
+        <p>
+          {confirming === "DELETE"
+            ? "Anyone who has the link can no longer open the preview."
+            : "The link you shared before stops working. Share the new one instead."}
+        </p>
+      </ConfirmDialog>
     </section>
   );
 }

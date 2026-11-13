@@ -19,7 +19,7 @@ type Version = {
 };
 
 const sourceLabels: Record<Version["source"], string> = {
-  SAVE: "Saved",
+  SAVE: "Changed and published",
   SCHEDULED_PUBLISH: "Published on schedule",
   ROLLBACK: "Restored from an earlier version",
 };

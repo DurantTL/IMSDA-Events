@@ -788,15 +788,16 @@ export function EventContentWorkspace({
             </label>
             {!section.isPublished && (
               <div className={publishing.scheduleField}>
-                <label htmlFor={`publish-at-${section.cid ?? index}`}>Publish at (Central time)</label>
-                <div className={publishing.scheduleControls}>
+                <label>
+                  Publish at (Central time)
                   <input
-                    id={`publish-at-${section.cid ?? index}`}
                     type="datetime-local"
                     value={isoToCentralLocal(section.scheduledPublishAt)}
                     disabled={section.kind === "CUSTOM_HTML" && !isSystemAdmin}
                     onChange={(event) => updateSection(index, { scheduledPublishAt: centralLocalToIso(event.target.value) })}
                   />
+                </label>
+                <div className={publishing.scheduleControls}>
                   {section.scheduledPublishAt && (
                     <button
                       className="secondary-button"
@@ -804,7 +805,7 @@ export function EventContentWorkspace({
                       disabled={section.kind === "CUSTOM_HTML" && !isSystemAdmin}
                       onClick={() => updateSection(index, { scheduledPublishAt: null })}
                     >
-                      Clear
+                      Remove publish time
                     </button>
                   )}
                 </div>

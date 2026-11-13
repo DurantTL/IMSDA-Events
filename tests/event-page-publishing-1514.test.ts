@@ -37,6 +37,7 @@ function matches(section: Section, where: Record<string, any> = {}) { // eslint-
 
 vi.mock("@/lib/prisma", () => {
   const tx = {
+    $queryRaw: async () => [],
     eventAsset: { findMany: async ({ where }: { where: { id: { in: string[] } } }) => where.id.in.map((id) => ({ id, contentType: "image/png" })) },
     eventContentSection: {
       findMany: async (args: { where?: Record<string, unknown>; distinct?: string[] } = {}) => {
@@ -125,11 +126,40 @@ describe("scheduledPublishAt on a section", () => {
     expect(eventContentSectionInputSchema.safeParse(text("Hours")).success).toBe(true);
   });
 
-  it("refuses a time that is not in the future, with a plain message", () => {
-    const result = parse("2027-03-10T14:00:00.000Z");
-    expect(result.success).toBe(false);
-    expect(result.error?.issues[0]?.message).toBe("Choose a publish time that is still in the future, or clear it.");
-    expect(parse("2027-03-10T15:00:00.000Z").success).toBe(false);
+  it("refuses a newly entered time that is not in the future, with a plain message, and writes nothing", async () => {
+    await save([text("Welcome")]);
+    const before = JSON.stringify(db.sections);
+    for (const at of ["2027-03-10T14:00:00.000Z", "2027-03-10T15:00:00.000Z"]) {
+      const error = await save([text("Welcome"), text("Hours", { isPublished: false, scheduledPublishAt: at })]).catch((caught) => caught);
+      expect(error).toBeInstanceOf(EventContentError);
+      expect(error.code).toBe("SCHEDULE_NOT_FUTURE");
+      expect(error.message).toBe("Choose a publish time that is still in the future, or clear it.");
+    }
+    expect(JSON.stringify(db.sections)).toBe(before);
+  });
+
+  it("accepts the stored time after it has passed and publishes that section in the save, with a version", async () => {
+    await save([text("Welcome"), text("Hours", { isPublished: false, scheduledPublishAt: "2027-03-12T15:00:00.000Z" })]);
+    vi.setSystemTime(new Date("2027-03-12T15:02:00.000Z")); // due, sweep not yet run
+    const versions = db.versions.length;
+    await save([text("Welcome"), text("Hours", { isPublished: false, scheduledPublishAt: "2027-03-12T15:00:00.000Z" })]);
+    expect(db.sections.find((section) => section.title === "Hours")).toMatchObject({ isPublished: true, scheduledPublishAt: null });
+    expect(db.versions).toHaveLength(versions + 1);
+    expect(db.audits.at(-1)?.metadata).toMatchObject({ publishedCount: 2 });
+  });
+
+  it("lets an event administrator save custom HTML whose stored schedule has passed", async () => {
+    const html = { kind: "CUSTOM_HTML", title: "Banner", body: "<p>Hi</p>", isPublished: false, scheduledPublishAt: "2027-03-12T15:00:00.000Z" };
+    await save([html], { isSystemAdmin: true });
+    vi.setSystemTime(new Date("2027-03-12T15:02:00.000Z"));
+    await expect(save([html])).resolves.toBeTruthy();
+    expect(db.sections[0]).toMatchObject({ isPublished: true, scheduledPublishAt: null });
+  });
+
+  it("still refuses a past time that differs from the stored one", async () => {
+    await save([text("Hours", { isPublished: false, scheduledPublishAt: "2027-03-12T15:00:00.000Z" })]);
+    vi.setSystemTime(new Date("2027-03-12T15:02:00.000Z"));
+    await expect(save([text("Hours", { isPublished: false, scheduledPublishAt: "2027-03-12T14:00:00.000Z" })])).rejects.toMatchObject({ code: "SCHEDULE_NOT_FUTURE" });
   });
 
   it("refuses text that is not a date and time", () => {
@@ -263,6 +293,33 @@ describe("restoring a version", () => {
     const result = await restoreEventPageVersion({ eventId: "event-1", versionId: db.versions[0]!.id, actorUserId: "user-1", isSystemAdmin: false, now: NOW });
     const overdue = result.sections.find((section) => section.title === "Overdue");
     expect(overdue).toMatchObject({ isPublished: false, scheduledPublishAt: null });
+  });
+
+  it("does not bring back a draft twice when it is the same section as one in the version", async () => {
+    await save([text("Welcome"), text("Schedule")]);
+    await save([text("Welcome"), text("Schedule", { isPublished: false })]); // unpublished after version 1
+    const result = await restoreEventPageVersion({ eventId: "event-1", versionId: db.versions[0]!.id, actorUserId: "user-1", isSystemAdmin: false, now: NOW });
+    expect(result.sections.map((section) => [section.title, section.isPublished])).toEqual([["Welcome", true], ["Schedule", true]]);
+  });
+
+  it("drops a draft header banner when the version has one, instead of failing", async () => {
+    const hero = (title: string, isPublished: boolean) => ({ kind: "HERO", title, body: "", isPublished, data: { assetId: "asset-1", alt: "Pines", subtitle: "", button: null, focalX: 50, focalY: 50, overlay: 40 } });
+    await save([hero("Come away", true), text("Welcome")]);
+    await save([text("Welcome"), hero("New banner draft", false)]);
+    // The save above moved the live banner to a draft; restore version 1 brings the live one back.
+    const result = await restoreEventPageVersion({ eventId: "event-1", versionId: db.versions[0]!.id, actorUserId: "user-1", isSystemAdmin: false, now: NOW });
+    expect(result.sections.filter((section) => section.kind === "HERO").map((section) => section.title)).toEqual(["Come away"]);
+  });
+
+  it("says so plainly when the version plus the drafts would be over the section limit", async () => {
+    db.versions.push({ id: "big", eventId: "event-1", versionNumber: 1, sections: Array.from({ length: 29 }, (_, index) => ({ ...text(`Section ${index}`), tone: null, placement: "PUBLIC_PAGE", items: [], data: {}, links: [] })), source: "SAVE", restoredFromId: null, createdByUserId: null, createdAt: NOW });
+    for (let index = 0; index < 3; index += 1) {
+      db.sections.push({ id: `d${index}`, eventId: "event-1", kind: "RICH_TEXT", title: `Draft ${index}`, body: "x", tone: null, placement: "PUBLIC_PAGE", items: [], data: {}, position: index, isPublished: false, scheduledPublishAt: null, links: [] });
+    }
+    const error = await restoreEventPageVersion({ eventId: "event-1", versionId: "big", actorUserId: "user-1", isSystemAdmin: true }).catch((caught) => caught);
+    expect(error).toBeInstanceOf(PageVersionRestoreError);
+    expect(error.message).toContain("at most 30");
+    expect(error.message).not.toBe("This version can no longer be restored.");
   });
 
   it("refuses a version of another event as not found", async () => {

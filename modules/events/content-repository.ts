@@ -20,12 +20,13 @@ import {
   type EventContentTone,
   effectiveScheduledPublishAt,
 } from "@/modules/events/content-schemas";
+import { SCHEDULE_NOT_FUTURE_MESSAGE } from "@/modules/events/content-schedule";
 import { recordPageVersionIfChanged, type PageVersionSource } from "@/modules/events/page-versions";
 
 /** Thrown when a content save cannot be honored as written. */
 export class EventContentError extends Error {
   constructor(
-    public readonly code: "ASSET_NOT_IN_EVENT" | "ASSET_NOT_AN_IMAGE" | "CUSTOM_HTML_FORBIDDEN" | "INVALID_CONTACT",
+    public readonly code: "ASSET_NOT_IN_EVENT" | "ASSET_NOT_AN_IMAGE" | "CUSTOM_HTML_FORBIDDEN" | "INVALID_CONTACT" | "SCHEDULE_NOT_FUTURE",
     message: string,
   ) {
     super(message);
@@ -159,7 +160,13 @@ export async function replaceEventContent(
   eventId: string,
   input: EventContentInput,
   actorUserId: string,
-  options: { isSystemAdmin?: boolean; source?: PageVersionSource; restoredFromId?: string | null } = {},
+  options: {
+    isSystemAdmin?: boolean;
+    source?: PageVersionSource;
+    restoredFromId?: string | null;
+    /** An audit row written in the same transaction as the save (a rollback's own entry, #1514). */
+    extraAudit?: { action: string; entityType: string; entityId: string; summary: string; metadata: Prisma.InputJsonValue };
+  } = {},
 ) {
   const prisma = getPrisma();
   const isSystemAdmin = options.isSystemAdmin === true;
@@ -179,8 +186,10 @@ export async function replaceEventContent(
     const blockAssets = section.kind === "CUSTOM_HTML"
       ? customHtmlAssetIds(body)
       : blockAssetIds(section.kind, data);
-    return { section, body, data, blockAssets };
+    // Set below, inside the transaction, for a schedule that has already come due (#1514).
+    return { section, body, data, blockAssets, publishNow: false };
   });
+  const saveTime = new Date();
 
   const linkedAssetIds = [...new Set(
     input.sections.flatMap((section) => (
@@ -272,10 +281,31 @@ export async function replaceEventContent(
         }
       }
 
+      // A publish time must be in the future when it is newly entered. The editor sends back the time already stored, and
+      // between that time and the next sweep it is in the past: that section is due, so this save publishes it (#1514).
+      const pastSchedules = prepared.filter((entry) => {
+        const at = effectiveScheduledPublishAt(entry.section);
+        return at !== null && at.getTime() <= saveTime.getTime();
+      });
+      if (pastSchedules.length > 0) {
+        const storedScheduled = await tx.eventContentSection.findMany({
+          where: { eventId, isPublished: false, scheduledPublishAt: { not: null } },
+          select: { kind: true, title: true, scheduledPublishAt: true },
+        });
+        for (const entry of pastSchedules) {
+          const at = effectiveScheduledPublishAt(entry.section)!.getTime();
+          const isStored = storedScheduled.some((row) => (
+            row.kind === entry.section.kind && row.title === entry.section.title && row.scheduledPublishAt?.getTime() === at
+          ));
+          if (!isStored) throw new EventContentError("SCHEDULE_NOT_FUTURE", SCHEDULE_NOT_FUTURE_MESSAGE);
+          entry.publishNow = true;
+        }
+      }
+
       // Links and image references go with their section: the foreign keys cascade on delete.
       await tx.eventContentSection.deleteMany({ where: { eventId } });
       for (const [position, entry] of prepared.entries()) {
-        const { section, body, data, blockAssets } = entry;
+        const { section, body, data, blockAssets, publishNow } = entry;
         await tx.eventContentSection.create({
           data: {
             eventId,
@@ -291,8 +321,8 @@ export async function replaceEventContent(
               }))
               : [],
             data: data ?? {},
-            isPublished: section.isPublished,
-            scheduledPublishAt: effectiveScheduledPublishAt(section),
+            isPublished: section.isPublished || publishNow,
+            scheduledPublishAt: publishNow ? null : effectiveScheduledPublishAt(section),
             position,
             links: section.kind === "RESOURCE_LINKS" || section.kind === "NOTICE"
               ? {
@@ -317,7 +347,7 @@ export async function replaceEventContent(
         actorUserId,
         restoredFromId: options.restoredFromId ?? null,
       });
-      const publishedCount = input.sections.filter((section) => section.isPublished).length;
+      const publishedCount = prepared.filter((entry) => entry.section.isPublished || entry.publishNow).length;
       const customHtmlCount = input.sections.filter((section) => section.kind === "CUSTOM_HTML").length;
       await tx.auditLog.create({
         data: {
@@ -336,6 +366,20 @@ export async function replaceEventContent(
           },
         },
       });
+      if (options.extraAudit) {
+        await tx.auditLog.create({
+          data: {
+            eventId,
+            actorUserId,
+            action: options.extraAudit.action,
+            entityType: options.extraAudit.entityType,
+            entityId: options.extraAudit.entityId,
+            correlationId: `${options.extraAudit.action.toLowerCase()}:${eventId}:${Date.now()}`,
+            summary: options.extraAudit.summary,
+            metadata: options.extraAudit.metadata,
+          },
+        });
+      }
     });
   } catch (error) {
     // A linked file deleted between the ownership check and the link insert
@@ -357,7 +401,7 @@ export async function replaceEventContent(
   }
   // Every published header image is kept in the shared library (#1913). After the save has committed; never fails it.
   for (const entry of prepared) {
-    if (entry.section.kind !== "HERO" || !entry.section.isPublished) continue;
+    if (entry.section.kind !== "HERO" || !(entry.section.isPublished || entry.publishNow)) continue;
     const hero = entry.data as { assetId?: string; alt?: string } | null;
     if (hero?.assetId) await keepHeaderImageInLibrary(eventId, hero.assetId, hero.alt ?? "");
   }

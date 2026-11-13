@@ -1,13 +1,12 @@
 import "server-only";
 
-import { getPrisma } from "@/lib/prisma";
 import {
   EventContentError,
   listEventContentSections,
   replaceEventContent,
 } from "@/modules/events/content-repository";
-import { eventContentInputSchema } from "@/modules/events/content-schemas";
-import { getPageVersion } from "@/modules/events/page-versions";
+import { EVENT_CONTENT_SECTION_LIMIT, eventContentInputSchema } from "@/modules/events/content-schemas";
+import { getPageVersion, stableJson } from "@/modules/events/page-versions";
 
 export const VERSION_CANNOT_RESTORE_MESSAGE = "This version can no longer be restored.";
 
@@ -54,7 +53,22 @@ export async function restoreEventPageVersion(input: {
       : null,
   }));
   const versionSections = Array.isArray(version.sections) ? version.sections : [];
-  const parsed = eventContentInputSchema.safeParse({ sections: [...versionSections, ...drafts] });
+  // A draft that is the same section as one coming back (it was unpublished after this version) would appear twice, and a
+  // draft header banner would clash with the version's: neither is kept.
+  const contentKey = (section: { kind: unknown; title: unknown; body: unknown; tone?: unknown; placement?: unknown; items?: unknown; data?: unknown; links?: unknown }) => stableJson({
+    kind: section.kind, title: section.title, body: section.body, tone: section.tone ?? null, placement: section.placement,
+    items: section.items ?? [], data: section.data ?? {}, links: section.links ?? [],
+  });
+  const comingBack = new Set(versionSections.map((section) => contentKey(section as Parameters<typeof contentKey>[0])));
+  const versionHasHero = versionSections.some((section) => (section as { kind?: unknown }).kind === "HERO");
+  const keptDrafts = drafts.filter((draft) => !comingBack.has(contentKey(draft)) && !(versionHasHero && draft.kind === "HERO"));
+  if (versionSections.length + keptDrafts.length > EVENT_CONTENT_SECTION_LIMIT) {
+    throw new PageVersionRestoreError(
+      "VERSION_CANNOT_BE_RESTORED",
+      `Restoring this version would put ${versionSections.length + keptDrafts.length} sections on the page, and a page holds at most ${EVENT_CONTENT_SECTION_LIMIT}. Remove some unpublished sections first.`,
+    );
+  }
+  const parsed = eventContentInputSchema.safeParse({ sections: [...versionSections, ...keptDrafts] });
   if (!parsed.success) throw new PageVersionRestoreError("VERSION_CANNOT_BE_RESTORED", VERSION_CANNOT_RESTORE_MESSAGE);
 
   let sections;
@@ -63,6 +77,13 @@ export async function restoreEventPageVersion(input: {
       isSystemAdmin: input.isSystemAdmin,
       source: "ROLLBACK",
       restoredFromId: version.id,
+      extraAudit: {
+        action: "EVENT_PAGE_ROLLED_BACK",
+        entityType: "EventPageVersion",
+        entityId: version.id,
+        summary: `Restored published version ${version.versionNumber} of the event page.`,
+        metadata: { versionNumber: version.versionNumber },
+      },
     });
   } catch (error) {
     // A file or contact the old version used is gone or no longer valid: the version cannot come back as it was.
@@ -71,17 +92,5 @@ export async function restoreEventPageVersion(input: {
     }
     throw error;
   }
-  await getPrisma().auditLog.create({
-    data: {
-      eventId: input.eventId,
-      actorUserId: input.actorUserId,
-      action: "EVENT_PAGE_ROLLED_BACK",
-      entityType: "EventPageVersion",
-      entityId: version.id,
-      correlationId: `event-page-rollback:${input.eventId}:${now.getTime()}`,
-      summary: `Restored published version ${version.versionNumber} of the event page.`,
-      metadata: { versionNumber: version.versionNumber },
-    },
-  });
   return { sections, versionNumber: version.versionNumber };
 }

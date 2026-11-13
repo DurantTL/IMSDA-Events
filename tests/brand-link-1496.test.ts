@@ -55,7 +55,7 @@ describe("every IMAdventist logo links to the calendar (#1496, #1549)", () => {
       "app/(public)/clubs/page.tsx",
       "components/public-club-forms-view.tsx",
       "app/(public)/events/page.tsx",
-      "app/(public)/events/[eventSlug]/page.tsx",
+      "components/public-event-landing-view.tsx",
       "app/(public)/events/[eventSlug]/loading.tsx",
     ];
     const found = sourceFiles.filter((file) => /destination="home"/.test(read(file))).sort();
