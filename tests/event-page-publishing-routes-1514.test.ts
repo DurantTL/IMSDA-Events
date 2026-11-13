@@ -99,3 +99,16 @@ describe("event page publishing routes (#1514)", () => {
     expect(state.restore).toHaveBeenCalledWith(expect.objectContaining({ eventId: "event-1", versionId: "v1", isSystemAdmin: true }));
   });
 });
+
+describe("preview routes are private (#1514)", () => {
+  it("sends the private headers for the preview page and its file route", async () => {
+    const { default: nextConfig } = await import("../next.config");
+    const rules = await nextConfig.headers!();
+    for (const source of ["/event-preview/:path*", "/api/public/event-preview/:path*"]) {
+      const headers = Object.fromEntries((rules.find((rule) => rule.source === source)?.headers ?? []).map((header) => [header.key, header.value]));
+      expect(headers["Cache-Control"], source).toBe("private, no-store, max-age=0");
+      expect(headers["Referrer-Policy"], source).toBe("no-referrer");
+      expect(headers["X-Robots-Tag"], source).toContain("noindex");
+    }
+  });
+});

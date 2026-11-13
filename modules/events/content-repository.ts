@@ -288,16 +288,20 @@ export async function replaceEventContent(
         return at !== null && at.getTime() <= saveTime.getTime();
       });
       if (pastSchedules.length > 0) {
-        const storedScheduled = await tx.eventContentSection.findMany({
-          where: { eventId, isPublished: false, scheduledPublishAt: { not: null } },
-          select: { kind: true, title: true, scheduledPublishAt: true },
+        // Either still scheduled and now due, or already published by the sweep since the editor loaded (its schedule is
+        // cleared): an editor left open sends such a section back as a draft with its old time, and it stays published.
+        const candidates = await tx.eventContentSection.findMany({
+          where: { eventId, OR: [{ isPublished: false, scheduledPublishAt: { not: null } }, { isPublished: true }] },
+          select: { kind: true, title: true, isPublished: true, scheduledPublishAt: true },
         });
         for (const entry of pastSchedules) {
           const at = effectiveScheduledPublishAt(entry.section)!.getTime();
-          const isStored = storedScheduled.some((row) => (
-            row.kind === entry.section.kind && row.title === entry.section.title && row.scheduledPublishAt?.getTime() === at
-          ));
-          if (!isStored) throw new EventContentError("SCHEDULE_NOT_FUTURE", SCHEDULE_NOT_FUTURE_MESSAGE);
+          const sameSection = (row: (typeof candidates)[number]) => row.kind === entry.section.kind && row.title === entry.section.title;
+          let at_index = candidates.findIndex((row) => !row.isPublished && sameSection(row) && row.scheduledPublishAt?.getTime() === at);
+          if (at_index < 0) at_index = candidates.findIndex((row) => row.isPublished && sameSection(row));
+          if (at_index < 0) throw new EventContentError("SCHEDULE_NOT_FUTURE", SCHEDULE_NOT_FUTURE_MESSAGE);
+          // One stored row answers for one submitted section.
+          candidates.splice(at_index, 1);
           entry.publishNow = true;
         }
       }

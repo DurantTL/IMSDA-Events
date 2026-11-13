@@ -19,6 +19,7 @@ const db = vi.hoisted(() => ({
   links: [] as PreviewLink[],
   audits: [] as Array<{ action: string; actorUserId: string | null; metadata: Record<string, unknown> | null; summary: string }>,
   failEvent: null as string | null,
+  onLock: null as null | (() => void),
   nextId: 1,
 }));
 
@@ -37,7 +38,7 @@ function matches(section: Section, where: Record<string, any> = {}) { // eslint-
 
 vi.mock("@/lib/prisma", () => {
   const tx = {
-    $queryRaw: async () => [],
+    $queryRaw: async () => { db.onLock?.(); return []; },
     eventAsset: { findMany: async ({ where }: { where: { id: { in: string[] } } }) => where.id.in.map((id) => ({ id, contentType: "image/png" })) },
     eventContentSection: {
       findMany: async (args: { where?: Record<string, unknown>; distinct?: string[] } = {}) => {
@@ -154,6 +155,21 @@ describe("scheduledPublishAt on a section", () => {
     vi.setSystemTime(new Date("2027-03-12T15:02:00.000Z"));
     await expect(save([html])).resolves.toBeTruthy();
     expect(db.sections[0]).toMatchObject({ isPublished: true, scheduledPublishAt: null });
+  });
+
+  it("keeps a section published when a stale editor sends it back as a draft after the sweep published it", async () => {
+    await save([text("Welcome"), text("Hours", { isPublished: false, scheduledPublishAt: "2027-03-12T15:00:00.000Z" })]);
+    await publishDueEventPageSections({ now: new Date("2027-03-12T15:05:00.000Z") });
+    vi.setSystemTime(new Date("2027-03-12T15:10:00.000Z"));
+    await save([text("Welcome"), text("Hours", { isPublished: false, scheduledPublishAt: "2027-03-12T15:00:00.000Z" })]);
+    expect(db.sections.find((section) => section.title === "Hours")).toMatchObject({ isPublished: true, scheduledPublishAt: null });
+  });
+
+  it("lets one stored row answer for only one submitted section", async () => {
+    await save([text("Hours", { isPublished: false, scheduledPublishAt: "2027-03-12T15:00:00.000Z" })]);
+    vi.setSystemTime(new Date("2027-03-12T15:02:00.000Z"));
+    const past = { isPublished: false, scheduledPublishAt: "2027-03-12T15:00:00.000Z" };
+    await expect(save([text("Hours", past), text("Hours", past)])).rejects.toMatchObject({ code: "SCHEDULE_NOT_FUTURE" });
   });
 
   it("still refuses a past time that differs from the stored one", async () => {
@@ -278,7 +294,7 @@ describe("restoring a version", () => {
     await save([text("Welcome"), text("Schedule changed"), text("Draft", { isPublished: false, scheduledPublishAt: "2027-03-15T15:00:00.000Z" })]);
     expect(db.versions).toHaveLength(2);
 
-    const result = await restoreEventPageVersion({ eventId: "event-1", versionId: db.versions[0]!.id, actorUserId: "user-1", isSystemAdmin: false, now: NOW });
+    const result = await restoreEventPageVersion({ eventId: "event-1", versionId: db.versions[0]!.id, actorUserId: "user-1", isSystemAdmin: false });
     expect(result.versionNumber).toBe(1);
     expect(result.sections.map((section) => [section.title, section.isPublished])).toEqual([["Welcome", true], ["Schedule", true], ["Draft", false]]);
     expect(result.sections[2]?.scheduledPublishAt).toBe("2027-03-15T15:00:00.000Z");
@@ -286,29 +302,37 @@ describe("restoring a version", () => {
     expect(db.audits.at(-1)).toMatchObject({ action: "EVENT_PAGE_ROLLED_BACK", metadata: { versionNumber: 1 } });
   });
 
-  it("drops a draft's schedule that has already passed instead of failing", async () => {
+  it("passes a draft's stored schedule that has already passed through, and the save publishes it as due", async () => {
     await save([text("Welcome")]);
     await save([text("Welcome"), text("Extra")]);
     db.sections.push({ id: "old", eventId: "event-1", kind: "RICH_TEXT", title: "Overdue", body: "x", tone: null, placement: "PUBLIC_PAGE", items: [], data: {}, position: 5, isPublished: false, scheduledPublishAt: new Date("2027-03-01T00:00:00Z"), links: [] });
-    const result = await restoreEventPageVersion({ eventId: "event-1", versionId: db.versions[0]!.id, actorUserId: "user-1", isSystemAdmin: false, now: NOW });
+    const result = await restoreEventPageVersion({ eventId: "event-1", versionId: db.versions[0]!.id, actorUserId: "user-1", isSystemAdmin: false });
     const overdue = result.sections.find((section) => section.title === "Overdue");
-    expect(overdue).toMatchObject({ isPublished: false, scheduledPublishAt: null });
+    expect(overdue).toMatchObject({ isPublished: true, scheduledPublishAt: null });
   });
 
   it("does not bring back a draft twice when it is the same section as one in the version", async () => {
     await save([text("Welcome"), text("Schedule")]);
     await save([text("Welcome"), text("Schedule", { isPublished: false })]); // unpublished after version 1
-    const result = await restoreEventPageVersion({ eventId: "event-1", versionId: db.versions[0]!.id, actorUserId: "user-1", isSystemAdmin: false, now: NOW });
+    const result = await restoreEventPageVersion({ eventId: "event-1", versionId: db.versions[0]!.id, actorUserId: "user-1", isSystemAdmin: false });
     expect(result.sections.map((section) => [section.title, section.isPublished])).toEqual([["Welcome", true], ["Schedule", true]]);
   });
 
-  it("drops a draft header banner when the version has one, instead of failing", async () => {
-    const hero = (title: string, isPublished: boolean) => ({ kind: "HERO", title, body: "", isPublished, data: { assetId: "asset-1", alt: "Pines", subtitle: "", button: null, focalX: 50, focalY: 50, overlay: 40 } });
+  const hero = (title: string, isPublished: boolean) => ({ kind: "HERO", title, body: "", isPublished, data: { assetId: "asset-1", alt: "Pines", subtitle: "", button: null, focalX: 50, focalY: 50, overlay: 40 } });
+
+  it("refuses with a plain message when a different draft header banner would clash with the version's", async () => {
     await save([hero("Come away", true), text("Welcome")]);
     await save([text("Welcome"), hero("New banner draft", false)]);
-    // The save above moved the live banner to a draft; restore version 1 brings the live one back.
-    const result = await restoreEventPageVersion({ eventId: "event-1", versionId: db.versions[0]!.id, actorUserId: "user-1", isSystemAdmin: false, now: NOW });
-    expect(result.sections.filter((section) => section.kind === "HERO").map((section) => section.title)).toEqual(["Come away"]);
+    const error = await restoreEventPageVersion({ eventId: "event-1", versionId: db.versions[0]!.id, actorUserId: "user-1", isSystemAdmin: false }).catch((caught) => caught);
+    expect(error).toBeInstanceOf(PageVersionRestoreError);
+    expect(error.message).toBe("Publish or remove your draft header banner first, then restore.");
+  });
+
+  it("drops a draft header banner that is identical to the version's, as a duplicate", async () => {
+    await save([hero("Come away", true), text("Welcome")]);
+    await save([hero("Come away", false), text("Welcome")]); // the banner was unpublished after version 1
+    const result = await restoreEventPageVersion({ eventId: "event-1", versionId: db.versions[0]!.id, actorUserId: "user-1", isSystemAdmin: false });
+    expect(result.sections.filter((section) => section.kind === "HERO").map((section) => [section.title, section.isPublished])).toEqual([["Come away", true]]);
   });
 
   it("says so plainly when the version plus the drafts would be over the section limit", async () => {
@@ -358,6 +382,14 @@ describe("the preview link", () => {
     expect(await findPreviewLinkByToken(created.token, NOW)).toMatchObject({ eventId: "event-1" });
     expect(JSON.stringify(db.audits)).not.toContain(created.token);
     expect(db.audits.at(-1)?.action).toBe("EVENT_PAGE_PREVIEW_LINK_CREATED");
+  });
+
+  it("takes the event row lock before it revokes or inserts", async () => {
+    const order: string[] = [];
+    db.onLock = () => order.push(`lock:${db.links.length}`);
+    await createPreviewLink("event-1", "user-1", NOW);
+    expect(order).toEqual(["lock:0"]);
+    db.onLock = null;
   });
 
   it("revokes the previous link when a new one is made", async () => {
