@@ -95,7 +95,7 @@ describe("transitionEventLifecycle (#156)", () => {
     });
     expect(tx.eventLifecycleTransition.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        eventId: "event-1", fromState: "TEST", toState: "PUBLISHED", actorUserId: "usr_1", reason: "go live",
+        id: expect.any(String), eventId: "event-1", fromState: "TEST", toState: "PUBLISHED", actorUserId: "usr_1", reason: "go live",
         evidence: { publishReadiness: expect.arrayContaining([{ id: "registration-form", complete: true }]) },
       }),
     });
@@ -271,3 +271,67 @@ describe("getEventLifecycle", () => {
     expect(result).toMatchObject({ state: "ARCHIVED", allowedNext: [] });
   });
 });
+
+describe("the closeout moves (#1515)", () => {
+  const finance = { userId: "usr_1", permissions: ["MANAGE_FINANCE"] as const };
+  const invoicer = { userId: "usr_1", permissions: ["FINALIZE_INVOICES"] as const };
+
+  it("refuses a plain move to Closed and a plain reopen, pointing at the Closeout page, and changes nothing", async () => {
+    const { tx } = mockPrisma(row({ lifecycleState: "FINANCIAL_RECONCILIATION", isPublished: true }));
+    await expect(transitionEventLifecycle({ eventId: "event-1", toState: "CLOSED", expectedFromState: "FINANCIAL_RECONCILIATION", actor: finance, now }))
+      .rejects.toMatchObject({ code: "CLOSEOUT_REQUIRED", message: expect.stringContaining("Closeout page") });
+    expect(tx.event.updateMany).not.toHaveBeenCalled();
+    expect(tx.eventLifecycleTransition.create).not.toHaveBeenCalled();
+    const second = mockPrisma(row({ lifecycleState: "CLOSED", isPublished: true }));
+    await expect(transitionEventLifecycle({ eventId: "event-1", toState: "FINANCIAL_RECONCILIATION", expectedFromState: "CLOSED", actor: finance, reason: "x", now }))
+      .rejects.toMatchObject({ code: "CLOSEOUT_REQUIRED" });
+    expect(second.tx.event.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses an account holding neither finance permission before it reaches the closeout action", async () => {
+    mockPrisma(row({ lifecycleState: "FINANCIAL_RECONCILIATION", isPublished: true }));
+    const run = vi.fn();
+    await expect(transitionEventLifecycle({
+      eventId: "event-1", toState: "CLOSED", expectedFromState: "FINANCIAL_RECONCILIATION", actor: { userId: "usr_1", permissions: ["CONFIGURE_EVENT", "VIEW_REPORTS"] }, now,
+      closeout: { action: "SIGN_OFF", run },
+    })).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("runs the closeout action inside the locked transaction for either finance permission, and stores its evidence and id", async () => {
+    for (const actor of [finance, invoicer]) {
+      const { tx, order } = mockPrisma(row({ lifecycleState: "FINANCIAL_RECONCILIATION", isPublished: true, lifecycleVersion: 3 }));
+      const run = vi.fn(async () => { order.push("closeout"); return { evidence: { closeout: "SIGN_OFF", signoffId: "so_1" } }; });
+      const result = await transitionEventLifecycle({ eventId: "event-1", toState: "CLOSED", expectedFromState: "FINANCIAL_RECONCILIATION", actor, now, closeout: { action: "SIGN_OFF", run } });
+      expect(result).toMatchObject({ changed: true, toState: "CLOSED", lifecycleVersion: 4, transitionId: expect.any(String) });
+      expect(order).toEqual(["lock", "read", "closeout", "update", "history", "audit"]);
+      expect(run).toHaveBeenCalledWith(tx, expect.objectContaining({ eventId: "event-1", fromState: "FINANCIAL_RECONCILIATION", transitionId: result.transitionId }));
+      expect(tx.eventLifecycleTransition.create).toHaveBeenCalledWith({ data: expect.objectContaining({ id: result.transitionId, toState: "CLOSED", evidence: { closeout: "SIGN_OFF", signoffId: "so_1" } }) });
+    }
+  });
+
+  it("does not let a sign-off action close through the reopen rule, or the reverse", async () => {
+    mockPrisma(row({ lifecycleState: "FINANCIAL_RECONCILIATION", isPublished: true }));
+    await expect(transitionEventLifecycle({
+      eventId: "event-1", toState: "CLOSED", expectedFromState: "FINANCIAL_RECONCILIATION", actor: finance, now,
+      closeout: { action: "REOPEN", run: vi.fn() },
+    })).rejects.toMatchObject({ code: "CLOSEOUT_REQUIRED" });
+  });
+
+  it("rolls the closeout action's refusal up unchanged and writes no state", async () => {
+    const { tx } = mockPrisma(row({ lifecycleState: "FINANCIAL_RECONCILIATION", isPublished: true }));
+    const refusal = new Error("blocked");
+    await expect(transitionEventLifecycle({
+      eventId: "event-1", toState: "CLOSED", expectedFromState: "FINANCIAL_RECONCILIATION", actor: finance, now,
+      closeout: { action: "SIGN_OFF", run: async () => { throw refusal; } },
+    })).rejects.toBe(refusal);
+    expect(tx.event.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("shows the lifecycle history to a finalize-invoices holder too", async () => {
+    mockPrisma(row({ lifecycleState: "CLOSED", isPublished: true }));
+    const view = await getEventLifecycle({ eventId: "event-1", permissions: ["FINALIZE_INVOICES"], now });
+    expect(view?.allowedNext).toEqual([]);
+  });
+});
+

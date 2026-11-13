@@ -77,7 +77,7 @@ describe("More money tools model (#1575)", () => {
     expect(view.groups.map((group) => group.title)).toEqual(["Invoices and churches", "Funds and matching", "Rules and checks"]);
     expect(view.groups.map((group) => group.cards.map((card) => card.title))).toEqual([
       [staffPageTitles.invoices, staffPageTitles.churchOwed, staffPageTitles.billingResponsibility],
-      [staffPageTitles.eventMoneyReport, staffPageTitles.scholarshipFund, staffPageTitles.squarePayments, staffPageTitles.attendanceReconciliation],
+      [staffPageTitles.eventMoneyReport, staffPageTitles.eventCloseout, staffPageTitles.scholarshipFund, staffPageTitles.squarePayments, staffPageTitles.attendanceReconciliation],
       [staffPageTitles.cancellationPolicy, staffPageTitles.ledgerCheck],
     ]);
     expect(view.groups.flatMap((group) => group.cards.map((card) => card.href))).toEqual([
@@ -85,6 +85,7 @@ describe("More money tools model (#1575)", () => {
       "/finance/church-owed?event=evt_1",
       "/finance/billing-responsibility?event=evt_1",
       "/finance/money-report?event=evt_1",
+      "/finance/closeout?event=evt_1",
       "/finance/scholarship-fund?event=evt_1",
       "/finance/square-payments?event=evt_1",
       "/finance/attendance-reconciliation?event=evt_1",
@@ -111,9 +112,11 @@ describe("More money tools model (#1575)", () => {
   it("shows a failed read as Unavailable, never as zero or healthy", () => {
     const failed = allMetrics(finance, null);
     // The Event money report card (#1962) reads no number, so its chip is fixed wording and never "Unavailable".
-    const withStatus = cards(failed).filter((card) => card.status && card.title !== staffPageTitles.eventMoneyReport);
+    const withStatus = cards(failed).filter((card) => card.status && card.title !== staffPageTitles.eventMoneyReport && card.title !== staffPageTitles.eventCloseout);
     expect(withStatus.length).toBe(8);
     expect(statusOf(staffPageTitles.eventMoneyReport, failed)).toEqual({ tone: "draft", text: "Read-only report" });
+    // The Event closeout card (#1515) reads no number either: its checks are read on its own page.
+    expect(statusOf(staffPageTitles.eventCloseout, failed)).toEqual({ tone: "draft", text: "Closes the event" });
     for (const card of withStatus) expect(card.status).toEqual(UNAVAILABLE_STATUS);
     // One failed read does not hide the others.
     expect(statusOf(staffPageTitles.churchOwed, { ...allMetrics(finance, 0), churchFlags: null })).toEqual(UNAVAILABLE_STATUS);
@@ -121,7 +124,7 @@ describe("More money tools model (#1575)", () => {
   });
 
   it("treats a number nobody read as unreadable, so it never claims health", () => {
-    for (const card of cards({}).filter((entry) => entry.status && entry.title !== staffPageTitles.eventMoneyReport)) expect(card.status).toEqual(UNAVAILABLE_STATUS);
+    for (const card of cards({}).filter((entry) => entry.status && entry.title !== staffPageTitles.eventMoneyReport && entry.title !== staffPageTitles.eventCloseout)) expect(card.status).toEqual(UNAVAILABLE_STATUS);
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyVersions: 1 })).toEqual(UNAVAILABLE_STATUS);
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyInEffect: 1 })).toEqual(UNAVAILABLE_STATUS);
   });
