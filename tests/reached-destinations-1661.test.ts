@@ -104,13 +104,15 @@ describe("the registry", () => {
         expect(source, entry.route).toContain("closeoutPermissions.some");
         continue;
       }
-      // Most pages accept one permission; a page that accepts either of two (the Event money report, #1962) checks each by name.
+      // Most pages accept one permission; a page that accepts either of two (the Event money report, #1962) denies only
+      // when the viewer holds neither.
       if (entry.permissions.length > 1) {
         expect(entry.permissions, entry.route).toHaveLength(2);
-        for (const permission of entry.permissions) expect(source, entry.route).toContain(`permissions.includes("${permission}")`);
-        continue;
+        const [first, second] = entry.permissions;
+        expect(source, entry.route).toContain(`!permissions.includes("${first}") && !permissions.includes("${second}")`);
+      } else {
+        expect(source, entry.route).toContain(`!permissions.includes("${entry.permissions[0]}")`);
       }
-      expect(source, entry.route).toContain(`!permissions.includes("${entry.permissions[0]}")`);
       // A page that is for one audience says "Not available" on the other.
       if (entry.audience) expect(source, entry.route).toContain(`event.audience !== "${entry.audience}"`);
     }

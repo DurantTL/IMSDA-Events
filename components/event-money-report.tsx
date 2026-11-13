@@ -123,7 +123,7 @@ export function EventMoneyReportView({ eventId, data, canManageFinance, unmatche
                 <p className={styles.label}>{unmatchedSquare.state === "notConfigured" ? "Square is not set up" : "Unavailable"}</p>
                 <div className={styles.detail}>
                   <p className={styles.detailText}>{unmatchedSquare.state === "notConfigured"
-                    ? "Square is not configured for this site. Ask your event administrator or the system administrator to set it up; nothing is shown as zero."
+                    ? "Square is not configured for this site. Ask the system administrator to set it up; nothing is shown as zero."
                     : "Square could not be read just now, so this is not shown as zero. Try again shortly."}</p>
                   {canManageFinance ? <a className={styles.open} href={withCurrentEvent("/finance/square-payments", eventId)}>Open the match tool</a> : null}
                 </div>
