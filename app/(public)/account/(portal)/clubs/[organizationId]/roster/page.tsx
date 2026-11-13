@@ -16,6 +16,7 @@ import { ROSTER_DETAILS_NEEDED_FILTER, rosterSectionsStartClosed } from "@/modul
 import { listRoster } from "@/modules/club-rosters/repository";
 import { isGuestClub, listTransferClubOptions } from "@/modules/club-transfers/repository";
 import { personIdsMovedToOtherClubs } from "@/modules/earned-awards/order-source";
+import { rosterChartsAvailable } from "@/modules/club-roster-charts/repository";
 import { rosterHealthAvailable } from "@/modules/club-features/roster-health";
 import { staffTrainingAvailable } from "@/modules/staff-training/repository";
 import { requireHealthViewerForClub } from "@/modules/health-records/access";
@@ -93,6 +94,8 @@ export default async function ClubRosterPage({
     : null;
   // The optional roster health list (#1709): the link is shown exactly when that page would open, with its own check.
   const showRosterHealth = await rosterHealthAvailable(organizationId, access.capabilities);
+  // The optional roster charts (#1704): shown exactly when that page would open, so a registrar reaches it from here.
+  const showRosterCharts = await rosterChartsAvailable(organizationId, access.capabilities);
   // The optional staff training records (#1697): shown exactly when that page would open.
   const showStaffTraining = await staffTrainingAvailable(organizationId, access.capabilities);
   return (
@@ -104,6 +107,11 @@ export default async function ClubRosterPage({
       {showRosterHealth && (
         <p>
           <a className="secondary-button club-event-action" href={`/account/clubs/${organizationId}/roster-health`}>Open roster health</a>
+        </p>
+      )}
+      {showRosterCharts && (
+        <p>
+          <a className="secondary-button club-event-action" href={`/account/clubs/${organizationId}/charts`}>Open charts</a>
         </p>
       )}
       {showStaffTraining && (

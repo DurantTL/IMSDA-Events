@@ -89,6 +89,9 @@ export function ClubOptionalFeatures({ organizationId, initialEnabled }: { organ
             {key === "completion-certificates" && saved.includes(key) && (
               <p><Link className="secondary-button" href={`/account/clubs/${organizationId}/certificates`}>Open certificates</Link></p>
             )}
+            {key === "roster-charts" && saved.includes(key) && (
+              <p><Link className="secondary-button" href={`/account/clubs/${organizationId}/charts`}>Open charts</Link></p>
+            )}
             {key === "staff-training-records" && saved.includes(key) && (
               <p><Link className="secondary-button" href={`/account/clubs/${organizationId}/staff-training`}>Open staff training</Link></p>
             )}

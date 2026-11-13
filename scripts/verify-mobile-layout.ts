@@ -330,6 +330,8 @@ const pages: PageSpec[] = [
   // Optional class and honor certificates (#1696): switched on for the club by this script's seed.
   { ...club("certificates", "/certificates"), expectText: /Class and honor certificates/ },
   club("certificates-print", "/certificates/print"),
+  // Optional roster charts and birthdays (#1704): switched on for the club by this script's seed.
+  { ...club("charts", "/charts"), expectText: /Roster charts/ },
   // Area Coordinator.
   { ...area("overview", "/account/area-clubs/overview"), flow: "portal-navigation" },
   area("clubs", "/account/area-clubs/clubs"),
@@ -1899,6 +1901,12 @@ async function seedSynthetic(prisma: PrismaClient) {
     where: { organizationId_featureKey: { organizationId: clubA, featureKey: "completion-certificates" } },
     update: {},
     create: { organizationId: clubA, featureKey: "completion-certificates" },
+  });
+  // #1704: roster charts and birthdays are switched on for the audit club (undone in cleanupSynthetic).
+  await prisma.clubOptionalFeature.upsert({
+    where: { organizationId_featureKey: { organizationId: clubA, featureKey: "roster-charts" } },
+    update: {},
+    create: { organizationId: clubA, featureKey: "roster-charts" },
   });
   for (const [id, kind, title, body] of [
     [clubLetterId, "LETTER", "Welcome letter", "Dear {first_name},\n\nWelcome to {club_name} for {club_year}. We are glad to have {full_name} with us.\n\n{date}"],

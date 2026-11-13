@@ -141,6 +141,7 @@ person's role allows. Print views open from the page named and have no tab of th
 | `/account/clubs/[organizationId]/letters/[templateId]/print` | Director, deputy, when turned on | "Open print view" on Letters | Printable letters |
 | `/account/clubs/[organizationId]/certificates` | Director, deputy, when turned on | "Open certificates" in Club settings | Class and honor certificates |
 | `/account/clubs/[organizationId]/certificates/print` | Director, deputy, when turned on | "Print certificates" on Certificates | Printable certificates |
+| `/account/clubs/[organizationId]/charts` | Director, deputy, registrar (birthdays and age groups: director, deputy), when turned on | Roster; Club settings | Roster charts and birthdays |
 | `/account/clubs/[organizationId]/master-guide` | Director, deputy, when turned on | "Open Master Guide tracking" in Club settings | Master Guide candidates and approvals |
 | `/account/clubs/[organizationId]/awards` | - | Old address; goes to Class tracking | - |
 | `/account/clubs/[organizationId]/exports` | - | Old address; goes to Honors | - |
