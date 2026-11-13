@@ -27,6 +27,9 @@ const client = {
     findMany: mocksExtra.reportFindMany,
   },
   clubYearStanding: { findMany: mocksExtra.standingFindMany },
+  // Area Coordinator review (#1701) is off by default: no switch row, no decisions.
+  monthlyRecordAreaReviewSetting: { findUnique: async () => null },
+  clubMonthlyReportItemReview: { updateMany: async () => ({ count: 0 }), count: async () => 0 },
   clubEventPointAward: { findMany: async () => [] },
   $transaction: (work: (tx: unknown) => unknown) => work(client),
 };

@@ -11,6 +11,7 @@ import { getPrisma } from "@/lib/prisma";
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { ON_TIME_POINTS, formatDueDate, isLockedForClub, isReportMonth, noSubmittedReportMessage, reportDueDate, reportMonthLabel } from "@/modules/club-reports/domain";
 import { getClubReport, reportPrefill } from "@/modules/club-reports/repository";
+import { getItemDecisionsForRecord } from "@/modules/club-reports/area-review";
 import { getClubReportReview } from "@/modules/club-reports/review";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { AdminPageHeader } from "@/components/admin-page-header";
@@ -41,7 +42,7 @@ export default async function StaffClubReportPage({
   if (!isReportMonth(month) || month > calendarDateIn(now).slice(0, 7)) notFound();
   const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true, clubKind: true } });
   if (!club || club.type !== "CLUB") notFound();
-  const [report, rosterPrefill, review] = await Promise.all([getClubReport(organizationId, month), reportPrefill(organizationId, now), getClubReportReview(organizationId, month)]);
+  const [report, rosterPrefill, review, areaReview] = await Promise.all([getClubReport(organizationId, month), reportPrefill(organizationId, now), getClubReportReview(organizationId, month), getItemDecisionsForRecord(organizationId, month, { includeReviewer: true })]);
   const prefill = { ...rosterPrefill, averageAttendance: null, honors: [] };
   const clubYear = clubYearFor(new Date(`${month}-15T12:00:00Z`));
   // The back link names its parent and returns to the exact address the record was opened from (#1588).
@@ -75,6 +76,7 @@ export default async function StaffClubReportPage({
         endpoint={`/api/admin/club-reports/${encodeURIComponent(organizationId)}/${month}`}
         expectedOnTime={isLockedForClub(month, now) ? 0 : ON_TIME_POINTS}
         initial={report}
+        itemDecisions={areaReview.switchOn ? areaReview.decisions : undefined}
         monthLabel={reportMonthLabel(month)}
         prefill={prefill}
         readOnly={false}

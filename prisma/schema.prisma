@@ -1213,6 +1213,7 @@ model PasswordResetToken {
 model AttendeeAccount {
   id                 String                @id @default(cuid())
   healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]
+  monthlyRecordItemReviews ClubMonthlyReportItemReview[]
   leaderDirectoryPreference LeaderDirectoryPreference?
   teamPermissionDecisions ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedByAccount")
   /// The staff `User` linked to this account (#554), if any. See `User.attendeeAccountId`.
@@ -3397,10 +3398,46 @@ model ClubMonthlyReport {
   updatedAt            DateTime         @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  itemReviews  ClubMonthlyReportItemReview[]
 
   @@unique([organizationId, reportMonth])
   @@index([clubYear, reportMonth])
   @@index([clubYear, status])
+}
+
+enum MonthlyRecordItemOutcome {
+  OK
+  RETURNED
+}
+
+/// The conference switch for Area Coordinator item-by-item review of Monthly Records (#1701), per club year. No row
+/// means off. Turned on or off by a Clubs Administrator or system administrator; audited.
+model MonthlyRecordAreaReviewSetting {
+  clubYear        String   @id
+  enabled         Boolean  @default(false)
+  updatedByUserId String?
+  updatedAt       DateTime @updatedAt
+}
+
+/// An Area Coordinator's decision on one item of a submitted Monthly Record (#1701). `itemKey` is one of the twelve
+/// point items (never on-time points). A change writes a new row and sets `supersededAt` on the old one; any save of the
+/// record as SUBMITTED supersedes the current rows. At most one current row (supersededAt null) per report and item:
+/// a partial unique index in the migration SQL, which Prisma cannot express.
+model ClubMonthlyReportItemReview {
+  id                  String                   @id @default(cuid())
+  reportId            String
+  itemKey             String
+  outcome             MonthlyRecordItemOutcome
+  /// Required (1 to 500 characters) for RETURNED, optional for OK.
+  note                String                   @default("")
+  reviewedByAccountId String?
+  reviewedAt          DateTime                 @default(now())
+  supersededAt        DateTime?
+
+  report            ClubMonthlyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reviewedByAccount AttendeeAccount?  @relation(fields: [reviewedByAccountId], references: [id], onDelete: SetNull)
+
+  @@index([reportId, supersededAt])
 }
 
 /// One club's Pathfinder Year-End Report (#607) for one Pathfinder year
