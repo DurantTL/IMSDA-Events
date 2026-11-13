@@ -30,10 +30,11 @@ export function RegistrationProfileReview({ registrationId }: { registrationId: 
   const [busy, setBusy] = useState(false);
   const statusRef = useRef<HTMLParagraphElement>(null);
 
-  // One live region stays mounted through every state; after an action focus moves to it so the result is announced.
-  function focusStatus() {
-    window.requestAnimationFrame(() => statusRef.current?.focus());
-  }
+  // One live region stays mounted through every state (same tree position, so React keeps the element); after an
+  // action focus moves to it once the new phase is committed, so the result is announced.
+  useEffect(() => {
+    if (phase === "done" || phase === "kept") statusRef.current?.focus();
+  }, [phase]);
 
   const load = useCallback(async (keepMessage = false) => {
     try {
@@ -102,7 +103,6 @@ export function RegistrationProfileReview({ registrationId }: { registrationId: 
       }
       setMessage("Your saved profile is updated.");
       setPhase("done");
-      focusStatus();
     } catch {
       setMessage("We could not update your profile. Check your connection and try again.");
     } finally {
@@ -113,7 +113,6 @@ export function RegistrationProfileReview({ registrationId }: { registrationId: 
   function keep() {
     setMessage("Your profile was not changed.");
     setPhase("kept");
-    focusStatus();
   }
 
   const reviewing = phase === "review" && review;
@@ -128,10 +127,9 @@ export function RegistrationProfileReview({ registrationId }: { registrationId: 
       {message}
     </p>
   );
-  if (!reviewing) return status;
-
   return (
     <>
+    {reviewing ? (
     <section className={styles.panel} aria-labelledby={headingId}>
       <h2 id={headingId} className={styles.heading}>Your saved profile is different</h2>
       <p className={styles.intro}>
@@ -179,6 +177,7 @@ export function RegistrationProfileReview({ registrationId }: { registrationId: 
         </button>
       </div>
     </section>
+    ) : null}
     {status}
     </>
   );
