@@ -3,7 +3,7 @@
 .filters { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); align-items: end; margin: 0 0 12px; }
 .field { display: grid; gap: 4px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; color: var(--imsda-navy); }
 .field select { min-height: 44px; width: 100%; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--field-border); border-radius: var(--radius-element); background: var(--card); font: inherit; font-weight: 400; color: inherit; }
-.field .searchBox input { min-height: 42px; border: 0; padding: 0; background: transparent; width: 100%; }
+.field .searchBox input { min-height: var(--touch-target, 44px); border: 0; padding: 0; background: transparent; width: 100%; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .list { display: grid; gap: 10px; margin: 12px 0; padding: 0; list-style: none; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); }
 .card { display: grid; gap: 6px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); align-content: start; }

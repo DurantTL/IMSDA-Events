@@ -2,7 +2,7 @@
 .filters { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); align-items: end; margin: 0 0 12px; }
 .field { display: grid; gap: 4px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; color: var(--imsda-navy); }
 .field input, .field select { min-height: 44px; width: 100%; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--field-border); border-radius: var(--radius-element); background: var(--card); font: inherit; font-weight: 400; color: inherit; }
-.field .searchBox input { min-height: 42px; border: 0; padding: 0; background: transparent; }
+.field .searchBox input { min-height: var(--touch-target, 44px); border: 0; padding: 0; background: transparent; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; }
 .sortRow { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin: 0 0 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .sortLink { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); }
