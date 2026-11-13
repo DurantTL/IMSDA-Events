@@ -53,7 +53,10 @@ export function EventInfoCards({
   eventSlug,
   placement,
   preview = false,
+  assetHref,
 }: {
+  /** Where an uploaded file is served from, when not the public address (a private preview, #1514). */
+  assetHref?: (assetId: string) => string;
   /** Staff preview: an uploaded file has no public address yet, so show its label as text. */
   preview?: boolean;
   sections: EventInfoCardSection[];
@@ -117,7 +120,7 @@ export function EventInfoCards({
                       );
                     }
                     const href = link.assetId
-                      ? `/api/public/events/${encodeURIComponent(eventSlug)}/assets/${encodeURIComponent(link.assetId)}`
+                      ? (assetHref ? assetHref(link.assetId) : `/api/public/events/${encodeURIComponent(eventSlug)}/assets/${encodeURIComponent(link.assetId)}`)
                       : (card.kind === "NOTICE" ? safeNoticeHref(link.url) : safeContentHref(link.url));
                     if (!href) return null;
                     const isMail = href.toLowerCase().startsWith("mailto:");

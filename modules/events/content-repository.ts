@@ -18,7 +18,9 @@ import {
   type EventContentKind,
   type EventContentPlacement,
   type EventContentTone,
+  effectiveScheduledPublishAt,
 } from "@/modules/events/content-schemas";
+import { recordPageVersionIfChanged, type PageVersionSource } from "@/modules/events/page-versions";
 
 /** Thrown when a content save cannot be honored as written. */
 export class EventContentError extends Error {
@@ -53,6 +55,8 @@ export type EventContentSectionRecord = {
   /** Per-kind block content (#816), as stored; `{}` for the older kinds. Parse with `parseBlockData`. */
   data: Record<string, unknown>;
   isPublished: boolean;
+  /** When an unpublished section publishes itself (#1514), as an ISO time; null for none. */
+  scheduledPublishAt: string | null;
   links: EventContentLinkRecord[];
 };
 
@@ -66,19 +70,29 @@ const sectionSelect = {
   items: true,
   data: true,
   isPublished: true,
+  scheduledPublishAt: true,
   links: {
     orderBy: { position: "asc" as const },
     select: { label: true, description: true, url: true, assetId: true },
   },
 } as const;
 
-type StoredSection = Omit<EventContentSectionRecord, "items" | "data"> & { items: unknown; data: unknown };
+type StoredSection = Omit<EventContentSectionRecord, "items" | "data" | "scheduledPublishAt"> & {
+  items: unknown;
+  data: unknown;
+  scheduledPublishAt: Date | null;
+};
 
 function toRecord(section: StoredSection): EventContentSectionRecord {
   const data = section.data && typeof section.data === "object" && !Array.isArray(section.data)
     ? (section.data as Record<string, unknown>)
     : {};
-  return { ...section, items: parseEventContentItems(section.items), data };
+  return {
+    ...section,
+    scheduledPublishAt: section.scheduledPublishAt ? section.scheduledPublishAt.toISOString() : null,
+    items: parseEventContentItems(section.items),
+    data,
+  };
 }
 
 /** Every section, published or not. For staff. */
@@ -145,7 +159,7 @@ export async function replaceEventContent(
   eventId: string,
   input: EventContentInput,
   actorUserId: string,
-  options: { isSystemAdmin?: boolean } = {},
+  options: { isSystemAdmin?: boolean; source?: PageVersionSource; restoredFromId?: string | null } = {},
 ) {
   const prisma = getPrisma();
   const isSystemAdmin = options.isSystemAdmin === true;
@@ -188,15 +202,16 @@ export async function replaceEventContent(
       if (!isSystemAdmin) {
         const stored = await tx.eventContentSection.findMany({
           where: { eventId, kind: "CUSTOM_HTML" },
-          select: { title: true, body: true, isPublished: true },
+          select: { title: true, body: true, isPublished: true, scheduledPublishAt: true },
         });
-        const fingerprint = (title: string, body: string, isPublished: boolean) => (
-          `${title}\u0000${isPublished}\u0000${sanitizeCustomHtml(body).trim()}`
+        // The schedule counts as part of the block (#1514): setting, moving or clearing it is a change.
+        const fingerprint = (title: string, body: string, isPublished: boolean, scheduledAt: Date | null) => (
+          `${title}\u0000${isPublished}\u0000${scheduledAt ? scheduledAt.toISOString() : ""}\u0000${sanitizeCustomHtml(body).trim()}`
         );
-        const expected = stored.map((row) => fingerprint(row.title, row.body, row.isPublished)).sort();
+        const expected = stored.map((row) => fingerprint(row.title, row.body, row.isPublished, row.isPublished ? null : row.scheduledPublishAt)).sort();
         const submitted = prepared
           .filter((entry) => entry.section.kind === "CUSTOM_HTML")
-          .map((entry) => fingerprint(entry.section.title, entry.body, entry.section.isPublished))
+          .map((entry) => fingerprint(entry.section.title, entry.body, entry.section.isPublished, effectiveScheduledPublishAt(entry.section)))
           .sort();
         if (expected.length !== submitted.length || expected.some((value, index) => value !== submitted[index])) {
           throw new EventContentError(
@@ -277,6 +292,7 @@ export async function replaceEventContent(
               : [],
             data: data ?? {},
             isPublished: section.isPublished,
+            scheduledPublishAt: effectiveScheduledPublishAt(section),
             position,
             links: section.kind === "RESOURCE_LINKS" || section.kind === "NOTICE"
               ? {
@@ -296,6 +312,11 @@ export async function replaceEventContent(
           },
         });
       }
+      await recordPageVersionIfChanged(tx, eventId, {
+        source: options.source ?? "SAVE",
+        actorUserId,
+        restoredFromId: options.restoredFromId ?? null,
+      });
       const publishedCount = input.sections.filter((section) => section.isPublished).length;
       const customHtmlCount = input.sections.filter((section) => section.kind === "CUSTOM_HTML").length;
       await tx.auditLog.create({

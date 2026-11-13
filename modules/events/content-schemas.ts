@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { isUnchangedPhone, MAX_PHONE_LENGTH, resolvePhoneChange } from "@/lib/field-validation";
 import { embedProviders, isValidEmbedId } from "@/modules/events/content-embeds";
+import { SCHEDULE_NOT_FUTURE_MESSAGE } from "@/modules/events/content-schedule";
 
 /**
  * A resource tile: a flyer, a schedule, a link back to a ministry page.
@@ -414,10 +415,19 @@ export const eventContentSectionInputSchema = z.object({
   placement: z.enum(eventContentPlacements).default("PUBLIC_PAGE"),
   items: z.array(eventContentItemSchema).max(20).default([]),
   isPublished: z.boolean().default(false),
+  /**
+   * When an unpublished section publishes itself (#1514), as an ISO time. Empty or null means no schedule. Only
+   * meaningful while the section is unpublished; a published section stores none.
+   */
+  scheduledPublishAt: z.union([z.literal(""), z.iso.datetime({ offset: true, message: "Choose a valid publish date and time." })])
+    .nullable().optional(),
   links: z.array(eventContentLinkInputSchema).max(12).default([]),
   /** Per-kind content for the #816 blocks; checked against the kind's schema below. */
   data: z.record(z.string(), z.unknown()).optional(),
 }).strict().superRefine((value, context) => {
+  if (!value.isPublished && value.scheduledPublishAt && new Date(value.scheduledPublishAt).getTime() <= Date.now()) {
+    context.addIssue({ code: "custom", path: ["scheduledPublishAt"], message: SCHEDULE_NOT_FUTURE_MESSAGE });
+  }
   if (value.kind !== "CUSTOM_HTML" && value.body.length > 8000) {
     context.addIssue({
       code: "custom",
@@ -524,6 +534,13 @@ export const eventContentInputSchema = z.object({
     });
   }
 });
+
+/** The schedule a section stores: an ISO instant while it is unpublished, otherwise none. */
+export function effectiveScheduledPublishAt(section: { isPublished: boolean; scheduledPublishAt?: string | null }): Date | null {
+  if (section.isPublished || !section.scheduledPublishAt) return null;
+  const date = new Date(section.scheduledPublishAt);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
 export type EventContentLinkInput = z.infer<typeof eventContentLinkInputSchema>;
 export type EventContentSectionInput = z.infer<typeof eventContentSectionInputSchema>;

@@ -11,7 +11,7 @@ import {
 } from "@/modules/events/public-domain";
 import { isListablePublishedDefinition, latestPublishedVersionArgs, publishedFormVersionWhere } from "@/modules/events/public-registration-status";
 import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
-import { listPublishedEventContentSections } from "@/modules/events/content-repository";
+import { listEventContentSections, listPublishedEventContentSections } from "@/modules/events/content-repository";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { groupFormDefinition, groupFormProblem } from "@/modules/group-registrations/domain";
 import { pickClubPortalForm } from "@/modules/club-registrations/portal-form";
@@ -20,13 +20,21 @@ import { publicFormDifferentiators } from "@/modules/forms/duplicate-public-form
 import { clubRegistrationEntryPath } from "@/modules/club-registrations/entry-path";
 import { generalLinkFormProblem, generalLinkPath, GENERAL_LINK_LABEL } from "@/modules/general-link-registrations/domain";
 
-async function loadPublicEventLanding(
-  eventSlug: string,
+/**
+ * `preview` (#1514) is for a private preview link: the event is found by id whether or not it is published, and every
+ * section comes back, drafts included. The public page never sets it.
+ */
+type LandingTarget = { kind: "public"; eventSlug: string } | { kind: "preview"; eventId: string };
+
+async function loadLanding(
+  target: LandingTarget,
   now = new Date(),
 ) {
   const prisma = getPrisma();
   const event = await prisma.event.findFirst({
-    where: { slug: eventSlug, isPublished: true, archivedAt: null },
+    where: target.kind === "public"
+      ? { slug: target.eventSlug, isPublished: true, archivedAt: null }
+      : { id: target.eventId },
     select: {
       id: true,
       slug: true,
@@ -200,10 +208,16 @@ async function loadPublicEventLanding(
     announcements,
     forms,
     links,
-    contentSections: await listPublishedEventContentSections(event.id),
+    contentSections: target.kind === "public"
+      ? await listPublishedEventContentSections(event.id)
+      : await listEventContentSections(event.id),
     /** The server's clock for this render, so the countdown block paints the same on the client. */
     renderedAtMs: now.getTime(),
   };
+}
+
+async function loadPublicEventLanding(eventSlug: string, now = new Date()) {
+  return loadLanding({ kind: "public", eventSlug }, now);
 }
 
 export type PublicEventLanding = NonNullable<
@@ -211,6 +225,11 @@ export type PublicEventLanding = NonNullable<
 >;
 
 export const getPublicEventLanding = cache(loadPublicEventLanding);
+
+/** The landing for a private preview link (#1514): the event whether or not it is published, with every section. */
+export async function getEventPreviewLanding(eventId: string, now = new Date()) {
+  return loadLanding({ kind: "preview", eventId }, now);
+}
 
 export async function listPublicEventSitemapEntries() {
   return getPrisma().event.findMany({

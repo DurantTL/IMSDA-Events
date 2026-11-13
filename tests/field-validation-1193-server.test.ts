@@ -34,6 +34,7 @@ const db: any = {
   },
   eventAsset: { findMany: vi.fn(async () => []) },
   auditLog: { create: vi.fn(async () => ({})) },
+  eventPageVersion: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
   user: { count: vi.fn(async () => 0) },
   $queryRaw: vi.fn(async () => []),
   $transaction: async (work: (tx: unknown) => unknown) => work(db),
