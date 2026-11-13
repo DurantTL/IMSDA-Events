@@ -27,12 +27,15 @@ export function savedViewHref(eventId: string, query: string) {
 export function SavedViewsPanel({
   eventId,
   views,
+  archivedViews = [],
   currentQuery,
   canSave,
   canShare,
 }: {
   eventId: string;
   views: SavedViewItem[];
+  /** Shared by staff who have left the event: only handed to someone who can share, and shown only to them. */
+  archivedViews?: SavedViewItem[];
   /** The page's canonical query (no page number): what "Save these filters" would store, and what marks the current view. */
   currentQuery: string;
   /** The page has filters, or a sort, worth keeping. */
@@ -123,6 +126,33 @@ export function SavedViewsPanel({
     afterChange();
   }
 
+  async function restore(view: SavedViewItem) {
+    if (busy) return;
+    const ok = await send(`${base}/${encodeURIComponent(view.id)}/restore`, { method: "POST", body: "{}" }, "the view couldn't be restored.", `${view.id}:restore`);
+    if (!ok) return;
+    setMessage({ tone: "success", text: "Restored. You now own this view, and event staff can open it." });
+    afterChange();
+  }
+
+  function archivedRow(view: SavedViewItem) {
+    return (
+      <li className={styles.item} key={view.id}>
+        <div className={styles.itemBody}>
+          <span className={styles.link}>{view.name}</span>
+          <p className={styles.sharedBy}>Made by {view.ownerName}, who is no longer on this event&apos;s staff</p>
+        </div>
+        <div className={styles.actions}>
+          <button aria-disabled={busy || undefined} className="secondary-button" onClick={() => void restore(view)} type="button">
+            {working === `${view.id}:restore` ? "Restoring…" : "Restore"}<span className="sr-only"> {view.name}</span>
+          </button>
+          <button aria-disabled={busy || undefined} className="secondary-button" onClick={() => void remove(view)} type="button">
+            {working === `${view.id}:delete` ? "Deleting…" : "Delete"}<span className="sr-only"> {view.name}</span>
+          </button>
+        </div>
+      </li>
+    );
+  }
+
   function row(view: SavedViewItem) {
     const noteId = `saved-view-note-${view.id}`;
     const current = view.query === currentQuery;
@@ -186,6 +216,12 @@ export function SavedViewsPanel({
           <h3 className={styles.groupTitle}>Shared with event staff</h3>
           {group(shared)}
         </div>
+      ) : null}
+      {canShare && archivedViews.length > 0 ? (
+        <details className={styles.more}>
+          <summary>Archived views ({archivedViews.length})</summary>
+          <ul className={styles.list}>{archivedViews.map(archivedRow)}</ul>
+        </details>
       ) : null}
       {canSave ? (
         <form className={styles.saveForm} onSubmit={(event) => void save(event)}>

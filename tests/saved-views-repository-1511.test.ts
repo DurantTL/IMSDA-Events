@@ -5,7 +5,8 @@ import { emptySearchCatalog } from "@/modules/registrations/operations-search-do
 // #1511: saved views, owner-only for unshared ones, share needs MANAGE_REGISTRATION, the audit says keys not values.
 // An in-memory stand-in for the one table. Synthetic data only.
 vi.mock("server-only", () => ({}));
-const mocks = vi.hoisted(() => ({ getPrisma: vi.fn(), writeAuditLog: vi.fn(), loadCatalog: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getPrisma: vi.fn(), writeAuditLog: vi.fn(), loadCatalog: vi.fn(), findActiveMembership: vi.fn() }));
+vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/modules/registrations/operations-search-repository", () => ({ loadOperationsSearchCatalog: mocks.loadCatalog }));
@@ -14,14 +15,16 @@ import { AccessDeniedError } from "@/modules/access/authorization";
 import {
   SavedViewError,
   createSavedView,
+  restoreSavedView,
   deleteSavedView,
   listSavedViews,
   setSavedViewShared,
 } from "@/modules/registrations/saved-views-repository";
 
-type Row = { id: string; eventId: string; ownerUserId: string; name: string; query: string; shared: boolean; sharedAt: Date | null; sharedByUserId: string | null; owner: { displayName: string } };
+type Row = { id: string; eventId: string; ownerUserId: string; name: string; query: string; shared: boolean; sharedAt: Date | null; sharedByUserId: string | null; owner: { displayName: string; globalRole?: "SYSTEM_ADMIN" | null } };
 let rows: Row[] = [];
 let counter = 0;
+let gone = new Set<string>();
 
 function matches(row: Row, where: Record<string, unknown>): boolean {
   return Object.entries(where).every(([key, value]) => {
@@ -71,6 +74,9 @@ beforeEach(() => {
   counter = 0;
   vi.clearAllMocks();
   installPrisma();
+  // Everyone is on the event's staff unless a test says they left.
+  mocks.findActiveMembership.mockImplementation(async (userId: string) => (gone.has(userId) ? null : { status: "ACTIVE" }));
+  gone = new Set();
   mocks.loadCatalog.mockResolvedValue({ ...emptySearchCatalog(), tags: [{ id: "tag-1", name: "VIP", isActive: true }] });
 });
 
@@ -136,7 +142,7 @@ describe("listing views", () => {
     seed({ id: "theirs-private", name: "Private" });
     seed({ id: "other-event", eventId: "event-2", ownerUserId: "user-b", name: "Elsewhere" });
     const catalog = { ...emptySearchCatalog(), tags: [{ id: "tag-1", name: "VIP", isActive: true }] };
-    const views = await listSavedViews(viewerFor("user-b", reader), catalog);
+    const { views } = await listSavedViews(viewerFor("user-b", reader), catalog);
     expect(views.map((view) => view.id).sort()).toEqual(["own", "theirs-shared"]);
     expect(views.find((view) => view.id === "own")).toMatchObject({ isOwn: true, ownerName: null, stale: false });
     expect(views.find((view) => view.id === "theirs-shared")).toMatchObject({ isOwn: false, ownerName: "Alex Sample", stale: true });
@@ -145,7 +151,7 @@ describe("listing views", () => {
   it("flags a shared view that uses a domain this viewer lacks", async () => {
     seed({ id: "money", shared: true, query: "payment=PAID" });
     const catalog = emptySearchCatalog();
-    const [view] = await listSavedViews(viewerFor("user-b", reader), catalog);
+    const [view] = (await listSavedViews(viewerFor("user-b", reader), catalog)).views;
     expect(view?.stale).toBe(true);
   });
 });
@@ -220,5 +226,94 @@ describe("deleting", () => {
     await expect(deleteSavedView(viewerFor("user-a", manager, "event-1"), "elsewhere")).rejects.toBeInstanceOf(SavedViewError);
     await expect(setSavedViewShared(viewerFor("user-a", manager, "event-1"), "elsewhere", false)).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(rows).toHaveLength(1);
+  });
+});
+
+describe("a deactivated tag counts as gone (Caleb, #1511)", () => {
+  const withInactive = () => mocks.loadCatalog.mockResolvedValue({ ...emptySearchCatalog(), tags: [{ id: "tag-1", name: "VIP", isActive: true }, { id: "tag-off", name: "Old", isActive: false }] });
+
+  it("flags a view with a deactivated tag stale in the list", async () => {
+    seed({ id: "off", shared: true, query: "tag=tag-off" });
+    const catalog = { ...emptySearchCatalog(), tags: [{ id: "tag-off", name: "Old", isActive: false }] };
+    expect((await listSavedViews(viewerFor("user-b", reader), catalog)).views[0]?.stale).toBe(true);
+  });
+
+  it("refuses saving, and turning sharing on, with a deactivated tag", async () => {
+    withInactive();
+    await expect(createSavedView(viewerFor("user-a", reader), { name: "Old", query: "tag=tag-off" })).rejects.toMatchObject({ code: "INVALID" });
+    expect(rows).toHaveLength(0);
+    seed({ id: "v1", ownerUserId: "user-a", query: "tag=tag-off" });
+    await expect(setSavedViewShared(viewerFor("user-a", manager), "v1", true)).rejects.toMatchObject({ code: "INVALID" });
+    await expect(createSavedView(viewerFor("user-a", reader), { name: "Active", query: "tag=tag-1" })).resolves.toBeTruthy();
+  });
+});
+
+describe("archived views (shared by staff who left)", () => {
+  const catalog = () => ({ ...emptySearchCatalog(), tags: [{ id: "tag-1", name: "VIP", isActive: true }] });
+
+  it("hides them from a reader, lists them as archived for a manager, never lists unshared ones", async () => {
+    gone = new Set(["user-gone"]);
+    seed({ id: "arch", ownerUserId: "user-gone", shared: true, name: "Archived one" });
+    seed({ id: "arch-private", ownerUserId: "user-gone", name: "Private" });
+    seed({ id: "live", ownerUserId: "user-a", shared: true, name: "Live" });
+    const reading = await listSavedViews(viewerFor("user-b", reader), catalog());
+    expect(reading.views.map((view) => view.id)).toEqual(["live"]);
+    expect(reading.archived).toEqual([]);
+    const managing = await listSavedViews(viewerFor("user-b", manager), catalog());
+    expect(managing.views.map((view) => view.id)).toEqual(["live"]);
+    expect(managing.archived.map((view) => view.id)).toEqual(["arch"]);
+  });
+
+  it("does not archive a system administrator's view, or a current member's", async () => {
+    gone = new Set(["admin-1"]);
+    seed({ id: "admin", ownerUserId: "admin-1", shared: true, owner: { displayName: "Admin", globalRole: "SYSTEM_ADMIN" } });
+    const result = await listSavedViews(viewerFor("user-b", manager), catalog());
+    expect(result.views.map((view) => view.id)).toEqual(["admin"]);
+    expect(result.archived).toEqual([]);
+  });
+
+  it("restores for a manager: the restorer owns it, it stays shared, and the audit has ids and keys only", async () => {
+    gone = new Set(["user-gone"]);
+    seed({ id: "arch", ownerUserId: "user-gone", shared: true, name: "Private Name", query: "tag=tag-1" });
+    await restoreSavedView(viewerFor("user-b", manager), "arch");
+    expect(rows[0]).toMatchObject({ ownerUserId: "user-b", shared: true, sharedByUserId: "user-b" });
+    const entry = mocks.writeAuditLog.mock.calls[0]![0];
+    expect(entry).toMatchObject({ action: "REGISTRATION_SAVED_VIEW_RESTORED", entityId: "arch" });
+    expect(entry.metadata).toEqual({ savedViewId: "arch", previousOwnerUserId: "user-gone", filterKeys: ["tag"] });
+    expect(JSON.stringify(entry)).not.toContain("Private Name");
+    expect(JSON.stringify(entry)).not.toContain("tag-1");
+  });
+
+  it("refuses a non-manager, a view whose owner is still on staff, an unshared view and another event's view", async () => {
+    gone = new Set(["user-gone"]);
+    seed({ id: "arch", ownerUserId: "user-gone", shared: true });
+    seed({ id: "live", ownerUserId: "user-a", shared: true });
+    seed({ id: "private", ownerUserId: "user-gone" });
+    seed({ id: "elsewhere", eventId: "event-2", ownerUserId: "user-gone", shared: true });
+    await expect(restoreSavedView(viewerFor("user-b", reader), "arch")).rejects.toBeInstanceOf(AccessDeniedError);
+    for (const id of ["live", "private", "elsewhere"]) await expect(restoreSavedView(viewerFor("user-b", manager), id)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(rows.find((row) => row.id === "arch")?.ownerUserId).toBe("user-gone");
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("answers a name clash and the 50-view limit as refusals, and re-checks the filters for the restorer", async () => {
+    gone = new Set(["user-gone"]);
+    seed({ id: "arch", ownerUserId: "user-gone", shared: true, name: "Same" });
+    seed({ ownerUserId: "user-b", name: "same" });
+    await expect(restoreSavedView(viewerFor("user-b", manager), "arch")).rejects.toMatchObject({ code: "NAME_TAKEN" });
+    rows = rows.filter((row) => row.ownerUserId !== "user-b");
+    for (let index = 0; index < 50; index += 1) seed({ ownerUserId: "user-b", name: `View ${index}` });
+    await expect(restoreSavedView(viewerFor("user-b", manager), "arch")).rejects.toMatchObject({ code: "LIMIT_REACHED" });
+    rows = rows.filter((row) => row.ownerUserId !== "user-b");
+    rows.find((row) => row.id === "arch")!.query = "tag=tag-gone";
+    await expect(restoreSavedView(viewerFor("user-b", manager), "arch")).rejects.toMatchObject({ code: "INVALID" });
+  });
+
+  it("lets a manager delete an archived view", async () => {
+    gone = new Set(["user-gone"]);
+    seed({ id: "arch", ownerUserId: "user-gone", shared: true });
+    await deleteSavedView(viewerFor("user-b", manager), "arch");
+    expect(rows).toHaveLength(0);
+    expect(mocks.writeAuditLog.mock.calls[0]![0].action).toBe("REGISTRATION_SAVED_VIEW_DELETED");
   });
 });

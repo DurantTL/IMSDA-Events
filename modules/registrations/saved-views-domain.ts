@@ -66,13 +66,19 @@ export type SavedViewCheck =
   | { ok: false; stored: string; issues: SearchIssue[] };
 
 /**
- * Whether a view's query runs for this viewer on this event's catalog now. The same all-or-nothing rule as the
+ * Whether a view's query runs for this viewer on this event's catalog now (a deactivated tag counts as gone). The same all-or-nothing rule as the
  * search itself, so a filter that was removed from the event and one the viewer may not use read the same.
  */
 export function checkSavedViewQuery(raw: string, viewer: SearchViewer, catalog: SearchCatalog): SavedViewCheck {
   const { query, stored, parseIssues } = normalizeSavedViewQuery(raw);
   const resolved = resolveOperationsSearch(query, viewer, catalog, parseIssues);
-  return resolved.ok ? { ok: true, stored, query } : { ok: false, stored, issues: resolved.issues };
+  if (!resolved.ok) return { ok: false, stored, issues: resolved.issues };
+  // The search still accepts a deactivated tag, but a view that uses one counts as no longer existing (Caleb, #1511).
+  const inactive = new Set(catalog.tags.filter((tag) => !tag.isActive).map((tag) => tag.id));
+  if (query.tag.some((id) => inactive.has(id))) {
+    return { ok: false, stored, issues: [{ filter: "tag", code: "stale-reference", message: "This item no longer exists for this event." }] };
+  }
+  return { ok: true, stored, query };
 }
 
 export const STALE_VIEW_NOTE = "Uses a filter that no longer exists or isn't available to you.";

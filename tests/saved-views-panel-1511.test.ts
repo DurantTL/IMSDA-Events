@@ -93,6 +93,19 @@ describe("Saved views panel (#1511)", () => {
     expect(page).toContain("searchParseIssues.length === 0 && retiredAnswerParams.length === 0}");
   });
 
+  it("shows the Archived views group only to someone who can share", () => {
+    const archived: SavedViewItem[] = [{ id: "a1", name: "Old walk-ins", query: "tag=t1", shared: true, isOwn: false, ownerName: "Sam Departed", stale: false }];
+    const html = render({ archivedViews: archived });
+    expect(html).toContain("Archived views (1)");
+    expect(html).toContain("Made by Sam Departed, who is no longer on this event&#x27;s staff");
+    expect(html).toContain("Restore<span");
+    expect(html).not.toContain('href="/people?tag=t1');
+    const reader = render({ archivedViews: archived, canShare: false });
+    expect(reader).not.toContain("Archived views");
+    expect(reader).not.toContain("Sam Departed");
+    expect(render()).not.toContain("Archived views");
+  });
+
   it("says one plain sentence when there are no views", () => {
     expect(render({ views: [], canSave: false })).toContain("No saved views yet.");
   });

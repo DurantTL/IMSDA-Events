@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
     createSavedView: vi.fn(),
     setSavedViewShared: vi.fn(),
     deleteSavedView: vi.fn(),
+    restoreSavedView: vi.fn(),
   };
 });
 
@@ -32,9 +33,11 @@ vi.mock("@/modules/registrations/saved-views-repository", () => ({
   createSavedView: mocks.createSavedView,
   setSavedViewShared: mocks.setSavedViewShared,
   deleteSavedView: mocks.deleteSavedView,
+  restoreSavedView: mocks.restoreSavedView,
 }));
 
 import { POST } from "@/app/api/events/[eventId]/registration-views/route";
+import { POST as RESTORE } from "@/app/api/events/[eventId]/registration-views/[viewId]/restore/route";
 import { DELETE, PATCH } from "@/app/api/events/[eventId]/registration-views/[viewId]/route";
 
 const json = (method: string, body: unknown) => new Request("https://events.example.test/api", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -98,5 +101,24 @@ describe("a full list", () => {
   it("answers 409 when a person is at the limit", async () => {
     mocks.createSavedView.mockRejectedValueOnce(new mocks.SavedViewError("LIMIT_REACHED", "Full."));
     expect((await POST(json("POST", { name: "More", query: "status=CONFIRMED" }), create)).status).toBe(409);
+  });
+});
+
+describe("restoring an archived view", () => {
+  it("restores as the signed-in person, rejects cross-origin and unknown fields, and maps refusals", async () => {
+    mocks.restoreSavedView.mockResolvedValue({ id: "view-1", shared: true });
+    expect((await RESTORE(json("POST", {}), one)).status).toBe(200);
+    expect(mocks.restoreSavedView).toHaveBeenCalledWith(expect.objectContaining({ eventId: "event-1", userId: "user-a" }), "view-1");
+    expect((await RESTORE(json("POST", { owner: "user-z" }), one)).status).toBe(400);
+    mocks.restoreSavedView.mockRejectedValueOnce(new mocks.SavedViewError("NOT_FOUND", "Missing."));
+    expect((await RESTORE(json("POST", {}), one)).status).toBe(404);
+    mocks.restoreSavedView.mockRejectedValueOnce(new mocks.SavedViewError("NAME_TAKEN", "Taken."));
+    expect((await RESTORE(json("POST", {}), one)).status).toBe(409);
+    mocks.restoreSavedView.mockRejectedValueOnce(new mocks.AccessDeniedError("No.", 403, "PERMISSION_DENIED"));
+    expect((await RESTORE(json("POST", {}), one)).status).toBe(403);
+    mocks.rejectCrossOriginRequest.mockReturnValue(Response.json({ error: "CROSS_ORIGIN" }, { status: 403 }));
+    mocks.restoreSavedView.mockClear();
+    expect((await RESTORE(json("POST", {}), one)).status).toBe(403);
+    expect(mocks.restoreSavedView).not.toHaveBeenCalled();
   });
 });
