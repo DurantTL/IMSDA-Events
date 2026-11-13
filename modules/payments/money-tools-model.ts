@@ -107,6 +107,14 @@ const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
         status: () => ({ tone: "draft", text: "Read-only report" }),
       },
       {
+        // The checks and the finance sign-off that close the event (#1515). The checks are read on the page itself, not here.
+        href: "/finance/closeout",
+        title: staffPageTitles.eventCloseout,
+        description: "The checks to settle before an event is closed, and the finance sign-off that closes it.",
+        gate: finance,
+        status: () => ({ tone: "draft", text: "Closes the event" }),
+      },
+      {
         href: "/finance/scholarship-fund",
         title: staffPageTitles.scholarshipFund,
         description: "Money given for scholarships, what has been awarded, and what is left.",

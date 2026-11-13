@@ -25,6 +25,7 @@ const allowlist: Record<string, string> = {
   "components/background-check-review-panel.tsx": "action button only, no typed fields",
   "components/cancellation-requests-workspace.tsx": "action button only, no typed fields",
   "components/check-in-scanner.tsx": "action button only, no typed fields",
+  "components/check-in-station-gate.tsx": "search box only, nothing typed is saved",
   "components/check-in-stations-panel.tsx": "action button only, no typed fields",
   "components/choice-answer-filter.tsx": "search or filter",
   "components/church-sponsor-flags.tsx": "action button only, no typed fields",

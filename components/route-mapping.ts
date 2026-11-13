@@ -174,6 +174,7 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/finance/cancellation-policy", "/finance", "components/finance-workspace.tsx"],
   ["/finance/cancellation-requests", "/finance", "components/finance-workspace.tsx"],
   ["/finance/church-owed", "/finance", "components/finance-workspace.tsx"],
+  ["/finance/closeout", "/finance", "components/finance-workspace.tsx"],
   ["/finance/invoices", "/finance", "components/finance-workspace.tsx"],
   ["/finance/invoices/statements", "/finance/invoices", "components/invoices.tsx"],
   ["/finance/money-report", "/finance", "components/finance-workspace.tsx"],

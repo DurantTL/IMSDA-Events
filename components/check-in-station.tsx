@@ -5,6 +5,7 @@ import { CheckCircle2, Clock, CreditCard, ShieldAlert, Square, TriangleAlert, Wi
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { formatPersonName } from "@/lib/person-name";
+import { CheckInStationGate, StationModeSwitch, type StationMode } from "@/components/check-in-station-gate";
 import { CheckInPaymentDue } from "@/components/check-in-payment-due";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -134,12 +135,17 @@ export function CheckInStationScreen({
   eventName,
   stationLabel,
   canRecordPayments,
+  gateModeEnabled = false,
 }: {
   stationId: string;
   eventName: string;
   stationLabel: string;
   canRecordPayments: boolean;
+  /** Gate mode (#1684) is on for this event: show the Check-in | Gate switch. Off changes nothing on this screen. */
+  gateModeEnabled?: boolean;
 }) {
+  const [mode, setMode] = useState<StationMode>("check-in");
+  const inGate = gateModeEnabled && mode === "gate";
   const [entry, setEntry] = useState("");
   const [family, setFamily] = useState<StationFamily | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -635,6 +641,9 @@ export function CheckInStationScreen({
         )}
       </div>
 
+      {gateModeEnabled && <StationModeSwitch mode={mode} onChange={setMode} />}
+      {inGate && <CheckInStationGate offline={offline} send={send} onStopped={markStopped} />}
+      {!inGate && <>
       <form className={`${styles.cisCard} ${styles.cisLookup}`} onSubmit={lookup}>
         <label htmlFor="cis-code"><strong>Scan a pass or type the confirmation code</strong></label>
         <div className={styles.cisLookupRow}>
@@ -854,6 +863,7 @@ export function CheckInStationScreen({
         </section>
       )}
 
+      </>}
       <ConfirmDialog
         busy={busy === "stop"}
         busyLabel="Stopping..."

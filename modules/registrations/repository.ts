@@ -454,17 +454,19 @@ export class RegistrationAttendeeOperationError extends Error {
 export async function listRegistrations(
   eventId: string,
   options?: { statuses?: readonly RegistrationStatus[]; tagIds?: readonly string[]; locationId?: string | null; registrationIds?: readonly string[] },
+  /** A transaction client, to read inside a transaction without taking another pool connection. */
+  client: RegistrationReadClient = getPrisma(),
 ) {
   const registrations = await getRegistrationQuery(
-    getPrisma(),
+    client,
     eventId,
     options?.statuses,
     options?.tagIds,
     options?.locationId,
     options?.registrationIds,
   );
-  const directory = await directoryForRegistrations(getPrisma(), registrations);
-  const waitlistPlaces = await waitlistPlacesFor(getPrisma(), registrations);
+  const directory = await directoryForRegistrations(client, registrations);
+  const waitlistPlaces = await waitlistPlacesFor(client, registrations);
   return registrations.map((registration) => serializeRegistration(registration, directory, waitlistPlaces));
 }
 

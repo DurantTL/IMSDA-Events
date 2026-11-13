@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { formatPersonName } from "@/lib/person-name";
@@ -31,11 +32,12 @@ const emptyMethods = (): Record<MoneyMethod, number> => ({ CARD_REFERENCE: 0, CA
 export type MoneyReportRow = MoneyReportRegistration & { accountHolderName: string };
 export type EventMoneyReport = { eventName: string; report: Omit<MoneyReport, "owing"> & { owing: MoneyReportRow[] } };
 
-export async function loadEventMoneyReport(eventId: string): Promise<EventMoneyReport> {
-  const prisma = getPrisma();
+/** `client` is a transaction client when the caller reads inside a transaction (the closeout sign-off), so no second pool connection is taken. */
+export async function loadEventMoneyReport(eventId: string, client: Prisma.TransactionClient | PrismaClient = getPrisma()): Promise<EventMoneyReport> {
+  const prisma = client;
   const [event, registrations, payments, adjustments, redemptions, ledger] = await Promise.all([
     prisma.event.findUnique({ where: { id: eventId }, select: { name: true } }),
-    listRegistrations(eventId),
+    listRegistrations(eventId, undefined, client),
     prisma.payment.findMany({
       where: { eventId },
       select: { registrationId: true, status: true, method: true, amount: true, refunds: { select: { status: true, amount: true } } },
@@ -45,7 +47,7 @@ export async function loadEventMoneyReport(eventId: string): Promise<EventMoneyR
       select: { registrationId: true, kind: true, amountCents: true },
     }),
     prisma.promoCodeRedemption.findMany({ where: { eventId }, select: { registrationId: true, discountAmountCents: true } }),
-    loadEventLedger(eventId),
+    loadEventLedger(eventId, {}, client),
   ]);
 
   const gross = new Map<string, Record<MoneyMethod, number>>();

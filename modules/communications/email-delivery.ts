@@ -90,6 +90,8 @@ import {
   deadlineRemindersHonourAnnouncementOptOut,
   reminderOptOutSkipMessage,
   isOptOutEligibleTemplate,
+  CLUB_DRAFT_REMINDER_OPT_OUT_TEMPLATE_KEY,
+  clubDraftReminderOptOutSkipMessage,
   unsubscribeApiPath,
   unsubscribeHeadersAllowed,
   unsubscribePagePath,
@@ -557,6 +559,58 @@ async function cancelIfScheduledEmailObsolete(
   }
 }
 
+/**
+ * A reminder to finish an unsubmitted club registration (#164) is checked again immediately before it goes out: the
+ * drafts may have been submitted, removed or expired, registration may have closed, reminders may have been turned off,
+ * the club or event may no longer qualify, or the recipient may no longer be an active director or deputy of the club.
+ * Such a message ends CANCELLED with a plain note and an audit entry (ids only, never an address or an answer). Outside
+ * the send hours a wanted reminder is put back, without using up an attempt, to go from the next 9 a.m. where the event
+ * is held. When the check itself fails the attempt is retried after the usual backoff rather than sent on a guess.
+ */
+async function cancelIfClubDraftReminderObsolete(
+  prisma: DeliveryPrisma,
+  message: ClaimedMessage,
+  at: Date,
+) {
+  if (message.templateKey !== CLUB_DRAFT_REMINDER_OPT_OUT_TEMPLATE_KEY) return false;
+  let check: Awaited<ReturnType<typeof import("@/modules/club-registrations/draft-reminders")["clubDraftReminderCheck"]>>;
+  try {
+    const { clubDraftReminderCheck } = await import("@/modules/club-registrations/draft-reminders");
+    check = await clubDraftReminderCheck({ eventId: message.eventId, recipientEmail: message.recipientEmail, metadata: message.metadata }, at);
+  } catch (error) {
+    logError("Unable to check whether a club registration reminder was still wanted; it will be retried.", error);
+    await finalizeFailedAttempt(prisma, message, { code: "CLUB_DRAFT_REMINDER_CHECK_FAILED", message: "Could not confirm the registration reminder was still wanted, so it was not sent.", retryable: true }, at, true);
+    return true;
+  }
+  if (!check) return false;
+  if (check.kind === "WAIT") {
+    await prisma.messageOutbox.updateMany({
+      where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken },
+      // No lastError: staff views show any stored error as a "Delivery issue", and waiting for the morning is not one.
+      data: { status: "PENDING", availableAt: check.until, lockedAt: null, lockToken: null, lastError: null },
+    });
+    return true;
+  }
+  const updated = await prisma.messageOutbox.updateMany({
+    where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken },
+    data: { status: "CANCELLED", lockedAt: null, lockToken: null, lastError: check.note },
+  });
+  if (updated.count === 1) {
+    await prisma.auditLog.create({
+      data: {
+        eventId: message.eventId,
+        action: "CLUB_DRAFT_REMINDER_CANCELLED",
+        entityType: "MessageOutbox",
+        entityId: message.id,
+        correlationId: randomUUID(),
+        summary: "Cancelled a club registration reminder because it was no longer wanted before it was sent.",
+        metadata: { messageId: message.id, templateKey: message.templateKey },
+      },
+    });
+  }
+  return true;
+}
+
 function announcementIdOf(metadata: unknown) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
   const value = (metadata as Record<string, unknown>).announcementId;
@@ -599,6 +653,7 @@ async function suppressIfAnnouncementOptedOut(
   // reminder skips this check; provider suppression is checked elsewhere. Announcements need their event as before.
   const reminder = message.templateKey === DEADLINE_REMINDER_TEMPLATE_KEY;
   if (reminder ? !deadlineRemindersHonourAnnouncementOptOut() : (!isOptOutEligibleTemplate(message.templateKey) || !message.eventId)) return false;
+  const draftReminder = message.templateKey === CLUB_DRAFT_REMINDER_OPT_OUT_TEMPLATE_KEY;
   const optOutEventId = message.eventId ?? "";
   const failClosed = async (code: string, text: string, error?: unknown): Promise<OptOutCheckResult> => {
     if (error) logError("Unable to check an announcement opt-out; the message will be retried.", error);
@@ -621,19 +676,21 @@ async function suppressIfAnnouncementOptedOut(
   if (!scope) return false;
   const updated = await prisma.messageOutbox.updateMany({
     where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken },
-    data: { status: "SUPPRESSED", lockedAt: null, lockToken: null, lastError: reminder ? reminderOptOutSkipMessage(scope) : announcementOptOutSkipMessage(scope) },
+    data: { status: "SUPPRESSED", lockedAt: null, lockToken: null, lastError: reminder ? reminderOptOutSkipMessage(scope) : draftReminder ? clubDraftReminderOptOutSkipMessage(scope) : announcementOptOutSkipMessage(scope) },
   });
   if (updated.count !== 1) return "lost";
   await prisma.auditLog.create({
     data: {
       eventId: message.eventId ?? undefined,
-      action: reminder ? "DEADLINE_REMINDER_SKIPPED_OPTED_OUT" : "EVENT_ANNOUNCEMENT_SKIPPED_OPTED_OUT",
+      action: reminder ? "DEADLINE_REMINDER_SKIPPED_OPTED_OUT" : draftReminder ? "CLUB_DRAFT_REMINDER_SKIPPED_OPTED_OUT" : "EVENT_ANNOUNCEMENT_SKIPPED_OPTED_OUT",
       entityType: "MessageOutbox",
       entityId: message.id,
       correlationId: randomUUID(),
       summary: reminder
         ? "Skipped a deadline reminder because the recipient opted out of announcements."
-        : "Skipped an event announcement because the recipient opted out of announcements.",
+        : draftReminder
+          ? "Skipped a club registration reminder because the recipient opted out of announcements."
+          : "Skipped an event announcement because the recipient opted out of announcements.",
       metadata: { messageId: message.id, scope },
     },
   });
@@ -1349,6 +1406,7 @@ async function runDeliveryLoop(
     // An invoice email is sent only while its version is still FINALIZED (#168): one a revision replaced is cancelled, never sent.
     if (await cancelIfInvoiceReplaced(prisma, message)) continue;
     if (await cancelIfLodgingStale(prisma, message, now())) continue;
+    if (await cancelIfClubDraftReminderObsolete(prisma, message, now())) continue;
     if (await suppressIfAnnouncementOptedOut(prisma, message, announcementPolicy, now())) continue;
     // A suppressed address (hard bounce or complaint, #863) receives nothing, of any kind. Checked before the body is
     // prepared so no private link is minted for a message that will not go.
@@ -1395,6 +1453,7 @@ async function runDeliveryLoop(
       if (await cancelIfInvoiceReplaced(prisma, message)) continue;
       if (await cancelIfLodgingStale(prisma, message, now())) continue;
       if (await cancelIfScheduledEmailObsolete(prisma, message, now(), preparedBody)) continue;
+      if (await cancelIfClubDraftReminderObsolete(prisma, message, now())) continue;
       // And the opt-out again (#838): someone may have unsubscribed while the message was being prepared. An essential
       // announcement still goes. The private link minted for the body is unused, so it is withdrawn.
       const recheck = await suppressIfAnnouncementOptedOut(prisma, message, announcementPolicy, now());
@@ -1435,7 +1494,7 @@ async function runDeliveryLoop(
       const bodyTextForSend = appendEmailPlainTextFooter(
         // A problem report copy quotes a person's own words, so its text part is never flattened as Markdown (#1715).
         (parts.bodyHtml && message.templateKey !== "PROBLEM_REPORT_COPY" ? markdownToPlainText : (text: string) => text)(unsubscribe
-          ? `${preparedBody.bodyText}\n\n--\nTo stop getting event announcements, or change what you get: ${unsubscribe.pageUrl}`
+          ? `${preparedBody.bodyText}\n\n--\n${message.templateKey === CLUB_DRAFT_REMINDER_OPT_OUT_TEMPLATE_KEY ? "To stop getting reminders and announcements for this event, or change what you get" : "To stop getting event announcements, or change what you get"}: ${unsubscribe.pageUrl}`
           : preparedBody.bodyText),
         layout,
         { separator: !unsubscribe },

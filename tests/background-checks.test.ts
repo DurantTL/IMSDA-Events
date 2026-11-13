@@ -512,6 +512,7 @@ import {
   clubRosterComplianceStatuses,
   listBackgroundCheckReviews,
   checkInBlocksForAttendees,
+  gateSterlingStatusForAttendees,
   listEventBackgroundFlags,
   listManualBackgroundCheckMatches,
   listNameOnlyBackgroundCheckMatches,
@@ -1460,6 +1461,31 @@ describe("flags at youth or children's events (#388, #527)", () => {
     const flags = await listEventBackgroundFlags("event-1");
     expect(flags?.adults).toBe(3);
     expect(flags?.people.map((flag) => [flag.attendeeId, flag.state])).toEqual([["expired", "EXPIRED"], ["none", "MISSING"]]);
+  });
+
+  it("says current or not current for adults only at the gate, and nothing for youth (#1684)", async () => {
+    const { client, seed } = makeFakeDb();
+    currentClient = client;
+    seed.events.set("event-1", {
+      id: "event-1", checksAdultBackgrounds: true, startsAt: new Date("2026-10-02T17:00:00Z"), endsAt: new Date("2026-10-04T17:00:00Z"), timezone: "America/Chicago",
+    });
+    seed.attendees.push(
+      attendee("expired", { expiresOn: "2026-10-03", complianceStatus: null }, { attendeeType: "Adult" }),
+      attendee("current", { expiresOn: "2026-10-04", complianceStatus: null }, { attendeeType: "Adult" }),
+      attendee("pathfinder", null, { profileSnapshot: { ageOnEventDate: 12 } }),
+    );
+    const status = await gateSterlingStatusForAttendees("event-1", ["expired", "current", "pathfinder"]);
+    expect(Object.fromEntries(status)).toEqual({ expired: false, current: true });
+    expect(status.has("pathfinder")).toBe(false);
+    expect((await gateSterlingStatusForAttendees("event-1", [])).size).toBe(0);
+  });
+
+  it("says nothing at the gate for an event that doesn't check backgrounds (#1684)", async () => {
+    const { client, seed } = makeFakeDb();
+    currentClient = client;
+    seed.events.set("event-1", { id: "event-1", checksAdultBackgrounds: false, startsAt: new Date(), endsAt: new Date(), timezone: "America/Chicago" });
+    seed.attendees.push(attendee("adult", null, { attendeeType: "Adult" }));
+    expect((await gateSterlingStatusForAttendees("event-1", ["adult"])).size).toBe(0);
   });
 
   function freshEvent(checks = true) {

@@ -156,3 +156,29 @@ venue Wi-Fi.
   are a series of single check-ins, so each held person is refused on its own
   and the rest go through; the club view leaves them out up front and names
   them. Registration, logins and roster access are never blocked.
+
+- **Gate mode on the check-in station (#1684)**: an optional, per-event view of
+  the staff-run station for the person at the gate. Off by default
+  (`Event.checkInGateModeEnabled`); staff with `MANAGE_CHECK_IN` turn it on or
+  off from the stations panel on Check-in (`PUT /api/events/[eventId]/check-in-gate-mode`,
+  audited as `CHECK_IN_GATE_MODE_ENABLED` / `_DISABLED`, nothing written when
+  unchanged). Turning it off hides the Gate view and refuses gate requests;
+  logged arrivals are kept. Not copied when an event is cloned.
+  - `POST /api/check-in-station/gate-lookup` takes a pass or a name (2 to 80
+    characters) and returns only: attendee id, display name, club name,
+    `sterlingCurrent` (true or false only for an adult at an event that checks
+    backgrounds, same rules as #874; otherwise null), the latest gate arrival
+    time and a state (green Registered, yellow Registered: Sterling not
+    current, or red Not registered when nothing matches). Up to 10 people. No
+    birth dates, ages, health, payment, contact or confirmation codes. Every
+    lookup is audited as `CHECK_IN_GATE_LOOKUP` with the station, the method,
+    the result count and the matched ids, never the typed text or names.
+  - `POST /api/check-in-station/gate-arrival` notes "arrived at gate" for one
+    person of an active registration (`CheckInGateArrival`, one row per
+    idempotency key, audited as `CHECK_IN_GATE_ARRIVAL_RECORDED`). It is
+    separate from check-in and never creates a `CheckIn`.
+  - Gate mode is re-checked on the server on every request (403
+    `GATE_MODE_OFF` when off). The station stays staff-run: no family
+    self-service. Gate lookups need a connection and are never queued.
+  - Code: `modules/checkin-stations/gate-service.ts`; Sterling answer from
+    `gateSterlingStatusForAttendees` in `modules/background-checks/repository.ts`.

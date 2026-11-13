@@ -42,9 +42,9 @@ function passing(entry: ReachedDestination): DestinationSearchContext {
 }
 
 describe("the registry", () => {
-  it("lists the 38 pages once each", () => {
-    expect(reachedDestinations).toHaveLength(38);
-    expect(reachedRoutes.size).toBe(38);
+  it("lists the 39 pages once each", () => {
+    expect(reachedDestinations).toHaveLength(39);
+    expect(reachedRoutes.size).toBe(39);
     expect(systemEntries).toHaveLength(6);
   });
 
@@ -104,12 +104,10 @@ describe("the registry", () => {
         expect(source, entry.route).toContain("closeoutPermissions.some");
         continue;
       }
-      // Most pages accept one permission; a page that accepts either of two (the Event money report, #1962) denies only
-      // when the viewer holds neither.
+      // Most pages accept one permission; a page that accepts any of several (the Event money report, #1962; the Event
+      // closeout, #1515) denies only when the viewer holds none of them.
       if (entry.permissions.length > 1) {
-        expect(entry.permissions, entry.route).toHaveLength(2);
-        const [first, second] = entry.permissions;
-        expect(source, entry.route).toContain(`!permissions.includes("${first}") && !permissions.includes("${second}")`);
+        expect(source, entry.route).toContain(entry.permissions.map((permission) => `!permissions.includes("${permission}")`).join(" && "));
       } else {
         expect(source, entry.route).toContain(`!permissions.includes("${entry.permissions[0]}")`);
       }
@@ -183,7 +181,7 @@ describe("search finds each page for a viewer who may open it", () => {
 
   it("shows only the finance pages, the meal closeout and the item closeout to a finance-only viewer", () => {
     const routes = routesIn(as("MANAGE_FINANCE"));
-    expect(routes).toHaveLength(13);
+    expect(routes).toHaveLength(14);
     expect(routes.filter((route) => !route.startsWith("/finance/") && route !== "/more/ledger-health").sort()).toEqual(["/more/issued-assets/closeout", "/more/kitchen-report/closeout"]);
   });
 
@@ -191,6 +189,11 @@ describe("search finds each page for a viewer who may open it", () => {
     expect(routesIn(as("VIEW_REPORTS"))).toContain("/finance/money-report");
     expect(routesIn(as("MANAGE_FINANCE"))).toContain("/finance/money-report");
     expect(routesIn(as("VIEW_EVENT"))).not.toContain("/finance/money-report");
+  });
+
+  it("shows the Event closeout to finance, finalize-invoices and reports viewers, not to a plain event viewer (#1515)", () => {
+    for (const permission of ["MANAGE_FINANCE", "FINALIZE_INVOICES", "VIEW_REPORTS"] as const) expect(routesIn(as(permission))).toContain("/finance/closeout");
+    expect(routesIn(as("VIEW_EVENT"))).not.toContain("/finance/closeout");
   });
 
   it("shows nothing to a restricted viewer", () => {

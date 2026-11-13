@@ -13,6 +13,7 @@ import {
 import { clubPassTokenPrefix } from "@/modules/checkin/club-pass-token";
 import { CheckInOperationError, checkInAttendee, undoCheckIn } from "@/modules/checkin/repository";
 import {
+  GATE_MODE_OFF_MESSAGE,
   STATION_HISTORY_LIMIT,
   stationBadgeLine,
   stationBalanceReasonLabel,
@@ -51,7 +52,8 @@ export class StationServiceError extends Error {
       | "PAYMENT_NOT_LISTED"
       | "PERMISSION_DENIED"
       | "NOT_THIS_STATION"
-      | "NOTHING_TO_UNDO",
+      | "NOTHING_TO_UNDO"
+      | "GATE_MODE_OFF",
   ) {
     super(
       code === "NOT_FOUND"
@@ -72,6 +74,8 @@ export class StationServiceError extends Error {
                       ? "Only check-ins made at this station can be undone here. Use the check-in desk."
                       : code === "NOTHING_TO_UNDO"
                         ? "Already undone, or not checked in."
+                        : code === "GATE_MODE_OFF"
+                          ? GATE_MODE_OFF_MESSAGE
                         : "Nothing is due on this registration.",
     );
     this.name = "StationServiceError";
