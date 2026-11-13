@@ -1,4 +1,4 @@
-import { requireAnyPermission } from "@/modules/access/authorization";
+import { effectivePermissions, requireAnyPermission } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { closeoutApiError, closeoutHeaders } from "@/modules/events/closeout-api";
 import { getCloseoutView } from "@/modules/events/closeout-repository";
@@ -12,8 +12,10 @@ import { withRequestContext } from "@/lib/request-context";
 async function getHandler(_request: Request, context: { params: Promise<{ eventId: string }> }) {
   try {
     const { eventId } = await context.params;
-    await requireAnyPermission(await getCurrentSession(), eventId, ["MANAGE_FINANCE", "FINALIZE_INVOICES", "VIEW_REPORTS"], findActiveMembership);
-    const closeout = await getCloseoutView(eventId);
+    const access = await requireAnyPermission(await getCurrentSession(), eventId, ["MANAGE_FINANCE", "FINALIZE_INVOICES", "VIEW_REPORTS"], findActiveMembership);
+    const held = effectivePermissions(access.user, access.membership);
+    // The note and reopening reasons are free text: only those who may sign off or reopen read them.
+    const closeout = await getCloseoutView(eventId, { canReadText: held.includes("MANAGE_FINANCE") || held.includes("FINALIZE_INVOICES") });
     return closeout
       ? Response.json({ closeout }, { headers: closeoutHeaders })
       : Response.json({ error: "EVENT_NOT_FOUND", message: "That event no longer exists." }, { status: 404, headers: closeoutHeaders });

@@ -189,7 +189,7 @@ export function buildCloseoutChecklist(facts: CloseoutFacts): CloseoutCheck[] {
       clear: "Every Square payment for this event is matched.",
     })
     : square.state === "notConfigured"
-      ? { ...squareDraft, state: "warning", count: null, cents: null, sentence: "Square is not set up on this site, so unmatched Square payments could not be checked. This is not counted as ready." }
+      ? { ...squareDraft, state: "warning", count: null, cents: null, sentence: "Square is not set up on this site, so unmatched Square payments could not be checked. This is not counted as ready. Ask the system administrator to set it up." }
       : { ...squareDraft, state: "warning", count: null, cents: null, sentence: "Square could not be reached, so unmatched Square payments could not be checked. This is not counted as ready. Try again in a moment." });
 
   return checks;
@@ -210,8 +210,39 @@ export function closeoutSnapshot(checks: readonly CloseoutCheck[]): CloseoutSnap
   return checks.map(({ id, state, count, cents }) => ({ id, state, count, cents }));
 }
 
+/** What is stored on a sign-off: the checks as of `checkedAt` (an ISO time). */
+export type StoredCloseoutSnapshot = { checkedAt: string; checks: CloseoutSnapshotCheck[] };
+
+export function storedCloseoutSnapshot(checks: readonly CloseoutCheck[], checkedAt: Date): StoredCloseoutSnapshot {
+  return { checkedAt: checkedAt.toISOString(), checks: closeoutSnapshot(checks) };
+}
+
+/**
+ * The checks that are not ready, as sorted "id:state" strings. The page sends the set it showed; the server compares it with
+ * its own, so a warnings tick always belongs to the list the signer saw.
+ */
+export function openChecksSignature(checks: readonly Pick<CloseoutCheck, "id" | "state">[]): string[] {
+  return checks.filter((check) => check.state !== "ready").map((check) => `${check.id}:${check.state}`).sort();
+}
+
+export function sameOpenChecks(left: readonly string[], right: readonly string[]) {
+  const a = [...left].sort();
+  const b = [...right].sort();
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+export const CLOSEOUT_STALE_MESSAGE = "The checklist changed; review it again.";
+
+/** The stored checked-at time, or null for a snapshot written without one. */
+export function parseCloseoutCheckedAt(value: unknown): string | null {
+  if (!value || Array.isArray(value) || typeof value !== "object") return null;
+  const checkedAt = (value as Record<string, unknown>).checkedAt;
+  return typeof checkedAt === "string" ? checkedAt : null;
+}
+
 /** Reads a stored snapshot back for display, dropping anything that is not a well-formed row. */
 export function parseCloseoutSnapshot(value: unknown): CloseoutSnapshotCheck[] {
+  if (value && !Array.isArray(value) && typeof value === "object") value = (value as Record<string, unknown>).checks;
   if (!Array.isArray(value)) return [];
   const states = new Set<string>(["ready", "warning", "blocking"]);
   const ids = new Set<string>(closeoutCheckIds);

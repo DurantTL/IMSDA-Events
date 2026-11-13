@@ -88,14 +88,14 @@ async function main() {
     });
 
     // 1. A pending refund blocks.
-    const before = await getCloseoutView(eventId);
+    const before = await getCloseoutView(eventId, { canReadText: true });
     assert(before && before.state === "FINANCIAL_RECONCILIATION", "the view reads the state");
     const byId = new Map(before.checks.map((check) => [check.id, check]));
     assert(byId.get("pending-refunds")?.state === "blocking" && byId.get("pending-refunds")?.count === 1, "a pending refund is blocking");
     assert(byId.get("failed-payments")?.state === "warning" && byId.get("failed-messages")?.state === "warning" && byId.get("waitlist")?.state === "warning", "failed payment, failed message and waitlist are warnings");
     assert(byId.get("unmatched-square")?.state === "warning", "Square not checked is a warning, never ready");
     assert(before.summary.canSignOff === false, "blocked");
-    const blocked = await caught(signOffEvent({ eventId, actor: finance, acknowledgeWarnings: true, expectedVersion: before.lifecycleVersion }));
+    const blocked = await caught(signOffEvent({ eventId, actor: finance, acknowledgeWarnings: true, expectedVersion: before.lifecycleVersion, seenOpenChecks: before.openChecks }));
     assert(blocked instanceof CloseoutError && blocked.code === "BLOCKING_CHECKS", "sign-off is refused while a check blocks");
     assert((await signoffCount()) === 0 && (await stateOf()) === "FINANCIAL_RECONCILIATION" && (await version()) === before.lifecycleVersion, "a refused sign-off writes nothing");
 
@@ -106,38 +106,46 @@ async function main() {
 
     // 3. Settle the refund: warnings now need acknowledging.
     await prisma.refund.update({ where: { id: pendingRefund.id }, data: { status: "SUCCEEDED" } });
-    const cleared = await getCloseoutView(eventId);
+    const cleared = await getCloseoutView(eventId, { canReadText: true });
     assert(cleared && cleared.summary.blocking === 0 && cleared.summary.warning >= 5, `no blocking check, several warnings (${JSON.stringify(cleared?.summary)})`);
     assert(cleared.checks.find((check) => check.id === "outstanding-balances")?.count === 1, "the refunded registration owes a balance");
-    const unacknowledged = await caught(signOffEvent({ eventId, actor: finance, acknowledgeWarnings: false, expectedVersion: cleared.lifecycleVersion }));
+    const unacknowledged = await caught(signOffEvent({ eventId, actor: finance, acknowledgeWarnings: false, expectedVersion: cleared.lifecycleVersion, seenOpenChecks: cleared.openChecks }));
     assert(unacknowledged instanceof CloseoutError && unacknowledged.code === "WARNINGS_NOT_ACKNOWLEDGED", "open warnings must be acknowledged");
-    const viewer = await caught(signOffEvent({ eventId, actor: reports, acknowledgeWarnings: true, expectedVersion: cleared.lifecycleVersion }));
+    const viewer = await caught(signOffEvent({ eventId, actor: reports, acknowledgeWarnings: true, expectedVersion: cleared.lifecycleVersion, seenOpenChecks: cleared.openChecks }));
     assert(viewer instanceof EventLifecycleError && viewer.code === "PERMISSION_DENIED", "a reports-only account may not sign off");
-    const stale = await caught(signOffEvent({ eventId, actor: finance, acknowledgeWarnings: true, expectedVersion: cleared.lifecycleVersion - 1 }));
+    const stale = await caught(signOffEvent({ eventId, actor: finance, acknowledgeWarnings: true, expectedVersion: cleared.lifecycleVersion - 1, seenOpenChecks: cleared.openChecks }));
     assert(stale instanceof CloseoutError && stale.code === "STALE_VERSION", "a stale page version is refused");
-    const tooLong = await caught(signOffEvent({ eventId, actor: finance, acknowledgeWarnings: true, note: "x".repeat(501), expectedVersion: cleared.lifecycleVersion }));
+    const tooLong = await caught(signOffEvent({ eventId, actor: finance, acknowledgeWarnings: true, note: "x".repeat(501), expectedVersion: cleared.lifecycleVersion, seenOpenChecks: cleared.openChecks }));
     assert(tooLong instanceof CloseoutError && tooLong.code === "NOTE_TOO_LONG", "a long note is refused");
     assert((await signoffCount()) === 0 && (await stateOf()) === "FINANCIAL_RECONCILIATION", "every refusal left nothing behind");
 
+    // The warnings tick belongs to the list the signer saw: a different open set is refused as stale.
+    const staleSet = await caught(signOffEvent({ eventId, actor: finance, acknowledgeWarnings: true, expectedVersion: cleared.lifecycleVersion, seenOpenChecks: cleared.openChecks.filter((entry) => !entry.startsWith("waitlist:")) }));
+    assert(staleSet instanceof CloseoutError && staleSet.code === "STALE_CHECKLIST" && staleSet.message === "The checklist changed; review it again.", "an open set the signer did not see is refused as stale");
+    const noneSeen = await caught(signOffEvent({ eventId, actor: finance, acknowledgeWarnings: true, expectedVersion: cleared.lifecycleVersion, seenOpenChecks: [] }));
+    assert(noneSeen instanceof CloseoutError && noneSeen.code === "STALE_CHECKLIST", "an empty seen set is refused as stale");
+    assert((await signoffCount()) === 0 && (await stateOf()) === "FINANCIAL_RECONCILIATION", "stale refusals left nothing behind");
+
     // 4. A finalize-invoices account signs off.
-    const signed = await signOffEvent({ eventId, actor: invoicer, acknowledgeWarnings: true, note: "Reviewed the open items.", expectedVersion: cleared.lifecycleVersion });
+    const signed = await signOffEvent({ eventId, actor: invoicer, acknowledgeWarnings: true, note: "Reviewed the open items.", expectedVersion: cleared.lifecycleVersion, seenOpenChecks: cleared.openChecks });
     assert((await stateOf()) === "CLOSED", "the event is Closed");
     const signoff = await prisma.eventCloseoutSignoff.findUniqueOrThrow({ where: { id: signed.signoffId } });
     assert(signoff.signedByNameSnapshot === "Ivy Invoices" && signoff.signedByUserId === invoicer.userId && signoff.warningsAcknowledged && signoff.note === "Reviewed the open items.", "the sign-off records the name, acknowledgement and note");
     const snapshotText = JSON.stringify(signoff.checklistSnapshot);
-    assert(Array.isArray(signoff.checklistSnapshot) && (signoff.checklistSnapshot as unknown[]).length === 11, "the snapshot holds all eleven checks");
+    const stored = signoff.checklistSnapshot as { checkedAt?: string; checks?: unknown[] };
+    assert(typeof stored.checkedAt === "string" && !Number.isNaN(Date.parse(stored.checkedAt)) && Array.isArray(stored.checks) && stored.checks.length === 11, "the snapshot holds a checkedAt time and all eleven checks");
     assert(!/Sample|Registrant|@|ECO-/.test(snapshotText), "the snapshot holds no name, email or code");
-    for (const row of signoff.checklistSnapshot as Array<Record<string, unknown>>) assert(Object.keys(row).sort().join() === "cents,count,id,state", "each snapshot row is id, state, count, cents");
+    for (const row of stored.checks as Array<Record<string, unknown>>) assert(Object.keys(row).sort().join() === "cents,count,id,state", "each snapshot row is id, state, count, cents");
     const closing = await prisma.eventLifecycleTransition.findUniqueOrThrow({ where: { id: signoff.transitionId! } });
     assert(closing.fromState === "FINANCIAL_RECONCILIATION" && closing.toState === "CLOSED" && closing.actorUserId === invoicer.userId, "the transition to Closed is the sign-off's");
     assert((closing.evidence as { signoffId?: string } | null)?.signoffId === signoff.id, "the transition evidence carries the sign-off id");
     const audit = await prisma.auditLog.findFirstOrThrow({ where: { eventId, action: "EVENT_CLOSEOUT_SIGNED_OFF" } });
     assert(audit.entityId === signoff.id && !/Ivy|Sample|Reviewed/.test(JSON.stringify(audit)), "the audit row holds ids and counts, no name or note");
-    const again = await caught(signOffEvent({ eventId, actor: finance, acknowledgeWarnings: true, expectedVersion: signed.lifecycleVersion }));
+    const again = await caught(signOffEvent({ eventId, actor: finance, acknowledgeWarnings: true, expectedVersion: signed.lifecycleVersion, seenOpenChecks: cleared.openChecks }));
     assert(again instanceof CloseoutError && again.code === "ALREADY_DONE", "a second sign-off is refused");
 
     // 5. Reopen.
-    const closedView = await getCloseoutView(eventId);
+    const closedView = await getCloseoutView(eventId, { canReadText: true });
     assert(closedView && closedView.state === "CLOSED" && closedView.history.length === 1 && closedView.history[0]!.reopened === null, "closed, one sign-off, not reopened");
     const plainReopen = await caught(transitionEventLifecycle({ eventId, toState: "FINANCIAL_RECONCILIATION", expectedFromState: "CLOSED", actor: finance, reason: "plain" }));
     assert(plainReopen instanceof EventLifecycleError && plainReopen.code === "CLOSEOUT_REQUIRED", "a plain reopen is refused");
@@ -150,17 +158,20 @@ async function main() {
     assert((await stateOf()) === "FINANCIAL_RECONCILIATION", "back in Financial reconciliation");
     const reopening = await prisma.eventCloseoutReopening.findUniqueOrThrow({ where: { id: reopened.reopeningId } });
     assert(reopening.signoffId === signoff.id && reopening.reopenedByNameSnapshot === "Pat Finance" && reopening.reason === "Late invoice arrived" && reopening.transitionId, "the reopening points at the sign-off and records who and why");
-    const afterReopen = await getCloseoutView(eventId);
+    const afterReopen = await getCloseoutView(eventId, { canReadText: true });
     assert(afterReopen && afterReopen.history.length === 1 && afterReopen.history[0]!.reopened?.reason === "Late invoice arrived" && afterReopen.history[0]!.signedByName === "Ivy Invoices", "the sign-off stays listed with its reopening");
+    const hidden = await getCloseoutView(eventId, { canReadText: false });
+    assert(hidden && hidden.history[0]!.note === null && hidden.history[0]!.reopened?.reason === null && hidden.history[0]!.reopened?.byName === "Pat Finance", "a viewer who may not read free text gets no note and no reopening reason, only the names");
+    assert(!JSON.stringify(hidden).includes("Late invoice arrived") && !JSON.stringify(hidden).includes("Reviewed the open items"), "no free text anywhere in that view");
     const unchanged = await prisma.eventCloseoutSignoff.findUniqueOrThrow({ where: { id: signoff.id } });
     assert(JSON.stringify(unchanged) === JSON.stringify(signoff), "reopening left the sign-off row exactly as it was");
 
     // 6. A second cycle keeps both.
-    const second = await signOffEvent({ eventId, actor: finance, acknowledgeWarnings: true, expectedVersion: afterReopen.lifecycleVersion });
-    const closedAgain = await getCloseoutView(eventId);
+    const second = await signOffEvent({ eventId, actor: finance, acknowledgeWarnings: true, expectedVersion: afterReopen.lifecycleVersion, seenOpenChecks: afterReopen.openChecks });
+    const closedAgain = await getCloseoutView(eventId, { canReadText: true });
     assert(closedAgain && closedAgain.history.length === 2 && closedAgain.history[0]!.id === second.signoffId && closedAgain.history[0]!.reopened === null && closedAgain.history[1]!.reopened !== null, "two sign-offs, the newest in force");
     await reopenClosedEvent({ eventId, actor: invoicer, reason: "Second look", expectedVersion: closedAgain.lifecycleVersion });
-    const final = await getCloseoutView(eventId);
+    const final = await getCloseoutView(eventId, { canReadText: true });
     assert(final && final.history.length === 2 && final.history.every((entry) => entry.reopened !== null), "both sign-offs stay, both reopened");
     assert((await prisma.eventLifecycleTransition.count({ where: { eventId, toState: "CLOSED" } })) === 2 && (await prisma.auditLog.count({ where: { eventId, action: "EVENT_CLOSEOUT_REOPENED" } })) === 2, "history and audit rows for both cycles");
 

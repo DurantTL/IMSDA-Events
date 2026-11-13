@@ -4,7 +4,11 @@ import {
   checkLabels,
   closeoutCheckIds,
   closeoutSnapshot,
+  openChecksSignature,
+  parseCloseoutCheckedAt,
   parseCloseoutSnapshot,
+  sameOpenChecks,
+  storedCloseoutSnapshot,
   signoffRefusal,
   summarizeCloseout,
   type CloseoutFacts,
@@ -90,6 +94,7 @@ describe("the closeout checklist (#1515)", () => {
     const notSetUp = stateOf(cleanFacts({ square: { state: "notConfigured" } }), "unmatched-square");
     expect(notSetUp).toMatchObject({ state: "warning", count: null });
     expect(notSetUp.sentence).toMatch(/not set up/);
+    expect(notSetUp.sentence).toContain("Ask the system administrator to set it up");
     const down = stateOf(cleanFacts({ square: { state: "unavailable" } }), "unmatched-square");
     expect(down).toMatchObject({ state: "warning", count: null });
     expect(down.sentence).toMatch(/could not be reached/);
@@ -146,5 +151,26 @@ describe("the stored snapshot", () => {
     expect(parseCloseoutSnapshot([{ id: "nope", state: "ready" }, { id: "waitlist", state: "odd" }, null, "x", { id: "waitlist", state: "warning", count: "3", cents: 5 }]))
       .toEqual([{ id: "waitlist", state: "warning", count: null, cents: 5 }]);
     expect(parseCloseoutSnapshot("nothing")).toEqual([]);
+  });
+});
+
+describe("the open set the signer saw (#1515)", () => {
+  it("lists the checks that are not ready as sorted id:state, and compares sets regardless of order", () => {
+    const checks = buildCloseoutChecklist(cleanFacts({ waitlistWaiting: 2, failedMessages: 1, report: { ...cleanFacts().report!, uncountedRefunds: { PENDING: tally(1, 100), FAILED: tally() } } }));
+    const open = openChecksSignature(checks);
+    expect(open).toEqual(["failed-messages:warning", "pending-refunds:blocking", "waitlist:warning"]);
+    expect(sameOpenChecks(open, [...open].reverse())).toBe(true);
+    expect(sameOpenChecks(open, open.slice(1))).toBe(false);
+    expect(sameOpenChecks(open, [...open.slice(1), "waitlist:blocking"])).toBe(false);
+    expect(openChecksSignature(buildCloseoutChecklist(cleanFacts()))).toEqual([]);
+  });
+
+  it("stores the checks with the time they were read, and reads both back", () => {
+    const stored = storedCloseoutSnapshot(buildCloseoutChecklist(cleanFacts({ waitlistWaiting: 1 })), new Date("2027-03-01T15:00:00.000Z"));
+    expect(stored.checkedAt).toBe("2027-03-01T15:00:00.000Z");
+    const roundTrip = JSON.parse(JSON.stringify(stored));
+    expect(parseCloseoutCheckedAt(roundTrip)).toBe("2027-03-01T15:00:00.000Z");
+    expect(parseCloseoutSnapshot(roundTrip)).toEqual(stored.checks);
+    expect(parseCloseoutCheckedAt(stored.checks)).toBeNull();
   });
 });

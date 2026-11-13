@@ -253,7 +253,9 @@ async function main() {
   const plainClose = await caught(transitionEventLifecycle({ eventId: done, toState: "CLOSED", expectedFromState: "FINANCIAL_RECONCILIATION", actor: finance }));
   assert(plainClose instanceof EventLifecycleError && plainClose.code === "CLOSEOUT_REQUIRED", "a plain move to CLOSED is refused");
   const beforeSignoff = await row(done);
-  await signOffEvent({ eventId: done, actor: finance, acknowledgeWarnings: true, expectedVersion: beforeSignoff.lifecycleVersion });
+  const { getCloseoutView } = await import("../modules/events/closeout-repository");
+  const closeoutView = await getCloseoutView(done, { canReadText: true });
+  await signOffEvent({ eventId: done, actor: finance, acknowledgeWarnings: true, expectedVersion: beforeSignoff.lifecycleVersion, seenOpenChecks: closeoutView!.openChecks });
   const closed = await row(done);
   assert(closed.isPublished && closed.lifecycleState === "CLOSED" && evaluateEventRegistrationPhase(closed) === "CLOSED", "a closed event stays public with registration closed");
   const unpublishClosed = await caught(unpublishEvent(done, actorId));

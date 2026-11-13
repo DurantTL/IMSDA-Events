@@ -14,7 +14,7 @@ export default async function EventCloseoutPage({ searchParams }: { searchParams
   if (!permissions.includes("MANAGE_FINANCE") && !permissions.includes("FINALIZE_INVOICES") && !permissions.includes("VIEW_REPORTS")) {
     return <AccessRestricted title="Closeout is restricted" detail="Only finance managers, people who can finalize invoices and people who can view reports can open the event closeout." whoToAsk="your event administrator" />;
   }
-  const data = await getCloseoutView(event.id);
+  const data = await getCloseoutView(event.id, { canReadText: canSignOff(permissions) });
   if (!data) notFound();
-  return <EventCloseoutView key={event.id} data={data} canSignOff={canSignOff(permissions)} canManageFinance={permissions.includes("MANAGE_FINANCE")} />;
+  return <EventCloseoutView key={event.id} data={data} canSignOff={canSignOff(permissions)} canManageFinance={permissions.includes("MANAGE_FINANCE")} canOpenMoneyReport={permissions.includes("MANAGE_FINANCE") || permissions.includes("VIEW_REPORTS")} canViewEvent={permissions.includes("VIEW_EVENT")} />;
 }

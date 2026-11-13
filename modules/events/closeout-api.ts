@@ -19,6 +19,7 @@ const closeoutStatus: Record<CloseoutError["code"], number> = {
   BLOCKING_CHECKS: 409,
   WARNINGS_NOT_ACKNOWLEDGED: 409,
   STALE_VERSION: 409,
+  STALE_CHECKLIST: 409,
   ALREADY_DONE: 409,
   NOTE_TOO_LONG: 400,
   REASON_REQUIRED: 400,

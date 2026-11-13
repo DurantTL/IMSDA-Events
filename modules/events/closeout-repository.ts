@@ -10,11 +10,16 @@ import { loadEventMoneyReport, loadUnmatchedSquareSummary } from "@/modules/paym
 import {
   buildCloseoutChecklist,
   CLOSEOUT_NOTE_MAX_LENGTH,
-  closeoutSnapshot,
+  CLOSEOUT_STALE_MESSAGE,
+  openChecksSignature,
+  parseCloseoutCheckedAt,
   parseCloseoutSnapshot,
+  sameOpenChecks,
   signoffRefusal,
+  storedCloseoutSnapshot,
   summarizeCloseout,
   type CloseoutCheck,
+  type CloseoutFacts,
   type CloseoutSummary,
 } from "@/modules/events/closeout-domain";
 import { EventLifecycleError, transitionEventLifecycle, type LifecycleActor } from "@/modules/events/lifecycle-repository";
@@ -40,6 +45,7 @@ export type CloseoutErrorCode =
   | "REASON_REQUIRED"
   | "REASON_TOO_LONG"
   | "STALE_VERSION"
+  | "STALE_CHECKLIST"
   | "ALREADY_DONE"
   | "NOT_FOUND";
 
@@ -64,8 +70,8 @@ async function readOrNull<T>(what: string, read: () => Promise<T>): Promise<T | 
   }
 }
 
-/** Gathers the facts and runs the pure checklist. Reads only. */
-export async function loadCloseoutChecklist(eventId: string): Promise<{ checks: CloseoutCheck[]; summary: CloseoutSummary }> {
+/** Gathers every fact the checklist needs, Square included. Reads only; run it before a transaction, never inside one. */
+export async function loadCloseoutFacts(eventId: string): Promise<CloseoutFacts> {
   const prisma = getPrisma();
   const event = await prisma.event.findUnique({ where: { id: eventId }, select: { billingMode: true } });
   if (!event) throw new CloseoutError("NOT_FOUND", "That event no longer exists.");
@@ -84,7 +90,7 @@ export async function loadCloseoutChecklist(eventId: string): Promise<{ checks: 
     readOrNull("the waitlist", () => prisma.registrationWaitlistEntry.count({ where: { eventId, status: "WAITING" } })),
     loadUnmatchedSquareSummary(eventId),
   ]);
-  const checks = buildCloseoutChecklist({
+  return {
     eventId,
     report: money?.report ?? null,
     churchBilled: event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
@@ -92,7 +98,26 @@ export async function loadCloseoutChecklist(eventId: string): Promise<{ checks: 
     failedMessages,
     waitlistWaiting,
     square,
-  });
+  };
+}
+
+export async function loadCloseoutChecklist(eventId: string): Promise<{ facts: CloseoutFacts; checks: CloseoutCheck[]; summary: CloseoutSummary; checkedAt: Date }> {
+  const facts = await loadCloseoutFacts(eventId);
+  const checks = buildCloseoutChecklist(facts);
+  return { facts, checks, summary: summarizeCloseout(checks), checkedAt: new Date() };
+}
+
+/**
+ * The checklist again inside the sign-off transaction, from the transaction's own connection (no pool access, no Square):
+ * the money report, which carries the pending and failed payments and refunds and the reconciliation check, and the draft
+ * invoices are read again with `tx`; the other facts are the ones read before the transaction opened.
+ */
+async function recheckInTransaction(tx: Prisma.TransactionClient, before: CloseoutFacts) {
+  const [money, draftInvoices] = await Promise.all([
+    readOrNull("the money report", () => loadEventMoneyReport(before.eventId, tx)),
+    before.churchBilled ? readOrNull("draft invoices", () => countOpenInvoiceDrafts(before.eventId, tx)) : Promise.resolve(0),
+  ]);
+  const checks = buildCloseoutChecklist({ ...before, report: money?.report ?? null, draftInvoices });
   return { checks, summary: summarizeCloseout(checks) };
 }
 
@@ -103,7 +128,10 @@ export type CloseoutHistoryEntry = {
   note: string | null;
   warningsAcknowledged: boolean;
   snapshot: ReturnType<typeof parseCloseoutSnapshot>;
-  reopened: { id: string; byName: string; at: string; reason: string } | null;
+  /** `reason` is null for a viewer who may not read free text. */
+  reopened: { id: string; byName: string; at: string; reason: string | null } | null;
+  /** When the snapshot's checks were read; null for a snapshot written without it. */
+  checkedAt: string | null;
 };
 
 export type CloseoutView = {
@@ -114,13 +142,21 @@ export type CloseoutView = {
   lifecycleVersion: number;
   checks: CloseoutCheck[];
   summary: CloseoutSummary;
+  /** The open checks this view shows, as sorted "id:state" strings; the sign-off form sends them back. */
+  openChecks: string[];
+  /** When the checklist was read. */
+  checkedAt: string;
   /** Newest first. The first entry that is not reopened is the current sign-off while the event is Closed. */
   history: CloseoutHistoryEntry[];
   /** Reopenings of an event closed before sign-offs existed: no sign-off to attach them to. */
-  unlinkedReopenings: Array<{ id: string; byName: string; at: string; reason: string }>;
+  unlinkedReopenings: Array<{ id: string; byName: string; at: string; reason: string | null }>;
 };
 
-export async function getCloseoutView(eventId: string): Promise<CloseoutView | null> {
+/**
+ * `canReadText`: the free-text note and reopening reasons are for those who may sign off or reopen (MANAGE_FINANCE or
+ * FINALIZE_INVOICES), like the lifecycle history's reasons. A reports-only viewer gets them as null.
+ */
+export async function getCloseoutView(eventId: string, options: { canReadText: boolean }): Promise<CloseoutView | null> {
   const prisma = getPrisma();
   const event = await prisma.event.findUnique({
     where: { id: eventId },
@@ -128,7 +164,7 @@ export async function getCloseoutView(eventId: string): Promise<CloseoutView | n
   });
   if (!event) return null;
   const state = effectiveLifecycleState(event);
-  const [{ checks, summary }, signoffs, unlinked] = await Promise.all([
+  const [{ checks, summary, checkedAt }, signoffs, unlinked] = await Promise.all([
     loadCloseoutChecklist(eventId),
     prisma.eventCloseoutSignoff.findMany({
       where: { eventId },
@@ -146,19 +182,22 @@ export async function getCloseoutView(eventId: string): Promise<CloseoutView | n
     lifecycleVersion: event.lifecycleVersion,
     checks,
     summary,
+    openChecks: openChecksSignature(checks),
+    checkedAt: checkedAt.toISOString(),
     history: signoffs.map((row) => {
       const reopening = row.reopenings[0];
       return {
         id: row.id,
         signedByName: row.signedByNameSnapshot,
         signedAt: row.createdAt.toISOString(),
-        note: row.note,
+        note: options.canReadText ? row.note : null,
         warningsAcknowledged: row.warningsAcknowledged,
         snapshot: parseCloseoutSnapshot(row.checklistSnapshot),
-        reopened: reopening ? { id: reopening.id, byName: reopening.reopenedByNameSnapshot, at: reopening.createdAt.toISOString(), reason: reopening.reason } : null,
+        checkedAt: parseCloseoutCheckedAt(row.checklistSnapshot),
+        reopened: reopening ? { id: reopening.id, byName: reopening.reopenedByNameSnapshot, at: reopening.createdAt.toISOString(), reason: options.canReadText ? reopening.reason : null } : null,
       };
     }),
-    unlinkedReopenings: unlinked.map((row) => ({ id: row.id, byName: row.reopenedByNameSnapshot, at: row.createdAt.toISOString(), reason: row.reason })),
+    unlinkedReopenings: unlinked.map((row) => ({ id: row.id, byName: row.reopenedByNameSnapshot, at: row.createdAt.toISOString(), reason: options.canReadText ? row.reason : null })),
   };
 }
 
@@ -184,14 +223,17 @@ export type SignOffInput = {
   note?: string | null;
   /** The event's `lifecycleVersion` on the page the signer reviewed. */
   expectedVersion: number;
+  /** The open checks the signer saw ("id:state", from `CloseoutView.openChecks`). A different set is refused as stale. */
+  seenOpenChecks: readonly string[];
   now?: Date;
 };
 
 /**
  * Signs the event off and closes it, in one transaction with the lifecycle transition (Financial reconciliation to
- * Closed): the event row is locked, the checklist is read again on the server (nothing is trusted from the page), any
- * blocking check refuses, open warnings must be acknowledged, then the sign-off row (name and checklist snapshot) is
- * written and the transition's evidence carries its id. Any failure leaves nothing behind.
+ * Closed). The checklist is read on the server before the transaction (nothing is trusted from the page) and its open set must
+ * match what the signer saw; inside the transaction, with the event row locked, the money facts are read again through the
+ * transaction's own connection. Any blocking check refuses, open warnings must be acknowledged, then the sign-off row (name and
+ * snapshot as of checkedAt) is written and the transition's evidence carries its id. Any failure leaves nothing behind.
  */
 export async function signOffEvent(input: SignOffInput) {
   const note = input.note?.trim() ? input.note.trim() : null;
@@ -199,6 +241,13 @@ export async function signOffEvent(input: SignOffInput) {
     throw new CloseoutError("NOTE_TOO_LONG", `The note can be at most ${CLOSEOUT_NOTE_MAX_LENGTH} characters.`);
   }
   const name = await signerName(input.actor.userId);
+  // Everything slow, Square included, is read before the transaction opens, so the event row is locked only briefly.
+  const before = await loadCloseoutChecklist(input.eventId);
+  const early = signoffRefusal(before.summary, input.acknowledgeWarnings);
+  if (early?.code === "BLOCKING_CHECKS") throw new CloseoutError(early.code, early.message);
+  if (!sameOpenChecks(openChecksSignature(before.checks), input.seenOpenChecks)) throw new CloseoutError("STALE_CHECKLIST", CLOSEOUT_STALE_MESSAGE);
+  if (early) throw new CloseoutError(early.code, early.message);
+
   let signoffId: string | null = null;
   const result = await transitionEventLifecycle({
     eventId: input.eventId,
@@ -210,8 +259,10 @@ export async function signOffEvent(input: SignOffInput) {
       action: "SIGN_OFF",
       run: async (tx, context) => {
         await assertVersion(tx, input.eventId, input.expectedVersion, context.fromState);
-        const { checks, summary } = await loadCloseoutChecklist(input.eventId);
+        const { checks, summary } = await recheckInTransaction(tx, before.facts);
         const refusal = signoffRefusal(summary, input.acknowledgeWarnings);
+        if (refusal?.code === "BLOCKING_CHECKS") throw new CloseoutError(refusal.code, refusal.message, context.fromState);
+        if (!sameOpenChecks(openChecksSignature(checks), input.seenOpenChecks)) throw new CloseoutError("STALE_CHECKLIST", CLOSEOUT_STALE_MESSAGE, context.fromState);
         if (refusal) throw new CloseoutError(refusal.code, refusal.message, context.fromState);
         const acknowledged = summary.warning > 0 && input.acknowledgeWarnings;
         const row = await tx.eventCloseoutSignoff.create({
@@ -219,7 +270,7 @@ export async function signOffEvent(input: SignOffInput) {
             eventId: input.eventId,
             signedByUserId: input.actor.userId,
             signedByNameSnapshot: name,
-            checklistSnapshot: closeoutSnapshot(checks),
+            checklistSnapshot: storedCloseoutSnapshot(checks, before.checkedAt),
             warningsAcknowledged: acknowledged,
             note,
             transitionId: context.transitionId,

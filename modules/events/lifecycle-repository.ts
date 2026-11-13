@@ -26,7 +26,7 @@ import { loadRequiredReadinessInputs } from "@/modules/events/readiness-inputs";
  */
 export class EventLifecycleError extends Error {
   constructor(
-    public readonly code: "UNKNOWN_TRANSITION" | "PERMISSION_DENIED" | "CONDITION_UNMET" | "CONFLICT" | "ARCHIVED" | "REASON_TOO_LONG" | "CLOSEOUT_REQUIRED" | "CLOSEOUT_REFUSED",
+    public readonly code: "UNKNOWN_TRANSITION" | "PERMISSION_DENIED" | "CONDITION_UNMET" | "CONFLICT" | "ARCHIVED" | "REASON_TOO_LONG" | "CLOSEOUT_REQUIRED",
     message: string,
     public readonly currentState?: EventLifecycleStateName,
   ) {
@@ -289,7 +289,7 @@ export async function transitionEventLifecycle(input: TransitionEventLifecycleIn
       },
     });
     return { changed: true, fromState: effective, toState: input.toState, lifecycleVersion: current.lifecycleVersion + 1, transitionId };
-  }, input.closeout ? { timeout: 30_000, maxWait: 10_000 } : undefined);
+  }, input.closeout ? { timeout: 15_000 } : undefined);
   // A banner saved while the event was a draft joins the shared image library once the event is public (#1913).
   // After the commit, best effort: it never fails or undoes the transition.
   if (result.changed && isPublicState(result.toState)) await keepPublishedHeaderImagesForEvent(input.eventId);

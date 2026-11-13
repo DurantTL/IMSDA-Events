@@ -44,7 +44,7 @@ const post = (path: string, body: unknown, origin = "https://events.imsda.test")
   body: JSON.stringify(body),
 });
 const get = () => new Request("https://events.imsda.test/api/events/evt_1/closeout");
-const validSignOff = { acknowledgeWarnings: true, note: "Looks right", lifecycleVersion: 4 };
+const validSignOff = { acknowledgeWarnings: true, note: "Looks right", lifecycleVersion: 4, seenOpenChecks: ["waitlist:warning"] };
 const validReopen = { reason: "Late invoice", lifecycleVersion: 5 };
 
 const asStaff = (role: "EVENT_ADMIN" | "FINANCE_MANAGER" | "READ_ONLY_STAFF" | "CHECK_IN_STAFF", extra: string[] = []) => {
@@ -84,6 +84,18 @@ describe("GET /api/events/[eventId]/closeout", () => {
     expect(dependencies.getCloseoutView).not.toHaveBeenCalled();
   });
 
+  it("hides the note and reopening reasons from a reports-only viewer, and shows them to a sign-off holder", async () => {
+    asStaff("READ_ONLY_STAFF", ["VIEW_REPORTS"]);
+    await GET(get(), context);
+    expect(dependencies.getCloseoutView).toHaveBeenLastCalledWith("evt_1", { canReadText: false });
+    asStaff("CHECK_IN_STAFF", ["FINALIZE_INVOICES"]);
+    await GET(get(), context);
+    expect(dependencies.getCloseoutView).toHaveBeenLastCalledWith("evt_1", { canReadText: true });
+    asStaff("FINANCE_MANAGER");
+    await GET(get(), context);
+    expect(dependencies.getCloseoutView).toHaveBeenLastCalledWith("evt_1", { canReadText: true });
+  });
+
   it("answers 404 for an event that is gone", async () => {
     asStaff("FINANCE_MANAGER");
     dependencies.getCloseoutView.mockResolvedValue(null);
@@ -106,7 +118,7 @@ describe("POST /api/events/[eventId]/closeout/sign-off", () => {
 
   it("validates the body: acknowledgeWarnings and lifecycleVersion required, a note of at most 500, no extra keys", async () => {
     asStaff("FINANCE_MANAGER");
-    for (const body of [{}, { acknowledgeWarnings: "yes", lifecycleVersion: 1 }, { acknowledgeWarnings: true }, { ...validSignOff, note: "x".repeat(501) }, { ...validSignOff, lifecycleVersion: -1 }, { ...validSignOff, extra: 1 }, null]) {
+    for (const body of [{}, { acknowledgeWarnings: "yes", lifecycleVersion: 1 }, { acknowledgeWarnings: true }, { ...validSignOff, note: "x".repeat(501) }, { ...validSignOff, lifecycleVersion: -1 }, { ...validSignOff, extra: 1 }, { acknowledgeWarnings: true, lifecycleVersion: 1 }, { ...validSignOff, seenOpenChecks: "waitlist:warning" }, null]) {
       expect((await signOff(post("sign-off", body), context)).status, JSON.stringify(body)).toBe(400);
     }
     expect(dependencies.signOffEvent).not.toHaveBeenCalled();
@@ -119,7 +131,7 @@ describe("POST /api/events/[eventId]/closeout/sign-off", () => {
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(await response.json()).toMatchObject({ signedOff: true, signoffId: "so_1" });
     expect(dependencies.signOffEvent).toHaveBeenCalledWith(expect.objectContaining({
-      eventId: "evt_1", acknowledgeWarnings: true, note: "Looks right", expectedVersion: 4,
+      eventId: "evt_1", acknowledgeWarnings: true, note: "Looks right", expectedVersion: 4, seenOpenChecks: ["waitlist:warning"],
       actor: expect.objectContaining({ userId: "usr_1", permissions: expect.arrayContaining(["MANAGE_FINANCE"]) }),
     }));
     asStaff("CHECK_IN_STAFF", ["FINALIZE_INVOICES"]);
@@ -136,6 +148,7 @@ describe("POST /api/events/[eventId]/closeout/sign-off", () => {
     ["BLOCKING_CHECKS", 409],
     ["WARNINGS_NOT_ACKNOWLEDGED", 409],
     ["STALE_VERSION", 409],
+    ["STALE_CHECKLIST", 409],
     ["ALREADY_DONE", 409],
     ["NOTE_TOO_LONG", 400],
     ["NOT_FOUND", 404],

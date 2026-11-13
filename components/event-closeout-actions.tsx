@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { useConfirm } from "@/components/use-confirm";
 import styles from "@/components/event-closeout.module.css";
@@ -14,6 +15,8 @@ type Props = {
   mode: "sign-off" | "reopen";
   blocking: number;
   warnings: number;
+  /** The open checks the page shows ("id:state"); the server refuses the sign-off when its own set differs. */
+  seenOpenChecks: readonly string[];
   noteMaxLength: number;
   reasonMaxLength: number;
 };
@@ -21,13 +24,15 @@ type Props = {
 type Outcome = { tone: "success" | "error"; message: string } | null;
 
 /** The sign-off form and the reopen form (#1515). The server re-reads the checklist; nothing here decides anything. */
-export function EventCloseoutActions({ eventId, eventName, lifecycleVersion, mode, blocking, warnings, noteMaxLength, reasonMaxLength }: Props) {
+export function EventCloseoutActions({ eventId, eventName, lifecycleVersion, mode, blocking, warnings, seenOpenChecks, noteMaxLength, reasonMaxLength }: Props) {
   const router = useRouter();
   const { confirm, ask, confirmDialog } = useConfirm();
   const [busy, setBusy] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [note, setNote] = useState("");
   const [outcome, setOutcome] = useState<Outcome>(null);
+  // A typed note or a ticked box is unsaved until the sign-off goes through (rule B6).
+  useUnsavedChangesGuard(mode === "sign-off" && (note.trim() !== "" || acknowledged));
 
   async function send(path: string, body: Record<string, unknown>, success: string) {
     setBusy(true);
@@ -43,6 +48,8 @@ export function EventCloseoutActions({ eventId, eventName, lifecycleVersion, mod
         setOutcome({ tone: "error", message: notSavedMessage(data?.message ?? "The server did not answer. Nothing was changed; try again.") });
         return;
       }
+      setNote("");
+      setAcknowledged(false);
       setOutcome({ tone: "success", message: savedMessage(success) });
       router.refresh();
     } catch {
@@ -61,7 +68,7 @@ export function EventCloseoutActions({ eventId, eventName, lifecycleVersion, mod
       confirmLabel: `Sign off and close ${eventName}`,
     });
     if (!confirmed) return;
-    await send("sign-off", { acknowledgeWarnings: acknowledged, note: note.trim() || null, lifecycleVersion }, "The event is closed.");
+    await send("sign-off", { acknowledgeWarnings: acknowledged, note: note.trim() || null, lifecycleVersion, seenOpenChecks }, "The event is closed.");
   }
 
   async function reopen() {
