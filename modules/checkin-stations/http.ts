@@ -4,6 +4,7 @@ import { z } from "zod";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
+import { EventClosedError } from "@/modules/events/money-lock";
 import { PaymentOperationError } from "@/modules/payments/repository";
 import { SquareMatchOperationError } from "@/modules/payments/square-match-repository";
 import {
@@ -81,6 +82,9 @@ const squareMatchMessages: Record<string, { status: number; message: string }> =
 };
 
 export function stationApiError(error: unknown) {
+  if (error instanceof EventClosedError) {
+    return stationJson({ error: error.code, message: error.message }, { status: error.status });
+  }
   if (error instanceof SquareMatchOperationError) {
     const mapped = squareMatchMessages[error.code] ?? {
       status: 409,

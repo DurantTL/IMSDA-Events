@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { getPrisma } from "@/lib/prisma";
+import { assertEventOpenForMoney } from "@/modules/events/money-lock";
 import { getSquarePayment } from "@/modules/payments/square-http";
 import {
   getSquareConfiguration,
@@ -263,6 +264,8 @@ export async function attachSquarePaymentToRegistration(
   }
 
   const payment = await prisma.$transaction(async (tx) => {
+    // A Closed event takes no new payments; checked in this transaction, before anything is written.
+    await assertEventOpenForMoney(tx, eventId, "staff");
     // Inside the transaction: two staff members working the same list must not
     // both record the same provider payment.
     const existing = await tx.payment.findFirst({

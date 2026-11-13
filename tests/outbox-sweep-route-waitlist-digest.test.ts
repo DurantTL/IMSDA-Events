@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   pruneAlertFeed: vi.fn(),
   reconcileDeadlineReminders: vi.fn(),
   sweepClassWaitlists: vi.fn(),
+  publishDueEventPageSections: vi.fn(),
   sendDueClassChangeEmails: vi.fn(),
   sendDueHonorWatchSummaries: vi.fn(),
   sendDueMonthlyRecordReminders: vi.fn(),
@@ -48,6 +49,7 @@ vi.mock("@/modules/calendar/feeds", () => ({ refreshDueCalendarFeeds: mocks.refr
 vi.mock("@/modules/event-locations/waitlist-digest", () => ({ sendDueLocationWaitlistDigests: mocks.sendDueLocationWaitlistDigests }));
 vi.mock("@/modules/notifications/feed", () => ({ pruneAlertFeed: mocks.pruneAlertFeed }));
 vi.mock("@/modules/calendar/deadline-reminders", () => ({ reconcileDeadlineReminders: mocks.reconcileDeadlineReminders }));
+vi.mock("@/modules/events/page-schedule-sweep", () => ({ publishDueEventPageSections: mocks.publishDueEventPageSections }));
 vi.mock("@/modules/honors/waitlist-repository", () => ({ sweepClassWaitlists: mocks.sweepClassWaitlists }));
 vi.mock("@/modules/honors/class-change-emails", () => ({ sendDueClassChangeEmails: mocks.sendDueClassChangeEmails }));
 vi.mock("@/modules/honors/watch-emails", () => ({ sendDueHonorWatchSummaries: mocks.sendDueHonorWatchSummaries }));
@@ -75,6 +77,7 @@ beforeEach(() => {
   mocks.pruneExpiredCommunityContent.mockResolvedValue({ removedPosts: 0 });
   mocks.pruneAlertFeed.mockResolvedValue(0);
   mocks.reconcileDeadlineReminders.mockResolvedValue({ prepared: 0, updated: 0, withdrawn: 0 });
+  mocks.publishDueEventPageSections.mockResolvedValue({ events: 0, published: 0, failed: 0 });
   mocks.sweepClassWaitlists.mockResolvedValue({ classes: 0, offered: 0, lapsed: 0, failed: 0, budgetExhausted: false });
   mocks.sendDueClassChangeEmails.mockResolvedValue({ status: "RAN", immediate: { changes: 0, queued: 0, skippedStale: 0, failed: 0 }, summaries: { due: false, instructors: 0, queued: 0, noChanges: 0, failed: 0 }, delivered: 0, pruned: 0 });
   mocks.sendDueHonorWatchSummaries.mockResolvedValue({ status: "RAN", due: false, watches: 0, queued: 0, noChanges: 0, failed: 0, messages: 0, delivered: 0 });
@@ -293,6 +296,17 @@ describe("the sweep records its steps for the System report (#1357)", () => {
     expect(response.status).toBe(200);
     expect(mocks.logError).toHaveBeenCalledWith(expect.stringContaining("Could not record the calendar feed refresh run"), expect.any(Error));
     expect(mocks.recordSweepHeartbeat).toHaveBeenCalledWith("SUCCEEDED");
+  });
+});
+
+describe("the scheduled event page publish step (#1514)", () => {
+  it("records its counts, and a failure there is recorded as FAILED without failing the sweep", async () => {
+    mocks.publishDueEventPageSections.mockResolvedValueOnce({ events: 2, published: 3, failed: 0 });
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.recordJobRun.mock.calls).toContainEqual(["event-page-scheduled-publish", "SUCCEEDED", { events: 2, published: 3, failed: 0 }]);
+    mocks.publishDueEventPageSections.mockRejectedValueOnce(new Error("synthetic"));
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.recordJobRun.mock.calls).toContainEqual(["event-page-scheduled-publish", "FAILED", undefined]);
   });
 });
 

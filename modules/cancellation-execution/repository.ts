@@ -33,6 +33,8 @@ import type {
 import { diffRegistrationState, registrationStateOf, type RegistrationStateSnapshot, type RequestConflict } from "@/modules/cancellation-requests/domain";
 import { stateFingerprint } from "@/modules/cancellation-requests/fingerprint";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
+import { assertEventOpenForMoney, EventClosedError } from "@/modules/events/money-lock";
+import { raiseClosedMoneyReview } from "@/modules/events/closed-event-money-reviews";
 import { PaymentOperationError, recordRefund } from "@/modules/payments/repository";
 import { createSquareRefund, SquareAdapterError } from "@/modules/payments/square-adapter";
 import { getSquareConfiguration, type SquareRuntimeConfiguration } from "@/modules/payments/square-config";
@@ -492,6 +494,9 @@ async function sendSquareLeg(execution: ExecutionRow, leg: Leg, user: { id: stri
     } else if (!refund.idempotencyKey) {
       refund = await tx.refund.update({ where: { id: refund.id }, data: { idempotencyKey: leg.idempotencyKey } });
     }
+    // Square has already made this refund, so it is recorded whatever happened meanwhile; if the event was closed after the
+    // up-front check, it is flagged for the finance office in this transaction.
+    if (!declined) await raiseClosedMoneyReview(tx, { eventId: execution.eventId, kind: "REFUND", refundId: refund.id, amountCents: leg.amountCents, source: "SQUARE_REFUND" });
     const settled = refund.status === "SUCCEEDED";
     await tx.cancellationExecutionRefund.update({
       where: { id: leg.id },
@@ -520,6 +525,11 @@ async function recordOfflineLeg(execution: ExecutionRow, leg: Leg, user: { id: s
     // The existing manual path: its own key check, balance check, audit entry and refund notice email.
     await recordRefund(execution.eventId, leg.paymentId, user.id, { amountCents: leg.amountCents, reason: refundReason(execution.requestId), idempotencyKey: leg.idempotencyKey });
   } catch (error) {
+    // A Closed event is a clean refusal of this leg (nothing recorded), never an abort part-way through the run.
+    if (error instanceof EventClosedError) {
+      await failLeg(leg.id, "EVENT_CLOSED");
+      return;
+    }
     if (!(error instanceof PaymentOperationError)) throw error;
     await failLeg(leg.id, error.code);
     return;
@@ -811,6 +821,9 @@ export async function carryOutCancellation(
     const request = await db.cancellationRequest.findFirst({ where: { id: requestId, eventId }, select: requestSelect });
     if (!request) throw new CancellationExecutionError("REQUEST_NOT_FOUND", "That request could not be found for this event.");
     if (request.status !== "APPROVED") throw new CancellationExecutionError("NOT_APPROVED", "Only an approved request can be carried out.");
+    // A refund on a Closed event is refused up front, before the registration or any leg is touched. A cancellation that
+    // moves no money is not a money record and goes ahead.
+    if (request.proposedRefundCents > 0) await db.$transaction((tx) => assertEventOpenForMoney(tx, eventId, "staff"));
 
     let execution = await loadExecution(db, requestId);
     if (!execution) {

@@ -14,6 +14,7 @@ function mockPrisma() {
     eventAsset: { findMany: vi.fn().mockResolvedValue([{ id: "asset_hero", contentType: "image/png" }]) },
     eventContentSection: { deleteMany: vi.fn(), create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     auditLog: { create: vi.fn() },
+    eventPageVersion: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({}) },
   };
   const client = {
     $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),

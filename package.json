@@ -70,6 +70,7 @@
     "test:scholarship-funds": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-scholarship-funds.ts",
     "test:event-money-report": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-money-report.ts",
     "test:event-closeout": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-closeout.ts",
+    "test:closed-event-money": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-closed-event-money.ts",
     "test:invoices": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-invoices.ts",
     "test:announcement-email": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-announcement-email.ts",
     "test:announcement-attachments": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-announcement-attachments.ts",

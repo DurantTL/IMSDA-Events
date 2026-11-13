@@ -84,6 +84,6 @@ describe("token routes are private links (#154)", () => {
   });
 
   it("keeps only fixed app route names for a stored link", () => {
-    expect([...fixedRouteNames].sort()).toEqual(["account", "api", "clubs", "club-forms", "health-records", "manage", "pay", "register", "staff-invite", "unsubscribe"].sort());
+    expect([...fixedRouteNames].sort()).toEqual(["account", "api", "clubs", "club-forms", "event-preview", "health-records", "manage", "pay", "register", "staff-invite", "unsubscribe"].sort());
   });
 });

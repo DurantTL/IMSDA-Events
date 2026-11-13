@@ -5,6 +5,8 @@ import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import type { EventPermission } from "@/modules/access/permissions";
+import { summarizeUnclearedClosedMoney, listUnclearedClosedMoney, type ClosedMoneyReviewRow } from "@/modules/events/closed-event-money-reviews";
+import { flushHostedDeletionsAfterResponse, invalidateHostedCheckoutsInTransaction } from "@/modules/payments/square-hosted-invalidation";
 import { countOpenInvoiceDrafts } from "@/modules/invoices/repository";
 import { loadEventMoneyReport, loadUnmatchedSquareSummary } from "@/modules/payments/event-money-report-repository";
 import {
@@ -75,7 +77,7 @@ export async function loadCloseoutFacts(eventId: string): Promise<CloseoutFacts>
   const prisma = getPrisma();
   const event = await prisma.event.findUnique({ where: { id: eventId }, select: { billingMode: true } });
   if (!event) throw new CloseoutError("NOT_FOUND", "That event no longer exists.");
-  const [money, draftInvoices, failedMessages, waitlistWaiting, square] = await Promise.all([
+  const [money, draftInvoices, failedMessages, waitlistWaiting, square, closedMoneyReviews] = await Promise.all([
     readOrNull("the money report", () => loadEventMoneyReport(eventId)),
     readOrNull("draft invoices", () => countOpenInvoiceDrafts(eventId)),
     // A failed message counts until a later copy of it was sent or queued (a retry), as the retry tool judges it.
@@ -89,6 +91,7 @@ export async function loadCloseoutFacts(eventId: string): Promise<CloseoutFacts>
     })),
     readOrNull("the waitlist", () => prisma.registrationWaitlistEntry.count({ where: { eventId, status: "WAITING" } })),
     loadUnmatchedSquareSummary(eventId),
+    readOrNull("money recorded while closed", () => summarizeUnclearedClosedMoney(eventId)),
   ]);
   return {
     eventId,
@@ -98,6 +101,7 @@ export async function loadCloseoutFacts(eventId: string): Promise<CloseoutFacts>
     failedMessages,
     waitlistWaiting,
     square,
+    closedMoneyReviews,
   };
 }
 
@@ -109,15 +113,16 @@ export async function loadCloseoutChecklist(eventId: string): Promise<{ facts: C
 
 /**
  * The checklist again inside the sign-off transaction, from the transaction's own connection (no pool access, no Square):
- * the money report, which carries the pending and failed payments and refunds and the reconciliation check, and the draft
- * invoices are read again with `tx`; the other facts are the ones read before the transaction opened.
+ * the money report, which carries the pending and failed payments and refunds and the reconciliation check, the draft
+ * invoices and the uncleared money-recorded-while-closed flags are read again with `tx`; the other facts are the ones read before the transaction opened.
  */
 async function recheckInTransaction(tx: Prisma.TransactionClient, before: CloseoutFacts) {
-  const [money, draftInvoices] = await Promise.all([
+  const [money, draftInvoices, closedMoneyReviews] = await Promise.all([
     readOrNull("the money report", () => loadEventMoneyReport(before.eventId, tx)),
     before.churchBilled ? readOrNull("draft invoices", () => countOpenInvoiceDrafts(before.eventId, tx)) : Promise.resolve(0),
+    readOrNull("money recorded while closed", () => summarizeUnclearedClosedMoney(before.eventId, tx)),
   ]);
-  const checks = buildCloseoutChecklist({ ...before, report: money?.report ?? null, draftInvoices });
+  const checks = buildCloseoutChecklist({ ...before, report: money?.report ?? null, draftInvoices, closedMoneyReviews });
   return { checks, summary: summarizeCloseout(checks) };
 }
 
@@ -148,6 +153,8 @@ export type CloseoutView = {
   checkedAt: string;
   /** Newest first. The first entry that is not reopened is the current sign-off while the event is Closed. */
   history: CloseoutHistoryEntry[];
+  /** Money Square recorded while the event was Closed that nobody has marked reviewed. Amounts and references only. */
+  closedMoney: ClosedMoneyReviewRow[];
   /** Reopenings of an event closed before sign-offs existed: no sign-off to attach them to. */
   unlinkedReopenings: Array<{ id: string; byName: string; at: string; reason: string | null }>;
 };
@@ -164,7 +171,7 @@ export async function getCloseoutView(eventId: string, options: { canReadText: b
   });
   if (!event) return null;
   const state = effectiveLifecycleState(event);
-  const [{ checks, summary, checkedAt }, signoffs, unlinked] = await Promise.all([
+  const [{ checks, summary, checkedAt }, signoffs, unlinked, closedMoney] = await Promise.all([
     loadCloseoutChecklist(eventId),
     prisma.eventCloseoutSignoff.findMany({
       where: { eventId },
@@ -173,6 +180,7 @@ export async function getCloseoutView(eventId: string, options: { canReadText: b
       include: { reopenings: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 1 } },
     }),
     prisma.eventCloseoutReopening.findMany({ where: { eventId, signoffId: null }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 50 }),
+    listUnclearedClosedMoney(eventId),
   ]);
   return {
     eventId,
@@ -197,6 +205,7 @@ export async function getCloseoutView(eventId: string, options: { canReadText: b
         reopened: reopening ? { id: reopening.id, byName: reopening.reopenedByNameSnapshot, at: reopening.createdAt.toISOString(), reason: options.canReadText ? reopening.reason : null } : null,
       };
     }),
+    closedMoney,
     unlinkedReopenings: unlinked.map((row) => ({ id: row.id, byName: row.reopenedByNameSnapshot, at: row.createdAt.toISOString(), reason: options.canReadText ? row.reason : null })),
   };
 }
@@ -264,6 +273,10 @@ export async function signOffEvent(input: SignOffInput) {
         if (refusal?.code === "BLOCKING_CHECKS") throw new CloseoutError(refusal.code, refusal.message, context.fromState);
         if (!sameOpenChecks(openChecksSignature(checks), input.seenOpenChecks)) throw new CloseoutError("STALE_CHECKLIST", CLOSEOUT_STALE_MESSAGE, context.fromState);
         if (refusal) throw new CloseoutError(refusal.code, refusal.message, context.fromState);
+        // Open Pay on Square links are withdrawn with the close, in this transaction (local rows only; Square is told after commit).
+        // A link with a payment already in flight is left alone, and a payment through it arrives as money to review.
+        const openLinks = await tx.squareHostedCheckout.findMany({ where: { eventId: input.eventId, status: { in: ["CREATING", "ACTIVE"] } }, select: { registrationId: true }, distinct: ["registrationId"] });
+        for (const link of openLinks) await invalidateHostedCheckoutsInTransaction(tx, { registrationId: link.registrationId, reason: "EVENT_CLOSED", now: new Date() });
         const acknowledged = summary.warning > 0 && input.acknowledgeWarnings;
         const row = await tx.eventCloseoutSignoff.create({
           data: {
@@ -294,6 +307,8 @@ export async function signOffEvent(input: SignOffInput) {
   if (!result.changed || !signoffId) {
     throw new CloseoutError("ALREADY_DONE", "This event is already closed. Nothing was changed.", result.fromState);
   }
+  // Withdrawn links are deleted at Square after commit; it never throws, and the sweep retries what it misses.
+  await flushHostedDeletionsAfterResponse();
   return { signoffId, transitionId: result.transitionId ?? null, lifecycleVersion: result.lifecycleVersion };
 }
 
