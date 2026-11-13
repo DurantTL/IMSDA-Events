@@ -104,12 +104,23 @@ export type LifecycleCondition = "STARTED" | "ENDED";
 export type LifecycleTransitionRule = {
   from: EventLifecycleStateName;
   to: EventLifecycleStateName;
+  /** The permission the rule names (shown when refusing). When `anyOf` is set it is one of them. */
   permission: EventPermission;
+  /** Holding any one of these allows the move (#1515). Absent means `permission` alone. */
+  anyOf?: readonly EventPermission[];
+  /**
+   * The move is made only by the closeout sign-off or reopen action (`closeout-repository.ts`), which record who did it
+   * and why; the generic transition refuses it and points at the Closeout page (#1515).
+   */
+  closeoutAction?: "SIGN_OFF" | "REOPEN";
   /** Event-time conditions that must hold. */
   condition?: LifecycleCondition;
   /** Moving to PUBLISHED needs the publish readiness checklist complete. */
   requiresReadiness?: boolean;
 };
+
+/** Who may sign an event off, and reopen it (#1515): any finance admin. */
+export const closeoutSignoffPermissions: readonly EventPermission[] = ["MANAGE_FINANCE", "FINALIZE_INVOICES"];
 
 /** Every allowed transition. Nothing else is allowed; ARCHIVED is reached only through archive/unarchive. */
 export const eventLifecycleTransitions: readonly LifecycleTransitionRule[] = [
@@ -127,8 +138,15 @@ export const eventLifecycleTransitions: readonly LifecycleTransitionRule[] = [
   { from: "REGISTRATION_CLOSED", to: "COMPLETE", permission: "CONFIGURE_EVENT", condition: "ENDED" },
   { from: "IN_PROGRESS", to: "COMPLETE", permission: "CONFIGURE_EVENT", condition: "ENDED" },
   { from: "COMPLETE", to: "FINANCIAL_RECONCILIATION", permission: "MANAGE_FINANCE" },
-  { from: "FINANCIAL_RECONCILIATION", to: "CLOSED", permission: "MANAGE_FINANCE" },
+  // Any finance admin may close out or reopen (#1515, Caleb, Nov 12, 2026): finance or finalize-invoices.
+  { from: "FINANCIAL_RECONCILIATION", to: "CLOSED", permission: "MANAGE_FINANCE", anyOf: closeoutSignoffPermissions, closeoutAction: "SIGN_OFF" },
+  { from: "CLOSED", to: "FINANCIAL_RECONCILIATION", permission: "MANAGE_FINANCE", anyOf: closeoutSignoffPermissions, closeoutAction: "REOPEN" },
 ];
+
+/** Every permission that lets this rule's move happen. */
+export function rulePermissions(rule: Pick<LifecycleTransitionRule, "permission" | "anyOf">): readonly EventPermission[] {
+  return rule.anyOf ?? [rule.permission];
+}
 
 export function findLifecycleTransition(from: EventLifecycleStateName, to: EventLifecycleStateName) {
   return eventLifecycleTransitions.find((rule) => rule.from === from && rule.to === to) ?? null;
@@ -177,7 +195,7 @@ export function decideLifecycleTransition(input: {
   if (!rule) {
     return { allowed: false, refusal: { code: "UNKNOWN_TRANSITION", message: unknownTransitionMessage(input.from, input.to) } };
   }
-  if (!input.permissions.includes(rule.permission)) {
+  if (!rulePermissions(rule).some((permission) => input.permissions.includes(permission))) {
     return {
       allowed: false,
       refusal: { code: "PERMISSION_DENIED", permission: rule.permission, message: `The ${rule.permission} permission is required for this change.` },
@@ -203,6 +221,8 @@ export function allowedNextStates(input: {
 }) {
   return eventLifecycleTransitions
     .filter((rule) => rule.from === input.from)
+    // Closeout moves are not generic transitions: the Closeout page offers them.
+    .filter((rule) => !rule.closeoutAction)
     .filter((rule) => decideLifecycleTransition({ from: input.from, to: rule.to, permissions: input.permissions, time: input.time }).allowed)
     .map((rule) => rule.to);
 }

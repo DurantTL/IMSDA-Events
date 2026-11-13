@@ -387,6 +387,8 @@ const pages: PageSpec[] = [
   staff("finance-square-payments", "/finance/square-payments"),
   // Event money report (#1962): charges, paid and refunded, outstanding, the reconciliation and the owing list. Square may be unreachable locally, which the page shows as Unavailable.
   { ...staff("finance-money-report", "/finance/money-report"), expectText: /Event money report/ },
+  // Event closeout (#1515): the checklist, sign-off and history. Square may be unreachable locally, which the checklist shows as a warning.
+  { ...staff("finance-closeout", "/finance/closeout"), expectText: /Event closeout/ },
   // More money tools (#1575): the other finance pages as grouped cards. The Refunds view is the cancellation queue, audited below as cancellation-staff-queue.
   { ...staff("finance-tools", "/finance/tools"), expectText: /Invoices and churches/ },
   // Review queues (#1574): the registration review pages as grouped cards.
@@ -466,6 +468,20 @@ const pages: PageSpec[] = [
       await page.getByLabel(/confirmation code/i).fill("MOBSTA1");
       await page.getByRole("button", { name: /Find family/i }).click();
       await page.getByRole("status").first().waitFor({ timeout: 5000 }).catch(() => undefined);
+      await page.waitForTimeout(500);
+    },
+  },
+  // Gate mode on the station (#1684): the Check-in | Gate switch, a name search and its result cards.
+  {
+    name: "station-gate",
+    path: "/check-in-station",
+    role: "station",
+    expectText: /Check-in station/i,
+    prepare: async (page) => {
+      await page.getByRole("button", { name: /^Gate$/ }).click();
+      await page.getByLabel(/Search a name or scan a pass/i).fill("Quillfeather");
+      await page.getByRole("button", { name: /Look up/i }).click();
+      await page.getByText(/Registered/).first().waitFor({ timeout: 5000 }).catch(() => undefined);
       await page.waitForTimeout(500);
     },
   },
@@ -1094,7 +1110,10 @@ async function cleanupHistoryAccount(prisma: PrismaClient) {
  * check-in station (#892) shows its real family list and payment panel. Idempotent.
  */
 async function seedStationEvent(prisma: PrismaClient) {
-  if (await prisma.event.findUnique({ where: { id: stationEventId }, select: { id: true } })) return;
+  if (await prisma.event.findUnique({ where: { id: stationEventId }, select: { id: true } })) {
+    await prisma.event.update({ where: { id: stationEventId }, data: { checkInGateModeEnabled: true } });
+    return;
+  }
   const { addDays, calendarDateIn } = await import("../modules/calendar/domain");
   const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
   const today = calendarDateIn(new Date());
@@ -1104,6 +1123,8 @@ async function seedStationEvent(prisma: PrismaClient) {
       data: {
         id: stationEventId, slug: `${P}-station-weekend`, name: "Mobilecheck Station Weekend",
         startsAt: new Date(`${addDays(today, -1)}T12:00:00Z`), endsAt: new Date(`${addDays(today, 1)}T12:00:00Z`), timezone: "America/Chicago",
+        // Gate mode (#1684) is on for this event so the station shows its Check-in | Gate switch.
+        checkInGateModeEnabled: true,
         // Unpublished: a station does not need it, and a published event dated today would join the public calendar's pages.
         isPublished: false, billingMode: "ATTENDEE_PAY",
       },

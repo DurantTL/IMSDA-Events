@@ -53,6 +53,7 @@ describe("typed answers stay out of the audit record (#1198)", () => {
           return {};
         }),
       },
+      registrationCapacityReservation: { updateMany: vi.fn().mockResolvedValue({ count: 0 }), upsert: vi.fn().mockResolvedValue({}) },
       programAssignmentRun: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
       programAttendeeAssignment: { findMany: vi.fn().mockResolvedValue([]) },
       auditLog: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({}) },

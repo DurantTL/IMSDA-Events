@@ -1,4 +1,5 @@
 import {
+  choiceDisplayLabel,
   registrationFormDefinitionSchema,
   type RegistrationFormField,
 } from "@/modules/forms/definition";
@@ -143,7 +144,7 @@ function textOf(value: unknown): string {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
   if (typeof value === "boolean") return value ? "Yes" : "";
-  if (Array.isArray(value)) return value.map(textOf).filter(Boolean).join(", ");
+  if (Array.isArray(value)) return value.map((entry) => (typeof entry === "string" ? choiceDisplayLabel(entry.trim()) : textOf(entry))).filter(Boolean).join(", ");
   return "";
 }
 

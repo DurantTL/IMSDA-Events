@@ -97,6 +97,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/finance/cancellation-policy` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/cancellation-policy/page.tsx` |
 | `/finance/cancellation-requests` | Page link | Events (inside an event) | Money | Refunds | More, This event | Event menu | - | `app/(workspace)/finance/cancellation-requests/page.tsx` |
 | `/finance/church-owed` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/church-owed/page.tsx` |
+| `/finance/closeout` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/closeout/page.tsx` |
 | `/finance/invoices` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/invoices/page.tsx` |
 | `/finance/invoices/[invoiceId]` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/invoices/[invoiceId]/page.tsx` |
 | `/finance/invoices/[invoiceId]/send` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/invoices/[invoiceId]/send/page.tsx` |
@@ -186,7 +187,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/select-event` | Existing page link | Home | none (Help, Profile and pages no tab lists light Home and no tab) | - | More | Home menu | - | `app/select-event/page.tsx` |
 | `/staff` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/staff/page.tsx` |
 
-176 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
+177 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
 
 ## Query states that move a page to another tab or view
 

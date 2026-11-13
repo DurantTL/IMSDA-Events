@@ -1,0 +1,179 @@
+.stack {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-container);
+  background: var(--card);
+}
+
+.panelHeading {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1.125rem);
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.summary {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-container);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.summaryReady {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.summaryWarning {
+  background: var(--imsda-gold-soft);
+  color: var(--ink);
+}
+
+.summaryBlocking {
+  background: var(--coral-soft);
+  color: var(--coral);
+}
+
+.checks,
+.history {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: start;
+  padding: 12px 0;
+  border-top: 1px solid var(--table-row-line);
+}
+
+.check:first-child {
+  border-top: 0;
+}
+
+.checkBody {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.checkLabel {
+  margin: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.9375rem);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.open {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target, 44px);
+  color: var(--imsda-purple);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.field textarea {
+  min-height: 88px;
+  max-width: 100%;
+}
+
+.tick {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: var(--touch-target, 44px);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.45;
+}
+
+.tick input {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-top: 2px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.entry {
+  display: grid;
+  gap: 4px;
+  padding: 12px 0;
+  border-top: 1px solid var(--table-row-line);
+  min-width: 0;
+}
+
+.entry:first-child {
+  border-top: 0;
+}
+
+.entryTitle {
+  margin: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.9375rem);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.snapshot {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .check {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actions > button {
+    flex: 1 1 100%;
+  }
+}
