@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { isEmail } from "@/lib/field-validation";
 import { effectiveLocationDates, evaluateLocationPhase, type LocationDateSource } from "@/modules/event-locations/domain";
-import { evaluateEventRegistrationPhase, type EventLifecycleSource } from "@/modules/events/lifecycle";
+import { calendarDateInEventTimeZone, evaluateEventRegistrationPhase, type EventLifecycleSource } from "@/modules/events/lifecycle";
 import { closesRegistration, effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { timeZoneLongName } from "@/modules/calendar/conference-format";
 import { neutralizePlaceholders } from "@/modules/invoices/delivery-domain";
@@ -141,7 +141,10 @@ export function draftRegistrationWindow(
   const phase = chosen || activeLocations.length === 0
     ? evaluateLocationPhase(event, chosen, now)
     : activeLocations.some((location) => evaluateLocationPhase(event, location, now) === "OPEN") ? "OPEN" : "CLOSED";
-  const closesOn = closesRegistration(effectiveLifecycleState(event)) ? null : effectiveLocationDates(event, chosen).registrationClosesOn;
+  const quoted = closesRegistration(effectiveLifecycleState(event)) ? null : effectiveLocationDates(event, chosen).registrationClosesOn;
+  // The fallback quotes the event's own date, which can already be past while a later location is still open: a date
+  // that has passed is never quoted, so the email cannot tell a club registration "closes" on a day already gone.
+  const closesOn = quoted && quoted < calendarDateInEventTimeZone(now, event.timezone) ? null : quoted;
   return { open: phase === "OPEN", closesOn };
 }
 

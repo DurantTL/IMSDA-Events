@@ -104,22 +104,29 @@ describe("the registration window of a draft, by the club page's own rules", () 
 
   it("follows the event's own dates when it has no locations, and quotes the event's close date", () => {
     expect(draftRegistrationWindow(event, [], null, at("2026-11-20T18:00:00Z"))).toEqual({ open: true, closesOn: "2026-12-01" });
-    expect(draftRegistrationWindow(event, [], null, now)).toEqual({ open: false, closesOn: "2026-12-01" });
+    expect(draftRegistrationWindow(event, [], null, now)).toEqual({ open: false, closesOn: null });
   });
 
   it("follows the chosen location's own dates, open or closed, and quotes its date", () => {
     expect(draftRegistrationWindow(event, [early, late], "loc-late", now)).toEqual({ open: true, closesOn: "2026-12-20" });
-    expect(draftRegistrationWindow(event, [early], "loc-early", now)).toEqual({ open: false, closesOn: "2026-12-01" });
+    expect(draftRegistrationWindow(event, [early], "loc-early", now)).toEqual({ open: false, closesOn: null });
   });
 
   it("falls back to the other open locations, and the event-level date, when the chosen location has closed", () => {
-    expect(draftRegistrationWindow(event, [early, late], "loc-early", now)).toEqual({ open: true, closesOn: "2026-12-01" });
+    expect(draftRegistrationWindow(event, [early, late], "loc-early", at("2026-11-20T18:00:00Z")).open).toBe(true);
+    const later = { ...late, id: "loc-later", registrationClosesOn: "2026-11-25" };
+    expect(draftRegistrationWindow(event, [later, late], "loc-later", at("2026-11-28T18:00:00Z"))).toEqual({ open: true, closesOn: "2026-12-01" });
+  });
+
+  it("never quotes a close date that has already passed", () => {
+    // The event's own date (Dec 1) is past on Dec 5 while a later location is still open: nothing is quoted.
+    expect(draftRegistrationWindow(event, [early, late], "loc-early", now)).toEqual({ open: true, closesOn: null });
   });
 
   it("with no location chosen, is open while any active location is, and quotes the event's date", () => {
     expect(draftRegistrationWindow(event, [early, late], null, now).open).toBe(true);
     expect(draftRegistrationWindow(event, [early], null, now).open).toBe(false);
-    expect(draftRegistrationWindow(event, [early, late], null, now).closesOn).toBe("2026-12-01");
+    expect(draftRegistrationWindow(event, [early, late], null, at("2026-11-20T18:00:00Z")).closesOn).toBe("2026-12-01");
     // A chosen location that is no longer active is treated as no choice.
     expect(draftRegistrationWindow(event, [late], "loc-gone", now).open).toBe(true);
   });
