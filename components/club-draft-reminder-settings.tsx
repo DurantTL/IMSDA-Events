@@ -95,6 +95,7 @@ export function ClubDraftReminderSettings({ eventId, eventTimezone, initial }: {
 
   async function toggle() {
     clearSummary();
+    setProblems({});
     await send({ ...overview.policy, enabled: !enabled }, !enabled ? "Reminders are on for this event." : "Reminders are off. Nothing will be sent.");
   }
 

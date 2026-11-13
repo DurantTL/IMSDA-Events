@@ -379,7 +379,7 @@ describe("a club with several team drafts", () => {
 describe("locations", () => {
   const location = (id: string, closes: string | null, overrides: Row = {}) => ({ id, eventId: "event-1", isActive: true, firstDay: null, lastDay: null, registrationClosesOn: closes, ...overrides });
 
-  it("does not remind a draft whose own location has closed even while the event's date is still ahead, and does remind one whose location is open", async () => {
+  it("still reminds a draft whose chosen location has closed while another is open, quoting the event-level date; an open chosen location quotes its own", async () => {
     state.locations = [location("loc-closed", "2026-11-12"), location("loc-open", "2026-12-20")];
     state.drafts = [
       draft("draft-closed", "club-a", new Date(NOON.getTime() - 4 * DAY), { locationId: "loc-closed" }),
@@ -387,8 +387,15 @@ describe("locations", () => {
     ];
     state.grants.push(grant("club-b", "b.director@example.test"));
     await sendDueClubDraftReminders({ now: NOON });
-    expect(state.outbox.map((row) => row.recipientEmail)).toEqual(["b.director@example.test"]);
-    expect(state.outbox[0]!.bodyTextSnapshot).toContain("Registration closes on December 20, 2026.");
+    const body = (email: string) => String(state.outbox.find((row) => row.recipientEmail === email)!.bodyTextSnapshot);
+    expect(body("a.director@example.test")).toContain("Registration closes on December 1, 2026.");
+    expect(body("b.director@example.test")).toContain("Registration closes on December 20, 2026.");
+  });
+
+  it("does not remind a draft when every active location has closed", async () => {
+    state.locations = [location("loc-closed", "2026-11-12"), location("loc-also", "2026-11-11")];
+    state.drafts = [draft("draft-closed", "club-a", new Date(NOON.getTime() - 4 * DAY), { locationId: "loc-closed" })];
+    expect((await sendDueClubDraftReminders({ now: NOON })).reminded).toBe(0);
   });
 
   it("quotes the earliest close date when a club's team drafts are at different locations", async () => {
@@ -444,7 +451,7 @@ describe("the check at delivery", () => {
     expect(await clubDraftReminderCheck(message(), NOON)).toMatchObject(obsolete);
   });
 
-  it("follows the draft's own location dates", async () => {
+  it("follows the draft's own location dates: obsolete only when every active location has closed", async () => {
     state.locations = [{ id: "loc-closed", eventId: "event-1", isActive: true, firstDay: null, lastDay: null, registrationClosesOn: "2026-11-12" }];
     state.drafts = [draft("draft-a", "club-a", new Date(NOON.getTime() - 4 * DAY), { locationId: "loc-closed" })];
     expect(await clubDraftReminderCheck(message(), NOON)).toMatchObject(obsolete);

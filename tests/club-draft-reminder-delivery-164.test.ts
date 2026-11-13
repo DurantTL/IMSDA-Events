@@ -197,7 +197,7 @@ describe("club registration reminders at delivery (#164)", () => {
     await done;
     expect(sendEmail).not.toHaveBeenCalled();
     expect(state.message).toMatchObject({ status: "PENDING", availableAt: until, attemptCount: 0, lockToken: null });
-    expect(String(state.message.lastError)).toMatch(/morning/);
+    expect(state.message.lastError ?? null).toBeNull();
     expect(state.auditRows).toEqual([]);
   });
 });

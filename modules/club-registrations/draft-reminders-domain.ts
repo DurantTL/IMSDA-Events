@@ -98,7 +98,10 @@ export function isWithinSendHours(now: Date, timeZone: string) {
 /** "9 a.m. to 7 p.m. Central": the send hours as a person reads them, in the event's own zone. */
 export function sendHoursLabel(timeZone: string) {
   const hour = (value: number) => (value < 12 ? `${value} a.m.` : `${value === 12 ? 12 : value - 12} p.m.`);
-  const zone = timeZoneLongName(timeZone).replace(/ Time$/, "");
+  // "Central Time" and "Mountain Standard Time" read as "Central" and "Mountain"; a zone with only a GMT offset for a name
+  // (UTC) says "where the event is held" instead.
+  const name = timeZoneLongName(timeZone).replace(/ Time$/, "").replace(/ Standard$/, "");
+  const zone = /^(GMT|UTC)/.test(name) ? "where the event is held" : name;
   return `${hour(QUIET_HOURS.sendFromHour)} to ${hour(QUIET_HOURS.sendUntilHour)} ${zone}`;
 }
 
@@ -120,9 +123,9 @@ export type DraftReminderLocation = LocationDateSource & { id: string };
 
 /**
  * Whether a club may still submit this draft, and the closing date its messages may quote, by the rules the club's own
- * page uses (`clubPhase` and `quotedClosingDate`): a draft at a chosen active location follows that location's dates; a
- * draft with no location (or one that is no longer active) is open while any active location is, or by the event's own
- * dates when it has none. A lifecycle state that closes registration closes it whatever the dates say, and no date is
+ * page uses (`clubPhase` and `quotedClosingDate`): a draft at a chosen active location that is open follows that
+ * location's dates; a draft with no location, or one whose location is inactive or no longer open, is open while any
+ * active location is (quoting the event's date), or by the event's own dates when it has none. A lifecycle state that closes registration closes it whatever the dates say, and no date is
  * then quoted. Judged in the event's own time zone.
  */
 export function draftRegistrationWindow(
@@ -131,7 +134,10 @@ export function draftRegistrationWindow(
   draftLocationId: string | null,
   now: Date,
 ): { open: boolean; closesOn: string | null } {
-  const chosen = draftLocationId ? activeLocations.find((location) => location.id === draftLocationId) ?? null : null;
+  const picked = draftLocationId ? activeLocations.find((location) => location.id === draftLocationId) ?? null : null;
+  // A chosen location that is no longer open does not close the draft: the club page then treats it as a draft with no
+  // location and asks the director to choose another, so the same fallback applies here.
+  const chosen = picked && evaluateLocationPhase(event, picked, now) === "OPEN" ? picked : null;
   const phase = chosen || activeLocations.length === 0
     ? evaluateLocationPhase(event, chosen, now)
     : activeLocations.some((location) => evaluateLocationPhase(event, location, now) === "OPEN") ? "OPEN" : "CLOSED";

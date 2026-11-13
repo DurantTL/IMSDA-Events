@@ -581,7 +581,8 @@ async function cancelIfClubDraftReminderObsolete(
   if (check.kind === "WAIT") {
     await prisma.messageOutbox.updateMany({
       where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken },
-      data: { status: "PENDING", availableAt: check.until, lockedAt: null, lockToken: null, lastError: check.note },
+      // No lastError: staff views show any stored error as a "Delivery issue", and waiting for the morning is not one.
+      data: { status: "PENDING", availableAt: check.until, lockedAt: null, lockToken: null, lastError: null },
     });
     return true;
   }

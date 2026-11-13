@@ -109,7 +109,11 @@ describe("the registration window of a draft, by the club page's own rules", () 
 
   it("follows the chosen location's own dates, open or closed, and quotes its date", () => {
     expect(draftRegistrationWindow(event, [early, late], "loc-late", now)).toEqual({ open: true, closesOn: "2026-12-20" });
-    expect(draftRegistrationWindow(event, [early, late], "loc-early", now)).toEqual({ open: false, closesOn: "2026-12-03" });
+    expect(draftRegistrationWindow(event, [early], "loc-early", now)).toEqual({ open: false, closesOn: "2026-12-01" });
+  });
+
+  it("falls back to the other open locations, and the event-level date, when the chosen location has closed", () => {
+    expect(draftRegistrationWindow(event, [early, late], "loc-early", now)).toEqual({ open: true, closesOn: "2026-12-01" });
   });
 
   it("with no location chosen, is open while any active location is, and quotes the event's date", () => {
@@ -129,6 +133,11 @@ describe("send hours as people read them", () => {
   it("says the hours and the zone in words", () => {
     expect(sendHoursLabel("America/Chicago")).toBe("9 a.m. to 7 p.m. Central");
     expect(sendHoursLabel("America/Los_Angeles")).toBe("9 a.m. to 7 p.m. Pacific");
+  });
+
+  it("keeps the label sane for zones without a plain Time name", () => {
+    expect(sendHoursLabel("America/Phoenix")).toBe("9 a.m. to 7 p.m. Mountain");
+    expect(sendHoursLabel("UTC")).toBe("9 a.m. to 7 p.m. where the event is held");
   });
 
   it("finds the next 9 a.m. where the event is held, or now when inside the hours", () => {
