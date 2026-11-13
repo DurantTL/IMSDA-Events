@@ -382,6 +382,8 @@ const pages: PageSpec[] = [
   staff("finance-square-payments", "/finance/square-payments"),
   // Event money report (#1962): charges, paid and refunded, outstanding, the reconciliation and the owing list. Square may be unreachable locally, which the page shows as Unavailable.
   { ...staff("finance-money-report", "/finance/money-report"), expectText: /Event money report/ },
+  // Event closeout (#1515): the checklist, sign-off and history. Square may be unreachable locally, which the checklist shows as a warning.
+  { ...staff("finance-closeout", "/finance/closeout"), expectText: /Event closeout/ },
   // More money tools (#1575): the other finance pages as grouped cards. The Refunds view is the cancellation queue, audited below as cancellation-staff-queue.
   { ...staff("finance-tools", "/finance/tools"), expectText: /Invoices and churches/ },
   // Review queues (#1574): the registration review pages as grouped cards.

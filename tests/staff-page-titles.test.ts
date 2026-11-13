@@ -131,7 +131,7 @@ describe("staff page names (#685)", () => {
       assignmentRoster: "more/program-assignments/[runId]", programAssignments: "more/program-assignments",
       teamResults: "more/team-results", teamForm: "more/reports/clubs/team-form", formResponses: "information-forms/responses",
       reviewQueues: "people/review-queues", moreMoneyTools: "finance/tools", invoices: "finance/invoices", churchOwed: "finance/church-owed", billingResponsibility: "finance/billing-responsibility", scholarshipFund: "finance/scholarship-fund",
-      squarePayments: "finance/square-payments", eventMoneyReport: "finance/money-report", attendanceReconciliation: "finance/attendance-reconciliation", cancellationPolicy: "finance/cancellation-policy", cancellationRequests: "finance/cancellation-requests",
+      squarePayments: "finance/square-payments", eventMoneyReport: "finance/money-report", eventCloseout: "finance/closeout", attendanceReconciliation: "finance/attendance-reconciliation", cancellationPolicy: "finance/cancellation-policy", cancellationRequests: "finance/cancellation-requests",
     };
     expect(Object.keys(pages).sort()).toEqual(Object.keys(staffPageTitles).sort());
     for (const [key, path] of Object.entries(pages)) {

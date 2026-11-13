@@ -1976,6 +1976,8 @@ model Event {
   updatedAt            DateTime           @updatedAt
 
   lifecycleTransitions                EventLifecycleTransition[]
+  closeoutSignoffs                    EventCloseoutSignoff[]
+  closeoutReopenings                  EventCloseoutReopening[]
   /// The calendar items this event was set up from or linked to (#445). Several items can share one registration
   /// event (#1086): different dates or sites of one event, or a snow date.
   calendarEntryLinks                  CalendarEntry[]    @relation("CalendarEntryLinkedEvent")
@@ -11731,6 +11733,49 @@ model EventLifecycleTransition {
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId, createdAt])
+}
+
+/// A finance admin's sign-off that closed an event (#1515). Append-only (database trigger): reopening the event never
+/// changes or removes it; the reopening is its own row (`EventCloseoutReopening`). `checklistSnapshot` holds check ids,
+/// states, counts and cents only, never attendee names or contact details. The user is a plain id with no foreign key,
+/// so deleting an account never touches a row, and the name is kept as it was.
+model EventCloseoutSignoff {
+  id                   String   @id @default(cuid())
+  eventId              String
+  signedByUserId       String?
+  signedByNameSnapshot String
+  checklistSnapshot    Json
+  /// Whether the signer acknowledged the warnings that were open.
+  warningsAcknowledged Boolean  @default(false)
+  note                 String?
+  /// The lifecycle transition (Financial reconciliation to Closed) this sign-off made.
+  transitionId         String?
+  createdAt            DateTime @default(now())
+
+  event      Event                    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  reopenings EventCloseoutReopening[]
+
+  @@index([eventId, createdAt])
+}
+
+/// An event reopened after a sign-off (#1515), with the reason. Append-only like the sign-off it points at.
+model EventCloseoutReopening {
+  id                     String   @id @default(cuid())
+  eventId                String
+  /// The sign-off being reopened. Null for an event closed before sign-offs existed.
+  signoffId              String?
+  reopenedByUserId       String?
+  reopenedByNameSnapshot String
+  reason                 String
+  /// The lifecycle transition (Closed to Financial reconciliation) this reopening made.
+  transitionId           String?
+  createdAt              DateTime @default(now())
+
+  event   Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  signoff EventCloseoutSignoff? @relation(fields: [signoffId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, createdAt])
+  @@index([signoffId])
 }
 
 enum ProblemReportStatus {

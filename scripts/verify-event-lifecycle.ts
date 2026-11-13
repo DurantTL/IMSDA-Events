@@ -92,6 +92,7 @@ async function main() {
   const { archiveEvent, unarchiveEvent } = await import("../modules/events/archive-repository");
   const { deleteEvent } = await import("../modules/events/deletion-repository");
   const { backfillEventLifecycle } = await import("../modules/events/lifecycle-backfill");
+  const { signOffEvent } = await import("../modules/events/closeout-repository");
   const { evaluateEventRegistrationPhase } = await import("../modules/events/lifecycle");
 
   await cleanup();
@@ -248,7 +249,11 @@ async function main() {
   assert(noFinance instanceof EventLifecycleError && noFinance.code === "PERMISSION_DENIED", "financial reconciliation needs MANAGE_FINANCE");
   const finance = { userId: actorId, permissions: ["MANAGE_FINANCE"] as const };
   await transitionEventLifecycle({ eventId: done, toState: "FINANCIAL_RECONCILIATION", expectedFromState: "COMPLETE", actor: finance });
-  await transitionEventLifecycle({ eventId: done, toState: "CLOSED", expectedFromState: "FINANCIAL_RECONCILIATION", actor: finance });
+  // Closing is the finance sign-off (#1515), not a generic move; the full closeout check is `npm run test:event-closeout`.
+  const plainClose = await caught(transitionEventLifecycle({ eventId: done, toState: "CLOSED", expectedFromState: "FINANCIAL_RECONCILIATION", actor: finance }));
+  assert(plainClose instanceof EventLifecycleError && plainClose.code === "CLOSEOUT_REQUIRED", "a plain move to CLOSED is refused");
+  const beforeSignoff = await row(done);
+  await signOffEvent({ eventId: done, actor: finance, acknowledgeWarnings: true, expectedVersion: beforeSignoff.lifecycleVersion });
   const closed = await row(done);
   assert(closed.isPublished && closed.lifecycleState === "CLOSED" && evaluateEventRegistrationPhase(closed) === "CLOSED", "a closed event stays public with registration closed");
   const unpublishClosed = await caught(unpublishEvent(done, actorId));

@@ -12,6 +12,7 @@ import {
   isPublicState,
   LIFECYCLE_REASON_MAX_LENGTH,
   normalizeLifecycleReason,
+  rulePermissions,
   type EventLifecycleStateName,
 } from "@/modules/events/lifecycle-state";
 import { EventOperationError } from "@/modules/events/operation-error";
@@ -25,7 +26,7 @@ import { loadRequiredReadinessInputs } from "@/modules/events/readiness-inputs";
  */
 export class EventLifecycleError extends Error {
   constructor(
-    public readonly code: "UNKNOWN_TRANSITION" | "PERMISSION_DENIED" | "CONDITION_UNMET" | "CONFLICT" | "ARCHIVED" | "REASON_TOO_LONG",
+    public readonly code: "UNKNOWN_TRANSITION" | "PERMISSION_DENIED" | "CONDITION_UNMET" | "CONFLICT" | "ARCHIVED" | "REASON_TOO_LONG" | "CLOSEOUT_REQUIRED" | "CLOSEOUT_REFUSED",
     message: string,
     public readonly currentState?: EventLifecycleStateName,
   ) {
@@ -56,6 +57,16 @@ export type TransitionEventLifecycleInput = {
    * - `alreadyDone` says when the request is already satisfied (any public state counts as published).
    */
   legacy?: { alreadyDone: (state: EventLifecycleStateName) => boolean };
+  /**
+   * The closeout sign-off and reopen actions (`closeout-repository.ts`, #1515) only. A move that a rule marks
+   * `closeoutAction` is refused (CLOSEOUT_REQUIRED) unless this names that action. `run` executes inside the transition's
+   * transaction after the event row is locked and the move is allowed; it writes the sign-off or reopening row, may refuse
+   * by throwing (nothing is kept), and returns the evidence stored on the history row.
+   */
+  closeout?: {
+    action: "SIGN_OFF" | "REOPEN";
+    run: (tx: Tx, context: { eventId: string; transitionId: string; fromState: EventLifecycleStateName; name: string }) => Promise<{ evidence: Record<string, unknown> }>;
+  };
 };
 
 export type TransitionEventLifecycleResult = {
@@ -63,6 +74,8 @@ export type TransitionEventLifecycleResult = {
   fromState: EventLifecycleStateName;
   toState: EventLifecycleStateName;
   lifecycleVersion: number;
+  /** The history row this transition wrote (absent for a no-op). */
+  transitionId?: string;
 };
 
 type PublishReadinessItem = { id: string; complete: boolean };
@@ -184,7 +197,7 @@ export async function transitionEventLifecycle(input: TransitionEventLifecycleIn
     if (alreadyDone) {
       // Even a no-op needs the permission that moving into this state needs, so a member without it learns nothing.
       // A state no rule enters (Archived) needs CONFIGURE_EVENT.
-      const entering = eventLifecycleTransitions.filter((rule) => rule.to === input.toState).map((rule) => rule.permission);
+      const entering = eventLifecycleTransitions.filter((rule) => rule.to === input.toState).flatMap((rule) => rulePermissions(rule));
       const required = entering.length > 0 ? entering : ["CONFIGURE_EVENT" as const];
       if (!required.some((permission) => input.actor.permissions.includes(permission))) {
         throw new EventLifecycleError("PERMISSION_DENIED", `The ${required[0]!} permission is required for this change.`, effective);
@@ -220,9 +233,22 @@ export async function transitionEventLifecycle(input: TransitionEventLifecycleIn
       );
     }
 
-    const evidence = decision.rule.requiresReadiness
+    if (decision.rule.closeoutAction && input.closeout?.action !== decision.rule.closeoutAction) {
+      throw new EventLifecycleError(
+        "CLOSEOUT_REQUIRED",
+        decision.rule.closeoutAction === "SIGN_OFF"
+          ? "An event is closed from its Closeout page, with a finance sign-off. Open the Closeout page to review the checklist and sign off."
+          : "An event is reopened from its Closeout page, with a reason. Open the Closeout page to reopen it.",
+        effective,
+      );
+    }
+    const transitionId = crypto.randomUUID();
+    let evidence: Record<string, unknown> | undefined = decision.rule.requiresReadiness
       ? { publishReadiness: await assertEventReadyToPublish(tx, input.eventId, current) }
       : undefined;
+    if (decision.rule.closeoutAction && input.closeout) {
+      evidence = (await input.closeout.run(tx, { eventId: input.eventId, transitionId, fromState: effective, name: current.name })).evidence;
+    }
 
     const { count } = await tx.event.updateMany({
       where: { id: input.eventId, lifecycleVersion: current.lifecycleVersion },
@@ -240,6 +266,7 @@ export async function transitionEventLifecycle(input: TransitionEventLifecycleIn
 
     await tx.eventLifecycleTransition.create({
       data: {
+        id: transitionId,
         eventId: input.eventId,
         fromState: effective,
         toState: input.toState,
@@ -261,8 +288,8 @@ export async function transitionEventLifecycle(input: TransitionEventLifecycleIn
         metadata: audit.metadata,
       },
     });
-    return { changed: true, fromState: effective, toState: input.toState, lifecycleVersion: current.lifecycleVersion + 1 };
-  });
+    return { changed: true, fromState: effective, toState: input.toState, lifecycleVersion: current.lifecycleVersion + 1, transitionId };
+  }, input.closeout ? { timeout: 30_000, maxWait: 10_000 } : undefined);
   // A banner saved while the event was a draft joins the shared image library once the event is public (#1913).
   // After the commit, best effort: it never fails or undoes the transition.
   if (result.changed && isPublicState(result.toState)) await keepPublishedHeaderImagesForEvent(input.eventId);
@@ -307,7 +334,7 @@ export async function getEventLifecycle(input: { eventId: string; permissions: r
       },
     }).map((to) => ({ state: to, label: eventLifecycleStateLabel(to) })),
     // The history carries actor ids and free-text reasons: only those who can change the state may read it.
-    history: !(input.permissions.includes("CONFIGURE_EVENT") || input.permissions.includes("MANAGE_FINANCE")) ? [] : history.map((row) => ({
+    history: !(input.permissions.includes("CONFIGURE_EVENT") || input.permissions.includes("MANAGE_FINANCE") || input.permissions.includes("FINALIZE_INVOICES")) ? [] : history.map((row) => ({
       id: row.id,
       fromState: row.fromState,
       toState: row.toState,
