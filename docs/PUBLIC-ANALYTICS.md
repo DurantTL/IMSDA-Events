@@ -42,4 +42,13 @@ Rows are daily aggregates. The outbox sweep deletes rows older than 400 days on 
 
 ## Viewing
 
-System administrators only: Public analytics (`/admin/analytics`), the last 30 days as tables of counts.
+System administrators only: Public analytics (`/admin/analytics`), as tables of counts. Links at the top (the staff view strip; they keep the reader's place and any table sort) pick the period: last 30 days (the default), last 90 days or last 12 months (`?days=30|90|365`; any other value shows 30 days). Retention is 400 days, so 12 months is always available.
+
+The page opens with an "At a glance" panel (#1961), built from the same stored daily counts (no new tracking):
+
+- **Tiles:** event page views, registrations started, registrations completed, and completed of started. Each shows an arrow and words ("Up 12% from the previous 30 days"). A rate's change is in percentage points. A previous count of 0 gives no percent (never a made-up +100%).
+- **Previous period:** the same number of days just before the chosen period. It is compared only when all of its days are still stored (inside the 400-day retention). That holds for 30 and 90 days; for 12 months the previous period is about 730 days back, so the tiles say "No comparison" instead of using a part-kept period.
+- **Charts:** views, starts and completions by day (30 and 90 days) or by week (12 months; weeks end today and the oldest bucket holds the leftover day), a whole-site funnel (views, started, completed), and the top 10 events by completed registrations. Each has a text summary for screen readers and a "Show as a table" copy of its numbers; series differ by line pattern, marker or fill as well as colour. The events table also carries a small decorative bar trio per event.
+- The rules (previous period, change, filling days, weekly buckets, top 10) are pure functions in `modules/public-metrics/domain.ts`; the markup is `components/analytics-charts.tsx`. Tests: `tests/public-analytics-charts-1961.test.ts`.
+
+The Events table, "Which event pages lead to registrations" (#1560), has one row per event with the event's name, page views, registrations started, registrations completed, completed as a share of views and completed as a share of started. It is built only from the `EVENT_PAGE_VIEW`, `REGISTRATION_START` and `REGISTRATION_COMPLETE` counts above; nothing new is recorded. Rows start in order of completed registrations, then views, and every column can be sorted. The counts are separate days' totals and people can arrive by a direct link, so a rate can pass 100% (it is shown as computed, not capped). Events are counted only while they are public; a count made while an event was public stays after it is unpublished.

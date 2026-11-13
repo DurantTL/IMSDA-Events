@@ -255,6 +255,12 @@ describe("providers", () => {
       mocks.getSquareConfiguration.mockReturnValue({ paymentConfigured: true });
     }
 
+    it("reads the public analytics totals without the day series or previous period (#1961)", async () => {
+      everySourceDown();
+      await loadSystemReport(now);
+      expect(mocks.getAnalyticsSummary).toHaveBeenCalledWith(expect.any(String), 30, { eventNames: false, trends: false });
+    });
+
     it("shows every reading as unavailable when every source fails, and never as OK", async () => {
       everySourceDown();
       const report = await loadSystemReport(now);

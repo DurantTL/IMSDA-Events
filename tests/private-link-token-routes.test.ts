@@ -33,7 +33,7 @@ describe("token routes are private links (#154)", () => {
     expect(routes.length).toBeGreaterThan(5);
     const listed = new Set(tokenRoutePrefixes.map((prefix) => prefix.join("/")));
     const missing = routes.map((route) => route.segments.join("/")).filter((route) => !listed.has(route));
-    expect(missing, `add these routes to tokenRoutePrefixes in modules/event-clones/private-links.ts: ${missing.join(", ")}`).toEqual([]);
+    expect(missing, `add these routes to tokenRoutePrefixes in lib/token-routes.ts: ${missing.join(", ")}`).toEqual([]);
   });
 
   it("has no secret route under a dynamic parent, which a fixed prefix cannot match", () => {

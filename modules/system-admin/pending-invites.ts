@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { clubInviteSignUpUrl } from "@/modules/club-imports/invites";
+import { ministriesLabel } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import type { PeopleScope } from "@/modules/system-admin/people-directory-model";
 import { containsAnyOf } from "@/lib/server-search";
@@ -37,7 +38,7 @@ export type PendingInvite = {
 export const PENDING_INVITES_PAGE_SIZE = 25;
 
 const clubSelect = { id: true, source: true, status: true, email: true, name: true, role: true, sentAt: true, createdAt: true, expiresAt: true, organization: { select: { name: true } } } as const;
-const areaSelect = { id: true, status: true, email: true, name: true, sentAt: true, createdAt: true, expiresAt: true } as const;
+const areaSelect = { id: true, status: true, ministries: true, email: true, name: true, sentAt: true, createdAt: true, expiresAt: true } as const;
 const staffSelect = {
   id: true, email: true, displayName: true, createdAt: true,
   resetTokens: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, expiresAt: true, usedAt: true } },
@@ -76,7 +77,7 @@ const fromArea = (invite: AreaRow, now: Date): PendingInvite => ({
   id: invite.id,
   name: invite.name,
   email: invite.email,
-  what: "Area Coordinator",
+  what: `Area Coordinator (${ministriesLabel(invite.ministries)})`,
   sentAt: (invite.sentAt ?? invite.createdAt).toISOString(),
   expired: Boolean(invite.expiresAt && invite.expiresAt <= now),
   // A pending invite cannot be accepted yet, so it has no sign-up link to pass on.

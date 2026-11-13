@@ -13,18 +13,19 @@ import { RoleDetails } from "@/components/role-details";
 import { systemRoleText } from "@/modules/access/role-descriptions";
 import { eventRoles, type EventRole } from "@/modules/access/permissions";
 import { roleLabel } from "@/modules/access/role-display";
+import { CLUB_KINDS, type ClubKindValue } from "@/modules/organizations/club-kind";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import styles from "./people-directory.module.css";
 import { EmailInput } from "@/components/email-input";
 import { EMAIL_FIELD_MESSAGE, MAX_EMAIL_LENGTH, isEmail } from "@/lib/field-validation";
 
-const FIELD_LABELS = { name: "Name", email: "Email", access: "Access to give", events: "Events", clubs: "Clubs" } as const;
+const FIELD_LABELS = { name: "Name", email: "Email", access: "Access to give", events: "Events", clubs: "Clubs", ministries: "Ministries" } as const;
 
 type Option = { id: string; name: string };
 type EventRow = { key: number; eventId: string; role: EventRole };
 type ClubRow = { key: number; organizationId: string; role: ClubRole };
-type FieldErrors = Partial<Record<"name" | "email" | "access", string>> & { events?: string; clubs?: string };
+type FieldErrors = Partial<Record<"name" | "email" | "access", string>> & { events?: string; clubs?: string; ministries?: string };
 
 type InviteResult = {
   created: {
@@ -60,6 +61,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
   const [systemAdmin, setSystemAdmin] = useState(false);
   const [clubsAdministrator, setClubsAdministrator] = useState(false);
   const [areaCoordinator, setAreaCoordinator] = useState(false);
+  const [ministries, setMinistries] = useState<ClubKindValue[]>(["PATHFINDER"]);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [clubs, setClubs] = useState<ClubRow[]>([]);
   const [nextKey, setNextKey] = useState(1);
@@ -81,7 +83,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
   const dialogRef = useAccessibleDialog<HTMLElement>(open, close);
 
   function show() {
-    setName(""); setEmail(""); setSystemAdmin(false); setClubsAdministrator(false); setAreaCoordinator(false);
+    setName(""); setEmail(""); setSystemAdmin(false); setClubsAdministrator(false); setAreaCoordinator(false); setMinistries(["PATHFINDER"]);
     setEvents([]); setClubs([]); setErrors({}); setFailure(""); setResult(null); clearSummary();
     setOpen(true);
   }
@@ -94,6 +96,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
     else if (new Set(events.map((row) => row.eventId)).size !== events.length) found.events = "Each event can be chosen once.";
     if (clubs.some((row) => !row.organizationId)) found.clubs = "Choose a club for each club row, or remove the row.";
     else if (new Set(clubs.map((row) => `${row.organizationId}:${row.role}`)).size !== clubs.length) found.clubs = "Each club role can be chosen once.";
+    if (areaCoordinator && ministries.length === 0) found.ministries = "Choose at least one ministry: Pathfinder, Adventurer or both.";
     if (!systemAdmin && !clubsAdministrator && !areaCoordinator && events.length === 0 && clubs.length === 0) found.access = "Choose at least one kind of access.";
     return found;
   }
@@ -113,7 +116,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
     setFailure("");
     const found = validate();
     setErrors(found);
-    const problems = (["name", "email", "access", "events", "clubs"] as const).filter((key) => found[key]);
+    const problems = (["name", "email", "access", "ministries", "events", "clubs"] as const).filter((key) => found[key]);
     if (problems.length > 0) {
       showSummary(problems.map((key) => ({ targetId: `invite-${key}`, message: summaryMessage(FIELD_LABELS[key], found[key] as string) })));
       return;
@@ -129,6 +132,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
           email: email.trim(),
           access: {
             systemAdmin, clubsAdministrator, areaCoordinator,
+            ...(areaCoordinator ? { areaCoordinatorMinistries: CLUB_KINDS.filter((kind) => ministries.includes(kind)) } : {}),
             events: events.map(({ eventId, role }) => ({ eventId, role })),
             clubs: clubs.map(({ organizationId, role }) => ({ organizationId, role })),
           },
@@ -222,6 +226,23 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
                   <RoleDetails role={systemRoleText.AREA_COORDINATOR} />
                   <FieldError id="invite-access-error">{errors.access}</FieldError>
                 </fieldset>
+
+                {areaCoordinator ? (
+                  <fieldset {...fieldErrorProps("invite-ministries-error", errors.ministries)} id="invite-ministries">
+                    <legend>Ministries {who} sees</legend>
+                    {CLUB_KINDS.map((kind) => (
+                      <label className={styles.check} key={kind}>
+                        <input
+                          checked={ministries.includes(kind)}
+                          onChange={(event) => setMinistries((current) => (event.target.checked ? [...current, kind] : current.filter((value) => value !== kind)))}
+                          type="checkbox"
+                        />
+                        <span>{kind === "ADVENTURER" ? "Adventurer clubs" : "Pathfinder clubs"}</span>
+                      </label>
+                    ))}
+                    <FieldError id="invite-ministries-error">{errors.ministries}</FieldError>
+                  </fieldset>
+                ) : null}
 
                 {full ? (
                   <fieldset {...fieldErrorProps("invite-events-error", errors.events)} id="invite-events">

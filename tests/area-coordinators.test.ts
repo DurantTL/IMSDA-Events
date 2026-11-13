@@ -261,6 +261,23 @@ describe("Changing an Area Coordinator's ministries (#843)", () => {
     expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({ metadata: expect.objectContaining({ viaClubsAdministrator: true }) });
   });
 
+  it("gives a new grant the ministries the route is sent, and refuses a bad list (#843)", async () => {
+    mocks.grantFindUnique.mockResolvedValue(null);
+    expect((await post({ action: "area-coordinator", on: true, ministries: ["ADVENTURER"] })).status).toBe(200);
+    expect(mocks.grantUpsert.mock.calls[0]![0].create).toMatchObject({ ministries: ["ADVENTURER"] });
+    expect(mocks.grantUpsert.mock.calls[0]![0].update).toMatchObject({ ministries: ["ADVENTURER"] });
+    mocks.grantUpsert.mockClear();
+    // An active grant keeps its own.
+    mocks.grantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null, ministries: ["PATHFINDER"] });
+    await post({ action: "area-coordinator", on: true, ministries: ["ADVENTURER"] });
+    expect(mocks.grantUpsert.mock.calls[0]![0].update).not.toHaveProperty("ministries");
+    mocks.grantUpsert.mockClear();
+    for (const ministries of [[], ["DISTRICT"], ["ADVENTURER", "ADVENTURER"]]) {
+      expect((await post({ action: "area-coordinator", on: true, ministries })).status).toBe(400);
+    }
+    expect(mocks.grantUpsert).not.toHaveBeenCalled();
+  });
+
   it("answers the route's action for a system administrator, and 400 for an empty or repeated list", async () => {
     const ok = await post({ action: "area-coordinator-ministries", ministries: ["PATHFINDER", "ADVENTURER"] });
     expect(ok.status).toBe(200);

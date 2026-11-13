@@ -3,6 +3,8 @@
  * accounts into one list of people and paging it. No database, so it is unit tested directly.
  */
 
+import { normalizeMinistries, parseMinistriesInput } from "@/modules/organizations/area-coordinator-ministries-domain";
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
 import { eventRoles, type EventRole } from "@/modules/access/permissions";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import { clubRoleText, eventRoleText, systemRoleText } from "@/modules/access/role-descriptions";
@@ -511,7 +513,8 @@ export function eventRolesNeedEvent(filters: PeopleFilters): boolean {
 export type GrantItem =
   | { type: "sa" }
   | { type: "ca" }
-  | { type: "ac" }
+  /** `ministries` is the choice made in the invite (#843); left out, the grant starts as Pathfinder. */
+  | { type: "ac"; ministries?: ClubKindValue[] }
   | { type: "event"; eventId: string; role: EventRole }
   | { type: "club"; organizationId: string; role: ClubRole };
 
@@ -534,7 +537,8 @@ export function isStaffSideGrant(item: GrantItem): boolean {
 
 /** `sa,ca,ac,e:<eventId>:<ROLE>,c:<organizationId>:<ROLE>`: what the person page is opened with to save the chosen access. */
 export function formatGrantParam(items: readonly GrantItem[]): string {
-  return items.map(grantKey).join(",");
+  // Area Coordinator carries its ministries as `ac:PATHFINDER+ADVENTURER` (#843).
+  return items.map((item) => (item.type === "ac" && item.ministries ? `ac:${normalizeMinistries(item.ministries).join("+")}` : grantKey(item))).join(",");
 }
 
 /**
@@ -552,6 +556,10 @@ export function parseGrantParam(value: unknown): GrantItem[] {
     let item: GrantItem | null = null;
     if (extra.length === 0) {
       if ((kind === "sa" || kind === "ca" || kind === "ac") && id === undefined) item = { type: kind };
+      else if (kind === "ac" && id && role === undefined) {
+        const ministries = parseMinistriesInput(id.split(/[+ ]/));
+        if (ministries) item = { type: "ac", ministries };
+      }
       else if (kind === "e" && id && idPattern.test(id) && (eventRoles as readonly string[]).includes(role ?? "")) item = { type: "event", eventId: id, role: role as EventRole };
       else if (kind === "c" && id && idPattern.test(id) && (clubRoles as string[]).includes(role ?? "")) item = { type: "club", organizationId: id, role: role as ClubRole };
     }
