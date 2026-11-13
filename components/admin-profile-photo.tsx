@@ -44,9 +44,9 @@ export function AdminProfilePhoto({ userId, version, displayName }: { userId: st
         {/* eslint-disable-next-line @next/next/no-img-element -- a signed-in route, not a static asset */}
         <img alt="" className={styles.photo} height={96} src={`/api/profile-photos/${encodeURIComponent(userId)}?size=full&v=${version}`} width={96} />
         <div className={styles.actions}>
-          <button className="secondary-button" disabled={busy} onClick={() => { void remove(); }} type="button">
+          <button aria-busy={busy} className="secondary-button" disabled={busy} onClick={() => { void remove(); }} type="button">
             <Trash2 aria-hidden="true" size={16} />
-            Remove photo
+            {busy ? "Removing…" : "Remove photo"}
           </button>
         </div>
       </div>

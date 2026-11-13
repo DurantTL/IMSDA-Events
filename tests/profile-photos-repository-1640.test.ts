@@ -5,28 +5,32 @@ import sharp from "sharp";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Row = Record<string, unknown> & { userId: string };
-const state = vi.hoisted(() => ({ rows: new Map<string, Record<string, unknown>>(), failUpsert: false, links: [] as Array<{ userId: string }> }));
+const state = vi.hoisted(() => ({ rows: new Map<string, Record<string, unknown>>(), failUpdate: false, links: [] as Array<{ userId: string }> }));
 const audit = vi.hoisted(() => ({ writeAuditLog: vi.fn() }));
 
 const profilePhoto = {
   findUnique: vi.fn(async ({ where }: { where: { userId: string } }) => state.rows.get(where.userId) ?? null),
-  upsert: vi.fn(async ({ where, create, update }: { where: { userId: string }; create: Row; update: Row }) => {
-    if (state.failUpsert) throw new Error("database unavailable");
-    const row = { ...(state.rows.get(where.userId) ?? create), ...(state.rows.has(where.userId) ? update : {}) };
-    state.rows.set(where.userId, row);
-    return row;
+  createMany: vi.fn(async ({ data }: { data: Row[] }) => {
+    for (const row of data) if (!state.rows.has(row.userId)) state.rows.set(row.userId, { ...row });
   }),
   update: vi.fn(async ({ where, data }: { where: { userId: string }; data: Row }) => {
+    if (state.failUpdate) throw new Error("database unavailable");
     const row = { ...state.rows.get(where.userId), ...data };
     state.rows.set(where.userId, row);
     return row;
   }),
-  updateMany: vi.fn(),
 };
+// Transactions run one after another, which is what the row lock gives overlapping saves and removals.
+let queue: Promise<unknown> = Promise.resolve();
+const transaction = vi.fn((callback: (tx: unknown) => Promise<unknown>) => {
+  const run = queue.then(() => callback({ profilePhoto, $queryRaw: vi.fn() }));
+  queue = run.catch(() => undefined);
+  return run;
+});
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
-  getPrisma: () => ({ profilePhoto, userPersonLink: { findMany: vi.fn(async () => state.links) } }),
+  getPrisma: () => ({ $transaction: transaction, profilePhoto, userPersonLink: { findMany: vi.fn(async () => state.links) } }),
 }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: audit.writeAuditLog }));
 
@@ -53,7 +57,7 @@ afterAll(async () => {
 beforeEach(async () => {
   vi.clearAllMocks();
   state.rows.clear();
-  state.failUpsert = false;
+  state.failUpdate = false;
   state.links = [];
   await rm(path.join(root, "profile-photos"), { recursive: true, force: true });
 });
@@ -81,7 +85,7 @@ describe("profile photo storage (#1640)", () => {
   it("deletes the new files when the database save fails, and keeps the old ones", async () => {
     await saveOwnProfilePhoto("u1", await photo());
     const before = await partitionFiles();
-    state.failUpsert = true;
+    state.failUpdate = true;
     await expect(saveOwnProfilePhoto("u1", await photo())).rejects.toThrow("database unavailable");
     expect(await partitionFiles()).toEqual(before);
   });
@@ -122,6 +126,41 @@ describe("profile photo storage (#1640)", () => {
     await removeProfilePhotosForPerson("p1");
     expect(await partitionFiles()).toHaveLength(0);
     expect((await getProfilePhotoState("u1")).hasPhoto).toBe(false);
+  });
+
+  it("two overlapping saves leave exactly the files the row names", async () => {
+    const [a, b] = await Promise.all([photo(), photo()]);
+    await Promise.all([saveOwnProfilePhoto("u1", a), saveOwnProfilePhoto("u1", b)]);
+    const files = (await partitionFiles()).map((name) => `profile-photos/${name}`).sort();
+    const row = state.rows.get("u1") as { storageKey: string; thumbStorageKey: string };
+    expect(files).toEqual([row.storageKey, row.thumbStorageKey].sort());
+  });
+
+  it("a removal racing a save never leaves stored files without a row naming them", async () => {
+    await saveOwnProfilePhoto("u1", await photo());
+    for (const order of ["save-first", "remove-first"]) {
+      const bytes = await photo();
+      const jobs = order === "save-first"
+        ? [saveOwnProfilePhoto("u1", bytes), removeOwnProfilePhoto("u1")]
+        : [removeOwnProfilePhoto("u1"), saveOwnProfilePhoto("u1", bytes)];
+      await Promise.all(jobs);
+      const files = (await partitionFiles()).map((name) => `profile-photos/${name}`).sort();
+      const row = state.rows.get("u1") as { storageKey: string | null; thumbStorageKey: string | null };
+      expect(files).toEqual([row.storageKey, row.thumbStorageKey].filter(Boolean).sort());
+    }
+  });
+
+  it("a staff removal whose audit write fails changes nothing and keeps the files", async () => {
+    await saveOwnProfilePhoto("u1", await photo());
+    audit.writeAuditLog.mockRejectedValueOnce(new Error("audit unavailable"));
+    await expect(removeProfilePhotoByStaff("u1", "admin1")).rejects.toThrow("audit unavailable");
+    expect(await partitionFiles()).toHaveLength(2);
+  });
+
+  it("the audit entry is written inside the same transaction", async () => {
+    await saveOwnProfilePhoto("u1", await photo());
+    await removeProfilePhotoByStaff("u1", "admin1");
+    expect(audit.writeAuditLog.mock.calls[0][1]).toEqual(expect.objectContaining({ profilePhoto }));
   });
 
   it("never throws when the cleanup fails", async () => {

@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { deleteAsset, writeStoredFile } from "@/modules/events/asset-storage";
@@ -59,32 +60,47 @@ async function deleteFilesQuietly(keys: Array<string | null | undefined>) {
   }
 }
 
-/** Stores a new photo for the person, replacing (and deleting) the old files once the new row is saved. */
+type PhotoKeys = { storageKey: string | null; thumbStorageKey: string | null };
+
+/**
+ * Takes the person's row lock for the rest of the transaction, creating the row first when there is none, and returns
+ * the stored keys as they are now. Overlapping saves and removals for one person queue on this lock, so each sees the
+ * keys the one before it left and every file ends up either named by the row or deleted.
+ */
+async function lockPhotoRow(tx: Prisma.TransactionClient, userId: string, createIfMissing: boolean): Promise<PhotoKeys> {
+  if (createIfMissing) await tx.profilePhoto.createMany({ data: [{ userId }], skipDuplicates: true });
+  await tx.$queryRaw`SELECT "id" FROM "ProfilePhoto" WHERE "userId" = ${userId} FOR UPDATE`;
+  const row = await tx.profilePhoto.findUnique({ where: { userId }, select: { storageKey: true, thumbStorageKey: true } });
+  return { storageKey: row?.storageKey ?? null, thumbStorageKey: row?.thumbStorageKey ?? null };
+}
+
+/** Stores a new photo for the person, replacing the old one; the old files are deleted only after the new row commits. */
 export async function saveOwnProfilePhoto(userId: string, bytes: Uint8Array) {
   const { full, thumb } = await processProfilePhoto(bytes);
-  const prisma = getPrisma();
   const written: string[] = [];
   try {
     const fullFile = await writeStoredFile(PROFILE_PHOTO_PARTITION, "webp", full);
     written.push(fullFile.storageKey);
     const thumbFile = await writeStoredFile(PROFILE_PHOTO_PARTITION, "webp", thumb);
     written.push(thumbFile.storageKey);
-    const previous = await prisma.profilePhoto.findUnique({
-      where: { userId },
-      select: { storageKey: true, thumbStorageKey: true },
-    });
     const uploadedAt = new Date();
-    const data = {
-      storageKey: fullFile.storageKey,
-      thumbStorageKey: thumbFile.storageKey,
-      byteSize: fullFile.byteSize,
-      checksum: fullFile.checksum,
-      uploadedAt,
-      removedByStaffAt: null,
-      removedByUserId: null,
-    };
-    await prisma.profilePhoto.upsert({ where: { userId }, create: { userId, ...data }, update: data });
-    await deleteFilesQuietly([previous?.storageKey, previous?.thumbStorageKey]);
+    const previous = await getPrisma().$transaction(async (tx) => {
+      const keys = await lockPhotoRow(tx, userId, true);
+      await tx.profilePhoto.update({
+        where: { userId },
+        data: {
+          storageKey: fullFile.storageKey,
+          thumbStorageKey: thumbFile.storageKey,
+          byteSize: fullFile.byteSize,
+          checksum: fullFile.checksum,
+          uploadedAt,
+          removedByStaffAt: null,
+          removedByUserId: null,
+        },
+      });
+      return keys;
+    }, { timeout: 15000 });
+    await deleteFilesQuietly([previous.storageKey, previous.thumbStorageKey]);
     return { version: uploadedAt.getTime() };
   } catch (error) {
     await deleteFilesQuietly(written);
@@ -94,46 +110,52 @@ export async function saveOwnProfilePhoto(userId: string, bytes: Uint8Array) {
 
 const clearedFields = { storageKey: null, thumbStorageKey: null, byteSize: null, checksum: null, uploadedAt: null };
 
-/** Deletes the stored files (not just the link) and clears the row. Returns whether there was a photo. */
-async function clearPhoto(userId: string, extra: { removedByStaffAt: Date; removedByUserId: string } | null) {
-  const prisma = getPrisma();
-  const row = await prisma.profilePhoto.findUnique({ where: { userId }, select: { storageKey: true, thumbStorageKey: true } });
-  if (!row) return false;
-  const hadPhoto = Boolean(row.storageKey || row.thumbStorageKey);
-  await prisma.profilePhoto.update({
-    where: { userId },
-    data: { ...clearedFields, ...(extra ?? { removedByStaffAt: null, removedByUserId: null }) },
-  });
-  await deleteFilesQuietly([row.storageKey, row.thumbStorageKey]);
-  return hadPhoto;
+/**
+ * Clears the row under its lock (and, for a staff removal, writes the audit entry in the same transaction), then
+ * deletes the stored files after commit. Returns whether there was a photo.
+ */
+async function clearPhoto(
+  userId: string,
+  mode: { kind: "own" } | { kind: "staff"; actorUserId: string },
+) {
+  const keys = await getPrisma().$transaction(async (tx) => {
+    const current = await lockPhotoRow(tx, userId, false);
+    const hadPhoto = Boolean(current.storageKey || current.thumbStorageKey);
+    // No photo stored: nothing to delete, and a removal notice already on the row stays until a new photo is added.
+    if (!hadPhoto) return null;
+    await tx.profilePhoto.update({
+      where: { userId },
+      data: {
+        ...clearedFields,
+        ...(mode.kind === "staff"
+          ? { removedByStaffAt: new Date(), removedByUserId: mode.actorUserId }
+          : { removedByStaffAt: null, removedByUserId: null }),
+      },
+    });
+    if (mode.kind === "staff") {
+      await writeAuditLog({
+        actorUserId: mode.actorUserId,
+        action: "PROFILE_PHOTO_REMOVED_BY_STAFF",
+        entityType: "User",
+        entityId: userId,
+        summary: `Removed the profile photo of staff account ${userId}.`,
+        metadata: { targetUserId: userId },
+      }, tx);
+    }
+    return current;
+  }, { timeout: 15000 });
+  if (!keys) return false;
+  await deleteFilesQuietly([keys.storageKey, keys.thumbStorageKey]);
+  return true;
 }
 
 export async function removeOwnProfilePhoto(userId: string) {
-  return clearPhoto(userId, null);
+  return clearPhoto(userId, { kind: "own" });
 }
 
 /** A system administrator removes an inappropriate photo: files deleted, the person told, the action logged. */
 export async function removeProfilePhotoByStaff(targetUserId: string, actorUserId: string) {
-  const removed = await clearPhoto(targetUserId, { removedByStaffAt: new Date(), removedByUserId: actorUserId });
-  if (removed) {
-    await writeAuditLog({
-      actorUserId,
-      action: "PROFILE_PHOTO_REMOVED_BY_STAFF",
-      entityType: "User",
-      entityId: targetUserId,
-      summary: `Removed the profile photo of staff account ${targetUserId}.`,
-      metadata: { targetUserId },
-    });
-  }
-  return removed;
-}
-
-/** Clears the person's "a staff member removed your photo" notice. */
-export async function dismissRemovalNotice(userId: string) {
-  await getPrisma().profilePhoto.updateMany({
-    where: { userId, storageKey: null },
-    data: { removedByStaffAt: null, removedByUserId: null },
-  });
+  return clearPhoto(targetUserId, { kind: "staff", actorUserId });
 }
 
 /**
@@ -145,7 +167,7 @@ export async function removeProfilePhotosForPerson(personId: string) {
     const links = await getPrisma().userPersonLink.findMany({ where: { personId }, select: { userId: true } });
     for (const { userId } of links) {
       try {
-        await clearPhoto(userId, null);
+        await clearPhoto(userId, { kind: "own" });
       } catch (error) {
         logError("Could not remove a profile photo after anonymization", error);
       }

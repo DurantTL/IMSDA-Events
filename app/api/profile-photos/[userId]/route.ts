@@ -29,8 +29,6 @@ async function getHandler(request: Request, context: RouteContext) {
       { displayName: "profile-photo.webp", contentType: "image/webp", storageKey },
       "inline",
     );
-    // The page URL carries `v=<uploadedAt>`, so a replacement is a new URL; the answer is only for this browser.
-    response.headers.set("Cache-Control", "private, max-age=3600");
     return response;
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return notFound();

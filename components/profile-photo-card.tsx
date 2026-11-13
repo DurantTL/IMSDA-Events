@@ -27,12 +27,16 @@ export function ProfilePhotoCard({
   const { confirm, confirmDialog } = useConfirm();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<"upload" | "remove" | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const hasPhoto = photo.version !== null;
+  const uploading = busy && busyAction === "upload";
+  const removing = busy && busyAction === "remove";
 
   async function choose(file: File | undefined) {
     if (!file) return;
+    setBusyAction("upload");
     setBusy(true);
     setMessage("");
     setError("");
@@ -63,6 +67,7 @@ export function ProfilePhotoCard({
       destructive: true,
     });
     if (!confirmed) return;
+    setBusyAction("remove");
     setBusy(true);
     setMessage("");
     setError("");
@@ -79,7 +84,7 @@ export function ProfilePhotoCard({
   }
 
   return (
-    <section aria-labelledby="profile-photo-heading" className={`panel ${styles.card}`}>
+    <section aria-labelledby="profile-photo-heading" id="profile-photo" className={`panel ${styles.card}`}>
       <div className="section-heading">
         <div>
           <p className="eyebrow">Staff account</p>
@@ -106,14 +111,14 @@ export function ProfilePhotoCard({
             ref={inputRef}
             type="file"
           />
-          <button className="secondary-button" disabled={busy} onClick={() => inputRef.current?.click()} type="button">
+          <button aria-busy={uploading} className="secondary-button" disabled={busy} onClick={() => inputRef.current?.click()} type="button">
             <Camera aria-hidden="true" size={16} />
-            {hasPhoto ? "Change photo" : "Add a profile photo"}
+            {uploading ? "Saving…" : hasPhoto ? "Change photo" : "Add a profile photo"}
           </button>
           {hasPhoto && (
-            <button className="secondary-button" disabled={busy} onClick={() => { void remove(); }} type="button">
+            <button aria-busy={removing} className="secondary-button" disabled={busy} onClick={() => { void remove(); }} type="button">
               <Trash2 aria-hidden="true" size={16} />
-              Remove photo
+              {removing ? "Removing…" : "Remove photo"}
             </button>
           )}
         </div>

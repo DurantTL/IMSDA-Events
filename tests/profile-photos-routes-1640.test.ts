@@ -118,7 +118,7 @@ describe("GET /api/profile-photos/[userId]", () => {
     expect((await get()).status).toBe(404);
   });
 
-  it("serves the thumbnail privately as inline webp", async () => {
+  it("serves the thumbnail as inline webp", async () => {
     signedIn();
     dependencies.canViewProfilePhoto.mockResolvedValue(true);
     dependencies.findProfilePhotoFile.mockResolvedValue("profile-photos/a.webp");
@@ -126,7 +126,6 @@ describe("GET /api/profile-photos/[userId]", () => {
     expect(response.status).toBe(200);
     expect(dependencies.findProfilePhotoFile).toHaveBeenCalledWith("u2", "thumb");
     expect(dependencies.eventAssetResponse).toHaveBeenCalledWith(expect.objectContaining({ contentType: "image/webp", storageKey: "profile-photos/a.webp" }), "inline");
-    expect(response.headers.get("Cache-Control")).toBe("private, max-age=3600");
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
   });
 

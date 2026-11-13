@@ -26,9 +26,9 @@ It never shows on public pages, emails, exports, CSV downloads, printed name bad
 
 Photos load only through `GET /api/profile-photos/[userId]` for a signed-in staff user. The viewer must be the person, a
 system administrator, or hold MANAGE_STAFF on an event where the person is on the staff list (the same people who see
-them on the Staff page). Anyone else gets "not found", the same as a person with no photo. Responses are private
-(`Cache-Control: private`), `nosniff`, sandboxed, and carry no referrer. Page URLs end in `&v=<uploaded time>` so a new
-photo is not hidden behind a cached old one.
+them on the Staff page). Anyone else gets "not found", the same as a person with no photo. Responses are not cached
+(the site sends `Cache-Control: no-store`), are `nosniff` and sandboxed, and carry no referrer. Page URLs end in
+`&v=<uploaded time>` so a new photo always shows as a new address.
 
 ## Change, removal and deletion
 

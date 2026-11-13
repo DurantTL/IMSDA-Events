@@ -2,7 +2,7 @@
 
 import { GuardedLink } from "@/components/guarded-link";
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
-import { ArrowRightLeft, CalendarPlus, CircleUserRound, Eye, ShieldCheck, Users, UserRound, X } from "lucide-react";
+import { ArrowRightLeft, CalendarPlus, Camera, CircleUserRound, Eye, ShieldCheck, Users, UserRound, X } from "lucide-react";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { SignOutButton } from "@/components/sign-out-button";
 import styles from "./staff-account-menu.module.css";
@@ -98,6 +98,10 @@ export function StaffAccountMenu({
           <GuardedLink className="account-system-link" href={PROFILE_HREF} onNavigate={close}>
             <UserRound aria-hidden="true" size={17} />
             Edit profile
+          </GuardedLink>
+          <GuardedLink className="account-system-link" href={`${PROFILE_HREF}#profile-photo`} onNavigate={close}>
+            <Camera aria-hidden="true" size={17} />
+            {photoUrl ? "Change profile photo" : "Add a profile photo"}
           </GuardedLink>
           {workspaces.length > 1 && (
             <div role="group" aria-label="Switch workspace" className={styles.workspaces}>
