@@ -24,10 +24,13 @@ export function CheckInStationsPanel({
   eventId,
   stations,
   timeZone,
+  gateModeEnabled = false,
 }: {
   eventId: string;
   stations: ActiveStationRow[];
   timeZone: string;
+  /** Gate mode (#1684) as saved for this event. */
+  gateModeEnabled?: boolean;
 }) {
   const router = useRouter();
   const { confirm, confirmDialog } = useConfirm();
@@ -58,6 +61,29 @@ export function CheckInStationsPanel({
       setError("No connection. Check the network and try again.");
       setBusy("");
     }
+  }
+
+  async function setGateMode(enabled: boolean) {
+    if (busy) return;
+    setBusy("gate");
+    setError("");
+    try {
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/check-in-gate-mode`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({})) as { message?: string };
+        setError(data.message ?? "Gate mode could not be changed. Try again.");
+      } else {
+        router.refresh();
+      }
+    } catch {
+      setError("No connection. Check the network and try again.");
+    }
+    setBusy("");
   }
 
   async function revoke(stationId: string, stationName: string) {
@@ -110,6 +136,22 @@ export function CheckInStationsPanel({
           {busy === "start" ? "Starting..." : "Open as a station on this device"}
         </button>
       </form>
+      <div className={styles.cisPanelGate}>
+        <p id="cis-gate-help" className={styles.cisPanelHelp}>
+          <strong>Gate mode:</strong> lets a station look up people arriving at the gate. Off by default.
+        </p>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={gateModeEnabled}
+          aria-describedby="cis-gate-help"
+          className={`secondary-button ${styles.cisPanelSwitch}`}
+          disabled={busy !== ""}
+          onClick={() => void setGateMode(!gateModeEnabled)}
+        >
+          {busy === "gate" ? "Saving..." : gateModeEnabled ? "Gate mode: On (turn off)" : "Gate mode: Off (turn on)"}
+        </button>
+      </div>
       <div role="status" aria-live="polite">{error && <p className="form-error">{error}</p>}</div>
       {stations.length === 0 ? (
         <p className={styles.cisPanelHelp}>No stations are active for this event.</p>
