@@ -93,7 +93,7 @@ export function ClubReportForm({
   /** The Area Coordinator's current item decisions (#1701); only passed while the conference switch is on. */
   itemDecisions?: readonly ItemDecision[];
   /** Set only for a real Area Coordinator on a record in their ministries while the switch is on: shows the OK / Return controls. */
-  areaReviewTarget?: { organizationId: string; month: string };
+  areaReviewTarget?: { organizationId: string; month: string; version: string };
   /** Pathfinder or Adventurer: the member wording (#1517). Pathfinder when omitted. */
   clubKind?: string | null;
   endpoint: string;
@@ -316,7 +316,7 @@ export function ClubReportForm({
               <dd>
                 {answerText(points[item.key])}
                 {areaReviewTarget
-                  ? <AreaItemReviewControls decision={decisions[item.key]} itemKey={item.key} month={areaReviewTarget.month} organizationId={areaReviewTarget.organizationId} />
+                  ? <AreaItemReviewControls decision={decisions[item.key]} itemKey={item.key} month={areaReviewTarget.month} organizationId={areaReviewTarget.organizationId} version={areaReviewTarget.version} />
                   : decisions[item.key] && <ItemDecisionView decision={decisions[item.key]!} />}
               </dd>
             </div>

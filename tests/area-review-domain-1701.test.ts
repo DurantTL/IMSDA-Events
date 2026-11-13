@@ -17,7 +17,7 @@ import { pointItems } from "@/modules/club-reports/domain";
 
 /** The pure rules of Area Coordinator item review (#1701). Synthetic data only. */
 
-const decision = (itemKey: string, outcome: "OK" | "RETURNED") => ({ itemKey: itemKey as never, outcome, note: "", reviewedAt: "2026-11-12T15:00:00.000Z" });
+const decision = (itemKey: string, outcome: "OK" | "RETURNED") => ({ itemKey: itemKey as never, outcome, note: "", reviewedAt: "2026-11-12T15:00:00.000Z", reviewedOnLabel: "Nov 12, 2026" });
 
 describe("which items can be reviewed", () => {
   it("is exactly the twelve point items, never the on-time points", () => {
@@ -56,13 +56,14 @@ describe("a decision", () => {
 });
 
 describe("the route body", () => {
-  const body = { organizationId: "club-1", month: "2026-10", itemKey: "ratio", outcome: "OK" };
+  const body = { organizationId: "club-1", month: "2026-10", itemKey: "ratio", outcome: "OK", version: "2026-11-05T15:00:00.000Z" };
   it("accepts exactly the known fields", () => {
     expect(itemReviewSchema.parse(body)).toEqual(body);
     expect(() => itemReviewSchema.parse({ ...body, extra: 1 })).toThrow();
     expect(() => itemReviewSchema.parse({ ...body, itemKey: "onTime" })).toThrow();
     expect(() => itemReviewSchema.parse({ ...body, month: "2026-13" })).toThrow();
     expect(() => itemReviewSchema.parse({ ...body, outcome: "NO" })).toThrow();
+    expect(() => itemReviewSchema.parse({ ...body, version: undefined })).toThrow();
   });
 });
 

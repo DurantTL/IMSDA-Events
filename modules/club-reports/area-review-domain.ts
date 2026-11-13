@@ -38,7 +38,7 @@ export function checkItemDecision(input: ItemDecisionInput): { ok: true; itemKey
   return { ok: true, itemKey: input.itemKey, outcome: input.outcome, note };
 }
 
-export type ItemDecision = { itemKey: PointItemKey; outcome: MonthlyRecordItemOutcome; note: string; reviewedAt: string; reviewedByName?: string | null };
+export type ItemDecision = { itemKey: PointItemKey; outcome: MonthlyRecordItemOutcome; note: string; reviewedAt: string; /** The date in conference time, formatted on the server. */ reviewedOnLabel: string; reviewedByName?: string | null };
 
 export function itemLabel(key: PointItemKey) {
   return pointItems.find((item) => item.key === key)?.label ?? key;

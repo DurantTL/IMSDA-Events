@@ -16,6 +16,7 @@ const db = vi.hoisted(() => ({
   audit: [] as Row[],
   nextId: 1,
   uniqueViolation: false,
+  locks: 0,
 }));
 const mocks = vi.hoisted(() => ({
   getCurrentAttendee: vi.fn(),
@@ -35,6 +36,7 @@ const orgMatches = (org: Row, where: { clubKind?: { in: string[] }; isActive?: b
 
 const client = {
   $transaction: async (work: (tx: unknown) => unknown) => work(client),
+  $queryRaw: async () => { db.locks += 1; return []; },
   monthlyRecordAreaReviewSetting: {
     findUnique: async ({ where }: { where: { clubYear: string } }) => db.settings.find((row) => row.clubYear === where.clubYear) ?? null,
     upsert: async ({ where, update, create }: { where: { clubYear: string }; update: Row; create: Row }) => {
@@ -43,8 +45,8 @@ const client = {
     },
   },
   clubMonthlyReport: {
-    findUnique: async ({ where }: { where: { organizationId_reportMonth: { organizationId: string; reportMonth: string } } }) =>
-      db.reports.find((row) => row.organizationId === where.organizationId_reportMonth.organizationId && row.reportMonth === where.organizationId_reportMonth.reportMonth) ?? null,
+    findUnique: async ({ where }: { where: { id?: string; organizationId_reportMonth?: { organizationId: string; reportMonth: string } } }) =>
+      db.reports.find((row) => (where.id ? row.id === where.id : row.organizationId === where.organizationId_reportMonth!.organizationId && row.reportMonth === where.organizationId_reportMonth!.reportMonth)) ?? null,
     findFirst: async ({ where }: { where: { organizationId: string; reportMonth: string; organization: Parameters<typeof orgMatches>[1] } }) => {
       const report = db.reports.find((row) => row.organizationId === where.organizationId && row.reportMonth === where.reportMonth);
       const org = report && db.orgs.find((candidate) => candidate.id === report.organizationId);
@@ -63,7 +65,13 @@ const client = {
   },
   clubMonthlyReportItemReview: {
     findFirst: async ({ where }: { where: Row }) => db.reviews.find((row) => matches(row, where)) ?? null,
-    findMany: async ({ where }: { where: Row }) => db.reviews.filter((row) => matches(row, where)),
+    findMany: async ({ where }: { where: Row & { report?: { organizationId: string; clubYear: string } } }) => {
+      const { report, ...flat } = where;
+      return db.reviews.filter((row) => matches(row, flat)).filter((row) => {
+        const parent = db.reports.find((candidate) => candidate.id === row.reportId)!;
+        return !report || (parent.organizationId === report.organizationId && parent.clubYear === report.clubYear);
+      }).map((row) => ({ ...row, report: { reportMonth: db.reports.find((candidate) => candidate.id === row.reportId)!.reportMonth } }));
+    },
     count: async ({ where }: { where: Row }) => db.reviews.filter((row) => matches(row, where)).length,
     update: async ({ where, data }: { where: { id: string }; data: Row }) => { Object.assign(db.reviews.find((row) => row.id === where.id)!, data); },
     updateMany: async ({ where, data }: { where: Row; data: Row }) => {
@@ -101,7 +109,7 @@ vi.mock("@/modules/attendee-accounts/return-redirect", () => ({ twoStepRedirectP
 vi.mock("@/modules/rate-limit/service", () => ({ checkMasterGuideWriteRateLimit: mocks.rateLimit }));
 
 import { POST as reviewRoute } from "@/app/api/attendee/area-clubs/monthly-records/item-review/route";
-import { getItemDecisionsForRecord, reviewReportItem, setMonthlyRecordAreaReviewEnabled, getAreaReviewSwitch } from "@/modules/club-reports/area-review";
+import { getItemDecisionsForRecord, returnedReportMonths, reviewReportItem, setMonthlyRecordAreaReviewEnabled, getAreaReviewSwitch } from "@/modules/club-reports/area-review";
 import { reopenClubReport, saveClubReport } from "@/modules/club-reports/repository";
 import { clubReportInputSchema } from "@/modules/club-reports/schemas";
 import { ClubReportError } from "@/modules/club-reports/repository";
@@ -116,7 +124,8 @@ const call = (body: unknown, headers: Record<string, string> = { origin }) => re
   headers: { "content-type": "application/json", ...headers },
   body: JSON.stringify(body),
 }));
-const body = (overrides: Row = {}) => ({ organizationId: "club-1", month: "2026-10", itemKey: "ratio", outcome: "RETURNED", note: "Please recount the ratio.", ...overrides });
+const VERSION = "2026-11-05T15:00:00.000Z";
+const body = (overrides: Row = {}) => ({ organizationId: "club-1", month: "2026-10", itemKey: "ratio", outcome: "RETURNED", note: "Please recount the ratio.", version: VERSION, ...overrides });
 
 function signInAs(kind: "coordinator" | "coordinatorNoSecondStep" | "director" | "staffActingAsCoordinator" | "staff" | "signedOut") {
   mocks.currentStaffActingContext.mockResolvedValue(kind === "staffActingAsCoordinator" ? { role: "AREA_COORDINATOR", actAsId: "act-1" } : null);
@@ -130,7 +139,7 @@ function signInAs(kind: "coordinator" | "coordinatorNoSecondStep" | "director" |
 }
 
 function seed() {
-  Object.assign(db, { settings: [], reports: [], reviews: [], orgs: [], grants: [], audit: [], nextId: 1, uniqueViolation: false });
+  Object.assign(db, { settings: [], reports: [], reviews: [], orgs: [], grants: [], audit: [], nextId: 1, uniqueViolation: false, locks: 0 });
   db.orgs.push(
     { id: "club-1", type: "CLUB", name: "Aspen Pathfinders", clubKind: "PATHFINDER", isActive: true, guestEventId: null },
     { id: "club-adv", type: "CLUB", name: "Birch Adventurers", clubKind: "ADVENTURER", isActive: true, guestEventId: null },
@@ -260,6 +269,24 @@ describe("the Area Coordinator's item review route", () => {
     expect(db.reviews).toHaveLength(0);
   });
 
+  it("refuses a decision on a record that changed since the coordinator loaded it, and writes nothing", async () => {
+    const stale = await call(body({ version: "2026-11-04T10:00:00.000Z" }));
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ error: "CONFLICT", message: "This record changed. Reload to see the latest." });
+    expect(db.reviews).toHaveLength(0);
+    expect(db.audit).toHaveLength(0);
+    // The director resubmitted after the page loaded: the record's version moved on.
+    db.reports[0]!.updatedAt = new Date("2026-11-12T14:00:00.000Z");
+    expect((await call(body())).status).toBe(409);
+    expect((await call(body({ version: "2026-11-12T14:00:00.000Z" }))).status).toBe(200);
+  });
+
+  it("locks the record's row before it reads it, and needs a version in the body", async () => {
+    await call(body());
+    expect(db.locks).toBe(1);
+    expect((await call(body({ version: undefined }))).status).toBe(400);
+  });
+
   it("answers a conflict when two decisions race on the same item", async () => {
     db.uniqueViolation = true;
     expect((await call(body())).status).toBe(409);
@@ -296,6 +323,15 @@ describe("the conference switch", () => {
     expect(await getItemDecisionsForRecord("club-1", "2026-10")).toEqual({ switchOn: false, decisions: [] });
   });
 
+  it("lists the months with a current returned item for the director's month list, only while on", async () => {
+    stage("report-club-1", "RETURNED");
+    stage("report-club-adv", "RETURNED");
+    expect([...await returnedReportMonths("club-1", "2026-27")]).toEqual(["2026-10"]);
+    expect((await returnedReportMonths("club-1", "2025-26")).size).toBe(0);
+    db.settings[0]!.enabled = false;
+    expect((await returnedReportMonths("club-1", "2026-27")).size).toBe(0);
+  });
+
   it("leaves the coordinator's name out unless staff ask for it", async () => {
     await call(body());
     const plain = await getItemDecisionsForRecord("club-1", "2026-10");
@@ -322,6 +358,7 @@ describe("superseding decisions when the record is submitted again", () => {
     await saveClubReport("club-1", "2026-10", input(), club, beforeDue);
     expect(current("report-club-1")).toHaveLength(0);
     expect(reviewsFor("report-club-1").every((row) => row.supersededAt instanceof Date)).toBe(true);
+    expect(db.audit.at(-1)!.metadata).toMatchObject({ areaDecisionsSuperseded: 2 });
   });
 
   it("keeps them on a draft save and on a reopen, so the director still sees the notes", async () => {
@@ -329,6 +366,7 @@ describe("superseding decisions when the record is submitted again", () => {
     stage("report-club-1", "RETURNED");
     await saveClubReport("club-1", "2026-10", input({ status: "DRAFT" }), club, beforeDue);
     expect(current("report-club-1")).toHaveLength(1);
+    expect(db.audit.at(-1)!.metadata).not.toHaveProperty("areaDecisionsSuperseded");
     db.reports[0]!.status = "SUBMITTED";
     await reopenClubReport("club-1", "2026-10", club, beforeDue);
     expect(current("report-club-1")).toHaveLength(1);
@@ -405,7 +443,7 @@ describe("the past-due exception for a returned record", () => {
 
 describe("reviewReportItem directly", () => {
   it("reads the ministries inside the same transaction as the write", async () => {
-    await reviewReportItem({ organizationId: "club-1", month: "2026-10", itemKey: "ratio", outcome: "OK" }, coordinator, now);
+    await reviewReportItem({ organizationId: "club-1", month: "2026-10", itemKey: "ratio", outcome: "OK", version: VERSION }, coordinator, now);
     expect(current("report-club-1")).toHaveLength(1);
   });
 });

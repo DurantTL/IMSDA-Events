@@ -37,7 +37,7 @@ export default async function AreaClubReportPage({ params }: { params: Promise<{
 
   return (
     <ClubReportForm
-        areaReviewTarget={coordinator ? { organizationId, month } : undefined}
+        areaReviewTarget={coordinator ? { organizationId, month, version: report.updatedAt } : undefined}
         itemDecisions={switchOn ? decisions : undefined}
         clubKind={club.clubKind}
       dueLabel={formatDueDate(reportDueDate(month))}

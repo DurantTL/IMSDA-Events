@@ -7,5 +7,7 @@ export const itemReviewSchema = z.object({
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "That month isn't valid."),
   itemKey: z.string().refine(isReviewableItemKey, "That item can't be reviewed."),
   outcome: z.enum(["OK", "RETURNED"]),
+  /** The record's `updatedAt` as the coordinator saw it; a decision on a record that changed since is refused. */
+  version: z.string().min(1).max(40),
   note: z.string().max(ITEM_NOTE_MAX_LENGTH * 4).optional(),
 }).strict();

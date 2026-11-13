@@ -3,7 +3,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/conference-format";
+import { CONFERENCE_TIME_ZONE, formatInConferenceTime } from "@/modules/calendar/conference-format";
 import {
   AreaReviewError,
   checkItemDecision,
@@ -79,6 +79,7 @@ function serializeDecision(row: StoredDecision): ItemDecision {
     outcome: row.outcome,
     note: row.note,
     reviewedAt: row.reviewedAt.toISOString(),
+    reviewedOnLabel: formatInConferenceTime(row.reviewedAt, { month: "short", day: "numeric", year: "numeric" }),
     ...(row.reviewedByAccount !== undefined ? { reviewedByName: row.reviewedByAccount?.displayName ?? null } : {}),
   };
 }
@@ -111,6 +112,17 @@ export async function getItemDecisionsForRecord(organizationId: string, reportMo
   return { switchOn: true, decisions: await currentItemDecisions(prisma, report.id, options) };
 }
 
+/** The months of a club year whose record has a current returned item, while the switch is on; for the director's month list. */
+export async function returnedReportMonths(organizationId: string, clubYear: string): Promise<Set<string>> {
+  const prisma = getPrisma();
+  if (!(await areaReviewEnabledFor(prisma, clubYear))) return new Set();
+  const rows = await prisma.clubMonthlyReportItemReview.findMany({
+    where: { outcome: "RETURNED", supersededAt: null, report: { organizationId, clubYear } },
+    select: { report: { select: { reportMonth: true } } },
+  });
+  return new Set(rows.map((row) => row.report.reportMonth));
+}
+
 /** Whether the past-due exception applies to a record right now: the switch on for its year and a current returned item. */
 export async function areaReturnAllowsChange(client: Client, report: { id: string; clubYear: string }) {
   if (!(await areaReviewEnabledFor(client, report.clubYear))) return false;
@@ -133,7 +145,7 @@ export type AreaReviewActor = { accountId: string };
  * audits nothing. The audit entry holds ids and outcomes only, never the note.
  */
 export async function reviewReportItem(
-  input: { organizationId: string; month: string } & ItemDecisionInput,
+  input: { organizationId: string; month: string; version: string } & ItemDecisionInput,
   actor: AreaReviewActor,
   now = new Date(),
 ) {
@@ -159,7 +171,12 @@ export async function reviewReportItem(
     });
     if (!report) throw notFound();
     if (!(await areaReviewEnabledFor(tx, report.clubYear))) throw new AreaReviewError("FEATURE_OFF", "That record could not be found.");
-    if (report.status !== "SUBMITTED") throw new AreaReviewError("NOT_SUBMITTED", "Only a submitted record can be reviewed.");
+    // Lock the record's row, then read it again: a director's resubmission (which supersedes decisions) and this
+    // decision run one after the other, and a decision never lands on content the coordinator did not see.
+    await tx.$queryRaw`SELECT "id" FROM "ClubMonthlyReport" WHERE "id" = ${report.id} FOR UPDATE`;
+    const locked = await tx.clubMonthlyReport.findUnique({ where: { id: report.id }, select: { status: true, updatedAt: true } });
+    if (!locked || locked.status !== "SUBMITTED") throw new AreaReviewError("NOT_SUBMITTED", "Only a submitted record can be reviewed.");
+    if (locked.updatedAt.toISOString() !== input.version) throw new AreaReviewError("CONFLICT", "This record changed. Reload to see the latest.");
     if (!decision.ok) throw new AreaReviewError("INVALID_DECISION", decision.message);
 
     const current = await tx.clubMonthlyReportItemReview.findFirst({

@@ -19,7 +19,7 @@ import {
   reportMonthLabel,
   yearToDate,
 } from "@/modules/club-reports/domain";
-import { getItemDecisionsForRecord } from "@/modules/club-reports/area-review";
+import { getItemDecisionsForRecord, returnedReportMonths } from "@/modules/club-reports/area-review";
 import { mayChangeAfterReturn } from "@/modules/club-reports/area-review-domain";
 import { getClubReport, getClubReportYear, reportPrefill } from "@/modules/club-reports/repository";
 import {
@@ -68,7 +68,7 @@ export default async function ClubRecordsPage({
 
   // The check-off lists roster names, so it needs the roster's own gate (MFA and an open unlock), not just the report role.
   const attendanceAvailable = (await getRosterAccessState(organizationId, now)).state === "OPEN";
-  const [notes, roster, report, rosterPrefill, notesPrefill, reportYear, areaReview] = await Promise.all([
+  const [notes, roster, report, rosterPrefill, notesPrefill, reportYear, areaReview, returnedMonths] = await Promise.all([
     listClubMeetingNotes(organizationId, month),
     attendanceAvailable ? listAttendanceRoster(organizationId, clubYear) : Promise.resolve([]),
     getClubReport(organizationId, month),
@@ -76,6 +76,7 @@ export default async function ClubRecordsPage({
     monthlyNotesSummary(organizationId, month),
     getClubReportYear(organizationId, clubYear),
     getItemDecisionsForRecord(organizationId, month),
+    returnedReportMonths(organizationId, clubYear),
   ]);
   const reportsByMonth = new Map(reportYear.reports.map((entry) => [entry.reportMonth, entry]));
   // A club made this month is not behind on earlier ones (#1410). A month the club did file anyway stays listed.
@@ -140,8 +141,10 @@ export default async function ClubRecordsPage({
             const submitted = filed?.status === "SUBMITTED";
             const candidateDue = formatDueDate(reportDueDate(candidate));
             const candidateLocked = isLockedForClub(candidate, now);
+            // A returned item (switch on, #1701) reopens the month for the club after the due date.
+            const returned = returnedMonths.has(candidate);
             // A draft never locks; only a submitted report closes.
-            const closed = candidateLocked && submitted;
+            const closed = candidateLocked && submitted && !returned;
             return (
               <li key={candidate}>
                 {submitted ? <CheckCircle2 size={17} aria-hidden="true" /> : <CircleAlert size={17} aria-hidden="true" />}
@@ -149,7 +152,7 @@ export default async function ClubRecordsPage({
                   <strong>{reportMonthLabel(candidate)}</strong>
                   <small>
                     {filed
-                      ? `${filed.status === "DRAFT" ? "Draft" : `${filed.totalPoints} points${filed.onTimePoints ? "" : " · late"}`}${closed ? " · closed" : candidateLocked ? ` · was due ${candidateDue}` : ` · editable until ${candidateDue}`}`
+                      ? `${filed.status === "DRAFT" ? "Draft" : `${filed.totalPoints} points${filed.onTimePoints ? "" : " · late"}`}${closed ? " · closed" : returned ? " · returned" : candidateLocked ? ` · was due ${candidateDue}` : ` · editable until ${candidateDue}`}`
                       : candidateLocked ? `Missing · was due ${candidateDue}` : `Due ${candidateDue}`}
                   </small>
                 </span>

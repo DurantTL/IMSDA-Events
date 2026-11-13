@@ -226,7 +226,7 @@ export async function saveClubReport(
       ? await tx.clubMonthlyReport.update({ where: { id: existing.id }, data, select: reportSelect })
       : await tx.clubMonthlyReport.create({ data: { ...data, organizationId, reportMonth }, select: reportSelect });
     // A save that leaves the record SUBMITTED needs a fresh look from the coordinator (#1701).
-    if (existing && input.status === "SUBMITTED") await supersedeCurrentReviews(tx, existing.id, now);
+    const supersededDecisions = existing && input.status === "SUBMITTED" ? await supersedeCurrentReviews(tx, existing.id, now) : 0;
     const action = input.status === "DRAFT" ? "CLUB_REPORT_DRAFT_SAVED" : becomingSubmittedNow ? "CLUB_REPORT_SUBMITTED" : "CLUB_REPORT_UPDATED";
     await writeAuditLog({
       ...("userId" in actor ? { actorUserId: actor.userId } : {}),
@@ -246,6 +246,7 @@ export async function saveClubReport(
           : {}),
         ...(existing?.reviewedAt ? { reviewCleared: true } : {}),
         ...(afterAreaReturn ? { afterAreaReturn: true } : {}),
+        ...(supersededDecisions > 0 ? { areaDecisionsSuperseded: supersededDecisions } : {}),
         ...(!isClub && pastDue && input.status === "SUBMITTED" && existing?.firstSubmittedAt && existing.status === "DRAFT"
           ? { resubmittedAfterDueDate: true }
           : {}),

@@ -4,15 +4,9 @@
 .meta { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .notice { margin: 0; }
 .controls { display: grid; gap: 8px; min-width: 0; padding-top: 8px; }
-.buttons { display: flex; flex-wrap: wrap; gap: 8px; }
-.buttons button { min-height: 44px; min-width: 44px; }
+.buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.buttons button { min-height: 44px; min-width: 44px; width: 100%; }
+.returned, .ok { font-weight: 700; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .noteField { display: grid; gap: 4px; }
 .noteField textarea { width: 100%; min-height: 88px; }
 .error { margin: 0; color: var(--coral); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.switchBlock { display: grid; gap: 8px; }
-.switchRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
-.switchRow button { min-height: 44px; min-width: 44px; }
-.card { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-info); background: var(--card); }
-.heading { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); line-height: 1.35; font-weight: 700; }
-.state { font-weight: 700; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.help { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }

@@ -12,10 +12,6 @@ import {
 import type { PointItemKey } from "@/modules/club-reports/domain";
 import styles from "./monthly-record-item-review.module.css";
 
-function shortDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
 /**
  * One item's current decision from the Area Coordinator (#1701), read-only: OK or Returned with the note. Staff also see
  * who decided and when (`reviewedByName` is only ever set for staff).
@@ -25,9 +21,10 @@ export function ItemDecisionView({ decision }: { decision: ItemDecision }) {
   return (
     <div className={styles.decision} data-item-decision={decision.itemKey} data-outcome={decision.outcome}>
       <div className={styles.decisionRow}>
-        <span className={`status-chip ${returned ? "gold" : "green"}`}>{outcomeLabel(decision.outcome)}</span>
+        {/* Plain text, not a status chip: "Returned" and "OK" are not status words (B12). */}
+        <strong className={returned ? styles.returned : styles.ok}>{returned ? `${outcomeLabel(decision.outcome)}:` : outcomeLabel(decision.outcome)}</strong>
         {decision.reviewedByName !== undefined && (
-          <span className={styles.meta}>{`${decision.reviewedByName ? `by ${decision.reviewedByName}, ` : ""}${shortDate(decision.reviewedAt)}`}</span>
+          <span className={styles.meta}>{`${decision.reviewedByName ? `by ${decision.reviewedByName}, ` : ""}${decision.reviewedOnLabel}`}</span>
         )}
       </div>
       {decision.note && <p className={styles.note}>{decision.note}</p>}
@@ -43,11 +40,14 @@ export function AreaItemReviewControls({
   organizationId,
   month,
   itemKey,
+  version,
   decision,
 }: {
   organizationId: string;
   month: string;
   itemKey: PointItemKey;
+  /** The record's `updatedAt` as the coordinator sees it now; the route refuses the decision if the record changed since. */
+  version: string;
   decision: ItemDecision | undefined;
 }) {
   const router = useRouter();
@@ -67,7 +67,7 @@ export function AreaItemReviewControls({
       const response = await fetch("/api/attendee/area-clubs/monthly-records/item-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ organizationId, month, itemKey, outcome, ...(noteText ? { note: noteText } : {}) }),
+        body: JSON.stringify({ organizationId, month, itemKey, outcome, version, ...(noteText ? { note: noteText } : {}) }),
       });
       if (!response.ok) {
         const result = await response.json().catch(() => ({})) as { message?: string };
