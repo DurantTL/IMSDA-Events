@@ -5,8 +5,8 @@ import { emptySearchCatalog } from "@/modules/registrations/operations-search-do
 // #1511: saved views, owner-only for unshared ones, share needs MANAGE_REGISTRATION, the audit says keys not values.
 // An in-memory stand-in for the one table. Synthetic data only.
 vi.mock("server-only", () => ({}));
-const mocks = vi.hoisted(() => ({ getPrisma: vi.fn(), writeAuditLog: vi.fn(), loadCatalog: vi.fn(), findActiveMembership: vi.fn() }));
-vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership }));
+const mocks = vi.hoisted(() => ({ getPrisma: vi.fn(), writeAuditLog: vi.fn(), loadCatalog: vi.fn(), isClubEvent: vi.fn() }));
+vi.mock("@/modules/access/club-event-access", () => ({ isClubEvent: mocks.isClubEvent }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/modules/registrations/operations-search-repository", () => ({ loadOperationsSearchCatalog: mocks.loadCatalog }));
@@ -25,6 +25,8 @@ type Row = { id: string; eventId: string; ownerUserId: string; name: string; que
 let rows: Row[] = [];
 let counter = 0;
 let gone = new Set<string>();
+let inactive = new Set<string>();
+let grants = new Set<string>();
 
 function matches(row: Row, where: Record<string, unknown>): boolean {
   return Object.entries(where).every(([key, value]) => {
@@ -56,7 +58,12 @@ function installPrisma() {
       return { count: hit.length };
     }),
   };
-  mocks.getPrisma.mockReturnValue({ registrationSavedView });
+  // Everyone has an ACTIVE membership unless a test says they left or only hold an INACTIVE one.
+  const eventMembership = {
+    findMany: vi.fn(async ({ where }: { where: { userId: { in: string[] }; status: string } }) => where.userId.in.filter((id) => !gone.has(id) && !inactive.has(id)).map((userId) => ({ userId }))),
+  };
+  const clubsAdministratorGrant = { findMany: vi.fn(async ({ where }: { where: { userId: { in: string[] } } }) => where.userId.in.filter((id) => grants.has(id)).map((userId) => ({ userId }))) };
+  mocks.getPrisma.mockReturnValue({ registrationSavedView, eventMembership, clubsAdministratorGrant });
   return registrationSavedView;
 }
 
@@ -75,8 +82,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   installPrisma();
   // Everyone is on the event's staff unless a test says they left.
-  mocks.findActiveMembership.mockImplementation(async (userId: string) => (gone.has(userId) ? null : { status: "ACTIVE" }));
   gone = new Set();
+  inactive = new Set();
+  grants = new Set();
+  mocks.isClubEvent.mockResolvedValue(false);
   mocks.loadCatalog.mockResolvedValue({ ...emptySearchCatalog(), tags: [{ id: "tag-1", name: "VIP", isActive: true }] });
 });
 
@@ -307,6 +316,43 @@ describe("archived views (shared by staff who left)", () => {
     rows = rows.filter((row) => row.ownerUserId !== "user-b");
     rows.find((row) => row.id === "arch")!.query = "tag=tag-gone";
     await expect(restoreSavedView(viewerFor("user-b", manager), "arch")).rejects.toMatchObject({ code: "INVALID" });
+  });
+
+  it("counts an INACTIVE membership as left", async () => {
+    inactive = new Set(["user-off"]);
+    seed({ id: "off", ownerUserId: "user-off", shared: true });
+    const result = await listSavedViews(viewerFor("user-b", manager), catalog());
+    expect(result.views).toEqual([]);
+    expect(result.archived.map((view) => view.id)).toEqual(["off"]);
+  });
+
+  it("keeps a Clubs Administrator without a membership on staff for a club event only", async () => {
+    gone = new Set(["clubs-admin"]);
+    grants = new Set(["clubs-admin"]);
+    seed({ id: "clubs", ownerUserId: "clubs-admin", shared: true });
+    expect((await listSavedViews(viewerFor("user-b", manager), catalog())).archived.map((view) => view.id)).toEqual(["clubs"]);
+    mocks.isClubEvent.mockResolvedValue(true);
+    const result = await listSavedViews(viewerFor("user-b", manager), catalog());
+    expect(result.views.map((view) => view.id)).toEqual(["clubs"]);
+    expect(result.archived).toEqual([]);
+  });
+
+  it("reads memberships for all owners in one query", async () => {
+    gone = new Set(["g1", "g2"]);
+    seed({ ownerUserId: "g1", shared: true, name: "One" });
+    seed({ ownerUserId: "g2", shared: true, name: "Two" });
+    seed({ ownerUserId: "user-a", shared: true, name: "Three" });
+    await listSavedViews(viewerFor("user-b", manager), catalog());
+    expect(mocks.getPrisma().eventMembership.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("answers not found when the restore finds the view already taken over", async () => {
+    gone = new Set(["user-gone"]);
+    seed({ id: "arch", ownerUserId: "user-gone", shared: true });
+    const table = mocks.getPrisma().registrationSavedView;
+    table.updateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(restoreSavedView(viewerFor("user-b", manager), "arch")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
   it("lets a manager delete an archived view", async () => {

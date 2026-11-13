@@ -49,3 +49,4 @@
 .more > summary { display: flex; align-items: center; min-height: var(--touch-target, 44px); color: var(--imsda-navy); cursor: pointer; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
 .more[open] > summary { margin-bottom: 6px; }
 .title:focus-visible { outline-offset: 2px; }
+.plainName { display: block; padding: 10px 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; overflow-wrap: anywhere; }

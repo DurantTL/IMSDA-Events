@@ -106,6 +106,19 @@ describe("Saved views panel (#1511)", () => {
     expect(render()).not.toContain("Archived views");
   });
 
+  it("shows the note and no Restore on an archived view that no longer works, and no empty message when only archived exist", () => {
+    const archived: SavedViewItem[] = [
+      { id: "a1", name: "Good old", query: "tag=t1", shared: true, isOwn: false, ownerName: "Sam Departed", stale: false },
+      { id: "a2", name: "Broken old", query: "tag=gone", shared: true, isOwn: false, ownerName: "Sam Departed", stale: true },
+    ];
+    const html = render({ views: [], archivedViews: archived });
+    expect(html).not.toContain("No saved views yet.");
+    expect(html).toContain("isn&#x27;t available to you.");
+    expect(html.match(/Restore<span/g)).toHaveLength(1);
+    expect(html).toMatch(/Delete<span class="sr-only"> Broken old/);
+    expect(render({ views: [], archivedViews: archived, canShare: false })).toContain("No saved views yet.");
+  });
+
   it("says one plain sentence when there are no views", () => {
     expect(render({ views: [], canSave: false })).toContain("No saved views yet.");
   });

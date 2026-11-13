@@ -138,13 +138,16 @@ export function SavedViewsPanel({
     return (
       <li className={styles.item} key={view.id}>
         <div className={styles.itemBody}>
-          <span className={styles.link}>{view.name}</span>
+          <span className={styles.plainName}>{view.name}</span>
           <p className={styles.sharedBy}>Made by {view.ownerName}, who is no longer on this event&apos;s staff</p>
+          {view.stale ? <p className={styles.note}>{STALE_VIEW_NOTE}</p> : null}
         </div>
         <div className={styles.actions}>
-          <button aria-disabled={busy || undefined} className="secondary-button" onClick={() => void restore(view)} type="button">
-            {working === `${view.id}:restore` ? "Restoring…" : "Restore"}<span className="sr-only"> {view.name}</span>
-          </button>
+          {view.stale ? null : (
+            <button aria-disabled={busy || undefined} className="secondary-button" onClick={() => void restore(view)} type="button">
+              {working === `${view.id}:restore` ? "Restoring…" : "Restore"}<span className="sr-only"> {view.name}</span>
+            </button>
+          )}
           <button aria-disabled={busy || undefined} className="secondary-button" onClick={() => void remove(view)} type="button">
             {working === `${view.id}:delete` ? "Deleting…" : "Delete"}<span className="sr-only"> {view.name}</span>
           </button>
@@ -204,7 +207,7 @@ export function SavedViewsPanel({
   return (
     <section aria-labelledby="saved-views-title" className={styles.panel} data-testid="saved-views">
       <h2 className={styles.title} id="saved-views-title" ref={headingRef} tabIndex={-1}>Saved views</h2>
-      {views.length === 0 ? <p className={styles.empty}>No saved views yet. Choose some filters, then save them here to open them again.</p> : null}
+      {views.length === 0 && !(canShare && archivedViews.length > 0) ? <p className={styles.empty}>No saved views yet. Choose some filters, then save them here to open them again.</p> : null}
       {own.length > 0 ? (
         <div className={styles.group}>
           <h3 className={styles.groupTitle}>Your views</h3>

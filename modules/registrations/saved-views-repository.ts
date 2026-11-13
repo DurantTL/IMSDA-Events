@@ -2,7 +2,7 @@ import { getPrisma } from "@/lib/prisma";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import type { EventPermission } from "@/modules/access/permissions";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { findActiveMembership } from "@/modules/events/repository";
+import { isClubEvent } from "@/modules/access/club-event-access";
 import { loadOperationsSearchCatalog } from "@/modules/registrations/operations-search-repository";
 import type { SearchCatalog } from "@/modules/registrations/operations-search-domain";
 import {
@@ -68,13 +68,20 @@ const GENERIC_REFUSAL = "This view has a filter that isn't available for this ev
  * Administrator on a club event still has one) and not a system administrator, who can always open the event.
  */
 async function ownersWhoLeft(eventId: string, owners: readonly { id: string; globalRole: string | null }[]) {
-  const left = new Set<string>();
-  await Promise.all(owners.map(async (owner) => {
-    if (owner.globalRole === "SYSTEM_ADMIN") return;
-    const membership = await findActiveMembership(owner.id, eventId);
-    if (!membership || membership.status !== "ACTIVE") left.add(owner.id);
-  }));
-  return left;
+  // The same meaning as `requireEventMembership` and `findEffectiveMembership`, read for all owners at once: a system
+  // administrator is never gone; an ACTIVE membership keeps someone on staff; without one, an active Clubs
+  // Administrator grant still counts on a club event.
+  let candidates = owners.filter((owner) => owner.globalRole !== "SYSTEM_ADMIN").map((owner) => owner.id);
+  if (candidates.length === 0) return new Set<string>();
+  const prisma = getPrisma();
+  const active = await prisma.eventMembership.findMany({ where: { eventId, userId: { in: candidates }, status: "ACTIVE" }, select: { userId: true } });
+  const stillStaff = new Set(active.map((row) => row.userId));
+  candidates = candidates.filter((id) => !stillStaff.has(id));
+  if (candidates.length > 0 && (await isClubEvent(eventId, prisma))) {
+    const grants = await prisma.clubsAdministratorGrant.findMany({ where: { userId: { in: candidates }, revokedAt: null }, select: { userId: true } });
+    for (const grant of grants) stillStaff.add(grant.userId);
+  }
+  return new Set(candidates.filter((id) => !stillStaff.has(id)));
 }
 
 /**
