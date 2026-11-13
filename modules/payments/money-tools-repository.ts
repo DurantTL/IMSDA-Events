@@ -37,7 +37,7 @@ const billing = (context: Context) => shared(context, "billing", () => getBillin
 export const squareTimeoutMs = 3000;
 
 /** Rejects when `read` has not finished in time. The late result is dropped. */
-function withTimeout<T>(read: () => Promise<T>, ms: number): Promise<T> {
+export function withTimeout<T>(read: () => Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("The Square read took too long")), ms);
     read().then(
@@ -48,7 +48,7 @@ function withTimeout<T>(read: () => Promise<T>, ms: number): Promise<T> {
 }
 
 /** Square not being set up is expected on a site without it: the card says Unavailable, and nothing is logged. */
-const isExpectedUnavailable = (error: unknown) => (error as { code?: unknown } | null)?.code === "SQUARE_NOT_CONFIGURED";
+export const isExpectedUnavailable = (error: unknown) => (error as { code?: unknown } | null)?.code === "SQUARE_NOT_CONFIGURED";
 
 const readers: Record<MoneyMetricKey, (context: Context) => Promise<number>> = {
   // The Payments page's notice and the Owed by churches page read the same open flags.

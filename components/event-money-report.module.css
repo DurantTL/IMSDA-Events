@@ -1,0 +1,149 @@
+.stack {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-container);
+  background: var(--card);
+}
+
+.panelHeading {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1.125rem);
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.ok,
+.bad {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-container);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.ok {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.bad {
+  background: var(--coral-soft);
+  color: var(--coral);
+}
+
+.lines {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  align-items: start;
+  padding: 12px 0;
+  border-top: 1px solid var(--table-row-line);
+}
+
+.line:first-child {
+  border-top: 0;
+}
+
+.label {
+  margin: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.9375rem);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.amount {
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.detail {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  min-width: 0;
+}
+
+.detailText {
+  flex: 1 1 16rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.open {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target, 44px);
+  color: var(--imsda-purple);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.sub {
+  padding-left: 16px;
+}
+
+.owing {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.owingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 16px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-container);
+}
+
+.owingText {
+  display: grid;
+  flex: 1 1 14rem;
+  gap: 2px;
+  min-width: 0;
+}
+
+.code {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
