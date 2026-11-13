@@ -22,6 +22,7 @@ import {
   DEADLINE_REMINDER_PREPARATION_JOB,
   EMAIL_REACHABILITY_JOB,
   GENERAL_LINK_EXPIRY_JOB,
+  VISITING_CLUB_ACCESS_END_JOB,
   GOOGLE_KEYS_REACHABILITY_JOB,
   HEALTH_SNAPSHOT_SWEEP_JOB,
   HONOR_WATCH_SUMMARIES_JOB,
@@ -63,6 +64,7 @@ import {
   diskFields,
   dockerCleanupFields,
   generalLinkExpiryFields,
+  visitingClubAccessEndFields,
   healthSnapshotFields,
   honorWatchSummaryFields,
   instructorClassEmailFields,
@@ -651,7 +653,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("page-speed", "Page speed", "How public pages loaded for visitors, last 30 days.", "/admin/analytics", "Open analytics"),
     m("calendar-feed-reachable", "Calendar feed", "A read-only test that our own public calendar feed builds. No network is used and nothing is changed.", null, "Press Test connections"),
   ], async (ctx) => {
-    const read = await ctx.once("analytics", () => getAnalyticsSummary(conferenceToday(), 30, { eventNames: false }));
+    const read = await ctx.once("analytics", () => getAnalyticsSummary(conferenceToday(), 30, { eventNames: false, trends: false }));
     const calendarFeed = await reachabilityRow(ctx, "calendar-feed", "calendar-feed-reachable", CALENDAR_FEED_REACHABILITY_JOB, () => true);
     if (!read.ok) return [{ key: "broken-links", ...tried(read) }, { key: "page-speed", ...tried(read) }, calendarFeed];
     const { totals, vitals } = read.value;
@@ -698,6 +700,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("open-without-form", "Open events have a form", "Every event that is open for registration has a published registration form.", "/registration-builder", "Open the form builder"),
     m("registrations-received", "Registrations received", "Public registration submissions in the last 24 hours for open events. A count only.", "/people", "Open registrations"),
     m("general-link-expiry", "Pending-team expiry", "The last sweep's expiry of general-link teams still waiting 30 days after their event ended.", "/admin/events", "Open events"),
+    m("visiting-club-access-end", "Visiting club access end", "The last sweep's ending of visiting club roles 30 days after their event ended.", "/admin/events", "Open events"),
   ], async (ctx) => {
     let pricing: Awaited<ReturnType<Reader>>[number];
     try {
@@ -749,7 +752,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
         : registrationsReceivedFields("registrations-received", { count: count.value, openCount: opened.value.length, readAt: iso(count.readAt) });
     }
 
-    return [pricing, holds, noForm, received, await jobRow(ctx, GENERAL_LINK_EXPIRY_JOB, "general-link-expiry", generalLinkExpiryFields)];
+    return [pricing, holds, noForm, received, await jobRow(ctx, GENERAL_LINK_EXPIRY_JOB, "general-link-expiry", generalLinkExpiryFields), await jobRow(ctx, VISITING_CLUB_ACCESS_END_JOB, "visiting-club-access-end", visitingClubAccessEndFields)];
   }),
   ...buildMoneyProviders({ defineProvider, reportEvents, perEvent, tried, iso, m, jobRow, couldNotReadNote, eventHref }),
   ...buildCommunicationsProviders({ defineProvider, tried, iso, m }),

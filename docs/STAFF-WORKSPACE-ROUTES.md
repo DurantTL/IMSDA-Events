@@ -160,6 +160,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/more/program-assignments` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/program-assignments/page.tsx` |
 | `/more/program-assignments/[runId]` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/program-assignments/[runId]/page.tsx` |
 | `/more/promo-codes` | More directory | Events (inside an event) | Money | Promo codes | More, This event | Event menu | - | `app/(workspace)/more/promo-codes/page.tsx` |
+| `/more/recognitions` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/recognitions/page.tsx` |
 | `/more/reports` | Event sidebar | Events (inside an event) | Reports | Operational reports | More, This event | Event menu | - | `app/(workspace)/more/reports/page.tsx` |
 | `/more/reports/clubs` | Page link | Events (inside an event) | Reports | Printouts | More, This event | Event menu | - | `app/(workspace)/more/reports/clubs/page.tsx` |
 | `/more/reports/clubs/check-in-book` | Page link | Events (inside an event) | Reports | Printouts | More, This event | Event menu | - | `app/(workspace)/more/reports/clubs/check-in-book/page.tsx` |

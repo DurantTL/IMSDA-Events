@@ -131,7 +131,7 @@ describe("when an open application can be used (#1229)", () => {
     expect(view.status).toBe("OPEN");
     if (view.status !== "OPEN") return;
     expect(view.clubs).toEqual([{ id: "club-a", name: "Example Pathfinders" }]);
-    expect(mocks.organizationFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { type: "CLUB", isActive: true }, select: { id: true, name: true } }));
+    expect(mocks.organizationFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { type: "CLUB", isActive: true, guestEventId: null }, select: { id: true, name: true } }));
     expect(view.clubYear).toBe("2026-27");
   });
 
@@ -196,7 +196,7 @@ describe("submitting an open application (#1229)", () => {
 
   it("refuses an id that is not an active club, and saves nothing", async () => {
     await expect(submitOpenApplication(KEY, input({ organizationId: "club-unknown" }), now)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
-    expect(mocks.organizationFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "club-unknown", type: "CLUB", isActive: true } }));
+    expect(mocks.organizationFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "club-unknown", type: "CLUB", isActive: true, guestEventId: null } }));
     expect(mocks.submissionCreate).not.toHaveBeenCalled();
     expect(mocks.sendAlert).not.toHaveBeenCalled();
   });

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -302,7 +303,7 @@ export async function listClubReportsForYear(clubYear: string) {
   const prisma = getPrisma();
   const [clubs, reports, standings, eventPoints] = await Promise.all([
     prisma.organization.findMany({
-      where: { type: "CLUB", isActive: true, guestEventId: null },
+      where: conferenceClubWhere(),
       orderBy: { name: "asc" },
       select: { id: true, name: true, parentOrganization: { select: { name: true } }, ...clubJoinSelect },
     }),

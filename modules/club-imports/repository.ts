@@ -38,7 +38,7 @@ export async function annotateImportDrafts(drafts: ClubImportDraft[]) {
     // A church, company or group may sponsor a club (#822).
     prisma.organization.findMany({ where: { type: { in: [...SPONSOR_ORGANIZATION_TYPES] }, isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, normalizedName: true, type: true, city: true, state: true } }),
     // The same order the confirm step uses, so a name shared by two clubs resolves to the same one in both.
-    prisma.organization.findMany({ where: { type: "CLUB" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, name: true, normalizedName: true, isActive: true, parentOrganizationId: true } }),
+    prisma.organization.findMany({ where: { type: "CLUB", guestEventId: null }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, name: true, normalizedName: true, isActive: true, parentOrganizationId: true } }),
     // Only form 89 entries are Fluent Forms identities. A club-list row's number ("1", "2") must never match one.
     prisma.externalIdentity.findMany({
       where: { provider: "FLUENT_FORMS", externalId: { in: drafts.filter((draft) => draft.kind === "REGISTRATION").map((draft) => draft.entryId) } },
@@ -187,9 +187,9 @@ async function importListedClub(item: ClubImportItem, actorUserId: string): Prom
       }
       // The #1031 near-duplicate check plugs in here; until then, exact normalized names. The own name wins.
       const ownName = normalizeOrganizationName(item.clubName);
-      let club = await tx.organization.findFirst({ where: { type: "CLUB", normalizedName: ownName }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, parentOrganizationId: true } });
+      let club = await tx.organization.findFirst({ where: { type: "CLUB", guestEventId: null, normalizedName: ownName }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, parentOrganizationId: true } });
       if (!club) {
-        const older = await tx.organization.findMany({ where: { type: "CLUB", normalizedName: { in: names.filter((name) => name !== ownName) } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, parentOrganizationId: true } });
+        const older = await tx.organization.findMany({ where: { type: "CLUB", guestEventId: null, normalizedName: { in: names.filter((name) => name !== ownName) } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, parentOrganizationId: true } });
         const picked = item.existingClubId ? older.find((candidate) => candidate.id === item.existingClubId) : undefined;
         club = picked ?? (older.length === 1 ? older[0]! : null);
         if (!picked && older.length > 1) throw new ImportRefused("More than one club in the directory matches this name. Preview the file again and pick the club.");
@@ -273,7 +273,7 @@ async function importOne(item: ClubImportItem, actorUserId: string, now: Date): 
   try {
     const result = await prisma.$transaction(async (tx) => {
       const normalizedName = normalizeOrganizationName(item.clubName);
-      let club = await tx.organization.findFirst({ where: { type: "CLUB", normalizedName }, select: { id: true, isActive: true, parentOrganizationId: true } });
+      let club = await tx.organization.findFirst({ where: { type: "CLUB", guestEventId: null, normalizedName }, select: { id: true, isActive: true, parentOrganizationId: true } });
       if (club && !club.isActive) throw new ImportRefused("A club with that name is inactive. Reactivate it first, or give the import another name.");
 
       // Every club has a sponsoring church or company; church-billed events invoice it.

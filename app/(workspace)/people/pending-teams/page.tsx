@@ -25,7 +25,7 @@ export default async function PendingTeamsPage({ searchParams }: { searchParams:
   const canAddClub = user.globalRole === "SYSTEM_ADMIN";
   const [teams, clubs, counts, sponsors] = await Promise.all([
     listPendingTeams(event.id),
-    listAttachableClubs(),
+    listAttachableClubs(event.id),
     resolvedTeamCounts(event.id),
     canAddClub ? listClubSponsorChoices() : Promise.resolve([]),
   ]);

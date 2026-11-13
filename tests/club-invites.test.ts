@@ -147,6 +147,21 @@ describe("accepting a club invite", () => {
     });
   });
 
+  it("refuses an invite on a visiting club once its event ended more than 30 days ago", async () => {
+    mocks.inviteFindUnique.mockResolvedValue({
+      ...sentInvite,
+      organization: { isActive: true, type: "CLUB", guestEventId: "event-1", guestEvent: { endsAt: new Date(now.getTime() - 31 * 24 * 60 * 60 * 1000) } },
+    });
+    await expect(acceptClubInvite("invite-1", account, now)).rejects.toMatchObject({ message: "This visiting club's event ended more than 30 days ago, so its roles have ended." });
+    expect(mocks.grantCreate).not.toHaveBeenCalled();
+    // Inside the window it still works.
+    mocks.inviteFindUnique.mockResolvedValue({
+      ...sentInvite,
+      organization: { isActive: true, type: "CLUB", guestEventId: "event-1", guestEvent: { endsAt: new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000) } },
+    });
+    await expect(acceptClubInvite("invite-1", account, now)).resolves.toEqual({ organizationId: "club-1" });
+  });
+
   it("accepts an invite that never expires (expiresAt: null, #425)", async () => {
     mocks.inviteFindUnique.mockResolvedValue({ ...sentInvite, expiresAt: null });
     await expect(acceptClubInvite("invite-1", account, now)).resolves.toEqual({ organizationId: "club-1" });

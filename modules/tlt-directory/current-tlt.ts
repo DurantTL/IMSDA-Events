@@ -1,5 +1,6 @@
 import "server-only";
 
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import type { Prisma } from "@prisma/client";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 
@@ -17,7 +18,7 @@ function currentTltWhere(now: Date): Prisma.ClubRosterMemberWhereInput {
     attendeeType: "YOUTH",
     isTlt: true,
     status: "ACTIVE",
-    organization: { type: "CLUB", isActive: true, guestEventId: null },
+    organization: conferenceClubWhere(),
   };
 }
 

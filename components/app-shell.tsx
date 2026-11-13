@@ -85,6 +85,7 @@ export function AppShell({
   defaultEventId = null,
   events,
   user,
+  accountPhotoUrl = null,
   adminRoleView = null,
   siteContentEditor = false,
   youthDirectory = false,
@@ -101,6 +102,8 @@ export function AppShell({
   defaultEventId?: string | null;
   events: ShellEvent[];
   user: ShellUser;
+  /** The signed-in staff member's profile photo thumbnail (#1640), or null for the usual icon. */
+  accountPhotoUrl?: string | null;
   /**
    * The admin roles this account holds and the one showing (#1225), computed server-side. Only the roles held decide which
    * rail areas and tabs show, and which dashboard Home opens; no server gate reads it.
@@ -334,6 +337,7 @@ export function AppShell({
             createEventHref={createEventHrefFor(isSystemAdmin)}
             displayName={user.displayName}
             email={user.email}
+            photoUrl={accountPhotoUrl}
             workspaces={workspaces}
           />
         </div>

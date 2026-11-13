@@ -191,7 +191,7 @@ export async function loadSourceConfiguration(db: Db, eventId: string): Promise<
       bodyTemplate: template.versions[0]!.bodyTemplate,
     })),
     messageTemplatesWithoutPublishedVersion: messageTemplates.length - currentTemplates.length,
-    tags: tags.map((tag) => ({ name: tag.name, normalizedName: tag.normalizedName, color: tag.color, description: tag.description, isActive: tag.isActive })),
+    tags: tags.map((tag) => ({ name: tag.name, normalizedName: tag.normalizedName, color: tag.color, description: tag.description, isActive: tag.isActive, recognitionItem: tag.recognitionItem })),
     promoCodes: promoCodes.map((promo) => ({
       id: promo.id, code: promo.code, normalizedCode: promo.normalizedCode, discountType: promo.discountType,
       discountValue: promo.discountValue, startsOn: promo.startsOn, endsOn: promo.endsOn,

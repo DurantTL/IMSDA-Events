@@ -129,6 +129,8 @@ export type CurrentMemberHonor = {
   status: MemberHonorStatus;
   completionDate: string;
   createdAt: string;
+  /** The club that recorded the current entry. */
+  recordedAtOrganizationId?: string;
 };
 
 /**
@@ -156,6 +158,7 @@ export function currentHonorsFromHistory(
       status: entry.status,
       completionDate: entry.completionDate,
       createdAt: entry.createdAt,
+      recordedAtOrganizationId: entry.recordedAtOrganizationId,
     }))
     .sort((a, b) => a.honorName.localeCompare(b.honorName));
 }

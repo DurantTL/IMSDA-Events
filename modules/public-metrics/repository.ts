@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logWarn } from "@/lib/logger";
 import { calendarDateIn, addDays } from "@/modules/calendar/domain";
-import { buildEventFunnel, decideDimension, defaultAnalyticsPeriod, retentionDays, type AnalyticsPeriod, type EventFunnelRow, type PublicMetricName } from "@/modules/public-metrics/domain";
+import { buildEventFunnel, decideDimension, defaultAnalyticsPeriod, fillDailySeries, previousPeriodAvailable, previousPeriodRange, retentionDays, type AnalyticsPeriod, type DailyFunnelPoint, type DateRange, type EventFunnelRow, type FunnelCounts, type PublicMetricName } from "@/modules/public-metrics/domain";
 
 /**
  * Counts one public event (#111). Aggregate only: one row per day, metric and allowlisted dimension, incremented
@@ -60,16 +60,38 @@ export type AnalyticsSummary = {
   imageErrors: MetricRow[];
   vitals: Array<{ name: string; good: number; needsImprovement: number; poor: number }>;
   directory: MetricRow[];
+  /** The same-length period just before this one (#1961); `totals` is null when it is no longer fully stored (past the 400-day retention). */
+  previous: (DateRange & { totals: FunnelCounts | null });
+  /** One point per day of the period for views, starts and completions; days with no counts are 0. */
+  daily: DailyFunnelPoint[];
 };
 
 /** The last 30, 90 or 365 days, counts only (system administrators' view). `today` is a conference-calendar date. */
-export async function getAnalyticsSummary(today: string, days: AnalyticsPeriod = defaultAnalyticsPeriod, options: { eventNames?: boolean } = {}): Promise<AnalyticsSummary> {
+export async function getAnalyticsSummary(today: string, days: AnalyticsPeriod = defaultAnalyticsPeriod, options: { eventNames?: boolean; /** The previous-period totals and the day-by-day series (#1961); on by default, off for callers that only read totals. */ trends?: boolean } = {}): Promise<AnalyticsSummary> {
   const from = addDays(today, -(days - 1));
   const rows = await getPrisma().publicMetricDaily.groupBy({
     by: ["metric", "dimension"],
     where: { day: { gte: new Date(`${from}T00:00:00Z`), lte: new Date(`${today}T00:00:00Z`) } },
     _sum: { count: true },
   });
+  const funnelMetrics = ["EVENT_PAGE_VIEW", "REGISTRATION_START", "REGISTRATION_COMPLETE"] as const;
+  const trends = options.trends !== false;
+  const dayRows = trends ? await getPrisma().publicMetricDaily.groupBy({
+    by: ["day", "metric"],
+    where: { metric: { in: [...funnelMetrics] }, day: { gte: new Date(`${from}T00:00:00Z`), lte: new Date(`${today}T00:00:00Z`) } },
+    _sum: { count: true },
+  }) : [];
+  const previousRange = previousPeriodRange(from, days);
+  let previousTotals: FunnelCounts | null = null;
+  if (trends && previousPeriodAvailable(today, days)) {
+    const previousRows = await getPrisma().publicMetricDaily.groupBy({
+      by: ["metric"],
+      where: { metric: { in: [...funnelMetrics] }, day: { gte: new Date(`${previousRange.from}T00:00:00Z`), lte: new Date(`${previousRange.to}T00:00:00Z`) } },
+      _sum: { count: true },
+    });
+    const sum = (metric: PublicMetricName) => previousRows.filter((row) => row.metric === metric).reduce((total, row) => total + (row._sum.count ?? 0), 0);
+    previousTotals = { views: sum("EVENT_PAGE_VIEW"), started: sum("REGISTRATION_START"), completed: sum("REGISTRATION_COMPLETE") };
+  }
   const by = (metric: PublicMetricName): MetricRow[] =>
     rows.filter((row) => row.metric === metric).map((row) => ({ dimension: row.dimension, count: row._sum.count ?? 0 })).sort((a, b) => b.count - a.count || a.dimension.localeCompare(b.dimension));
   const total = (metric: PublicMetricName) => by(metric).reduce((sum, row) => sum + row.count, 0);
@@ -101,5 +123,7 @@ export async function getAnalyticsSummary(today: string, days: AnalyticsPeriod =
       poor: vitalCounts.get(`${name}:poor`) ?? 0,
     })),
     directory: [...by("DIRECTORY_SEARCH"), ...by("DIRECTORY_FILTER")],
+    previous: { ...previousRange, totals: previousTotals },
+    daily: !trends ? [] : fillDailySeries(from, today, dayRows.map((row) => ({ day: row.day.toISOString().slice(0, 10), metric: row.metric, count: row._sum.count ?? 0 }))),
   };
 }

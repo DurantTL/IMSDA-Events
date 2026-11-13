@@ -103,6 +103,8 @@ export async function listStaffMemberships(eventId: string) {
           accountStatus: true,
           credential: { select: { disabledAt: true } },
           clubsAdministratorGrant: { select: { revokedAt: true } },
+          // Only the version, never the storage keys (#1640).
+          profilePhoto: { select: { storageKey: true, uploadedAt: true } },
         },
       },
     },
@@ -126,6 +128,8 @@ export async function listStaffMemberships(eventId: string) {
       accountDisabled: Boolean(row.user.credential?.disabledAt),
       /** An active Clubs Administrator grant (#1225); shown to system administrators on the Team page. */
       clubsAdministrator: Boolean(row.user.clubsAdministratorGrant && !row.user.clubsAdministratorGrant.revokedAt),
+      /** Milliseconds since the epoch of the profile photo (#1640), or null when there is none; used in the photo URL. */
+      photoVersion: row.user.profilePhoto?.storageKey && row.user.profilePhoto.uploadedAt ? row.user.profilePhoto.uploadedAt.getTime() : null,
     },
   }));
 }

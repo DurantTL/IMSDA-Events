@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- profile photos come from a signed-in route, not a static asset (#1640) */
 
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
 import { staffPageTitles } from "@/components/staff-navigation";
@@ -33,6 +34,8 @@ type StaffMembership = {
     accountDisabled: boolean;
     /** An active Clubs Administrator grant (#1225). */
     clubsAdministrator?: boolean;
+    /** The profile photo's version (#1640), or null/absent for initials. */
+    photoVersion?: number | null;
   };
 };
 
@@ -128,7 +131,7 @@ export function StaffWorkspace({ eventId, eventName, initialMemberships, current
       if (!response.ok) throw new Error(result.message ?? "Unable to save the staff assignment.");
       const membership = result.membership as StaffMembership;
       setFormDirty(false);
-      setMemberships((current) => editing ? current.map((row) => row.id === membership.id ? membership : row) : [membership, ...current.filter((row) => row.id !== membership.id)]);
+      setMemberships((current) => editing ? current.map((row) => row.id === membership.id ? { ...membership, user: { ...membership.user, photoVersion: row.user.photoVersion } } : row) : [membership, ...current.filter((row) => row.id !== membership.id)]);
       if (result.setupUrl || result.invitationEmailed) {
         setSetupUrl(result.setupUrl ?? "");
         setInvitedEmail(result.invitationEmailed ? membership.user.email : "");
@@ -156,7 +159,7 @@ export function StaffWorkspace({ eventId, eventName, initialMemberships, current
         : pendingActivation
           ? "awaiting activation"
           : membership.status.toLowerCase();
-      return <button className="staff-row staff-record" type="button" key={membership.id} onClick={() => openEdit(membership)}><span className="staff-person"><span className="person-avatar">{membership.user.displayName.split(/\s+/).map((part) => part[0]).slice(0, 2).join("")}</span><span><strong>{membership.user.displayName}{membership.user.id === currentUserId ? " (you)" : ""}</strong><small>{membership.user.jobTitle || membership.user.email}</small>{membership.user.jobTitle && <small>{membership.user.email}</small>}</span></span><span><strong>{roleLabel(membership.role)}</strong><small>{membership.user.globalRole === "SYSTEM_ADMIN" ? systemRoleText.SYSTEM_ADMIN.name : roleDetails[membership.role].description}</small></span><span className={`status-chip ${hasAccess ? "green" : "purple"}`}>{statusLabel}</span><span>{hasAccess ? `${rolePermissions[membership.role].length} permissions` : "No access"}</span></button>;
+      return <button className="staff-row staff-record" type="button" key={membership.id} onClick={() => openEdit(membership)}><span className="staff-person"><span className="person-avatar">{typeof membership.user.photoVersion === "number" ? <img alt="" className="person-avatar-photo" height={38} loading="lazy" src={`/api/profile-photos/${encodeURIComponent(membership.user.id)}?size=thumb&v=${membership.user.photoVersion}`} width={38} /> : membership.user.displayName.split(/\s+/).map((part) => part[0]).slice(0, 2).join("")}</span><span><strong>{membership.user.displayName}{membership.user.id === currentUserId ? " (you)" : ""}</strong><small>{membership.user.jobTitle || membership.user.email}</small>{membership.user.jobTitle && <small>{membership.user.email}</small>}</span></span><span><strong>{roleLabel(membership.role)}</strong><small>{membership.user.globalRole === "SYSTEM_ADMIN" ? systemRoleText.SYSTEM_ADMIN.name : roleDetails[membership.role].description}</small></span><span className={`status-chip ${hasAccess ? "green" : "purple"}`}>{statusLabel}</span><span>{hasAccess ? `${rolePermissions[membership.role].length} permissions` : "No access"}</span></button>;
     })}</div>
     {memberships.length === 0
       ? <EmptyState action={{ label: "Add the first staff member", onClick: openAdd }} actionClass="secondary-button" canCreate={canAddStaff} className="empty-state panel" hint="Ask an event administrator to add staff." icon={<UserCog size={24} />} title="No staff on this event yet">Nobody but system administrators can work in {eventName} until you add someone and choose their role.</EmptyState>

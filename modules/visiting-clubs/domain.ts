@@ -29,6 +29,28 @@ export const visitingClubSourceOrgType: Record<VisitingClubTypeValue, string> = 
 export const VISITING_CLUB_INVITE_LIFETIME_DAYS = 30;
 export const VISITING_DECLINE_REASON_MAX = 500;
 
+/**
+ * How long a visiting club's roles keep working after its event ends: 30 days, long enough to settle the registration
+ * and read the event's emails, then the sweep ends them (Caleb, November 12, 2026).
+ */
+export const VISITING_CLUB_ACCESS_DAYS_AFTER_EVENT = 30;
+
+/** Shown when someone tries to give or accept a role on a visiting club after its window. */
+export const VISITING_CLUB_PAST_WINDOW_MESSAGE = "This visiting club's event ended more than 30 days ago, so its roles have ended.";
+
+/** Whether a club is a visiting club whose event ended more than 30 days ago (or whose event was not loaded). A conference club never is. */
+export function visitingClubPastWindow(club: { guestEventId?: string | null; guestEvent?: { endsAt: Date } | null }, now: Date): boolean {
+  if (!club.guestEventId) return false;
+  // A visiting club whose event was not loaded cannot be shown to be inside the window, so it is refused.
+  if (!club.guestEvent) return true;
+  return club.guestEvent.endsAt.getTime() < visitingClubAccessCutoff(now).getTime();
+}
+
+/** Events that ended before this moment are past the window. Exactly 30 days after the end is still inside it. */
+export function visitingClubAccessCutoff(now: Date): Date {
+  return new Date(now.getTime() - VISITING_CLUB_ACCESS_DAYS_AFTER_EVENT * 24 * 60 * 60 * 1000);
+}
+
 /** The one sentence the director agrees to. Their own conference does the screening; we do not ask for Sterling. */
 export const VISITING_SCREENING_CONFIRMATION =
   "I confirm that the adults coming with this club have been screened under my own conference's adult screening policy.";

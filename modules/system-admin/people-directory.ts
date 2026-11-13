@@ -1,5 +1,6 @@
 import "server-only";
 
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { getPrisma } from "@/lib/prisma";
 import {
   buildRoleWhere,
@@ -414,7 +415,7 @@ export async function listEventOptions(): Promise<EventOption[]> {
 /** Active clubs a director role can be given for. CLUB-type only; the route still decides. */
 export async function listClubOptions(): Promise<ClubOption[]> {
   return getPrisma().organization.findMany({
-    where: { type: "CLUB", isActive: true, guestEventId: null },
+    where: conferenceClubWhere(),
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });

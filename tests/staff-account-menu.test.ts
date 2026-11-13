@@ -33,6 +33,21 @@ function renderMenu(input: { isSystemAdmin: boolean; attendeeAccountAvailable?: 
   }));
 }
 
+describe("staff account menu profile photo (#1640)", () => {
+  it("offers Add a profile photo, or Change when there is one, linking to the photo card", () => {
+    const without = renderMenu({ isSystemAdmin: false });
+    expect(without).toContain('href="/profile#profile-photo"');
+    expect(without).toContain("Add a profile photo");
+    const withPhoto = renderToStaticMarkup(createElement(StaffAccountMenu, {
+      attendeePreviewHref: "/account", defaultOpen: true, displayName: "Riley Staff", email: "riley@imsda-events.test",
+      photoUrl: "/api/profile-photos/u1?size=thumb&v=1",
+    }));
+    expect(withPhoto).toContain("Change profile photo");
+    expect(withPhoto).not.toContain("Add a profile photo");
+    expect(withPhoto).toContain('alt=""');
+  });
+});
+
 describe("staff account menu (#543)", () => {
   it("shows name, email, Edit profile and Sign out to event staff, without System management or separate security links", () => {
     const markup = renderMenu({ isSystemAdmin: false });

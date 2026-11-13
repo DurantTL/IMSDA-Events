@@ -19,6 +19,8 @@ export type DirectedClub = {
   sponsoringChurch: string | null;
   /** Pathfinder or Adventurer, for the portal's member wording (#1517). */
   clubKind: ClubKindValue;
+  /** Set when this is a visiting club that belongs to one event (#835); null or missing for a conference club. */
+  guestEventId?: string | null;
 };
 
 export async function listDirectedClubs(attendeeAccountId: string, now = new Date()): Promise<DirectedClub[]> {
@@ -38,6 +40,7 @@ export async function listDirectedClubs(attendeeAccountId: string, now = new Dat
           id: true,
           name: true,
           clubKind: true,
+          guestEventId: true,
           parentOrganization: { select: { name: true } },
         },
       },
@@ -55,6 +58,7 @@ export async function listDirectedClubs(attendeeAccountId: string, now = new Dat
       role: grant.role,
       sponsoringChurch: grant.organization.parentOrganization?.name ?? null,
       clubKind: grant.organization.clubKind,
+      guestEventId: grant.organization.guestEventId,
     });
   }
   return [...clubs.values()];

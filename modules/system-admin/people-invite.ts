@@ -20,6 +20,7 @@ import { clubInviteSignUpUrl, createPeopleClubInvite, findOpenClubInvite } from 
 import { createAreaCoordinatorInvite, findOpenAreaCoordinatorInvite } from "@/modules/organizations/area-coordinator-invites";
 import { normalizeMinistries, parseMinistriesInput } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { CLUB_KINDS } from "@/modules/organizations/club-kind";
+import { VISITING_CLUB_PAST_WINDOW_MESSAGE, visitingClubPastWindow } from "@/modules/visiting-clubs/domain";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import type { GrantItem } from "@/modules/system-admin/people-directory-model";
 import { deferredPersonHref, inviteLookupHref } from "@/modules/system-admin/people-invite-href";
@@ -113,8 +114,12 @@ async function assertTargetsExist(access: Pick<Access, "events"> & Partial<Pick<
   }
   const clubIds = [...new Set((access.clubs ?? []).map((club) => club.organizationId))];
   if (clubIds.length > 0) {
-    const found = await prisma.organization.findMany({ where: { id: { in: clubIds }, type: "CLUB", isActive: true }, select: { id: true } });
+    const found = await prisma.organization.findMany({
+      where: { id: { in: clubIds }, type: "CLUB", isActive: true },
+      select: { id: true, guestEventId: true, guestEvent: { select: { endsAt: true } } },
+    });
     if (found.length !== clubIds.length) throw new PeopleInviteError("INVALID_ACCESS", "One of the clubs you chose could not be found.");
+    if (found.some((club) => visitingClubPastWindow(club, new Date()))) throw new PeopleInviteError("INVALID_ACCESS", VISITING_CLUB_PAST_WINDOW_MESSAGE);
   }
 }
 

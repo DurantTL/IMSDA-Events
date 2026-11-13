@@ -1,5 +1,6 @@
 import "server-only";
 
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -133,7 +134,7 @@ async function loadClubData(eventId: string, notifications: FormNotificationConf
   const storedIds = [...new Set(notifications.flatMap((config) => (config.condition?.fieldKey === CLUB_CONDITION_KEY ? [config.condition.value] : [])))];
   const event = await prisma.event.findUnique({ where: { id: eventId }, select: { audience: true } });
   const active = event?.audience === "CLUB" || storedIds.length > 0
-    ? await prisma.organization.findMany({ where: { type: "CLUB", isActive: true }, orderBy: [{ name: "asc" }, { id: "asc" }], select: { id: true, name: true } })
+    ? await prisma.organization.findMany({ where: { OR: [conferenceClubWhere(), { type: "CLUB", isActive: true, guestEventId: eventId }] }, orderBy: [{ name: "asc" }, { id: "asc" }], select: { id: true, name: true } })
     : [];
   const activeIds = new Set(active.map((club) => club.id));
   const stored = storedIds.length > 0

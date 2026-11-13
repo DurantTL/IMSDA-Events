@@ -2,7 +2,7 @@
 
 import { GuardedLink } from "@/components/guarded-link";
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
-import { ArrowRightLeft, CalendarPlus, CircleUserRound, Eye, ShieldCheck, Users, UserRound, X } from "lucide-react";
+import { ArrowRightLeft, CalendarPlus, Camera, CircleUserRound, Eye, ShieldCheck, Users, UserRound, X } from "lucide-react";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { SignOutButton } from "@/components/sign-out-button";
 import styles from "./staff-account-menu.module.css";
@@ -25,6 +25,7 @@ export function StaffAccountMenu({
   defaultOpen = false,
   displayName,
   email,
+  photoUrl = null,
   workspaces = [],
 }: {
   attendeePreviewHref: string;
@@ -34,6 +35,8 @@ export function StaffAccountMenu({
   defaultOpen?: boolean;
   displayName: string;
   email: string;
+  /** The person's profile photo thumbnail (#1640); without one the usual icon shows. */
+  photoUrl?: string | null;
   /** The workspaces this person holds (`staffWorkspaceOptions`); the switcher shows when there is more than one. */
   workspaces?: readonly WorkspaceSwitchOption[];
 }) {
@@ -73,7 +76,10 @@ export function StaffAccountMenu({
         ref={triggerRef}
         type="button"
       >
-        <CircleUserRound aria-hidden="true" size={19} />
+        {photoUrl
+          // eslint-disable-next-line @next/next/no-img-element -- a signed-in route, not a static asset
+          ? <img alt="" className={styles.photo} height={36} src={photoUrl} width={36} />
+          : <CircleUserRound aria-hidden="true" size={19} />}
       </button>
       {open && (
         <div aria-labelledby={titleId} aria-modal="true" className={`header-popover account-popover ${styles.popover}`} id="staff-account-menu" ref={popoverRef} role="dialog" tabIndex={-1}>
@@ -81,10 +87,21 @@ export function StaffAccountMenu({
             <h2 id={titleId}>Your account</h2>
             <button className={`secondary-button ${styles.close}`} data-account-close type="button" onClick={() => { close(); }}><X aria-hidden="true" size={18} /><span>Close</span></button>
           </div>
-          <strong>{displayName}</strong><p>{email}</p><small>Database-backed staff session</small>
+          {photoUrl ? (
+            <div className={styles.identity}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- a signed-in route, not a static asset */}
+              <img alt="" className={styles.photoLarge} height={48} src={photoUrl} width={48} />
+              <div><strong>{displayName}</strong><p>{email}</p></div>
+            </div>
+          ) : <><strong>{displayName}</strong><p>{email}</p></>}
+          <small>Database-backed staff session</small>
           <GuardedLink className="account-system-link" href={PROFILE_HREF} onNavigate={close}>
             <UserRound aria-hidden="true" size={17} />
             Edit profile
+          </GuardedLink>
+          <GuardedLink className="account-system-link" href={`${PROFILE_HREF}#profile-photo`} onNavigate={close}>
+            <Camera aria-hidden="true" size={17} />
+            {photoUrl ? "Change profile photo" : "Add a profile photo"}
           </GuardedLink>
           {workspaces.length > 1 && (
             <div role="group" aria-label="Switch workspace" className={styles.workspaces}>

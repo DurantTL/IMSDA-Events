@@ -35,9 +35,18 @@ export function ministriesLabel(values: readonly string[] | null | undefined): s
 /** Every ministry: what the staff "act as" viewer and the staff pages that list clubs for coordination see. */
 export const ALL_CLUB_KINDS: readonly ClubKindValue[] = CLUB_KINDS;
 
+/**
+ * The Prisma filter for "the conference's clubs": active clubs, without the visiting clubs that belong to one event (#835).
+ * Every list, reminder, import or summary that means conference clubs builds on this; `tests/conference-club-where-guard.test.ts`
+ * fails on a bare club filter that skips it.
+ */
+export function conferenceClubWhere(): Prisma.OrganizationWhereInput {
+  return { type: "CLUB", isActive: true, guestEventId: null };
+}
+
 /** The Prisma filter for "an active club of these ministries": what a coordinator may list, search, export or open. */
 export function areaClubWhere(kinds: readonly ClubKindValue[]): Prisma.OrganizationWhereInput {
-  return { type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: [...kinds] } };
+  return { ...conferenceClubWhere(), clubKind: { in: [...kinds] } };
 }
 
 /** Whether a club kind is one of the ministries (a missing kind is not). */

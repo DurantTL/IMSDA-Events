@@ -58,6 +58,7 @@ const unsortedTables: Record<string, string> = {
   "app/(workspace)/more/program-assignments/[runId]/page.tsx": "print sheet: frozen assignment run",
   "components/asset-return-panel.tsx": "short fixed list: one person's items on a return form",
   "components/club-form-submission-view.tsx": "print sheet: passenger roll call",
+  "components/analytics-charts.tsx": "set order: a chart's data table in the chart's order (days or weeks in date order, steps in funnel order, events ranked as drawn)",
   "components/club-report-charts.tsx": "set order: months in year order and a chart's data table in the chart's order",
   "components/club-supply-catalog-workspace.tsx": "set order: import preview in file order",
   "components/information-form-responses-view.tsx": "set order: response log, newest first, paged by cursor",
@@ -82,6 +83,7 @@ const shownWording: Record<string, string> = {
 
 /** Files with a sorted table and one more table that is not (the exact number), and why. */
 const partlyUnsortedTables: Record<string, { unsorted: number; reason: string }> = {
+  "components/recognitions-workspace.tsx": { unsorted: 1, reason: "short fixed list: the event's recognitions in the order staff listed them; the per-club table sorts" },
   "components/asset-closeout-workspace.tsx": { unsorted: 1, reason: "short fixed list: one row per asset kind, a reconciliation tally" },
   "components/honors-setup-workspace.tsx": { unsorted: 1, reason: "set order: copy plan preview in source order" },
   "components/lodging-assignments-panels.tsx": { unsorted: 3, reason: "set order: offer and plan previews in apply order, occupancy by night in date order" },
