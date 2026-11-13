@@ -116,6 +116,10 @@ describe("Saved views panel (#1511)", () => {
     expect(html).toContain("isn&#x27;t available to you.");
     expect(html.match(/Restore<span/g)).toHaveLength(1);
     expect(html).toMatch(/Delete<span class="sr-only"> Broken old/);
+    // The reason is read with the button that is left.
+    expect(html).toContain('id="saved-view-archived-note-a2"');
+    expect(html).toContain('aria-describedby="saved-view-archived-note-a2"');
+    expect(html).not.toContain('aria-describedby="saved-view-archived-note-a1"');
     expect(render({ views: [], archivedViews: archived, canShare: false })).toContain("No saved views yet.");
   });
 

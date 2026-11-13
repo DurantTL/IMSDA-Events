@@ -135,12 +135,13 @@ export function SavedViewsPanel({
   }
 
   function archivedRow(view: SavedViewItem) {
+    const noteId = `saved-view-archived-note-${view.id}`;
     return (
       <li className={styles.item} key={view.id}>
         <div className={styles.itemBody}>
           <span className={styles.plainName}>{view.name}</span>
           <p className={styles.sharedBy}>Made by {view.ownerName}, who is no longer on this event&apos;s staff</p>
-          {view.stale ? <p className={styles.note}>{STALE_VIEW_NOTE}</p> : null}
+          {view.stale ? <p className={styles.note} id={noteId}>{STALE_VIEW_NOTE}</p> : null}
         </div>
         <div className={styles.actions}>
           {view.stale ? null : (
@@ -148,7 +149,7 @@ export function SavedViewsPanel({
               {working === `${view.id}:restore` ? "Restoring…" : "Restore"}<span className="sr-only"> {view.name}</span>
             </button>
           )}
-          <button aria-disabled={busy || undefined} className="secondary-button" onClick={() => void remove(view)} type="button">
+          <button aria-describedby={view.stale ? noteId : undefined} aria-disabled={busy || undefined} className="secondary-button" onClick={() => void remove(view)} type="button">
             {working === `${view.id}:delete` ? "Deleting…" : "Delete"}<span className="sr-only"> {view.name}</span>
           </button>
         </div>
