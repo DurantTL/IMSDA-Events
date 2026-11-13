@@ -47,7 +47,7 @@ cp .env.example .env            # if missing
 export DATABASE_URL='postgresql://imsda:imsda_dev@localhost:5432/imsda_events?schema=public'
 npm run db:deploy && npm run db:seed && npm run club-forms:sync && npm run lodging:sync \
   && npm run form-templates:sync && npm run event-content:sync
-NODE_OPTIONS=--max-old-space-size=6144 npm run build      # run in the background
+NODE_OPTIONS=--max-old-space-size=8192 npm run build      # run in the background
 ```
 
 ## 3. Start the apps and run the repo's browser suites
