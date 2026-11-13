@@ -1,0 +1,219 @@
+/* Registration look panel (#283): staff editor for an event's constrained theme. */
+.status {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.controls {
+  min-width: 0;
+}
+
+.group {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-container);
+  padding: 12px 14px 14px;
+}
+
+.group legend {
+  padding: 0 6px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.colorRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px 7.5rem;
+  align-items: center;
+  gap: 8px;
+}
+
+.colorRow > label {
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.colorRow input[type="text"] {
+  min-height: 44px;
+  font-family: monospace;
+}
+
+.swatch {
+  width: 44px;
+  min-height: 44px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.fieldError {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--coral);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.help {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.side {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.subheading {
+  margin: 16px 0 6px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.side .subheading {
+  margin-top: 0;
+}
+
+/* The sample reads the same custom properties the public form does (set on this element from the draft). */
+.sample {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-theme-card);
+  background: var(--reg-theme-page-bg);
+  box-shadow: var(--reg-theme-shadow);
+  color: var(--ink);
+  padding: 16px;
+  font-family: var(--reg-theme-font-body);
+}
+
+.sample p {
+  margin: 0;
+}
+
+.sampleHeading {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-family: var(--reg-theme-font-heading);
+  font-size: max(var(--type-staff-floor, 0px), 1.25rem);
+}
+
+.sampleMuted {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.sampleOption {
+  width: 100%;
+  box-sizing: border-box;
+  border: 2px solid var(--imsda-purple);
+  border-radius: var(--radius-theme-card);
+  background: var(--imsda-purple-soft);
+  color: var(--imsda-purple);
+  padding: 10px 12px;
+  font-weight: 700;
+}
+
+.sampleError {
+  background: var(--coral-soft);
+  color: var(--coral);
+  padding: 6px 10px;
+  border-radius: var(--radius-theme-button);
+}
+
+.sampleSuccess {
+  background: var(--green-soft);
+  color: var(--green);
+  padding: 6px 10px;
+  border-radius: var(--radius-theme-button);
+}
+
+.sampleButton {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  border-radius: var(--radius-theme-button);
+  background: var(--imsda-navy);
+  color: var(--reg-theme-on-primary);
+  padding: 0 18px;
+  font-weight: 700;
+}
+
+.checks {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checks li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.fail strong {
+  color: var(--coral);
+}
+
+.pass strong {
+  color: var(--green);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.actions button {
+  flex: 1 1 10rem;
+  min-height: 44px;
+}
+
+.group select {
+  min-height: 44px;
+}
+
+.passing {
+  margin-top: 8px;
+}
+
+.passing summary {
+  min-height: 44px;
+  padding: 12px 0;
+  cursor: pointer;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.history {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+@media (max-width: 860px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .colorRow {
+    grid-template-columns: minmax(0, 1fr) 44px 7.5rem;
+  }
+}

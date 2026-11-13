@@ -2100,6 +2100,8 @@ export async function submitPublicRegistration(
       if (bulk) bulk.registered?.(result.registrationId);
       return {
         ...result.confirmation,
+        // The submitter's own registration, for the profile review on the confirmation (#1512); ownership is still checked by sign-in.
+        registrationId: result.registrationId,
         emailSent: registrantSent,
         notificationStatus: registrantCaptured
           ? "CAPTURED" as const

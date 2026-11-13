@@ -39,7 +39,7 @@ import { StaffContextualHelp } from "@/components/contextual-help-slot";
 import { PageHeader } from "@/components/page-header";
 import { ExportLink } from "@/components/export-link";
 import listStyles from "@/components/people-list.module.css";
-import { ClipboardCheck, CopyCheck, Download, ExternalLink, FileUp, ListChecks, Phone, Tags } from "lucide-react";
+import { ClipboardCheck, CopyCheck, Download, ExternalLink, FileUp, ListChecks, Phone, Tags, UserPen } from "lucide-react";
 
 export const metadata: Metadata = { title: staffPageTitles.registrations };
 
@@ -142,6 +142,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
         <li><a href={`/people/review-queues?event=${encodeURIComponent(event.id)}`}><ClipboardCheck aria-hidden="true" size={16} /> Review queues</a></li>
         {/* The cross-event identity queue lives beside the event's own review queues, not in the sidebar; the page checks the role again. */}
         {canReviewPeopleMatches && <li><a href="/people/matches"><CopyCheck aria-hidden="true" size={16} /> Possible duplicate people (all events)</a></li>}
+        {canReviewPeopleMatches && <li><a href="/people/profile-updates"><UserPen aria-hidden="true" size={16} /> Profile updates (all attendees)</a></li>}
         {/* Reviewed bulk actions on the registrations this filter shows (#182): the page carries the current search. */}
         <li><a href={bulkActionsHref}><Tags aria-hidden="true" size={16} /> Bulk actions</a></li>
         <li><ExportLink href={`/api/events/${event.id}/exports/registrations${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink></li>

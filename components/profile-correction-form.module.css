@@ -1,0 +1,84 @@
+.details {
+  margin-top: 8px;
+}
+
+.summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  cursor: pointer;
+  color: var(--imsda-purple);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 12px;
+}
+
+.label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.input {
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: 8px 12px;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-element);
+  background: var(--field-bg);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+}
+
+.help {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.status {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--touch-target);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.check input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.loading {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}

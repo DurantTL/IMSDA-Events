@@ -64,7 +64,8 @@ const attendeeAccount = {
   findUniqueOrThrow: vi.fn(),
   update: vi.fn(),
 };
-const tx = { attendeeAccount };
+const attendeeProfileChange = { createMany: vi.fn() };
+const tx = { attendeeAccount, attendeeProfileChange, $queryRaw: vi.fn() };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -210,5 +211,42 @@ describe("registration prefill", () => {
     expect(prefill.city).toBe("");
     expect(prefill.emergency_contact_name).toBe("");
     expect(prefill.phone).toBe("555-0100");
+  });
+});
+
+describe("profile change history (#1512)", () => {
+  it("keeps old and new name, phone and shirt size values for a self edit", async () => {
+    attendeeAccount.update.mockResolvedValue({ ...stored, lastName: "Persona", shirtSize: "L" });
+    await updateAttendeeProfile("acct-1", { ...input, lastName: "Persona", shirtSize: "L" });
+    expect(attendeeProfileChange.createMany).toHaveBeenCalledWith({
+      data: [
+        { accountId: "acct-1", field: "lastName", oldValue: "Person", newValue: "Persona", source: "SELF_EDIT", actorAttendeeAccountId: "acct-1" },
+        { accountId: "acct-1", field: "shirtSize", oldValue: "M", newValue: "L", source: "SELF_EDIT", actorAttendeeAccountId: "acct-1" },
+      ],
+    });
+  });
+
+  it("records address and emergency contact changes by field name only, and never a health field", async () => {
+    attendeeAccount.update.mockResolvedValue({
+      ...stored, dietaryNeeds: "Vegan", mailingLine1: "1 Example Way", emergencyContactName: "Casey Contact",
+    });
+    await updateAttendeeProfile("acct-1", {
+      ...input, dietaryNeeds: "Vegan", mailingLine1: "1 Example Way", emergencyContactName: "Casey Contact",
+    });
+    const rows = attendeeProfileChange.createMany.mock.calls[0]![0].data;
+    expect(rows.map((row: { field: string }) => row.field)).toEqual(["mailingLine1", "emergencyContactName"]);
+    for (const row of rows) expect(row).toMatchObject({ oldValue: null, newValue: null });
+    expect(JSON.stringify(attendeeProfileChange.createMany.mock.calls)).not.toMatch(/Vegan|Example Way|Casey/);
+  });
+
+  it("does not record a name change when a first save only fills the name the form already showed", async () => {
+    attendeeAccount.findUniqueOrThrow.mockResolvedValue({ ...stored, firstName: null, lastName: null });
+    await updateAttendeeProfile("acct-1", input);
+    expect(attendeeProfileChange.createMany).not.toHaveBeenCalled();
+  });
+
+  it("writes no history when nothing changed", async () => {
+    await updateAttendeeProfile("acct-1", input);
+    expect(attendeeProfileChange.createMany).not.toHaveBeenCalled();
   });
 });

@@ -238,6 +238,11 @@ export function buildRouteMapping(): RouteMappingRow[] {
     reachedFrom: { parent: "/people", linkedIn: "app/(workspace)/people/page.tsx" },
     note: "System administrators only, from the People page's Actions menu; not in the sidebar. Identity merging stays a human decision.",
   });
+  rows.push({
+    route: "/people/profile-updates", kind: "reached", oldPlace: "Page link", scope: "System", destinationPath: "/people", label: "Profile updates", group: "/people",
+    reachedFrom: { parent: "/people", linkedIn: "app/(workspace)/people/page.tsx" },
+    note: "New in #1512. System administrators only, from the People page's Actions menu; not in the sidebar. Lists attendee profile changes and takes staff corrections of name, phone and shirt size.",
+  });
   return rows;
 }
 

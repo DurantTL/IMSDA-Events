@@ -883,6 +883,7 @@ enum ProgramUnassignedReason {
 
 model User {
   id            String            @id @default(cuid())
+  attendeeProfileChangesMade   AttendeeProfileChange[]       @relation("AttendeeProfileChangeActorUser")
   registrationSavedViews RegistrationSavedView[] @relation("RegistrationSavedViewOwner")
   personMergesActed            PersonMerge[]                 @relation("PersonMergeActor")
   personMergesReversed         PersonMerge[]                 @relation("PersonMergeReversedBy")
@@ -947,6 +948,8 @@ model User {
   eventPagePreviewLinksCreated EventPagePreviewLink[]    @relation("EventPagePreviewLinkCreatedBy")
   eventPagePreviewLinksRevoked EventPagePreviewLink[]    @relation("EventPagePreviewLinkRevokedBy")
   eventPageVersionsCreated     EventPageVersion[]        @relation("EventPageVersionCreatedBy")
+  registrationThemesCreated    RegistrationThemeVersion[] @relation("RegistrationThemeVersionCreatedBy")
+  registrationThemesPublished  RegistrationThemeVersion[] @relation("RegistrationThemeVersionPublishedBy")
   createdEventImageLibraryImages EventImageLibraryImage[] @relation("EventImageLibraryCreatedBy")
   retiredEventImageLibraryImages EventImageLibraryImage[] @relation("EventImageLibraryRetiredBy")
   uploadedMessageFiles      MessageFile[]             @relation("MessageFileUploadedBy")
@@ -1217,6 +1220,40 @@ model PasswordResetToken {
   @@index([userId, expiresAt])
 }
 
+enum AttendeeProfileChangeSource {
+  SELF_EDIT
+  REGISTRATION_REVIEW
+  STAFF_CORRECTION
+}
+
+/// One field of an attendee's own saved profile that changed (#1512). Values are kept ONLY for `firstName`,
+/// `lastName`, `phone` and `shirtSize`, plus the mailing address and emergency contact fields on a STAFF_CORRECTION row
+/// (a system administrator's correction). A row for those fields from any other source stores the field
+/// name alone with null values, and dietary and accessibility needs are never recorded here at all. The database
+/// enforces both rules. A staff correction always names the staff user and a reason, so that user cannot be deleted
+/// while the change exists.
+model AttendeeProfileChange {
+  id                     String                      @id @default(cuid())
+  accountId              String
+  field                  String
+  oldValue               String?
+  newValue               String?
+  source                 AttendeeProfileChangeSource
+  registrationId         String?
+  actorAttendeeAccountId String?
+  actorUserId            String?
+  reason                 String?
+  createdAt              DateTime                    @default(now())
+
+  account              AttendeeAccount  @relation("AttendeeProfileChangeAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  registration         Registration?    @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  actorAttendeeAccount AttendeeAccount? @relation("AttendeeProfileChangeActorAccount", fields: [actorAttendeeAccountId], references: [id], onDelete: SetNull)
+  actorUser            User?            @relation("AttendeeProfileChangeActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([accountId, createdAt])
+  @@index([createdAt])
+}
+
 /**
  * A registrant's identity, separate from `User` by decision (ADR 0003).
  * The separation is the security property, not an accident of modelling: every
@@ -1232,6 +1269,8 @@ model PasswordResetToken {
 model AttendeeAccount {
   id                 String                @id @default(cuid())
   healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]
+  profileChanges AttendeeProfileChange[] @relation("AttendeeProfileChangeAccount")
+  profileChangesMade AttendeeProfileChange[] @relation("AttendeeProfileChangeActorAccount")
   monthlyRecordItemReviews ClubMonthlyReportItemReview[]
   leaderDirectoryPreference LeaderDirectoryPreference?
   teamPermissionDecisions ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedByAccount")
@@ -1680,6 +1719,38 @@ model EventPageVersion {
   @@unique([eventId, versionNumber])
 }
 
+/// Where a registration look is in its life (#283): one draft being edited, one published look the public sees, and the
+/// earlier published looks kept as history.
+enum RegistrationThemeStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+/// One version of an event's registration look (#283): a constrained set of tokens (colors, system fonts, layout choices)
+/// validated by `modules/registration-themes/tokens.ts`. An event has at most one DRAFT and one PUBLISHED version (partial
+/// unique indexes in the migration). A database trigger keeps a non-draft version immutable: it can only move from
+/// PUBLISHED to ARCHIVED, and it is deleted only with its event.
+model RegistrationThemeVersion {
+  id                String                  @id @default(cuid())
+  eventId           String
+  versionNumber     Int
+  status            RegistrationThemeStatus @default(DRAFT)
+  tokens            Json
+  createdByUserId   String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  publishedAt       DateTime?
+  publishedByUserId String?
+  archivedAt        DateTime?
+
+  event       Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy   User? @relation("RegistrationThemeVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  publishedBy User? @relation("RegistrationThemeVersionPublishedBy", fields: [publishedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, versionNumber])
+}
+
 /// An uploaded image a block's `data` points at (#816), derived from `data` on
 /// every save. It is what lets the public asset route serve a published
 /// block's image, and what makes deleting a file that a block still shows fail
@@ -2065,6 +2136,7 @@ model Event {
   contentSections                     EventContentSection[]
   pagePreviewLinks                    EventPagePreviewLink[]
   pageVersions                        EventPageVersion[]
+  registrationThemeVersions           RegistrationThemeVersion[]
   emergencyPlan                       EmergencyPlan?
   assets                              EventAsset[]
   imageLibraryImages                  EventImageLibraryImage[] @relation("EventImageLibrarySource")
@@ -3971,6 +4043,7 @@ model Registration {
   attendees               RegistrationAttendee[]
   payments                Payment[]
   publicFormSubmission    PublicRegistrationSubmission?
+  attendeeProfileChanges  AttendeeProfileChange[]
   staffDraft              StaffRegistrationDraft?
   capacityReservations    RegistrationCapacityReservation[]
   messages                MessageOutbox[]
