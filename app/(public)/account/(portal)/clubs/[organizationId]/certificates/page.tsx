@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { clubAccessClosed } from "@/components/club-access-closed";
+import { GetFilterForm } from "@/components/get-filter-form";
 import { ClubCertificatePicker } from "@/components/club-certificates";
 import styles from "@/components/club-certificates.module.css";
 import { filterCandidates, parseCertificateFilter } from "@/modules/club-certificates/domain";
@@ -32,6 +34,7 @@ export default async function ClubCertificatesPage({
   if (!list) notFound();
   const base = `/account/clubs/${organizationId}`;
   const filter = parseCertificateFilter(query);
+  const filtered = filter.kind !== "ALL" || Boolean(filter.from) || Boolean(filter.to);
   const shown = filterCandidates(list.candidates, filter);
   return (
     <>
@@ -46,7 +49,7 @@ export default async function ClubCertificatesPage({
           batch for investiture, set the dates. Nothing is emailed. Only your club&apos;s director and deputy can see this page.
           You can turn it off in <a href={`${base}/club-info#club-optional-features`}>Club settings</a>.
         </p>
-        <form action={`${base}/certificates`} className={styles.filters} method="get">
+        <GetFilterForm action={`${base}/certificates`} className={styles.filters} key={`${filter.kind}|${filter.from}|${filter.to}`}>
           <div className={styles.field}>
             <label htmlFor="certificates-kind">Kind</label>
             <select defaultValue={filter.kind} id="certificates-kind" name="kind">
@@ -64,9 +67,10 @@ export default async function ClubCertificatesPage({
             <input defaultValue={filter.to} id="certificates-to" name="to" type="date" />
           </div>
           <button className="secondary-button" type="submit">Show</button>
-        </form>
+          {filtered && <Link className="secondary-button" href={`${base}/certificates`}>Clear filters</Link>}
+        </GetFilterForm>
         <p className={styles.meta}>{`${shown.length} ${shown.length === 1 ? "completion" : "completions"} shown`}</p>
-        <ClubCertificatePicker candidates={shown} key={`${filter.kind}|${filter.from}|${filter.to}`} organizationId={organizationId} />
+        <ClubCertificatePicker candidates={shown} filtered={filtered} key={`${filter.kind}|${filter.from}|${filter.to}`} organizationId={organizationId} />
       </section>
     </>
   );

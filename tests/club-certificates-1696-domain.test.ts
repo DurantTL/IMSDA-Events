@@ -37,24 +37,36 @@ describe("current completions", () => {
     const out = honorCandidates([{
       ...ann,
       honors: [
-        { honorId: "h1", honorName: "Archery", status: "COMPLETED", completionDate: "2026-10-04" },
-        { honorId: "h2", honorName: "Knots", status: "IN_PROGRESS", completionDate: "" },
-        { honorId: "h3", honorName: "Camping", status: "COMPLETED", completionDate: "not a date" },
+        { honorId: "h1", honorName: "Archery", status: "COMPLETED", completionDate: "2026-10-04", recordedAtOrganizationId: "club-1" },
+        { honorId: "h2", honorName: "Knots", status: "IN_PROGRESS", completionDate: "", recordedAtOrganizationId: "club-1" },
+        { honorId: "h3", honorName: "Camping", status: "COMPLETED", completionDate: "not a date", recordedAtOrganizationId: "club-1" },
       ],
-    }]);
+    }], "club-1");
     expect(out.map((item) => item.key)).toEqual(["h:m1:h1"]);
     expect(out[0]).toMatchObject({ kind: "HONOR", title: "Archery", completedOn: "2026-10-04" });
+  });
+
+  it("lists only honors this club recorded, never another club's under this club's name", () => {
+    const out = honorCandidates([{
+      ...ann,
+      honors: [
+        { honorId: "h1", honorName: "Archery", status: "COMPLETED", completionDate: "2026-10-04", recordedAtOrganizationId: "club-2" },
+        { honorId: "h2", honorName: "Knots", status: "COMPLETED", completionDate: "2026-10-05", recordedAtOrganizationId: "club-1" },
+        { honorId: "h3", honorName: "Birds", status: "COMPLETED", completionDate: "2026-10-06" },
+      ],
+    }], "club-1");
+    expect(out.map((item) => item.key)).toEqual(["h:m1:h2"]);
   });
 
   it("a voided entry never counts: the current-status reader leaves it out, so a person with none has no candidate", async () => {
     const { currentHonorsFromHistory } = await import("@/modules/honors/member-honor-domain");
     const entry = (over: Record<string, unknown>) => ({
       id: "e", honorId: "h1", honorCode: "A", honorName: "Archery", status: "COMPLETED", completionDate: "2026-10-04", note: "", createdAt: "2026-10-04T00:00:00.000Z",
-      organizationId: "club-1", organizationName: "Test", recordedBy: "", voided: null, ...over,
+      recordedAtOrganizationId: "club-1", recordedAtOrganizationName: "Test", recordedByName: "", voided: null, ...over,
     }) as unknown as Parameters<typeof currentHonorsFromHistory>[0][number];
-    const voided = { reason: "mistake", createdAt: "2026-10-05T00:00:00.000Z", voidedBy: "" };
+    const voided = { reason: "mistake", voidedAt: "2026-10-05T00:00:00.000Z", voidedByName: "" };
     const current = currentHonorsFromHistory([entry({ voided })]);
-    expect(honorCandidates([{ ...ann, honors: current }])).toEqual([]);
+    expect(honorCandidates([{ ...ann, honors: current }], "club-1")).toEqual([]);
   });
 
   it("builds class completions with class names", () => {
@@ -71,9 +83,9 @@ describe("current completions", () => {
     const list = sortCandidates([
       ...classCandidates([{ ...zed, classLevel: "FRIEND", completedOn: "2026-01-01" }]),
       ...honorCandidates([{ ...ann, honors: [
-        { honorId: "a", honorName: "Archery", status: "COMPLETED", completionDate: "2026-02-01" },
-        { honorId: "b", honorName: "Birds", status: "COMPLETED", completionDate: "2026-03-01" },
-      ] }]),
+        { honorId: "a", honorName: "Archery", status: "COMPLETED", completionDate: "2026-02-01", recordedAtOrganizationId: "club-1" },
+        { honorId: "b", honorName: "Birds", status: "COMPLETED", completionDate: "2026-03-01", recordedAtOrganizationId: "club-1" },
+      ] }], "club-1"),
     ]);
     expect(list.map((item) => item.title)).toEqual(["Birds", "Archery", "Friend Class"]);
   });
@@ -95,7 +107,7 @@ describe("dates", () => {
 
 describe("filters", () => {
   const all = sortCandidates([
-    ...honorCandidates([{ ...ann, honors: [{ honorId: "a", honorName: "Archery", status: "COMPLETED", completionDate: "2026-05-10" }] }]),
+    ...honorCandidates([{ ...ann, honors: [{ honorId: "a", honorName: "Archery", status: "COMPLETED", completionDate: "2026-05-10", recordedAtOrganizationId: "club-1" }] }], "club-1"),
     ...classCandidates([{ ...zed, classLevel: "RANGER", completedOn: "2026-06-20" }, { ...ann, classLevel: "GUIDE", completedOn: "2026-06-21" }]),
   ]);
   it("parses defensively", () => {
@@ -127,7 +139,7 @@ describe("the items a print asks for", () => {
   });
   it("keeps only keys that are current completions here, in the order asked, and drops the rest silently", () => {
     const candidates = [
-      ...honorCandidates([{ ...ann, honors: [{ honorId: "a", honorName: "Archery", status: "COMPLETED", completionDate: "2026-05-10" }] }]),
+      ...honorCandidates([{ ...ann, honors: [{ honorId: "a", honorName: "Archery", status: "COMPLETED", completionDate: "2026-05-10", recordedAtOrganizationId: "club-1" }] }], "club-1"),
       ...classCandidates([{ ...zed, classLevel: "RANGER", completedOn: "2026-06-20" }]),
     ];
     const chosen = selectCertificates([certificateKey("CLASS", "m2", "RANGER"), "h:other-club-member:a", "h:m1:a", "h:m1:a", "h:m1:never"], candidates);

@@ -11,8 +11,8 @@ import type { ClubCapabilities } from "@/modules/organizations/director-grants-d
 
 export const CLUB_CERTIFICATES_FEATURE_KEY = "completion-certificates";
 
-/** The most certificates one print view holds (the same cap as the fill-in letters). */
-export const CERTIFICATES_PRINT_MAX = 200;
+/** The most certificates one print view holds (print links get long). */
+export const CERTIFICATES_PRINT_MAX = 100;
 
 export const CERTIFICATE_KINDS = ["HONOR", "CLASS"] as const;
 export type CertificateKind = (typeof CERTIFICATE_KINDS)[number];
@@ -66,14 +66,17 @@ export function formatCompletionDate(value: string): string {
   return conferenceDateFormat({ dateStyle: "long" }).format(new Date(`${value}T12:00:00Z`));
 }
 
-/** The honors this person currently has completed: only the current status counts (voided entries never do). */
+/** The honors this person currently has completed, recorded by this club: only the current status counts (voided entries never do). */
 export function honorCandidates(
-  rows: ReadonlyArray<{ memberId: string; firstName: string; lastName: string; honors: ReadonlyArray<{ honorId: string; honorName: string; status: string; completionDate: string }> }>,
+  rows: ReadonlyArray<{ memberId: string; firstName: string; lastName: string; honors: ReadonlyArray<{ honorId: string; honorName: string; status: string; completionDate: string; recordedAtOrganizationId?: string }> }>,
+  organizationId: string,
 ): CertificateCandidate[] {
   const out: CertificateCandidate[] = [];
   for (const row of rows) {
     for (const honor of row.honors) {
       if (honor.status !== "COMPLETED" || !isCalendarDate(honor.completionDate)) continue;
+      // Only honors this club recorded: a certificate never carries another club's honor under this club's name.
+      if (honor.recordedAtOrganizationId !== organizationId) continue;
       out.push({ key: certificateKey("HONOR", row.memberId, honor.honorId), kind: "HONOR", memberId: row.memberId, firstName: row.firstName, lastName: row.lastName, title: honor.honorName, completedOn: honor.completionDate });
     }
   }

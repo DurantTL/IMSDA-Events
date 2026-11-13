@@ -49,7 +49,7 @@ async function loadCandidates(organizationId: string, now: Date): Promise<Certif
     const member = memberByPerson.get(completion.personId);
     return member ? [{ memberId: member.id, firstName: member.firstName, lastName: member.lastName, classLevel: completion.classLevel as ClubClassLevel, completedOn: completion.completedOn }] : [];
   });
-  return sortCandidates([...honorCandidates(honorRows), ...classCandidates(classRows)]);
+  return sortCandidates([...honorCandidates(honorRows, organizationId), ...classCandidates(classRows)]);
 }
 
 export type ClubCertificateList = { clubYear: string; clubName: string; candidates: CertificateCandidate[] };

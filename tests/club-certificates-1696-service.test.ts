@@ -35,8 +35,9 @@ beforeEach(() => {
   mocks.prisma.clubOptionalFeature.deleteMany.mockResolvedValue({ count: 1 });
   mocks.listClubHonorsPage.mockResolvedValue([
     { memberId: "m1", firstName: "Ann", lastName: "Example", classLevel: null, honors: [
-      { honorId: "h1", honorCode: "A", honorName: "Archery", status: "COMPLETED", completionDate: "2026-10-04", createdAt: "" },
-      { honorId: "h2", honorCode: "B", honorName: "Knots", status: "IN_PROGRESS", completionDate: "", createdAt: "" },
+      { honorId: "h1", honorCode: "A", honorName: "Archery", status: "COMPLETED", completionDate: "2026-10-04", createdAt: "", recordedAtOrganizationId: "club-1" },
+      { honorId: "h3", honorCode: "C", honorName: "Camping", status: "COMPLETED", completionDate: "2026-10-05", createdAt: "", recordedAtOrganizationId: "club-2" },
+      { honorId: "h2", honorCode: "B", honorName: "Knots", status: "IN_PROGRESS", completionDate: "", createdAt: "", recordedAtOrganizationId: "club-1" },
     ] },
   ]);
   mocks.prisma.clubRosterMember.findMany.mockResolvedValue([
@@ -83,7 +84,7 @@ describe("the list", () => {
 
 describe("the print", () => {
   it("keeps current completions here and silently drops anything else", async () => {
-    const result = await loadCertificateSheets("club-1", director, "c:m2:RANGER,h:m9:h1,h:m1:h2,h:m1:h1,junk", now);
+    const result = await loadCertificateSheets("club-1", director, "c:m2:RANGER,h:m9:h1,h:m1:h2,h:m1:h3,h:m1:h1,junk", now);
     expect(result?.sheets.map((item) => item.key)).toEqual(["c:m2:RANGER", "h:m1:h1"]);
   });
 

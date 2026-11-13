@@ -24,9 +24,11 @@
 .signatures { display: grid; grid-template-columns: 2fr 1fr; gap: 32px; width: min(100%, 36rem); margin-top: 28px; }
 .signature { display: grid; gap: 4px; padding-top: 6px; border-top: 1px solid var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); text-align: left; }
 
-@page { size: landscape; margin: 0.5in; }
+/* A named page, so only the certificates print landscape and later prints of other pages are not affected. */
+@page certificate { size: landscape; margin: 0.5in; }
 
 @media print {
+  .sheets { page: certificate; }
   :global(.club-shell):has(.sheets) > :not(:global(.club-roster-layout)) { display: none !important; }
   :global(.club-roster-layout):has(.sheets) { margin: 0; padding: 0; }
   .printTools { display: none !important; }

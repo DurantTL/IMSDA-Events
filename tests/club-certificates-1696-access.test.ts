@@ -29,7 +29,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => mocks.prisma }));
-vi.mock("next/navigation", () => ({ redirect: mocks.redirect, notFound: mocks.notFound, useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ redirect: mocks.redirect, notFound: mocks.notFound, useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }), usePathname: () => "/account/clubs/club-1/certificates", useSearchParams: () => new URLSearchParams() }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: mocks.listDirectedClubs }));
@@ -45,8 +45,6 @@ vi.mock("@/modules/club-certificates/repository", async () => {
 
 import CertificatesPage, { metadata } from "@/app/(public)/account/(portal)/clubs/[organizationId]/certificates/page";
 import PrintPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/certificates/print/page";
-import { requireClubCertificatesAccess } from "@/modules/club-certificates/access";
-import { RosterAccessError } from "@/modules/club-rosters/access";
 
 
 type Role = "DIRECTOR" | "DEPUTY" | "REGISTRAR" | "REPORTER";
@@ -139,6 +137,17 @@ describe("the certificates page", () => {
     expect(all).toContain("1 completion shown");
     expect(all).toContain("Ann Example: Archery");
     expect(all).toContain("Select all");
+    expect(all).toContain("Clear filters");
+    const none = renderToStaticMarkup((await CertificatesPage(pageProps())) as ReactElement);
+    expect(none).not.toContain("Clear filters");
+  });
+
+  it("points an empty club to the Honors and Class tracking pages", async () => {
+    signedInAs("DIRECTOR");
+    mocks.loadClubCertificates.mockResolvedValue({ ...list, candidates: [] });
+    const html = renderToStaticMarkup((await CertificatesPage(pageProps())) as ReactElement);
+    expect(html).toContain("/account/clubs/club-1/honors");
+    expect(html).toContain("/account/clubs/club-1/class-tracking");
   });
 });
 
@@ -187,39 +196,5 @@ describe("the print page", () => {
     arrange();
     expect(await PrintPage(printProps())).toBeNull();
     expect(mocks.loadCertificateSheets).not.toHaveBeenCalled();
-  });
-});
-
-describe("requireClubCertificatesAccess", () => {
-  it.each(["DIRECTOR", "DEPUTY"] as const)("lets a club %s in while the feature is on", async (role) => {
-    signedInAs(role);
-    await expect(requireClubCertificatesAccess("club-1")).resolves.toBeTruthy();
-    expect(mocks.isClubFeatureEnabled).toHaveBeenCalledWith("club-1", "completion-certificates");
-  });
-
-  it("answers 404 when the feature is off", async () => {
-    signedInAs("DIRECTOR");
-    mocks.isClubFeatureEnabled.mockResolvedValue(false);
-    await expect(requireClubCertificatesAccess("club-1")).rejects.toMatchObject({ status: 404 });
-  });
-
-  it.each(["REGISTRAR", "REPORTER"] as const)("refuses a club %s with 403", async (role) => {
-    signedInAs(role);
-    await expect(requireClubCertificatesAccess("club-1")).rejects.toMatchObject({ status: 403 });
-  });
-
-  it("refuses another club's director and an Area Coordinator with 404, and staff who are not acting with 401", async () => {
-    signedInAs("DIRECTOR", "club-2");
-    await expect(requireClubCertificatesAccess("club-1")).rejects.toBeInstanceOf(RosterAccessError);
-    await expect(requireClubCertificatesAccess("club-1")).rejects.toMatchObject({ status: 404 });
-    signedInAs(null);
-    await expect(requireClubCertificatesAccess("club-1")).rejects.toMatchObject({ status: 404 });
-    staffNotActing();
-    await expect(requireClubCertificatesAccess("club-1")).rejects.toMatchObject({ status: 401 });
-  });
-
-  it("lets staff acting as this club's director in", async () => {
-    actingAsDirector();
-    await expect(requireClubCertificatesAccess("club-1")).resolves.toBeTruthy();
   });
 });

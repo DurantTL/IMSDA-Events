@@ -17,14 +17,19 @@ import styles from "@/components/club-certificates.module.css";
  * The checkboxes, select all and the print link for the completions the page filtered to (#1696). Printing opens a page;
  * nothing is sent to anyone. The server re-checks every item the print page is asked for.
  */
-export function ClubCertificatePicker({ organizationId, candidates }: { organizationId: string; candidates: CertificateCandidate[] }) {
+export function ClubCertificatePicker({ organizationId, candidates, filtered = false }: { organizationId: string; candidates: CertificateCandidate[]; filtered?: boolean }) {
   const [picked, setPicked] = useState<string[]>([]);
   const shown = candidates.map((item) => item.key);
   const kept = picked.filter((key) => shown.includes(key));
   const tooMany = kept.length > CERTIFICATES_PRINT_MAX;
   const ready = kept.length > 0 && !tooMany;
   const href = `/account/clubs/${encodeURIComponent(organizationId)}/certificates/print?items=${certificateItemsParam(kept)}`;
-  if (candidates.length === 0) return <p className="inline-notice">No completed honors or classes match. Change the filters, or record completions on your roster first.</p>;
+  if (candidates.length === 0) {
+    const base = `/account/clubs/${encodeURIComponent(organizationId)}`;
+    return filtered
+      ? <p className="inline-notice">No completed honors or classes match these filters. Change them, or clear the filters.</p>
+      : <p className="inline-notice">{"Nothing has been completed yet. Record honors on your club's "}<Link href={`${base}/honors`}>Honors page</Link>{" and classes on "}<Link href={`${base}/class-tracking`}>Class tracking</Link>{", then come back here."}</p>;
+  }
   return (
     <fieldset className={styles.fieldset}>
       <legend className={styles.meta}>Certificates to print</legend>
