@@ -18,6 +18,7 @@ import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repos
 import { attentionTotalIsComplete } from "@/modules/system-admin/attention-model";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
+import { getProfilePhotoState, photoUrlFor } from "@/modules/profile-photos/repository";
 import { canManageSiteContent } from "@/modules/access/site-content-editor";
 
 /**
@@ -96,6 +97,8 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
     await findSwitchableAttendeeAccountForStaff(user.email, user.id),
   );
   const acting = await currentStaffActingContext();
+  // The header's round photo (#1640): one indexed lookup. A failed lookup shows the usual icon rather than breaking the shell.
+  const accountPhotoUrl = photoUrlFor(user.id, (await getProfilePhotoState(user.id).catch(() => null))?.version);
 
   return (
     <Suspense fallback={<div className="shell-loading">Loading IMAdventist…</div>}>
@@ -106,6 +109,7 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
         defaultEventId={defaultEventId}
         events={shellEvents}
         user={user}
+        accountPhotoUrl={accountPhotoUrl}
         siteContentEditor={siteContentEditor}
         youthDirectory={youthDirectory}
         adminRoleView={adminRoleView.held.length > 0 ? { held: adminRoleView.held, active: adminRoleView.active, counts: adminRoleCounts, healthImport: healthRecordsEnabled() } : null}
