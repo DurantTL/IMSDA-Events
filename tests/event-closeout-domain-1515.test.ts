@@ -155,13 +155,16 @@ describe("the stored snapshot", () => {
 });
 
 describe("the open set the signer saw (#1515)", () => {
-  it("lists the checks that are not ready as sorted id:state, and compares sets regardless of order", () => {
+  it("lists the checks that are not ready as sorted id:state:count:cents, and compares sets regardless of order", () => {
     const checks = buildCloseoutChecklist(cleanFacts({ waitlistWaiting: 2, failedMessages: 1, report: { ...cleanFacts().report!, uncountedRefunds: { PENDING: tally(1, 100), FAILED: tally() } } }));
     const open = openChecksSignature(checks);
-    expect(open).toEqual(["failed-messages:warning", "pending-refunds:blocking", "waitlist:warning"]);
+    expect(open).toEqual(["failed-messages:warning:1:-", "pending-refunds:blocking:1:100", "waitlist:warning:2:-"]);
     expect(sameOpenChecks(open, [...open].reverse())).toBe(true);
     expect(sameOpenChecks(open, open.slice(1))).toBe(false);
-    expect(sameOpenChecks(open, [...open.slice(1), "waitlist:blocking"])).toBe(false);
+    expect(sameOpenChecks(open, [...open.slice(1), "waitlist:blocking:2:-"])).toBe(false);
+    // The same checks with bigger numbers than the signer saw are a different list.
+    const grown = openChecksSignature(buildCloseoutChecklist(cleanFacts({ waitlistWaiting: 6, failedMessages: 1, report: { ...cleanFacts().report!, uncountedRefunds: { PENDING: tally(1, 100), FAILED: tally() } } })));
+    expect(sameOpenChecks(open, grown)).toBe(false);
     expect(openChecksSignature(buildCloseoutChecklist(cleanFacts()))).toEqual([]);
   });
 

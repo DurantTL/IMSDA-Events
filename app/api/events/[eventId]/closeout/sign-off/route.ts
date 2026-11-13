@@ -11,7 +11,7 @@ const bodySchema = z.strictObject({
   note: z.string().max(CLOSEOUT_NOTE_MAX_LENGTH).nullish(),
   /** The event's lifecycle version on the page the signer reviewed; a changed event is refused (409). */
   lifecycleVersion: z.number().int().min(0),
-  /** The open checks the signer saw ("id:state"); a different set on the server is refused (409). */
+  /** The open checks the signer saw ("id:state:count:cents"); a different set on the server is refused (409). */
   seenOpenChecks: z.array(z.string().max(80)).max(30),
 });
 

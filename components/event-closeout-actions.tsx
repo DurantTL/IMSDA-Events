@@ -15,7 +15,7 @@ type Props = {
   mode: "sign-off" | "reopen";
   blocking: number;
   warnings: number;
-  /** The open checks the page shows ("id:state"); the server refuses the sign-off when its own set differs. */
+  /** The open checks the page shows ("id:state:count:cents"); the server refuses the sign-off when its own set differs. */
   seenOpenChecks: readonly string[];
   noteMaxLength: number;
   reasonMaxLength: number;
@@ -46,6 +46,11 @@ export function EventCloseoutActions({ eventId, eventName, lifecycleVersion, mod
       const data = (await response.json().catch(() => null)) as { message?: string } | null;
       if (!response.ok) {
         setOutcome({ tone: "error", message: notSavedMessage(data?.message ?? "The server did not answer. Nothing was changed; try again.") });
+        // A changed checklist or event state: show the current list, and ask for the warnings tick again.
+        if (response.status === 409) {
+          setAcknowledged(false);
+          router.refresh();
+        }
         return;
       }
       setNote("");

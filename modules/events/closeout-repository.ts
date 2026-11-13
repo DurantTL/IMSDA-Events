@@ -142,7 +142,7 @@ export type CloseoutView = {
   lifecycleVersion: number;
   checks: CloseoutCheck[];
   summary: CloseoutSummary;
-  /** The open checks this view shows, as sorted "id:state" strings; the sign-off form sends them back. */
+  /** The open checks this view shows, as sorted "id:state:count:cents" strings; the sign-off form sends them back. */
   openChecks: string[];
   /** When the checklist was read. */
   checkedAt: string;
@@ -223,7 +223,7 @@ export type SignOffInput = {
   note?: string | null;
   /** The event's `lifecycleVersion` on the page the signer reviewed. */
   expectedVersion: number;
-  /** The open checks the signer saw ("id:state", from `CloseoutView.openChecks`). A different set is refused as stale. */
+  /** The open checks the signer saw ("id:state:count:cents", from `CloseoutView.openChecks`). A different set is refused as stale. */
   seenOpenChecks: readonly string[];
   now?: Date;
 };

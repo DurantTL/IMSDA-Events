@@ -218,11 +218,14 @@ export function storedCloseoutSnapshot(checks: readonly CloseoutCheck[], checked
 }
 
 /**
- * The checks that are not ready, as sorted "id:state" strings. The page sends the set it showed; the server compares it with
- * its own, so a warnings tick always belongs to the list the signer saw.
+ * The checks that are not ready, as sorted "id:state:count:cents" strings. The page sends the set it showed; the server
+ * compares it with its own, so a warnings tick always belongs to the list (and the numbers) the signer saw.
  */
-export function openChecksSignature(checks: readonly Pick<CloseoutCheck, "id" | "state">[]): string[] {
-  return checks.filter((check) => check.state !== "ready").map((check) => `${check.id}:${check.state}`).sort();
+export function openChecksSignature(checks: readonly Pick<CloseoutCheck, "id" | "state" | "count" | "cents">[]): string[] {
+  return checks
+    .filter((check) => check.state !== "ready")
+    .map((check) => `${check.id}:${check.state}:${check.count ?? "-"}:${check.cents ?? "-"}`)
+    .sort();
 }
 
 export function sameOpenChecks(left: readonly string[], right: readonly string[]) {
