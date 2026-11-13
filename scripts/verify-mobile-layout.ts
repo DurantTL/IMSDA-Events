@@ -342,6 +342,8 @@ const pages: PageSpec[] = [
   { ...area("budget", `/account/area-clubs/events/${clubEventId}/budget`), expectText: /Budget sheet/ },
   // Master Guide approvals (#1698): the coordinator's list of candidates the club approved.
   { ...area("master-guide", "/account/area-clubs/master-guide"), expectText: /Master Guide approvals/ },
+  // The optional Recognitions tool (#1683): the name list with its mark buttons, the add form, the totals and the hand-out list (switched on in seedRecognitions).
+  { ...staff("recognitions", `/more/recognitions?event=${clubEventId}`, "system-admin"), expectText: /Recognitions/ },
   // The optional Event staffing sheet (#1678): the coordinator's switch, the activities, the gaps and the people (switched on in seedEventStaffing).
   { ...area("event-staffing", `/account/area-clubs/events/${clubEventId}/staffing`), expectText: /Event staffing/ },
   // The optional Inspections tool (#1896): the switch, the phone score entry and the CSV import (switched on in seedInspections).
@@ -1291,6 +1293,16 @@ async function seedBaptismFollowUp(prisma: PrismaClient): Promise<void> {
   await prisma.baptismFollowUpSetting.upsert({
     where: { eventId: clubEventId },
     create: { eventId: clubEventId, leadEmails: ["lead@example.test"] },
+    update: {},
+  });
+}
+
+/** Recognitions (#1683) switched on for the club weekend with one synthetic recognition, so the page shows the search list and the add form and not only the off notice. */
+async function seedRecognitions(prisma: PrismaClient): Promise<void> {
+  await prisma.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "recognitions" }], skipDuplicates: true });
+  await prisma.eventTag.upsert({
+    where: { eventId_normalizedName: { eventId: clubEventId, normalizedName: "memory verses" } },
+    create: { eventId: clubEventId, name: "Memory verses", normalizedName: "memory verses", color: "#1D4ED8", recognitionItem: "PIN" },
     update: {},
   });
 }
@@ -4979,6 +4991,7 @@ async function main() {
     await seedBudgetSheet(prisma);
     await seedLeaderDirectory(prisma);
     await seedBaptismFollowUp(prisma);
+    await seedRecognitions(prisma);
     await seedEventStaffing(prisma);
     await seedInspections(prisma);
     pages.push(...await seedEventTemplatePages(prisma));
