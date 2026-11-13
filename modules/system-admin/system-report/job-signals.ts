@@ -223,6 +223,16 @@ export function monthlyRecordReminderFields(key: string, run: JobRun, readAt: Da
   return ranFields(key, run, c.failed > 0 ? "watch" : "ok", c.failed > 0 ? `${text} A club that failed is tried again on the next sweep.` : text);
 }
 
+export function clubDraftReminderFields(key: string, run: JobRun, readAt: Date): Fields {
+  const problem = runProblem(key, run, readAt, "the club registration reminders");
+  if (problem) return problem;
+  const c = counts(run, ["events", "reminded", "noRecipient", "skippedEmailOff", "failed", "delivered"]);
+  if (run.summary?.status !== "RAN" || !c) return ranFields(key, run, "watch", COUNTS_MISSING);
+  if (c.events === 0) return ranFields(key, run, "info", "No event has club registration reminders turned on. Nothing is sent until event staff turn them on.");
+  const text = `${c.events} ${c.events === 1 ? "event" : "events"} checked, ${c.reminded} registrations reminded, ${c.noRecipient} with nobody to email, ${c.skippedEmailOff} events with email off, ${c.delivered} delivered, ${c.failed} failed.`;
+  return ranFields(key, run, c.failed > 0 ? "watch" : "ok", c.failed > 0 ? `${text} A reminder that failed is tried again on the next sweep.` : text);
+}
+
 /**
  * Sealed health copies. With health records switched off nothing new is sealed, which is a choice and not a problem, so
  * the row reads "Off" as a count-only note (never OK, never a warning). The sweep still deletes expired copies while off,

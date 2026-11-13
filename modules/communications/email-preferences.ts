@@ -3,7 +3,7 @@ import { createHash, createHmac } from "node:crypto";
 /**
  * Announcement opt-outs (#838), the pure half.
  *
- * Only event announcements can be opted out of. Confirmations, receipts, waitlist and transfer notices, balance
+ * Only event announcements (and, since #164, the reminder to finish an unsubmitted club registration) can be opted out of. Confirmations, receipts, waitlist and transfer notices, balance
  * reminders and safety or schedule-change notices always go, so nothing here applies to any other template.
  *
  * The preference lives on the normalised email address, so it follows the address across registrations and events.
@@ -20,6 +20,9 @@ export type AnnouncementOptOutScope = "EVENT" | "ALL";
 
 export const ANNOUNCEMENT_OPT_OUT_TEMPLATE_KEY = "EVENT_ANNOUNCEMENT";
 
+/** The reminder (#164) to a club's directors that a club registration is started but not submitted. Event-scoped, and opt-out eligible like an announcement. */
+export const CLUB_DRAFT_REMINDER_OPT_OUT_TEMPLATE_KEY = "CLUB_DRAFT_REMINDER";
+
 /** The deadline reminder (#910): event-less mail to club role holders and Area Coordinators. */
 export const DEADLINE_REMINDER_TEMPLATE_KEY = "DEADLINE_REMINDER";
 
@@ -34,7 +37,7 @@ export function deadlineRemindersHonourAnnouncementOptOut() {
 
 /** Only these template keys can be opted out of. Everything else is sent regardless. */
 export function isOptOutEligibleTemplate(templateKey: string) {
-  return templateKey === ANNOUNCEMENT_OPT_OUT_TEMPLATE_KEY;
+  return templateKey === ANNOUNCEMENT_OPT_OUT_TEMPLATE_KEY || templateKey === CLUB_DRAFT_REMINDER_OPT_OUT_TEMPLATE_KEY;
 }
 
 export function normalizeEmailAddress(value: string) {
@@ -86,6 +89,11 @@ export const ANNOUNCEMENT_OPT_OUT_REASON = {
 /** Why a deadline reminder was not sent, as recorded on the outbox row. */
 export function reminderOptOutSkipMessage(scope: AnnouncementOptOutScope) {
   return `${ANNOUNCEMENT_OPT_OUT_REASON[scope]}; the deadline reminder was not sent.`;
+}
+
+/** Why an unfinished-registration reminder was not sent, as recorded on the outbox row (#164). */
+export function clubDraftReminderOptOutSkipMessage(scope: AnnouncementOptOutScope) {
+  return `${ANNOUNCEMENT_OPT_OUT_REASON[scope]}; the registration reminder was not sent.`;
 }
 
 /** Why a message was not sent, as recorded on the outbox row. */
