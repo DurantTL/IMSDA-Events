@@ -6,6 +6,7 @@ import { writeAuditLog } from "@/modules/audit/audit-service";
 import { CONFERENCE_TIME_ZONE, formatInConferenceTime } from "@/modules/calendar/conference-format";
 import {
   AreaReviewError,
+  areaReviewSwitchChoice,
   checkItemDecision,
   mayChangeAfterReturn,
   type ItemDecision,
@@ -36,9 +37,15 @@ export function areaReviewSwitchClubYear(now: Date) {
   return clubYearFor(new Date(`${today}T12:00:00Z`));
 }
 
+/**
+ * Whether review is on for a club year: that year's own row decides; with none, the latest earlier year's row carries
+ * over; with none at all, off.
+ */
 export async function areaReviewEnabledFor(client: Client, clubYear: string) {
-  const row = await client.monthlyRecordAreaReviewSetting.findUnique({ where: { clubYear }, select: { enabled: true } });
-  return row?.enabled === true;
+  const own = await client.monthlyRecordAreaReviewSetting.findUnique({ where: { clubYear }, select: { enabled: true } });
+  if (own) return areaReviewSwitchChoice(own.enabled, null);
+  const earlier = await client.monthlyRecordAreaReviewSetting.findFirst({ where: { clubYear: { lt: clubYear } }, orderBy: { clubYear: "desc" }, select: { enabled: true } });
+  return areaReviewSwitchChoice(null, earlier?.enabled ?? null);
 }
 
 export async function getAreaReviewSwitch(now = new Date()) {
@@ -123,11 +130,17 @@ export async function returnedReportMonths(organizationId: string, clubYear: str
   return new Set(rows.map((row) => row.report.reportMonth));
 }
 
+/** The items currently returned on a record, while the switch is on for its year; empty otherwise. */
+export async function returnedItemKeys(client: Client, report: { id: string; clubYear: string }): Promise<PointItemKey[]> {
+  if (!(await areaReviewEnabledFor(client, report.clubYear))) return [];
+  const rows = await client.clubMonthlyReportItemReview.findMany({ where: { reportId: report.id, supersededAt: null, outcome: "RETURNED" }, select: { itemKey: true } });
+  return rows.map((row) => row.itemKey as PointItemKey);
+}
+
 /** Whether the past-due exception applies to a record right now: the switch on for its year and a current returned item. */
 export async function areaReturnAllowsChange(client: Client, report: { id: string; clubYear: string }) {
-  if (!(await areaReviewEnabledFor(client, report.clubYear))) return false;
-  const returned = await client.clubMonthlyReportItemReview.count({ where: { reportId: report.id, supersededAt: null, outcome: "RETURNED" } });
-  return mayChangeAfterReturn(true, Array.from({ length: returned }, () => ({ outcome: "RETURNED" as const })));
+  const returned = await returnedItemKeys(client, report);
+  return mayChangeAfterReturn(true, returned.map(() => ({ outcome: "RETURNED" as const })));
 }
 
 /** Marks every current decision on a record superseded. Called in the transaction of any save that leaves it SUBMITTED. */
