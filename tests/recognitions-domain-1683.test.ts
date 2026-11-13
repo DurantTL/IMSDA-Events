@@ -20,7 +20,7 @@ describe("Recognitions module (#1683)", () => {
   });
 
   it("adds one nullable column and an enum, and writes no module row", () => {
-    const sql = readFileSync("prisma/migrations/20270153100000_event_recognitions/migration.sql", "utf8").replace(/^--.*$/gm, "");
+    const sql = readFileSync("prisma/migrations/20270162100000_event_recognitions/migration.sql", "utf8").replace(/^--.*$/gm, "");
     expect(sql).toContain(`CREATE TYPE "RecognitionItem" AS ENUM ('PIN', 'PATCH', 'STAR')`);
     expect(sql).toContain(`ADD COLUMN "recognitionItem" "RecognitionItem"`);
     expect(sql).not.toMatch(/NOT NULL|INSERT|EventModule/);
