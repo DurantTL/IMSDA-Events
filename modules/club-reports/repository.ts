@@ -4,7 +4,7 @@ import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-mi
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { areaReturnAllowsChange, supersedeCurrentReviews } from "@/modules/club-reports/area-review";
+import { areaReturnAllowsChange, returnedItemKeys, supersedeCurrentReviews } from "@/modules/club-reports/area-review";
 import {
   clubReportClosedMessage,
   clubJoinSelect,
@@ -17,6 +17,7 @@ import {
   type PickedPoints,
   type ReportHonor,
 } from "@/modules/club-reports/domain";
+import { lockedChanges, lockedChangesMessage, mayChangeAfterReturn } from "@/modules/club-reports/area-review-domain";
 import type { ClubReportInput } from "@/modules/club-reports/schemas";
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { clubYearFor, rosterIsTltFor, type ClubClassLevel } from "@/modules/club-rosters/domain";
@@ -30,6 +31,7 @@ import { loadClubEventPoints, noEventPoints } from "@/modules/event-points/award
 
 export type ClubReportErrorCode =
   | "CLUB_REPORT_LOCKED"
+  | "CLUB_REPORT_ITEMS_LOCKED"
   | "CLUB_REPORT_MONTH_INVALID"
   | "CLUB_REPORT_YEAR_INVALID"
   | "CLUB_REPORT_CONFLICT"
@@ -175,7 +177,11 @@ export async function saveClubReport(
     if (!club || club.type !== "CLUB") throw new ClubReportError("CLUB_NOT_FOUND", "That club could not be found.");
     const existing = await tx.clubMonthlyReport.findUnique({
       where: { organizationId_reportMonth: { organizationId, reportMonth } },
-      select: { id: true, status: true, firstSubmittedAt: true, submittedAt: true, totalPoints: true, onTimePoints: true, reviewedAt: true },
+      select: {
+        id: true, status: true, firstSubmittedAt: true, submittedAt: true, totalPoints: true, onTimePoints: true, reviewedAt: true,
+        meetingPlace: true, meetingSchedule: true, averageAttendance: true, pathfinderCount: true, tltCount: true, staffCount: true,
+        investitureDate: true, classLevels: true, points: true, honors: true,
+      },
     });
     // A staff "act as" director (#442) gets exactly the club's rules — never
     // the conference office's power to change a report after its due date.
@@ -188,8 +194,16 @@ export async function saveClubReport(
     // can change a closed report.
     let afterAreaReturn = false;
     if (existing?.firstSubmittedAt && isClub && pastDue) {
-      afterAreaReturn = await areaReturnAllowsChange(tx, { id: existing.id, clubYear });
+      const returned = await returnedItemKeys(tx, { id: existing.id, clubYear });
+      afterAreaReturn = mayChangeAfterReturn(true, returned.map(() => ({ outcome: "RETURNED" as const })));
       if (!afterAreaReturn) throw new ClubReportError("CLUB_REPORT_LOCKED", clubReportClosedMessage(reportMonth));
+      // Only the returned items can change now (#1701); a draft save follows the same rule. The signature may always change.
+      const locked = lockedChanges(
+        { ...existing, classLevels: existing.classLevels as string[], points: (existing.points ?? {}) as PickedPoints, honors: (Array.isArray(existing.honors) ? existing.honors : []) as ReportHonor[] },
+        input,
+        returned,
+      );
+      if (locked.length > 0) throw new ClubReportError("CLUB_REPORT_ITEMS_LOCKED", lockedChangesMessage(locked));
     }
     const becomingSubmittedNow = input.status === "SUBMITTED" && !existing?.firstSubmittedAt;
     const firstSubmittedAt = input.status === "SUBMITTED" ? (existing?.firstSubmittedAt ?? now) : (existing?.firstSubmittedAt ?? null);

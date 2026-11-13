@@ -4,7 +4,9 @@ import {
   REVIEWABLE_ITEM_KEYS,
   checkItemDecision,
   decisionsByItem,
+  areaReviewSwitchChoice,
   hasReturnedItem,
+  lockedChanges,
   isReviewableItemKey,
   itemLabel,
   mayChangeAfterReturn,
@@ -85,5 +87,31 @@ describe("returned items", () => {
     expect(mayChangeAfterReturn(false, [decision("ratio", "RETURNED")])).toBe(false);
     expect(mayChangeAfterReturn(true, [decision("ratio", "OK")])).toBe(false);
     expect(mayChangeAfterReturn(true, [])).toBe(false);
+  });
+});
+
+describe("the switch choice", () => {
+  it("lets this year's row decide, then the latest earlier year's, then off", () => {
+    expect(areaReviewSwitchChoice(true, false)).toBe(true);
+    expect(areaReviewSwitchChoice(false, true)).toBe(false);
+    expect(areaReviewSwitchChoice(null, true)).toBe(true);
+    expect(areaReviewSwitchChoice(undefined, false)).toBe(false);
+    expect(areaReviewSwitchChoice(null, null)).toBe(false);
+  });
+});
+
+describe("what stays locked after a return", () => {
+  const stored = { meetingPlace: "Hall", meetingSchedule: "", averageAttendance: 10, pathfinderCount: null, classLevels: ["FRIEND", "GUIDE"], points: { ratio: 0, staffMeeting: 25 }, honors: [{ name: "Knots", participants: 3 }] };
+  it("allows no change, and a change to a returned item", () => {
+    expect(lockedChanges(stored, { ...stored }, ["ratio"])).toEqual([]);
+    expect(lockedChanges(stored, { ...stored, points: { ratio: 25, staffMeeting: 25 } }, ["ratio"])).toEqual([]);
+  });
+  it("treats empty and missing values alike, and class level order and blank honors as no change", () => {
+    expect(lockedChanges(stored, { ...stored, meetingSchedule: undefined, pathfinderCount: undefined, classLevels: ["GUIDE", "FRIEND"], honors: [...stored.honors, { name: " ", participants: null }] }, [])).toEqual([]);
+  });
+  it("names what is locked, with honors and class levels following their own item", () => {
+    const incoming = { ...stored, meetingPlace: "Park", points: { ratio: 25, staffMeeting: 0 }, honors: [], classLevels: ["FRIEND"] };
+    expect(lockedChanges(stored, incoming, ["ratio"])).toEqual(["Meeting place", "Monthly staff meeting", "Class levels worked on", "Honors worked on"]);
+    expect(lockedChanges(stored, incoming, ["ratio", "honors", "classLevel", "staffMeeting"])).toEqual(["Meeting place"]);
   });
 });

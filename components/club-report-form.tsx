@@ -21,7 +21,7 @@ import { savedMessage } from "@/components/form-message";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { clubMemberNounPlural } from "@/modules/organizations/club-kind";
 import { AreaItemReviewControls, ItemDecisionView, ReturnedItemsNotice } from "@/components/monthly-record-item-review";
-import { decisionsByItem, returnedNotice, type ItemDecision } from "@/modules/club-reports/area-review-domain";
+import { RETURNED_ONLY_NOTE, decisionsByItem, returnedNotice, type ItemDecision } from "@/modules/club-reports/area-review-domain";
 
 type Prefill = {
   meetingPlace: string;
@@ -87,7 +87,13 @@ export function ClubReportForm({
   itemDecisions,
   areaReviewTarget,
   showReturnedNotice = false,
+  returnedOnly,
 }: {
+  /**
+   * Set only after the due date, when an Area Coordinator's return reopened the record (#1701): the items still open to
+   * change. Every other answer is shown read-only. Leave it out before the due date, when everything can change.
+   */
+  returnedOnly?: readonly PointItemKey[];
   /** The club's own page only: tells the director how many items were returned (#1701). */
   showReturnedNotice?: boolean;
   /** The Area Coordinator's current item decisions (#1701); only passed while the conference switch is on. */
@@ -151,6 +157,11 @@ export function ClubReportForm({
   const problemFor = (key: PointItemKey | "honorsList") => problems.find((problem) => problem.key === key)?.message;
   const unanswered = pointItems.filter((item) => points[item.key] === undefined).length;
   const isDraft = report?.status === "DRAFT";
+  const returnedOnlyMode = returnedOnly !== undefined && !readOnly;
+  const itemLocked = (key: PointItemKey) => returnedOnlyMode && !returnedOnly.includes(key);
+  const factsLocked = returnedOnlyMode;
+  const classLevelsLocked = itemLocked("classLevel");
+  const honorsLocked = itemLocked("honors");
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -170,13 +181,14 @@ export function ClubReportForm({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          meetingPlace: String(form.get("meetingPlace") ?? ""),
-          meetingSchedule: String(form.get("meetingSchedule") ?? ""),
-          averageAttendance: toCount(String(form.get("averageAttendance") ?? "")),
-          pathfinderCount: toCount(String(form.get("pathfinderCount") ?? "")),
-          tltCount: toCount(String(form.get("tltCount") ?? "")),
-          staffCount: toCount(String(form.get("staffCount") ?? "")),
-          investitureDate: String(form.get("investitureDate") ?? ""),
+          // A disabled field isn't in the form data, so a locked fact is sent back exactly as stored.
+          meetingPlace: factsLocked ? report?.meetingPlace ?? "" : String(form.get("meetingPlace") ?? ""),
+          meetingSchedule: factsLocked ? report?.meetingSchedule ?? "" : String(form.get("meetingSchedule") ?? ""),
+          averageAttendance: factsLocked ? report?.averageAttendance ?? null : toCount(String(form.get("averageAttendance") ?? "")),
+          pathfinderCount: factsLocked ? report?.pathfinderCount ?? null : toCount(String(form.get("pathfinderCount") ?? "")),
+          tltCount: factsLocked ? report?.tltCount ?? null : toCount(String(form.get("tltCount") ?? "")),
+          staffCount: factsLocked ? report?.staffCount ?? null : toCount(String(form.get("staffCount") ?? "")),
+          investitureDate: factsLocked ? report?.investitureDate ?? "" : String(form.get("investitureDate") ?? ""),
           classLevels,
           points,
           honors: honors.filter((honor) => honor.name.trim() || honor.participants !== null),
@@ -342,13 +354,14 @@ export function ClubReportForm({
     <>
       {renderSummary(asDialog)}
       {returnedText && <ReturnedItemsNotice text={returnedText} />}
+      {returnedOnlyMode && <div className="inline-notice" data-returned-only-note="" role="status">{RETURNED_ONLY_NOTE}</div>}
 
       {allowDraft && !isDraft && report && reopenEndpoint && (
         <div className="inline-notice" role="status">
           Submitted. <button className="text-button" disabled={saving} onClick={reopen} type="button">Reopen as draft</button> to change it.
         </div>
       )}
-      {notesPrefill && (report ? isDraft : notesChanged) && (
+      {notesPrefill && !returnedOnlyMode && (report ? isDraft : notesChanged) && (
         <div className="inline-notice" role="status">
           {notesChanged && "Meeting notes changed after you opened this report. "}
           <button className="text-button" disabled={saving} onClick={refreshFromNotes} type="button">
@@ -362,13 +375,13 @@ export function ClubReportForm({
       <fieldset className={`${card} form-stack`} disabled={saving}>
         <legend className={eyebrow}>Club facts</legend>
         <div className="form-grid two-column">
-          <label>Meeting place<input defaultValue={report?.meetingPlace ?? prefill.meetingPlace} maxLength={200} name="meetingPlace" /></label>
-          <label>Meeting day and time<input defaultValue={report?.meetingSchedule ?? prefill.meetingSchedule} maxLength={120} name="meetingSchedule" /></label>
-          <label>Average attendance<input key={`${countsKey}-averageAttendance`} defaultValue={countValue("averageAttendance", report?.averageAttendance, prefill.averageAttendance)} inputMode="numeric" max={999} min={0} name="averageAttendance" type="number" /></label>
-          <label>Number of {clubMemberNounPlural(clubKind)}<input key={`${countsKey}-pathfinderCount`} defaultValue={countValue("pathfinderCount", report?.pathfinderCount, prefill.pathfinderCount)} inputMode="numeric" max={999} min={0} name="pathfinderCount" type="number" /></label>
-          <label>Number of TLTs<input key={`${countsKey}-tltCount`} defaultValue={countValue("tltCount", report?.tltCount, prefill.tltCount)} inputMode="numeric" max={999} min={0} name="tltCount" type="number" /></label>
-          <label>Number of staff<input key={`${countsKey}-staffCount`} defaultValue={countValue("staffCount", report?.staffCount, prefill.staffCount)} inputMode="numeric" max={999} min={0} name="staffCount" type="number" /></label>
-          <label>Investiture date (if set)<input defaultValue={report?.investitureDate ?? ""} name="investitureDate" type="date" /></label>
+          <label>Meeting place<input disabled={factsLocked} defaultValue={report?.meetingPlace ?? prefill.meetingPlace} maxLength={200} name="meetingPlace" /></label>
+          <label>Meeting day and time<input disabled={factsLocked} defaultValue={report?.meetingSchedule ?? prefill.meetingSchedule} maxLength={120} name="meetingSchedule" /></label>
+          <label>Average attendance<input disabled={factsLocked} key={`${countsKey}-averageAttendance`} defaultValue={countValue("averageAttendance", report?.averageAttendance, prefill.averageAttendance)} inputMode="numeric" max={999} min={0} name="averageAttendance" type="number" /></label>
+          <label>Number of {clubMemberNounPlural(clubKind)}<input disabled={factsLocked} key={`${countsKey}-pathfinderCount`} defaultValue={countValue("pathfinderCount", report?.pathfinderCount, prefill.pathfinderCount)} inputMode="numeric" max={999} min={0} name="pathfinderCount" type="number" /></label>
+          <label>Number of TLTs<input disabled={factsLocked} key={`${countsKey}-tltCount`} defaultValue={countValue("tltCount", report?.tltCount, prefill.tltCount)} inputMode="numeric" max={999} min={0} name="tltCount" type="number" /></label>
+          <label>Number of staff<input disabled={factsLocked} key={`${countsKey}-staffCount`} defaultValue={countValue("staffCount", report?.staffCount, prefill.staffCount)} inputMode="numeric" max={999} min={0} name="staffCount" type="number" /></label>
+          <label>Investiture date (if set)<input disabled={factsLocked} defaultValue={report?.investitureDate ?? ""} name="investitureDate" type="date" /></label>
         </div>
       </fieldset>
 
@@ -389,6 +402,7 @@ export function ClubReportForm({
                 {problem && <small className="club-report-problem"><CircleAlert aria-hidden="true" size={13} /> {problem}</small>}
               </label>
               <select
+                disabled={itemLocked(item.key)}
                 id={`points-${item.key}`}
                 onChange={(event) => setPoints((current) => {
                   const next = { ...current };
@@ -414,6 +428,7 @@ export function ClubReportForm({
               <label className="checkbox-label" key={level}>
                 <input
                   checked={classLevels.includes(level)}
+                  disabled={classLevelsLocked}
                   onChange={(event) => setClassLevels((current) => (event.target.checked ? [...current, level] : current.filter((item) => item !== level)))}
                   type="checkbox"
                 />
@@ -431,6 +446,7 @@ export function ClubReportForm({
               <label>
                 Honor {index + 1}
                 <input
+                  disabled={honorsLocked}
                   maxLength={80}
                   onChange={(event) => setHonors((current) => current.map((item, i) => (i === index ? { ...item, name: event.target.value } : item)))}
                   value={honor.name}
@@ -439,6 +455,7 @@ export function ClubReportForm({
               <label>
                 Number participating
                 <input
+                  disabled={honorsLocked}
                   inputMode="numeric"
                   max={999}
                   min={0}

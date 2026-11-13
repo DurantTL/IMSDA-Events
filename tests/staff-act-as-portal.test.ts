@@ -41,7 +41,7 @@ const client = {
   clubRosterGuardian: { findMany: async () => [] },
   clubMonthlyReport: { findUnique: mocks.reportFindUnique },
   // Item review by Area Coordinators (#1701) is off unless a Clubs Administrator turns it on.
-  monthlyRecordAreaReviewSetting: { findUnique: async () => null },
+  monthlyRecordAreaReviewSetting: { findUnique: async () => null, findFirst: async () => null },
   clubProfile: { findUnique: mocks.profileFindUnique },
   person: { create: mocks.personCreate },
   $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(client),
