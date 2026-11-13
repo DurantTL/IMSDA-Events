@@ -107,7 +107,7 @@ describe("one hero on the public event page (#1004 item 8)", () => {
   });
 
   it("the page source draws the plain details row, not a second hero, when a banner exists", () => {
-    const source = readFileSync(path.join(process.cwd(), "app/(public)/events/[eventSlug]/page.tsx"), "utf8");
+    const source = readFileSync(path.join(process.cwd(), "components/public-event-landing-view.tsx"), "utf8");
     expect(source).toContain('className="public-event-facts"');
     expect(source).not.toContain("public-event-demoted-title");
     expect(source.match(/<h1>\{landing\.event\.name\}<\/h1>/g)).toHaveLength(1);

@@ -9,6 +9,7 @@ import { sendDueLocationWaitlistDigests } from "@/modules/event-locations/waitli
 import { pruneExpiredCommunityContent } from "@/modules/community/repository";
 import { pruneAlertFeed } from "@/modules/notifications/feed";
 import { prunePublicMetrics } from "@/modules/public-metrics/repository";
+import { publishDueEventPageSections } from "@/modules/events/page-schedule-sweep";
 import { sweepClassWaitlists } from "@/modules/honors/waitlist-repository";
 import { sendDueClassChangeEmails } from "@/modules/honors/class-change-emails";
 import { sendDueHonorWatchSummaries } from "@/modules/honors/watch-emails";
@@ -25,6 +26,7 @@ import {
   CALENDAR_FEED_REFRESH_JOB,
   CLASS_WAITLIST_SWEEP_JOB,
   DEADLINE_REMINDER_PREPARATION_JOB,
+  EVENT_PAGE_SCHEDULED_PUBLISH_JOB,
   GENERAL_LINK_EXPIRY_JOB,
   VISITING_CLUB_ACCESS_END_JOB,
   HEALTH_SNAPSHOT_SWEEP_JOB,
@@ -181,6 +183,18 @@ async function postHandler(request: Request) {
       "Pay on Square link sweep",
       hostedLinks !== null,
       hostedLinks ? { withdrawn: hostedLinks.withdrawn, deleted: hostedLinks.deleted, failed: hostedLinks.failed } : undefined,
+    );
+    // Event page sections scheduled to publish (#1514): each due section is published once (a repeated run finds
+    // nothing left to do). Its failure must not make a successful sweep look failed.
+    const eventPages = await publishDueEventPageSections({ now: new Date() }).catch((error) => {
+      logError("The scheduled event page publish failed after a successful outbox sweep", error);
+      return null;
+    });
+    await recordStep(
+      EVENT_PAGE_SCHEDULED_PUBLISH_JOB,
+      "scheduled event page publish",
+      eventPages !== null && eventPages.failed === 0,
+      eventPages ? { events: eventPages.events, published: eventPages.published, failed: eventPages.failed } : undefined,
     );
     // Honors Weekend class waitlists (#831): offers that ran out pass to the next youth in line, each director
     // emailed once for a new offer. Its failure must not make a successful sweep look failed.
@@ -392,6 +406,7 @@ async function postHandler(request: Request) {
       deadlineReminders,
       hostedLinks,
       classWaitlists,
+      eventPages,
       instructorClassEmails,
       honorWatchSummaries,
       monthlyRecordReminders,

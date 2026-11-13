@@ -939,6 +939,9 @@ model User {
   notificationSettingUpdates NotificationSetting[]    @relation("NotificationSettingUpdatedBy")
   adminAlertFeedReceipts     AdminAlertFeedReceipt[]
   uploadedEventAssets       EventAsset[]              @relation("EventAssetUploadedBy")
+  eventPagePreviewLinksCreated EventPagePreviewLink[]    @relation("EventPagePreviewLinkCreatedBy")
+  eventPagePreviewLinksRevoked EventPagePreviewLink[]    @relation("EventPagePreviewLinkRevokedBy")
+  eventPageVersionsCreated     EventPageVersion[]        @relation("EventPageVersionCreatedBy")
   createdEventImageLibraryImages EventImageLibraryImage[] @relation("EventImageLibraryCreatedBy")
   retiredEventImageLibraryImages EventImageLibraryImage[] @relation("EventImageLibraryRetiredBy")
   uploadedMessageFiles      MessageFile[]             @relation("MessageFileUploadedBy")
@@ -1608,6 +1611,10 @@ model EventContentSection {
   data        Json                    @default("{}")
   position    Int
   isPublished Boolean                 @default(false)
+  /// When an unpublished section publishes itself (#1514). A save stores it only on an unpublished section. The scheduled
+  /// sweep publishes the section and keeps the time on that row until the next save, so a save from an editor opened
+  /// before the sweep is recognised as the same section. Never copied when an event is cloned.
+  scheduledPublishAt DateTime?
   createdAt   DateTime                @default(now())
   updatedAt   DateTime                @updatedAt
 
@@ -1617,6 +1624,51 @@ model EventContentSection {
 
   @@index([eventId, position])
   @@index([eventId, isPublished])
+  @@index([isPublished, scheduledPublishAt])
+}
+
+/// A private link to an event page's unpublished changes (#1514). Only the hash of the token is stored. At most one
+/// link per event is active: creating one revokes the last in the same transaction. Expires 14 days after creation.
+model EventPagePreviewLink {
+  id              String    @id @default(cuid())
+  eventId         String
+  tokenHash       String    @unique
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  revokedByUserId String?
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("EventPagePreviewLinkCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  revokedBy User? @relation("EventPagePreviewLinkRevokedBy", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, createdAt])
+}
+
+enum EventPageVersionSource {
+  SAVE
+  SCHEDULED_PUBLISH
+  ROLLBACK
+}
+
+/// One published state of an event page (#1514): the published sections in page order, in the shape of an
+/// `eventContentInputSchema` section so a version can be restored through the normal save. A version is written only
+/// when the published sections change.
+model EventPageVersion {
+  id              String                 @id @default(cuid())
+  eventId         String
+  versionNumber   Int
+  sections        Json
+  source          EventPageVersionSource
+  restoredFromId  String?
+  createdByUserId String?
+  createdAt       DateTime               @default(now())
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("EventPageVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, versionNumber])
 }
 
 /// An uploaded image a block's `data` points at (#816), derived from `data` on
@@ -2001,6 +2053,8 @@ model Event {
   badgeBackground                     EventAsset?        @relation("EventBadgeBackground", fields: [badgeBackgroundAssetId], references: [id], onDelete: Restrict)
   memberships                         EventMembership[]
   contentSections                     EventContentSection[]
+  pagePreviewLinks                    EventPagePreviewLink[]
+  pageVersions                        EventPageVersion[]
   emergencyPlan                       EmergencyPlan?
   assets                              EventAsset[]
   imageLibraryImages                  EventImageLibraryImage[] @relation("EventImageLibrarySource")

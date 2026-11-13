@@ -197,6 +197,7 @@ const allowed: Record<string, string> = {
   "modules/communications/scheduled-email-domain.ts": "zoneFormatter reads wall-clock parts (hourCycle h23) to project a send time; never shown",
   "modules/cancellation-policy/event-time.ts": "zonedParts reads wall-clock parts for cancellation-window arithmetic; never shown",
   "modules/event-locations/waitlist-digest-domain.ts": "zonedParts reads wall-clock parts to find the digest send instant; never shown",
+  "modules/events/content-schedule.ts": "isoToCentralLocal returns the machine YYYY-MM-DDTHH:MM a datetime-local input holds, not a display string",
   "modules/events/content-countdown.ts": "wallClockFormatter reads wall-clock parts for the countdown target; never shown",
   "modules/events/event-times.ts": "localClockTime returns a machine HH:MM for time inputs, not a display string",
   "modules/meals/scanner-import.ts": "zoneParts reads wall-clock parts to find the event-local date; never shown",

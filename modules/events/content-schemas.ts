@@ -414,6 +414,13 @@ export const eventContentSectionInputSchema = z.object({
   placement: z.enum(eventContentPlacements).default("PUBLIC_PAGE"),
   items: z.array(eventContentItemSchema).max(20).default([]),
   isPublished: z.boolean().default(false),
+  /**
+   * When an unpublished section publishes itself (#1514), as an ISO time. Empty or null means no schedule. Only
+   * meaningful while the section is unpublished: a save stores none on a published section (only the sweep leaves the
+   * time on a row it published, until the next save).
+   */
+  scheduledPublishAt: z.union([z.literal(""), z.iso.datetime({ offset: true, message: "Choose a valid publish date and time." })])
+    .nullable().optional(),
   links: z.array(eventContentLinkInputSchema).max(12).default([]),
   /** Per-kind content for the #816 blocks; checked against the kind's schema below. */
   data: z.record(z.string(), z.unknown()).optional(),
@@ -513,8 +520,11 @@ export const eventContentSectionInputSchema = z.object({
  * Whole-page save. Order comes from the array rather than a per-section field,
  * so reordering cannot leave two sections claiming the same position.
  */
+/** The most sections one event page holds. */
+export const EVENT_CONTENT_SECTION_LIMIT = 30;
+
 export const eventContentInputSchema = z.object({
-  sections: z.array(eventContentSectionInputSchema).max(30),
+  sections: z.array(eventContentSectionInputSchema).max(EVENT_CONTENT_SECTION_LIMIT),
 }).strict().superRefine((value, context) => {
   if (value.sections.filter((section) => section.kind === "HERO").length > 1) {
     context.addIssue({
@@ -524,6 +534,13 @@ export const eventContentInputSchema = z.object({
     });
   }
 });
+
+/** The schedule a section stores: an ISO instant while it is unpublished, otherwise none. */
+export function effectiveScheduledPublishAt(section: { isPublished: boolean; scheduledPublishAt?: string | null }): Date | null {
+  if (section.isPublished || !section.scheduledPublishAt) return null;
+  const date = new Date(section.scheduledPublishAt);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
 export type EventContentLinkInput = z.infer<typeof eventContentLinkInputSchema>;
 export type EventContentSectionInput = z.infer<typeof eventContentSectionInputSchema>;

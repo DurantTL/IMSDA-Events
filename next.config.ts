@@ -119,6 +119,15 @@ const nextConfig: NextConfig = {
         headers: privateRegistrationHeaders,
       },
       {
+        // An event page preview link (#1514) shows unpublished changes: never cached, never indexed, no referrer.
+        source: "/event-preview/:path*",
+        headers: privateRegistrationHeaders,
+      },
+      {
+        source: "/api/public/event-preview/:path*",
+        headers: privateRegistrationHeaders,
+      },
+      {
         // An announcement's unsubscribe link (#838) names one address: never cached, never indexed, no referrer.
         source: "/unsubscribe/:path*",
         headers: privateRegistrationHeaders,

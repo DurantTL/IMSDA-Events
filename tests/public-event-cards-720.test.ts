@@ -453,7 +453,7 @@ describe("builder warning (#720)", () => {
 
 describe("public event page layout classes (#720)", () => {
   const css = readFileSync("app/globals.css", "utf8");
-  const page = readFileSync("app/(public)/events/[eventSlug]/page.tsx", "utf8");
+  const page = readFileSync("components/public-event-landing-view.tsx", "utf8");
 
   it("wraps every content section in one shared container", () => {
     const containerStart = page.indexOf('<div className="public-event-container">');

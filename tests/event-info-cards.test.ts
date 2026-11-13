@@ -186,6 +186,7 @@ describe("replaceEventContent with info cards", () => {
       eventAsset: { findMany: vi.fn().mockResolvedValue([]) },
       eventContentSection: { deleteMany: vi.fn(), create, findMany: vi.fn().mockResolvedValue([]) },
       auditLog: { create: vi.fn() },
+      eventPageVersion: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({}) },
     };
     dependencies.getPrisma.mockReturnValue({
       $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),

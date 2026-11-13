@@ -21,6 +21,7 @@ vi.mock("@/lib/prisma", () => {
       create: async ({ data }: { data: Record<string, unknown> }) => { state.created.push(data); },
     },
     auditLog: { create: async () => ({}) },
+    eventPageVersion: { findFirst: async () => null, create: async () => ({}) },
   };
   return {
     getPrisma: () => ({

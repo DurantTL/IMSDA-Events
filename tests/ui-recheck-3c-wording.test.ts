@@ -44,7 +44,7 @@ describe("one written-out date for people, ISO kept for machines (item 1)", () =
 });
 
 describe("the PBE public event page (item 2)", () => {
-  const page = read("app/(public)/events/[eventSlug]/page.tsx");
+  const page = read("components/public-event-landing-view.tsx");
 
   it("puts the options first on a club event, with one director instruction and one help block", () => {
     expect(page).toContain("{autoCards && optionsLayout}");
