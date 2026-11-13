@@ -33,7 +33,7 @@ export function ProfileUpdatesReview({ changes, accounts, capped }: { changes: S
       <section className={styles.section} aria-labelledby="profile-changes-heading">
         <h2 id="profile-changes-heading" className={styles.sectionTitle}>Recent changes</h2>
         <p className={styles.meta}>
-          {capped ? `Showing the latest ${PROFILE_CHANGE_LIST_LIMIT} changes, newest first.` : `Showing all ${changes.length} ${changes.length === 1 ? "change" : "changes"}, newest first.`}
+          {capped ? `The latest ${PROFILE_CHANGE_LIST_LIMIT} changes, newest first. Older changes are not listed.` : `All ${changes.length} ${changes.length === 1 ? "change" : "changes"}, newest first.`}
         </p>
         <ol className={styles.list}>
           {changes.map((change) => (

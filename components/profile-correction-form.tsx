@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PhoneInput } from "@/components/phone-input";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import { FormMessage, notSavedMessage, restoreFocusAfterSave, savedMessage } from "@/components/form-message";
@@ -11,10 +12,10 @@ import styles from "@/components/profile-correction-form.module.css";
 type Values = { firstName: string; lastName: string; phone: string; shirtSize: string };
 type FieldKey = keyof Values | "reason";
 
-const fields: Array<{ key: keyof Values; label: string; type?: "tel"; autoComplete?: string }> = [
+const fields: Array<{ key: keyof Values; label: string }> = [
   { key: "firstName", label: "First name" },
   { key: "lastName", label: "Last name" },
-  { key: "phone", label: "Phone", type: "tel", autoComplete: "tel" },
+  { key: "phone", label: "Phone" },
   { key: "shirtSize", label: "Shirt size" },
 ];
 const labels: Record<FieldKey, string> = { firstName: "First name", lastName: "Last name", phone: "Phone", shirtSize: "Shirt size", reason: "Reason for the correction" };
@@ -109,16 +110,31 @@ export function ProfileCorrectionForm({ accountId, current }: { accountId: strin
           {fields.map((field) => (
             <label key={field.key} className={styles.label} htmlFor={inputId(field.key)}>
               {field.label}
-              <input
-                id={inputId(field.key)}
-                className={styles.input}
-                type={field.type ?? "text"}
-                value={values[field.key]}
-                onChange={(event) => { setValues((existing) => ({ ...existing, [field.key]: event.target.value })); clearError(field.key); }}
-                autoComplete={field.autoComplete ?? "off"}
-                {...fieldErrorProps(`${inputId(field.key)}-error`, errors[field.key])}
-              />
-              <FieldError id={`${inputId(field.key)}-error`}>{errors[field.key]}</FieldError>
+              {field.key === "phone" ? (
+                <PhoneInput
+                  id={inputId(field.key)}
+                  className={styles.input}
+                  label={field.label}
+                  stored={current.phone}
+                  value={values.phone}
+                  onValueChange={(phone) => { setValues((existing) => ({ ...existing, phone })); clearError("phone"); }}
+                  error={errors.phone}
+                  errorId={`${inputId(field.key)}-error`}
+                />
+              ) : (
+                <>
+                  <input
+                    id={inputId(field.key)}
+                    className={styles.input}
+                    type="text"
+                    value={values[field.key]}
+                    onChange={(event) => { setValues((existing) => ({ ...existing, [field.key]: event.target.value })); clearError(field.key); }}
+                    autoComplete="off"
+                    {...fieldErrorProps(`${inputId(field.key)}-error`, errors[field.key])}
+                  />
+                  <FieldError id={`${inputId(field.key)}-error`}>{errors[field.key]}</FieldError>
+                </>
+              )}
             </label>
           ))}
         </div>
