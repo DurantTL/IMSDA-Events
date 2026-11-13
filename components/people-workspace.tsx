@@ -24,12 +24,10 @@ import {
   MailPlus,
   Filter,
   ListPlus,
-  Mail,
   PencilLine,
   Plus,
   RotateCcw,
   Search,
-  Send,
   UserCheck,
   UserRoundPen,
   UsersRound,
@@ -37,6 +35,8 @@ import {
 } from "lucide-react";
 import { RegistrationAmendmentEditor } from "@/components/registration-amendment-editor";
 import { RegistrationNotesTagsPanel } from "@/components/registration-notes-tags-panel";
+import { RegistrationCommunicationsPanel, canResendConfirmationMessage } from "@/components/registration-communications-panel";
+import type { RegistrationTimelineRow } from "@/modules/communications/timeline-repository";
 import { RegistrationSignaturesPanel } from "@/components/registration-signatures-panel";
 import { SelectedAudienceDialog } from "@/components/selected-audience-dialog";
 import { DangerZone, DangerZoneItem } from "@/components/danger-zone";
@@ -144,51 +144,6 @@ function paymentMethodLabel(value: string) {
   if (value === "CHECK") return "Check";
   if (value === "MANUAL") return "Manual";
   return answerLabel(value);
-}
-
-const confirmationTemplateKeys = new Set([
-  "REGISTRATION_CONFIRMATION_PAID",
-  "REGISTRATION_CONFIRMATION_UNPAID",
-  "WORKER_CONFIRMATION",
-]);
-
-function canResendConfirmationMessage(record: RegistrationRecord["messages"][number]) {
-  return confirmationTemplateKeys.has(record.templateKey)
-    && record.retryOfMessageId === null
-    && record.status !== "PENDING"
-    && record.status !== "PROCESSING";
-}
-
-function messageDelivery(record: RegistrationRecord["messages"][number]) {
-  if (record.providerDeliveryStatus === "DELIVERED") {
-    return { label: "Delivered", tone: "green", date: record.deliveredAt };
-  }
-  if (
-    record.providerDeliveryStatus === "BOUNCED"
-    || record.providerDeliveryStatus === "FAILED"
-    || record.providerDeliveryStatus === "COMPLAINED"
-    || record.providerDeliveryStatus === "SUPPRESSED"
-    || record.status === "FAILED"
-    || record.status === "SUPPRESSED"
-    || record.status === "CANCELLED"
-  ) {
-    return {
-      label: answerLabel(record.providerDeliveryStatus ?? record.status),
-      tone: "coral",
-      date: record.failedAt ?? record.createdAt,
-    };
-  }
-  if (record.status === "SENT") {
-    return { label: "Sent", tone: "green", date: record.sentAt };
-  }
-  if (record.status === "CAPTURED") {
-    return { label: "Captured locally", tone: "purple", date: record.capturedAt };
-  }
-  return {
-    label: record.status === "PROCESSING" ? "Processing" : "Queued",
-    tone: "gold",
-    date: record.createdAt,
-  };
 }
 
 function fieldLabelsFromDefinition(definition: Record<string, unknown>) {
@@ -371,6 +326,7 @@ export function PeopleWorkspace({
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [emailingSelection, setEmailingSelection] = useState(false);
   const [resendingMessageId, setResendingMessageId] = useState<string | null>(null);
+  const [timelineRefresh, setTimelineRefresh] = useState(0);
   const dialogRef = useAccessibleDialog<HTMLElement>(Boolean(modal), closeModal);
   const router = useRouter();
   const pathname = usePathname();
@@ -672,7 +628,7 @@ export function PeopleWorkspace({
     }
   }
 
-  async function resendConfirmationEmail(message: RegistrationRecord["messages"][number]) {
+  async function resendConfirmationEmail(message: RegistrationTimelineRow) {
     if (!selected || !canResendConfirmationMessage(message)) return;
     setResendingMessageId(message.id);
     setError("");
@@ -695,6 +651,7 @@ export function PeopleWorkspace({
         setRegistrations((current) => current.map((item) => item.id === updated.id ? updated : item));
         setSelected(updated);
       }
+      setTimelineRefresh((value) => value + 1);
       setNotice(result.operation?.replayed
         ? "This confirmation was already resent for this request."
         : `Confirmation email resent to ${result.operation?.recipientEmail ?? message.recipientEmail}.`);
@@ -1181,41 +1138,15 @@ export function PeopleWorkspace({
                     {selected.payments.length === 0 && <p className="quiet-copy">No successful payments have been recorded.</p>}
                   </div>
                 </section>
-                <section className="registration-related-panel" aria-labelledby="registration-email-history">
-                  <header>
-                    <span><Mail aria-hidden="true" size={17} /></span>
-                    <div><p className="eyebrow">Communication</p><h3 id="registration-email-history">Email history</h3></div>
-                    <strong>{selected.messages.length}</strong>
-                  </header>
-                  <div className="registration-related-list">
-                    {selected.messages.map((message) => {
-                      const delivery = messageDelivery(message);
-                      return <details className="registration-message" key={message.id}>
-                        <summary>
-                          <span><strong>{message.subject}</strong><small>To {message.recipientName ? `${message.recipientName} · ` : ""}{message.recipientEmail} · {dateTime(delivery.date, eventTimezone)}</small></span>
-                          <span className={`status-chip ${delivery.tone}`}>{delivery.label}</span>
-                        </summary>
-                        <div className="registration-message-body">
-                          <p>{message.bodyText}</p>
-                          <small>Message type: {answerLabel(message.templateKey)}</small>
-                          {message.lastError && <p className="form-error">Delivery issue: {message.lastError}</p>}
-                          {canEmail && canResendConfirmationMessage(message) && (
-                            <button
-                              className="text-button"
-                              type="button"
-                              disabled={resendingMessageId === message.id}
-                              onClick={() => resendConfirmationEmail(message)}
-                            >
-                              <Send aria-hidden="true" size={14} />
-                              {resendingMessageId === message.id ? "Resending…" : "Resend confirmation"}
-                            </button>
-                          )}
-                        </div>
-                      </details>;
-                    })}
-                    {selected.messages.length === 0 && <p className="quiet-copy">No registrant emails are linked to this registration yet.</p>}
-                  </div>
-                </section>
+                <RegistrationCommunicationsPanel
+                  eventId={eventId}
+                  registrationId={selected.id}
+                  timeZone={eventTimezone}
+                  refreshKey={timelineRefresh}
+                  canResend={canEmail}
+                  resendingMessageId={resendingMessageId}
+                  onResend={resendConfirmationEmail}
+                />
                 {selected.publicSubmission && <RegistrationSignaturesPanel key={selected.id} eventId={eventId} registrationId={selected.id} timeZone={eventTimezone} attendeeNames={Object.fromEntries(selected.attendees.map((attendee) => [attendee.id, `${attendee.firstName} ${attendee.lastName}`.trim()]))} />}
                 <RegistrationNotesTagsPanel eventId={eventId} subjectPath={`registrations/${selected.id}`} canManage={canEdit} />
                 {selected.publicSubmission && <p className="quiet-copy">This registration came through a published form. Submitted attendees, choices, and pricing stay together as one auditable snapshot.</p>}

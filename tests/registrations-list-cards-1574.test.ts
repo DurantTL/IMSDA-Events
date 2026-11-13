@@ -32,7 +32,6 @@ function registration(index: number, extra: Partial<RegistrationRecord> = {}): R
     balanceCents: 0,
     attendeeCount: 3,
     checkedInCount: 0,
-    messages: [],
     adjustments: [],
     submittedAt: "2028-03-04T18:00:00.000Z",
     location: { id: "loc-1", name: "Synthetic Lodge" },
