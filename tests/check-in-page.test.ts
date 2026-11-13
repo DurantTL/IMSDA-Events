@@ -48,6 +48,9 @@ vi.mock("@/modules/club-registrations/repository", () => ({
 vi.mock("@/modules/checkin-stations/repository", () => ({
   listActiveStations: vi.fn(async () => []),
 }));
+vi.mock("@/modules/checkin-stations/gate-service", () => ({
+  isGateModeEnabled: vi.fn(async () => false),
+}));
 
 import CheckInPage from "@/app/(workspace)/check-in/page";
 import { resolveLocationFilter } from "@/modules/event-locations/filter";

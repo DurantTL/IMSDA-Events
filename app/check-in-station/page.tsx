@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckInStationScreen } from "@/components/check-in-station";
 import { STATION_INACTIVE_MESSAGE } from "@/modules/checkin-stations/domain";
+import { isGateModeEnabled } from "@/modules/checkin-stations/gate-service";
 import { resolveStation } from "@/modules/checkin-stations/repository";
 import styles from "@/components/check-in-station.module.css";
 
@@ -31,12 +32,14 @@ export default async function CheckInStationPage() {
       </main>
     );
   }
+  const gateModeEnabled = await isGateModeEnabled(station.station.eventId);
   return (
     <CheckInStationScreen
       stationId={station.station.id}
       eventName={station.eventName}
       stationLabel={station.station.label}
       canRecordPayments={station.capabilities.canRecordPayments}
+      gateModeEnabled={gateModeEnabled}
     />
   );
 }
