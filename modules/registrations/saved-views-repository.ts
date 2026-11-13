@@ -68,12 +68,14 @@ const GENERIC_REFUSAL = "This view has a filter that isn't available for this ev
  */
 export async function listSavedViews(viewer: SavedViewViewer, catalog: SearchCatalog): Promise<SavedViewItem[]> {
   requireRead(viewer);
-  const rows = await getPrisma().registrationSavedView.findMany({
-    where: { eventId: viewer.eventId, OR: [{ ownerUserId: viewer.userId }, { shared: true }] },
-    orderBy: [{ name: "asc" }, { createdAt: "asc" }],
-    take: 200,
-    select: { id: true, name: true, query: true, shared: true, ownerUserId: true, owner: { select: { displayName: true } } },
-  });
+  const select = { id: true, name: true, query: true, shared: true, ownerUserId: true, owner: { select: { displayName: true } } } as const;
+  const orderBy = [{ name: "asc" as const }, { createdAt: "asc" as const }];
+  // Two bounded reads, so many shared views never push the person's own views off the list.
+  const [own, sharedByOthers] = await Promise.all([
+    getPrisma().registrationSavedView.findMany({ where: { eventId: viewer.eventId, ownerUserId: viewer.userId }, orderBy, take: SAVED_VIEWS_PER_PERSON_MAX, select }),
+    getPrisma().registrationSavedView.findMany({ where: { eventId: viewer.eventId, shared: true, ownerUserId: { not: viewer.userId } }, orderBy, take: 200, select }),
+  ]);
+  const rows = [...own, ...sharedByOthers];
   const search = searchViewer(viewer);
   return rows.map((row) => {
     const isOwn = row.ownerUserId === viewer.userId;

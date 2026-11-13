@@ -26,6 +26,7 @@ let counter = 0;
 function matches(row: Row, where: Record<string, unknown>): boolean {
   return Object.entries(where).every(([key, value]) => {
     if (key === "OR") return (value as Record<string, unknown>[]).some((branch) => matches(row, branch));
+    if (value && typeof value === "object" && "not" in value) return row[key as keyof Row] !== (value as { not: unknown }).not;
     if (value && typeof value === "object" && "equals" in value) return String(row[key as keyof Row]).toLowerCase() === String((value as { equals: string }).equals).toLowerCase();
     return row[key as keyof Row] === value;
   });

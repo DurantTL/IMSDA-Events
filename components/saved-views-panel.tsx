@@ -126,7 +126,8 @@ export function SavedViewsPanel({
   function row(view: SavedViewItem) {
     const noteId = `saved-view-note-${view.id}`;
     const current = view.query === currentQuery;
-    const mayChangeSharing = view.isOwn && canShare;
+    // An owner can always stop sharing their own view; turning sharing on needs the share permission (checked again on the server).
+    const mayChangeSharing = view.isOwn && (canShare || view.shared);
     const mayDelete = view.isOwn || canShare;
     return (
       <li className={styles.item} key={view.id}>

@@ -52,7 +52,9 @@ describe("Saved views panel (#1511)", () => {
     expect(withShare).toContain("Share with event staff");
     expect(withShare).toContain("Stop sharing");
     const withoutShare = render({ canShare: false });
-    expect(withoutShare).not.toContain("Stop sharing");
+    // The owner of a shared view may still take it down; nobody without the permission is offered to share.
+    expect(withoutShare).toMatch(/Stop sharing<span class="sr-only">: VIP list/);
+    expect(withoutShare).not.toMatch(/Stop sharing<span class="sr-only">: Late walk-ins/);
     expect(withoutShare).not.toContain("Share with event staff");
     // A reader cannot delete someone else's shared view; an owner can delete their own.
     expect(withoutShare).not.toMatch(/Delete<span class="sr-only"> Late walk-ins/);
