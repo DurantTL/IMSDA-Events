@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { deriveThemeTints, ON_PRIMARY } from "./contrast";
+import { checkThemeContrast, deriveThemeTints, ON_PRIMARY } from "./contrast";
 import { mixHex } from "./color";
 import {
   isPlatformDefaultTheme,
@@ -19,14 +19,17 @@ import {
 export type StoredThemeRow = { status: string; tokens: unknown };
 
 /**
- * The look a registration page uses: the event's PUBLISHED version when its stored tokens still pass the schema,
+ * The look a registration page uses: the event's PUBLISHED version when its stored tokens still pass the schema and the contrast checks,
  * otherwise the platform default. A draft, an archived version, a missing row or tokens that fail the schema all give the
  * default, so a bad row can never break or restyle a public form.
  */
 export function resolveRegistrationTheme(row: StoredThemeRow | null | undefined): RegistrationThemeTokens {
   if (!row || row.status !== "PUBLISHED") return PLATFORM_DEFAULT_THEME;
   const parsed = registrationThemeTokensSchema.safeParse(row.tokens);
-  return parsed.success ? normalizeThemeTokens(parsed.data) : PLATFORM_DEFAULT_THEME;
+  if (!parsed.success) return PLATFORM_DEFAULT_THEME;
+  const tokens = normalizeThemeTokens(parsed.data);
+  // Publishing checks contrast, but a row that got here another way (or under older rules) must not reach a public form.
+  return checkThemeContrast(tokens).passes ? tokens : PLATFORM_DEFAULT_THEME;
 }
 
 /**

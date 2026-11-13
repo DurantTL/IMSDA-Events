@@ -33,11 +33,14 @@ export default async function EmbeddedRegistrationPage({
   const experience = await getPublicRegistrationExperience(eventSlug, formSlug);
   if (!experience) notFound();
 
+  const themeStyle = registrationThemeStyle(resolveRegistrationTheme(await getPublishedThemeRowBySlug(eventSlug)));
+
   if (
     experience.lifecycle.phase !== "OPEN"
     || experience.lifecycle.capacityDecision === "FULL"
   ) {
     return (
+      <RegistrationThemeScope style={themeStyle}>
       <main className="public-registration-embed-state">
         <BrandLink target="_top" />
         <p className="public-registration-eyebrow">IMAdventist</p>
@@ -51,11 +54,11 @@ export default async function EmbeddedRegistrationPage({
           View event registration
         </Link>
       </main>
+      </RegistrationThemeScope>
     );
   }
 
   const { account } = await getCurrentAttendee();
-  const themeStyle = registrationThemeStyle(resolveRegistrationTheme(await getPublishedThemeRowBySlug(eventSlug)));
 
   return (
     <RegistrationThemeScope style={themeStyle}>

@@ -110,8 +110,19 @@ function validTokens(input: unknown): RegistrationThemeTokens {
   return normalizeThemeTokens(parsed.data);
 }
 
-function isUniqueViolation(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+/** A unique-index collision (two drafts or two published versions at once), or the immutability trigger refusing a change (SQLSTATE 23001). */
+export function isThemeWriteConflict(error: unknown) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return true;
+  return error instanceof Prisma.PrismaClientUnknownRequestError && error.message.includes('"23001"');
+}
+
+async function guardedWrite<T>(write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    if (isThemeWriteConflict(error)) throw conflict();
+    throw error;
+  }
 }
 
 const conflict = () => new RegistrationThemeError("CONFLICT", "Someone else changed this look at the same time. Refresh and try again.");
@@ -137,7 +148,7 @@ export async function saveRegistrationThemeDraft(eventId: string, input: unknown
       }, tx);
     });
   } catch (error) {
-    if (isUniqueViolation(error)) throw conflict();
+    if (isThemeWriteConflict(error)) throw conflict();
     throw error;
   }
   return getRegistrationThemeEditorState(eventId);
@@ -150,7 +161,7 @@ export async function saveRegistrationThemeDraft(eventId: string, input: unknown
 export async function publishRegistrationThemeDraft(eventId: string, actorUserId: string) {
   try {
     await getPrisma().$transaction(async (tx) => {
-      const draft = await tx.registrationThemeVersion.findFirst({ where: { eventId, status: "DRAFT" }, select: { id: true, versionNumber: true, tokens: true } });
+      const draft = await tx.registrationThemeVersion.findFirst({ where: { eventId, status: "DRAFT" }, select: { id: true, versionNumber: true, tokens: true, updatedAt: true } });
       if (!draft) throw new RegistrationThemeError("NO_DRAFT", "There is no draft to publish. Save a draft first.");
       const tokens = validTokens(draft.tokens);
       const report = checkThemeContrast(tokens);
@@ -159,14 +170,20 @@ export async function publishRegistrationThemeDraft(eventId: string, actorUserId
       }
       const now = new Date();
       const archived = await tx.registrationThemeVersion.updateMany({ where: { eventId, status: "PUBLISHED" }, data: { status: "ARCHIVED", archivedAt: now } });
-      await tx.registrationThemeVersion.update({ where: { id: draft.id }, data: { status: "PUBLISHED", publishedAt: now, publishedByUserId: actorUserId } });
+      // Conditional on the draft being exactly the one that was checked: a Save or another Publish in between changes
+      // updatedAt or the status, this updates nothing, and the whole transaction (including the archive above) is rolled back.
+      const published = await tx.registrationThemeVersion.updateMany({
+        where: { id: draft.id, status: "DRAFT", updatedAt: draft.updatedAt },
+        data: { tokens, status: "PUBLISHED", publishedAt: now, publishedByUserId: actorUserId },
+      });
+      if (published.count !== 1) throw conflict();
       await writeAuditLog({
         eventId, actorUserId, action: "REGISTRATION_THEME_PUBLISHED", entityType: "RegistrationThemeVersion", entityId: draft.id,
         summary: `Published version ${draft.versionNumber} of the registration look.`, metadata: { versionNumber: draft.versionNumber, replacedPublished: archived.count > 0 },
       }, tx);
     });
   } catch (error) {
-    if (isUniqueViolation(error)) throw conflict();
+    if (isThemeWriteConflict(error)) throw conflict();
     throw error;
   }
   return getRegistrationThemeEditorState(eventId);
@@ -174,7 +191,7 @@ export async function publishRegistrationThemeDraft(eventId: string, actorUserId
 
 /** Deletes the draft only. A published or archived version is never deleted. */
 export async function discardRegistrationThemeDraft(eventId: string, actorUserId: string) {
-  await getPrisma().$transaction(async (tx) => {
+  await guardedWrite(() => getPrisma().$transaction(async (tx) => {
     const draft = await tx.registrationThemeVersion.findFirst({ where: { eventId, status: "DRAFT" }, select: { id: true, versionNumber: true } });
     if (!draft) throw new RegistrationThemeError("NO_DRAFT", "There is no draft to discard.");
     await tx.registrationThemeVersion.deleteMany({ where: { id: draft.id, status: "DRAFT" } });
@@ -182,13 +199,13 @@ export async function discardRegistrationThemeDraft(eventId: string, actorUserId
       eventId, actorUserId, action: "REGISTRATION_THEME_DRAFT_DISCARDED", entityType: "RegistrationThemeVersion", entityId: draft.id,
       summary: `Discarded the draft registration look (version ${draft.versionNumber}).`, metadata: { versionNumber: draft.versionNumber },
     }, tx);
-  });
+  }));
   return getRegistrationThemeEditorState(eventId);
 }
 
 /** Goes back to the platform look: archives the published version (kept in the history). */
 export async function revertRegistrationThemeToPlatformDefault(eventId: string, actorUserId: string) {
-  await getPrisma().$transaction(async (tx) => {
+  await guardedWrite(() => getPrisma().$transaction(async (tx) => {
     const published = await tx.registrationThemeVersion.findFirst({ where: { eventId, status: "PUBLISHED" }, select: { id: true, versionNumber: true } });
     if (!published) throw new RegistrationThemeError("NO_PUBLISHED", "This event already uses the platform look.");
     await tx.registrationThemeVersion.update({ where: { id: published.id }, data: { status: "ARCHIVED", archivedAt: new Date() } });
@@ -196,6 +213,6 @@ export async function revertRegistrationThemeToPlatformDefault(eventId: string, 
       eventId, actorUserId, action: "REGISTRATION_THEME_REVERTED", entityType: "RegistrationThemeVersion", entityId: published.id,
       summary: `Went back to the platform registration look (version ${published.versionNumber} archived).`, metadata: { versionNumber: published.versionNumber },
     }, tx);
-  });
+  }));
   return getRegistrationThemeEditorState(eventId);
 }

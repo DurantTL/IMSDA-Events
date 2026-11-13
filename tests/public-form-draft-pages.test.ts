@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/modules/attendee-accounts/passkey-offer-eligibility", () => ({ passkeyOfferForPage: vi.fn().mockResolvedValue(false) }));
+vi.mock("@/modules/registration-themes/repository", () => ({ getPublishedThemeRowBySlug: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({
   getCurrentAttendee: async () => ({ account: mocks.account }),
 }));

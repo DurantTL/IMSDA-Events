@@ -112,6 +112,11 @@ describe("resolving the registration theme", () => {
     expect(resolveRegistrationTheme(published(custom, "ARCHIVED"))).toBe(PLATFORM_DEFAULT_THEME);
   });
 
+  it("falls back to the platform default when published tokens fail the contrast checks", () => {
+    expect(resolveRegistrationTheme(published({ ...custom, primary: "#f0b323" }))).toBe(PLATFORM_DEFAULT_THEME);
+    expect(resolveRegistrationTheme(published({ ...custom, muted: "#cccccc" }))).toBe(PLATFORM_DEFAULT_THEME);
+  });
+
   it("is deterministic", () => {
     expect(resolveRegistrationTheme(published(custom))).toEqual(resolveRegistrationTheme(published(custom)));
     expect(registrationThemeStyle(custom)).toEqual(registrationThemeStyle(custom));

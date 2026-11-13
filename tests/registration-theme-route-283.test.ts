@@ -38,7 +38,7 @@ function request(method: string, body?: unknown) {
   });
 }
 
-type Row = { id: string; eventId: string; versionNumber: number; status: string; tokens: unknown; createdAt: Date; publishedAt: Date | null; archivedAt: Date | null; publishedByUserId?: string | null };
+type Row = { updatedAt?: Date; id: string; eventId: string; versionNumber: number; status: string; tokens: unknown; createdAt: Date; publishedAt: Date | null; archivedAt: Date | null; publishedByUserId?: string | null };
 
 /** An in-memory stand-in for the one table the repository touches. */
 function database(initial: Row[] = []) {
@@ -50,7 +50,7 @@ function database(initial: Row[] = []) {
       findMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) => rows.filter((row) => matches(row, where))),
       aggregate: vi.fn(async () => ({ _max: { versionNumber: rows.reduce((max, row) => Math.max(max, row.versionNumber), 0) || null } })),
       create: vi.fn(async ({ data }: { data: Partial<Row> & { eventId: string; versionNumber: number; tokens: unknown } }) => {
-        rows.push({ id: `v${rows.length + 1}`, createdAt: new Date(), publishedAt: null, archivedAt: null, status: "DRAFT", ...data });
+        rows.push({ id: `v${rows.length + 1}`, createdAt: new Date(), updatedAt: new Date(), publishedAt: null, archivedAt: null, status: "DRAFT", ...data });
       }),
       update: vi.fn(async ({ where, data }: { where: { id: string }; data: Partial<Row> }) => { Object.assign(rows.find((row) => row.id === where.id)!, data); }),
       updateMany: vi.fn(async ({ where, data }: { where: Record<string, unknown>; data: Partial<Row> }) => {
@@ -68,7 +68,7 @@ function database(initial: Row[] = []) {
   return { rows, tx, prisma };
 }
 
-const row = (overrides: Partial<Row>): Row => ({ id: "v1", eventId: "event-1", versionNumber: 1, status: "DRAFT", tokens: good, createdAt: new Date("2027-01-05T12:00:00Z"), publishedAt: null, archivedAt: null, ...overrides });
+const row = (overrides: Partial<Row>): Row => ({ id: "v1", eventId: "event-1", versionNumber: 1, status: "DRAFT", tokens: good, createdAt: new Date("2027-01-05T12:00:00Z"), updatedAt: new Date("2027-01-05T12:00:00Z"), publishedAt: null, archivedAt: null, ...overrides });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -164,15 +164,42 @@ describe("registration theme repository", () => {
     await expect(response.json()).resolves.toMatchObject({ error: "INVALID_TOKENS" });
   });
 
-  it("answers a publish with no draft, and a lost publish race, in plain words", async () => {
+  it("answers a publish with no draft in plain words", async () => {
     database();
-    const none = await POST(request("POST", { action: "publish" }), context);
-    expect(none.status).toBe(404);
+    expect((await POST(request("POST", { action: "publish" }), context)).status).toBe(404);
+  });
+
+  it.each([
+    ["a unique-index collision", () => new Prisma.PrismaClientKnownRequestError("Unique constraint failed", { code: "P2002", clientVersion: "test" })],
+    ["the database refusing to change a published look", () => new Prisma.PrismaClientUnknownRequestError('QueryError(PostgresError { code: "23001", message: "A published registration look cannot be changed." })', { clientVersion: "test" })],
+  ])("answers %s with a conflict", async (_name, makeError) => {
     const { tx } = database([row({ id: "draft" })]);
-    tx.registrationThemeVersion.update.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError("Unique constraint failed", { code: "P2002", clientVersion: "test" }));
+    tx.registrationThemeVersion.updateMany.mockRejectedValue(makeError());
     const raced = await POST(request("POST", { action: "publish" }), context);
     expect(raced.status).toBe(409);
     await expect(raced.json()).resolves.toMatchObject({ error: "CONFLICT", message: expect.stringContaining("Refresh") });
+  });
+
+  it("publishes the exact tokens it checked: a Save that lands in between makes the publish conflict and changes nothing", async () => {
+    const { rows, tx } = database([
+      row({ id: "pub", versionNumber: 1, status: "PUBLISHED" }),
+      row({ id: "draft", versionNumber: 2, status: "DRAFT" }),
+    ]);
+    const find = tx.registrationThemeVersion.findFirst.getMockImplementation()!;
+    // The draft is edited (new updatedAt, unchecked tokens) after the publish read it.
+    tx.registrationThemeVersion.findFirst.mockImplementation(async (args: { where: Record<string, unknown> }) => {
+      const found = await find(args);
+      if (args.where.status === "DRAFT" && found) {
+        const snapshot = { ...found };
+        Object.assign(rows.find((entry) => entry.id === "draft")!, { tokens: lowContrast, updatedAt: new Date("2027-01-06T12:00:00Z") });
+        return snapshot;
+      }
+      return found;
+    });
+    const response = await POST(request("POST", { action: "publish" }), context);
+    expect(response.status).toBe(409);
+    expect(rows.find((entry) => entry.id === "draft")?.status).toBe("DRAFT");
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
   it("discards only the draft", async () => {

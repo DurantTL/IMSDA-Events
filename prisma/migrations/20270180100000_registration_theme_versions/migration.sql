@@ -57,6 +57,14 @@ BEGIN
     IF NEW."status" <> OLD."status" AND NOT (OLD."status" = 'PUBLISHED' AND NEW."status" = 'ARCHIVED') THEN
       RAISE EXCEPTION 'A registration look only moves from published to archived.' USING ERRCODE = '23001';
     END IF;
+    -- Who published it and when are frozen; the person can only be cleared (an account deleted), never changed.
+    IF NEW."publishedAt" IS DISTINCT FROM OLD."publishedAt"
+       OR (NEW."publishedByUserId" IS DISTINCT FROM OLD."publishedByUserId" AND NEW."publishedByUserId" IS NOT NULL) THEN
+      RAISE EXCEPTION 'A published registration look cannot be published again.' USING ERRCODE = '23001';
+    END IF;
+    IF NEW."status" = OLD."status" AND NEW."archivedAt" IS DISTINCT FROM OLD."archivedAt" THEN
+      RAISE EXCEPTION 'A published registration look cannot be changed.' USING ERRCODE = '23001';
+    END IF;
   ELSIF NEW."status" = 'ARCHIVED' THEN
     RAISE EXCEPTION 'A draft registration look is published or discarded, not archived.' USING ERRCODE = '23001';
   END IF;

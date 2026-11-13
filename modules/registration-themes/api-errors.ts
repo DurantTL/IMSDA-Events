@@ -1,6 +1,6 @@
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { clubRegistrationApiError } from "@/modules/club-registrations/api-errors";
-import { RegistrationThemeError, registrationThemeErrorStatus } from "./repository";
+import { isThemeWriteConflict, RegistrationThemeError, registrationThemeErrorStatus } from "./repository";
 
 const noStore = { "Cache-Control": "no-store" };
 
@@ -15,6 +15,10 @@ export function registrationThemeApiError(error: unknown, action: string) {
   if (error instanceof RegistrationThemeError) {
     const failing = error.report?.failing.map((check) => ({ id: check.id, label: check.label, ratio: check.ratio, minimum: check.minimum }));
     return Response.json({ error: error.code, message: error.message, ...(failing ? { failing } : {}) }, { status: registrationThemeErrorStatus(error.code), headers: noStore });
+  }
+  // A collision or the database refusing to change a published look, if one slipped past the repository's own mapping.
+  if (isThemeWriteConflict(error)) {
+    return Response.json({ error: "CONFLICT", message: "Someone else changed this look at the same time. Refresh and try again." }, { status: 409, headers: noStore });
   }
   return clubRegistrationApiError(error, action);
 }

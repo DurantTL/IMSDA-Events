@@ -183,7 +183,24 @@
 }
 
 .actions button {
+  flex: 1 1 10rem;
   min-height: 44px;
+}
+
+.group select {
+  min-height: 44px;
+}
+
+.passing {
+  margin-top: 8px;
+}
+
+.passing summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
 
 .history {
