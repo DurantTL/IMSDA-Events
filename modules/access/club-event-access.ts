@@ -30,7 +30,7 @@ export async function hasActiveYouthAdministratorGrant(userId: string, client: C
 }
 
 /** Whether the event's audience is CLUB, read from the database and never from the request. */
-async function isClubEvent(eventId: string, client: Client): Promise<boolean> {
+export async function isClubEvent(eventId: string, client: Client): Promise<boolean> {
   const event = await client.event.findUnique({ where: { id: eventId }, select: { audience: true } });
   return event?.audience === "CLUB";
 }
