@@ -92,6 +92,8 @@ import {
   isOptOutEligibleTemplate,
   CLUB_DRAFT_REMINDER_OPT_OUT_TEMPLATE_KEY,
   clubDraftReminderOptOutSkipMessage,
+  CLUB_CALENDAR_REMINDER_TEMPLATE_KEY,
+  clubCalendarReminderOptOutSkipMessage,
   unsubscribeApiPath,
   unsubscribeHeadersAllowed,
   unsubscribePagePath,
@@ -611,6 +613,48 @@ async function cancelIfClubDraftReminderObsolete(
   return true;
 }
 
+/**
+ * A club calendar reminder (#1700) is checked again immediately before it goes out: the item may have been deleted, moved
+ * or passed, the calendar or its reminders may have been turned off, the club may no longer be active, or the recipient
+ * may no longer hold an active club role. Such a message ends CANCELLED with a plain note and an audit entry (ids only,
+ * never an address or any of the item's text). When the check itself fails the attempt is retried after the usual backoff
+ * rather than sent on a guess.
+ */
+async function cancelIfClubCalendarReminderObsolete(
+  prisma: DeliveryPrisma,
+  message: ClaimedMessage,
+  at: Date,
+) {
+  if (message.templateKey !== CLUB_CALENDAR_REMINDER_TEMPLATE_KEY) return false;
+  let check: Awaited<ReturnType<typeof import("@/modules/club-calendar/reminders")["clubCalendarReminderCheck"]>>;
+  try {
+    const { clubCalendarReminderCheck } = await import("@/modules/club-calendar/reminders");
+    check = await clubCalendarReminderCheck({ recipientEmail: message.recipientEmail, metadata: message.metadata }, at);
+  } catch (error) {
+    logError("Unable to check whether a club calendar reminder was still wanted; it will be retried.", error);
+    await finalizeFailedAttempt(prisma, message, { code: "CLUB_CALENDAR_REMINDER_CHECK_FAILED", message: "Could not confirm the calendar reminder was still wanted, so it was not sent.", retryable: true }, at, true);
+    return true;
+  }
+  if (!check) return false;
+  const updated = await prisma.messageOutbox.updateMany({
+    where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken },
+    data: { status: "CANCELLED", lockedAt: null, lockToken: null, lastError: check.note },
+  });
+  if (updated.count === 1) {
+    await prisma.auditLog.create({
+      data: {
+        action: "CLUB_CALENDAR_REMINDER_CANCELLED",
+        entityType: "MessageOutbox",
+        entityId: message.id,
+        correlationId: randomUUID(),
+        summary: "Cancelled a club calendar reminder because it was no longer wanted before it was sent.",
+        metadata: { messageId: message.id, templateKey: message.templateKey },
+      },
+    });
+  }
+  return true;
+}
+
 function announcementIdOf(metadata: unknown) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
   const value = (metadata as Record<string, unknown>).announcementId;
@@ -651,8 +695,10 @@ async function suppressIfAnnouncementOptedOut(
   // A deadline reminder has no event (#910): only an opt-out of ALL announcements can apply, which an event id no
   // row carries ("") cannot match as an EVENT one. Deadlines are essential (#915), so the switch is off and a
   // reminder skips this check; provider suppression is checked elsewhere. Announcements need their event as before.
-  const reminder = message.templateKey === DEADLINE_REMINDER_TEMPLATE_KEY;
-  if (reminder ? !deadlineRemindersHonourAnnouncementOptOut() : (!isOptOutEligibleTemplate(message.templateKey) || !message.eventId)) return false;
+  // A club calendar reminder (#1700) is event-less the same way, but it does honour an opt-out of ALL announcements.
+  const calendarReminder = message.templateKey === CLUB_CALENDAR_REMINDER_TEMPLATE_KEY;
+  const reminder = message.templateKey === DEADLINE_REMINDER_TEMPLATE_KEY || calendarReminder;
+  if (!calendarReminder && (reminder ? !deadlineRemindersHonourAnnouncementOptOut() : (!isOptOutEligibleTemplate(message.templateKey) || !message.eventId))) return false;
   const draftReminder = message.templateKey === CLUB_DRAFT_REMINDER_OPT_OUT_TEMPLATE_KEY;
   const optOutEventId = message.eventId ?? "";
   const failClosed = async (code: string, text: string, error?: unknown): Promise<OptOutCheckResult> => {
@@ -676,17 +722,19 @@ async function suppressIfAnnouncementOptedOut(
   if (!scope) return false;
   const updated = await prisma.messageOutbox.updateMany({
     where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken },
-    data: { status: "SUPPRESSED", lockedAt: null, lockToken: null, lastError: reminder ? reminderOptOutSkipMessage(scope) : draftReminder ? clubDraftReminderOptOutSkipMessage(scope) : announcementOptOutSkipMessage(scope) },
+    data: { status: "SUPPRESSED", lockedAt: null, lockToken: null, lastError: calendarReminder ? clubCalendarReminderOptOutSkipMessage(scope) : reminder ? reminderOptOutSkipMessage(scope) : draftReminder ? clubDraftReminderOptOutSkipMessage(scope) : announcementOptOutSkipMessage(scope) },
   });
   if (updated.count !== 1) return "lost";
   await prisma.auditLog.create({
     data: {
       eventId: message.eventId ?? undefined,
-      action: reminder ? "DEADLINE_REMINDER_SKIPPED_OPTED_OUT" : draftReminder ? "CLUB_DRAFT_REMINDER_SKIPPED_OPTED_OUT" : "EVENT_ANNOUNCEMENT_SKIPPED_OPTED_OUT",
+      action: calendarReminder ? "CLUB_CALENDAR_REMINDER_SKIPPED_OPTED_OUT" : reminder ? "DEADLINE_REMINDER_SKIPPED_OPTED_OUT" : draftReminder ? "CLUB_DRAFT_REMINDER_SKIPPED_OPTED_OUT" : "EVENT_ANNOUNCEMENT_SKIPPED_OPTED_OUT",
       entityType: "MessageOutbox",
       entityId: message.id,
       correlationId: randomUUID(),
-      summary: reminder
+      summary: calendarReminder
+        ? "Skipped a club calendar reminder because the recipient opted out of announcements."
+        : reminder
         ? "Skipped a deadline reminder because the recipient opted out of announcements."
         : draftReminder
           ? "Skipped a club registration reminder because the recipient opted out of announcements."
@@ -1407,6 +1455,7 @@ async function runDeliveryLoop(
     if (await cancelIfInvoiceReplaced(prisma, message)) continue;
     if (await cancelIfLodgingStale(prisma, message, now())) continue;
     if (await cancelIfClubDraftReminderObsolete(prisma, message, now())) continue;
+    if (await cancelIfClubCalendarReminderObsolete(prisma, message, now())) continue;
     if (await suppressIfAnnouncementOptedOut(prisma, message, announcementPolicy, now())) continue;
     // A suppressed address (hard bounce or complaint, #863) receives nothing, of any kind. Checked before the body is
     // prepared so no private link is minted for a message that will not go.
@@ -1454,6 +1503,7 @@ async function runDeliveryLoop(
       if (await cancelIfLodgingStale(prisma, message, now())) continue;
       if (await cancelIfScheduledEmailObsolete(prisma, message, now(), preparedBody)) continue;
       if (await cancelIfClubDraftReminderObsolete(prisma, message, now())) continue;
+      if (await cancelIfClubCalendarReminderObsolete(prisma, message, now())) continue;
       // And the opt-out again (#838): someone may have unsubscribed while the message was being prepared. An essential
       // announcement still goes. The private link minted for the body is unused, so it is withdrawn.
       const recheck = await suppressIfAnnouncementOptedOut(prisma, message, announcementPolicy, now());

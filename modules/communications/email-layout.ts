@@ -115,6 +115,7 @@ export const EMAIL_HEADER_RULES: Record<MessageTemplateKey, EmailHeaderRule> = {
   MONTHLY_RECORD_REMINDER: "club",
   MONTHLY_RECORD_REMINDER_SUMMARY: "general",
   CLUB_DRAFT_REMINDER: "club",
+  CLUB_CALENDAR_REMINDER: "club",
 };
 
 /** The header context for a template. An unknown key (a row from a newer version) is general, never an error. */
@@ -223,6 +224,7 @@ export const EMAIL_WHY_LINES: Record<MessageTemplateKey, string> = {
   MONTHLY_RECORD_REMINDER: "You got this because you are the director or deputy of a club whose Monthly Record for last month is not submitted yet. The conference Clubs Administrator can turn these reminders off.",
   MONTHLY_RECORD_REMINDER_SUMMARY: "You got this because you are an Area Coordinator and clubs were reminded about last month's Monthly Record. The conference Clubs Administrator can turn these reminders off.",
   CLUB_DRAFT_REMINDER: "You got this because you are a director or deputy of a club with an unfinished registration for an event.",
+  CLUB_CALENDAR_REMINDER: "You got this because you are the director or deputy of a club that turned on calendar reminders, and a meeting, outing or deadline on its calendar is coming up. You can turn these reminders off on the club calendar page.",
 };
 
 const GENERIC_WHY = "You got this because of something you did on IMAdventist.";
