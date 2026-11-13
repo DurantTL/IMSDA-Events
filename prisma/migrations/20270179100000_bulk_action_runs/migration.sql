@@ -1,4 +1,4 @@
--- Reviewed bulk actions (#182): a run, its snapshot of candidate versions and per-record outcomes. Ids, keys, versions and counts only; no personal data.
+-- Reviewed bulk actions (#182): a run, its snapshot of candidate versions and per-record outcomes. Ids, keys, versions and counts only; no registrant data and no exported file. The query string can hold the search text staff typed while a run is previewed; it is replaced once the run is confirmed or expires.
 -- Additive: four enums, two tables. Applying it in production is a human step.
 
 -- CreateEnum

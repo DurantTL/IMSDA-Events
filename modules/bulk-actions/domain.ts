@@ -27,6 +27,9 @@ export const EXPORT_ACTION_MAX_RECORDS = 5000;
 /** A preview is good for this long. After that the person previews again. */
 export const PREVIEW_TTL_MINUTES = 30;
 
+/** A run still APPLYING after this long is treated as stopped, and ended on the next retry. */
+export const APPLYING_STALE_MINUTES = 10;
+
 /** At most this many non-completed records are listed by confirmation code in one summary. */
 export const NOT_COMPLETED_LIST_MAX = 200;
 
@@ -62,6 +65,7 @@ export const REASON_LABELS = {
   RECORD_CHANGED: "It changed after the preview, so it was left alone.",
   NO_LONGER_MATCHES: "It no longer matches the filter.",
   WRITE_FAILED: "The change could not be saved.",
+  INTERRUPTED: "The action stopped before this one. Check it before trying again.",
 } as const;
 export type BulkReasonCode = keyof typeof REASON_LABELS;
 

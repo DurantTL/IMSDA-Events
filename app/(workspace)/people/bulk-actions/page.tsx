@@ -8,7 +8,7 @@ import { listRecentBulkActions } from "@/modules/bulk-actions/repository";
 import { resolveEventContext } from "@/modules/events/selection";
 import { pickSearchParams } from "@/modules/registrations/operations-search-domain";
 import { enumerateOperationsRegistrationIds } from "@/modules/registrations/operations-search-repository";
-import { listActiveTags } from "@/modules/tags/repository";
+import { listActiveTags, listTags } from "@/modules/tags/repository";
 
 export const metadata: Metadata = { title: "Bulk actions" };
 export const dynamic = "force-dynamic";
@@ -28,7 +28,8 @@ export default async function BulkActionsPage({ searchParams }: { searchParams: 
   const found = await enumerateOperationsRegistrationIds({ eventId: event.id, permissions }, new URLSearchParams(queryString), undefined, issues);
   const canTag = permissions.includes("MANAGE_REGISTRATION");
   const canExport = permissions.includes("VIEW_REPORTS") && permissions.includes("VIEW_SENSITIVE_DATA");
-  const [tags, recent] = await Promise.all([canTag ? listActiveTags(event.id) : Promise.resolve([]), listRecentBulkActions(event.id, 10)]);
+  const [tags, removableTags, recent] = await Promise.all([canTag ? listActiveTags(event.id) : Promise.resolve([]), canTag ? listTags(event.id) : Promise.resolve([]), listRecentBulkActions(event.id, 10)]);
+  const carryNotes = String(Array.isArray(rawParams.notCarried) ? rawParams.notCarried[0] : rawParams.notCarried ?? "").split(",").filter((note) => note === "quick filter" || note === "form answer filter");
   const exportFields = EXPORT_FIELDS.filter((field) => field.permissions.some((needed) => permissions.includes(needed))).map((field) => ({ key: field.key, label: field.label, personal: field.personal }));
   const peopleHref = `/people${queryString ? `?${queryString}&` : "?"}event=${encodeURIComponent(event.id)}`;
   return <>
@@ -46,6 +47,9 @@ export default async function BulkActionsPage({ searchParams }: { searchParams: 
         scopeProblem={found.ok ? null : (found.issues[0]?.message ?? "This filter cannot be used for a bulk action.")}
         filters={describeQueryFilters(queryString, { showText: true })}
         tags={tags.map((tag) => ({ id: tag.id, name: tag.name }))}
+        removableTags={removableTags.map((tag) => ({ id: tag.id, name: tag.name, isActive: tag.isActive }))}
+        peopleHref={peopleHref}
+        notCarried={carryNotes}
         canTag={canTag}
         canExport={canExport}
         exportFields={exportFields}

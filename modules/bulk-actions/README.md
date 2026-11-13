@@ -17,6 +17,7 @@ A preview is not a grant. At confirm the route resolves the person's membership 
 - A record whose `updatedAt` differs from the preview: CONFLICT, never overwritten.
 - Tag already on (apply) or not on (remove): SKIPPED.
 - One record failing: FAILED, and the rest continue.
+- The handler itself stopping: the confirmation is already in the audit log, the run still ends APPLIED, and every record not reached is FAILED ("interrupted"). A run left in APPLYING for more than 10 minutes is ended the same way on the next retry with its key.
 
 The version check reads all current versions once, just before the writes. A change landing in the few milliseconds between that read and one record's write is not detected; the tag writes themselves are idempotent, so the worst case is a tag applied to a record that changed a moment ago.
 
@@ -34,13 +35,13 @@ At most 500 registrations for a tag action and 5000 for an export. A larger scop
 
 ## Actions in this slice
 
-- `APPLY_TAG` and `REMOVE_TAG`: through `modules/tags/repository.ts` (`applyRegistrationTag`, `removeRegistrationTag`, with the run id as the correlation id so each per-record audit row links to the run). Recognition tags are excluded. Needs `MANAGE_REGISTRATION`.
+- `APPLY_TAG` and `REMOVE_TAG`: through `modules/tags/repository.ts` (`applyRegistrationTag`, `removeRegistrationTag`, with the run id as the correlation id so each per-record audit row links to the run). Recognition tags are excluded. Needs `MANAGE_REGISTRATION`. Applying needs an active tag; removing also works for an inactive one.
 - `EXPORT_FIELDS`: a CSV through `toCsv` (formula-safe). Needs `VIEW_REPORTS` and `VIEW_SENSITIVE_DATA`, and each field has its own permission (`EXPORT_FIELDS` in `domain.ts`). A field the person may not use is refused, never dropped. Health, medical, consent, restricted-note and insurance information has no field and cannot be requested.
 
 Requesting information and queueing a message are later slices. Adding one is a new key in `BULK_ACTION_KEYS` and the catalog, a `BulkActionKey` value in the schema, and a new handler in `repository.ts`; the framework does the rest.
 
 ## Privacy
 
-Runs store keys, ids, versions and counts. They never store a name, an email, a phone number or the exported file. The audit metadata replaces any typed search text with `[text]`. The summaries list non-completed records by confirmation code and a reason code only.
+Runs store keys, ids, versions and counts. They never store a registrant's name, email or phone number, or the exported file. The run's query string can hold the search text staff typed while the run is PREVIEWED; it is replaced with `[text]` as soon as the run is confirmed or expires. The audit metadata always uses the replaced form. The summaries list non-completed records by confirmation code and a reason code only.
 
 `domain.ts` is pure; `repository.ts` is server-only; `http.ts` maps errors to responses.

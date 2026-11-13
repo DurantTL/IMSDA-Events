@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react";
 import { FormMessage } from "@/components/form-message";
+import { cardCell } from "@/components/table-card-labels";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import type { BulkPreview, BulkSummary, RecentBulkAction } from "@/modules/bulk-actions/repository";
 import { OUTCOME_LABELS, OUTCOME_ORDER, type BulkActionKey } from "@/modules/bulk-actions/domain";
 import styles from "./bulk-actions-panel.module.css";
@@ -14,6 +16,12 @@ type Props = {
   scopeProblem: string | null;
   filters: string[];
   tags: Array<{ id: string; name: string }>;
+  /** Tags that can be removed: the active ones and the inactive ones, never recognitions. */
+  removableTags: Array<{ id: string; name: string; isActive: boolean }>;
+  /** The People list with the same filters, for going back to change them. */
+  peopleHref: string;
+  /** List filters the link could not carry over (the quick filter and the form answer filter). */
+  notCarried: string[];
   canTag: boolean;
   canExport: boolean;
   exportFields: Array<{ key: string; label: string; personal: boolean }>;
@@ -22,7 +30,7 @@ type Props = {
   recent: RecentBulkAction[];
 };
 
-const dateText = (iso: string) => new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+const dateText = (iso: string) => formatInConferenceTime(iso, { dateStyle: "medium", timeStyle: "short" });
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
 function newKey() {
@@ -35,7 +43,7 @@ function newKey() {
  * server's, again at confirm.
  */
 export function BulkActionsPanel(props: Props) {
-  const { eventId, queryString, total, scopeProblem, filters, tags, canTag, canExport, exportFields, hiddenFieldCount, limits, recent } = props;
+  const { eventId, queryString, total, scopeProblem, filters, tags, removableTags, peopleHref, notCarried, canTag, canExport, exportFields, hiddenFieldCount, limits, recent } = props;
   const [action, setAction] = useState<BulkActionKey | "">("");
   const [tagId, setTagId] = useState("");
   const [fields, setFields] = useState<string[]>([]);
@@ -65,6 +73,7 @@ export function BulkActionsPanel(props: Props) {
     try {
       const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/bulk-actions`, {
         method: "POST",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, params: tagAction ? { tagId } : { fields }, query: queryString }),
       });
@@ -84,7 +93,7 @@ export function BulkActionsPanel(props: Props) {
   }
 
   async function readSummary(runId: string) {
-    const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/bulk-actions/${encodeURIComponent(runId)}`);
+    const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/bulk-actions/${encodeURIComponent(runId)}`, { cache: "no-store" });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message ?? "The result could not be read.");
     return data.summary as BulkSummary;
@@ -97,6 +106,7 @@ export function BulkActionsPanel(props: Props) {
     try {
       const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/bulk-actions/${encodeURIComponent(preview.runId)}/confirm`, {
         method: "POST",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idempotencyKey: keyRef.current }),
       });
@@ -152,10 +162,18 @@ export function BulkActionsPanel(props: Props) {
             )}</dd>
           </div>
         </dl>
+        {notCarried.length > 0 && <p className={`${styles.notice} ${styles.warn}`}>The list&apos;s {notCarried.join(" and ")} {notCarried.length > 1 ? "were" : "was"} not carried over. This covers every registration matching the filters above, which may be more than the list showed. <a href={peopleHref}>Go back to the list</a> to check.</p>}
         <p className={styles.sub}>A selection on the list is never widened to the whole filter, and the whole filter is never shortened to fit. Go back to the list to change the filter.</p>
       </section>
 
-      {total !== null && (
+      {total === 0 && (
+        <section className={styles.card} aria-labelledby="bulk-none-title">
+          <h2 className={styles.title} id="bulk-none-title">Nothing to act on</h2>
+          <p className={styles.sub}>No registrations match the current filter. <a href={peopleHref}>Go back to the list</a> and change the filters.</p>
+        </section>
+      )}
+
+      {total !== null && total > 0 && (
         <section className={styles.card} aria-labelledby="bulk-action-title">
           <h2 className={styles.title} id="bulk-action-title">1. Choose an action</h2>
           <fieldset className={styles.fieldset}>
@@ -176,7 +194,7 @@ export function BulkActionsPanel(props: Props) {
               Tag
               <select value={tagId} onChange={(event) => { reset(); setTagId(event.target.value); }}>
                 <option value="">Choose a tag</option>
-                {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+                {(action === "REMOVE_TAG" ? removableTags : tags).map((tag) => <option key={tag.id} value={tag.id}>{tag.name}{"isActive" in tag && !tag.isActive ? " (inactive)" : ""}</option>)}
               </select>
               <span className={styles.help}>Up to {limits.tag} registrations at a time.</span>
             </label>
@@ -255,18 +273,18 @@ export function BulkActionsPanel(props: Props) {
           </ul>
           {summary.notCompleted.length > 0 && (
             <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <caption className="sr-only">Registrations that were not completed</caption>
-                <thead><tr><th scope="col">Confirmation code</th><th scope="col">What happened</th><th scope="col">Why</th></tr></thead>
-                <tbody>
+              <table role="table" className="report-table table-cards">
+                <caption className="sr-only">Registrations that were not completed, by confirmation code</caption>
+                <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Confirmation code</th><th role="columnheader" scope="col">What happened</th><th role="columnheader" scope="col">Why</th></tr></thead>
+                <tbody role="rowgroup">
                   {summary.notCompleted.map((row) => (
-                    <tr key={row.confirmationCode}><td>{row.confirmationCode}</td><td>{OUTCOME_LABELS[row.outcome]}</td><td>{row.reason}</td></tr>
+                    <tr role="row" key={row.confirmationCode}><th role="rowheader" scope="row">{row.confirmationCode}</th><td {...cardCell("What happened")}>{OUTCOME_LABELS[row.outcome]}</td><td {...cardCell("Why")}>{row.reason}</td></tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-          {summary.notCompletedTotal > summary.notCompleted.length && <p className={styles.help}>Showing the first {summary.notCompleted.length} of {summary.notCompletedTotal}.</p>}
+          {summary.notCompletedTotal > summary.notCompleted.length && <p className={styles.help}>{summary.notCompletedTotal - summary.notCompleted.length} more are not listed here. The counts above include them.</p>}
         </section>
       )}
 
@@ -274,16 +292,17 @@ export function BulkActionsPanel(props: Props) {
         <h2 className={styles.title} id="bulk-recent-title">Recent bulk actions</h2>
         {recent.length === 0 ? <p className={styles.empty}>No bulk actions have been run for this event yet.</p> : (
           <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Action</th><th scope="col">Scope</th><th scope="col">Result</th></tr></thead>
-              <tbody>
+            <table role="table" className="report-table table-cards">
+              <caption className="sr-only">The last bulk actions for this event, newest first</caption>
+              <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">When</th><th role="columnheader" scope="col">Who</th><th role="columnheader" scope="col">Action</th><th role="columnheader" scope="col">Scope</th><th role="columnheader" scope="col">Result</th></tr></thead>
+              <tbody role="rowgroup">
                 {recent.map((run) => (
-                  <tr key={run.runId}>
-                    <td>{dateText(run.previewedAt)}</td>
-                    <td>{run.actorName}</td>
-                    <td>{run.actionLabel}</td>
-                    <td>{run.scope.kind === "SELECTED" ? "Selection within " : ""}{plural(run.candidateCount, "registration")}{run.scope.filters.length > 0 ? `: ${run.scope.filters.join("; ")}` : ""}</td>
-                    <td>{run.status === "APPLIED" ? `${run.counts.completed} completed, ${run.counts.skipped} skipped, ${run.counts.conflict} changed, ${run.counts.failed} failed, ${run.counts.obsolete} no longer matching` : run.status === "APPLYING" ? "Being applied" : run.status === "EXPIRED" ? "Preview expired, nothing changed" : "Previewed, not confirmed"}</td>
+                  <tr role="row" key={run.runId}>
+                    <th role="rowheader" scope="row">{dateText(run.previewedAt)}</th>
+                    <td {...cardCell("Who")}>{run.actorName}</td>
+                    <td {...cardCell("Action")}>{run.actionLabel}</td>
+                    <td {...cardCell("Scope")}>{run.scope.kind === "SELECTED" ? "Selection within " : ""}{plural(run.candidateCount, "registration")}{run.scope.filters.length > 0 ? `: ${run.scope.filters.join("; ")}` : ""}</td>
+                    <td {...cardCell("Result")}>{run.status === "APPLIED" ? `${run.counts.completed} completed, ${run.counts.skipped} skipped, ${run.counts.conflict} changed, ${run.counts.failed} failed, ${run.counts.obsolete} no longer matching` : run.status === "APPLYING" ? "Being applied" : run.status === "EXPIRED" ? "Preview expired, nothing changed" : "Previewed, not confirmed"}</td>
                   </tr>
                 ))}
               </tbody>

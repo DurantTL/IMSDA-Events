@@ -2711,7 +2711,9 @@ enum BulkActionOutcome {
 }
 
 /// One reviewed bulk action over registrations of ONE event (#182): the preview, the confirmation and the result. It
-/// stores keys, ids, versions and counts only. It never stores a name, an email, a phone number or an exported file.
+/// stores keys, ids, versions and counts only. It never stores a registrant's name, email or phone number, or an exported
+/// file. `queryString` is the staff member's own search; while the run is PREVIEWED it can hold the search text they typed,
+/// and that text is replaced by "[text]" once the run is confirmed or expires.
 /// `id` is the client-generated UUID. `snapshot` is the candidate registrations as `{ id, v }`, where `v` is the
 /// registration's `updatedAt` at preview time; apply refuses to overwrite one that changed since.
 model BulkActionRun {

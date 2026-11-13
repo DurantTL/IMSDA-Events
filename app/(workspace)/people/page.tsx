@@ -120,6 +120,9 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   // The bulk actions page starts from exactly the filters on this page (#182), in canonical form with no page number.
   const bulkActionsParams = new URLSearchParams(currentViewQuery);
   bulkActionsParams.set("event", event.id);
+  // The quick filter and the form answer filter are not search filters, so the bulk page cannot apply them; it says so.
+  const notCarried = [filter && filter !== "ALL" ? "quick filter" : null, answerQuestion || answerValue ? "form answer filter" : null].filter(Boolean);
+  if (notCarried.length > 0) bulkActionsParams.set("notCarried", notCarried.join(","));
   const bulkActionsHref = `/people/bulk-actions?${bulkActionsParams.toString()}`;
   return <>
       <AdminPageHeader path="/people" eventId={event.id} />

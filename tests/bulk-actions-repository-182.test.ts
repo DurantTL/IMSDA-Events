@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
     writeAuditLog: vi.fn(),
     enumerate: vi.fn(),
     listActiveTags: vi.fn(),
+    listTags: vi.fn(),
     applyTag: vi.fn(),
     removeTag: vi.fn(),
     TagConfigurationError: MockTagConfigurationError,
@@ -23,6 +24,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAudi
 vi.mock("@/modules/registrations/operations-search-repository", () => ({ enumerateOperationsRegistrationIds: mocks.enumerate }));
 vi.mock("@/modules/tags/repository", () => ({
   listActiveTags: mocks.listActiveTags,
+  listTags: mocks.listTags,
   applyRegistrationTag: mocks.applyTag,
   removeRegistrationTag: mocks.removeTag,
   TagConfigurationError: mocks.TagConfigurationError,
@@ -48,7 +50,9 @@ type Reg = {
   _count: { attendees: number };
   tagAssignments: Array<{ tag: { name: string } }>;
   totalAmount: number;
-  payments: Array<{ amount: number; refunds: Array<{ amount: number }> }>;
+  payments: Array<{ amount: number; status?: string; refunds: Array<{ amount: number; status?: string }> }>;
+  event: { billingMode: string };
+  groupRegistration: { id: string } | null;
 };
 type Run = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 type Outcome = { runId: string; registrationId: string; outcome: string; reason: string | null };
@@ -79,7 +83,9 @@ function makeReg(index: number, overrides: Partial<Reg> = {}): Reg {
     _count: { attendees: 2 },
     tagAssignments: [],
     totalAmount: 100,
-    payments: [{ amount: 40, refunds: [] }],
+    payments: [{ amount: 40, status: "SUCCEEDED", refunds: [] }],
+    event: { billingMode: "PER_REGISTRATION" },
+    groupRegistration: null,
     ...overrides,
   };
 }
@@ -90,9 +96,14 @@ function seed(count: number) {
   matching = [...regs.keys()];
 }
 
-function pick(row: Record<string, unknown>, select: Record<string, unknown>) {
+function pick(row: Record<string, unknown>, select: Record<string, any>) { // eslint-disable-line @typescript-eslint/no-explicit-any
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(select)) if (select[key]) out[key] = row[key];
+  // The same status filters the real query asks for: only SUCCEEDED payments and refunds come back.
+  if (select.payments?.where?.status && Array.isArray(row.payments)) {
+    out.payments = (row.payments as Reg["payments"]).filter((payment) => payment.status === select.payments.where.status)
+      .map((payment) => ({ ...payment, refunds: payment.refunds.filter((refund) => refund.status === select.payments.select.refunds.where.status) }));
+  }
   return out;
 }
 
@@ -156,6 +167,7 @@ beforeEach(() => {
   seed(3);
   installPrisma();
   mocks.listActiveTags.mockResolvedValue([TAG]);
+  mocks.listTags.mockResolvedValue([TAG]);
   mocks.enumerate.mockImplementation(async (_viewer: unknown, _params: unknown, _catalog: unknown, _issues: unknown, onlyIds?: string[]) => {
     const ids = onlyIds ? matching.filter((id) => onlyIds.includes(id)) : [...matching];
     return { ok: true, issues: [], total: ids.length, registrationIds: ids, queryString: "", query: {} };
@@ -499,6 +511,88 @@ describe("confirm and apply", () => {
   });
 });
 
+describe("a run always ends", () => {
+  it("audits the confirmation before anything is changed", async () => {
+    const runId = await previewed();
+    await confirmBulkAction(viewer(), runId, KEY);
+    const actions = mocks.writeAuditLog.mock.calls.map((call) => call[0].action);
+    expect(actions).toEqual(["BULK_ACTION_PREVIEWED", "BULK_ACTION_CONFIRMED", "BULK_ACTION_APPLIED"]);
+  });
+
+  it("ends the run with FAILED outcomes when the handler throws, keeping what was done", async () => {
+    const runId = await previewed();
+    // The assignment lookup fails, so the handler stops before it reaches any record.
+    const prisma = mocks.getPrisma();
+    prisma.registrationTagAssignment.findMany.mockRejectedValueOnce(new Error("lookup failed"));
+    mocks.getPrisma.mockReturnValue(prisma);
+    const { summary } = await confirmBulkAction(viewer(), runId, KEY);
+    expect(summary).toMatchObject({ status: "APPLIED", counts: { completed: 0, failed: 3 } });
+    expect(summary.notCompleted.every((row) => row.outcome === "FAILED" && row.reason.includes("stopped"))).toBe(true);
+    expect(runs[0]).toMatchObject({ status: "APPLIED", failedCount: 3 });
+    expect(mocks.writeAuditLog.mock.calls.at(-1)![0].action).toBe("BULK_ACTION_APPLIED");
+    expect(JSON.stringify(outcomes)).not.toContain("lookup failed");
+  });
+
+  it("returns no file and FAILED outcomes when an export cannot be built", async () => {
+    const runId = await previewed(exportInput(["code"]));
+    const prisma = mocks.getPrisma();
+    prisma.registration.findMany.mockResolvedValueOnce([{ id: "reg-1", confirmationCode: "X", updatedAt: new Date("2027-02-01T10:00:00.000Z") }, { id: "reg-2", updatedAt: new Date("2027-02-01T10:00:00.000Z") }, { id: "reg-3", updatedAt: new Date("2027-02-01T10:00:00.000Z") }]);
+    prisma.registration.findMany.mockRejectedValueOnce(new Error("read failed"));
+    const { summary, file } = await confirmBulkAction(viewer(), runId, KEY);
+    expect(file).toBeNull();
+    expect(summary).toMatchObject({ status: "APPLIED", exportRowCount: null, counts: { completed: 0, failed: 3 } });
+  });
+
+  it("ends a run stuck in APPLYING on the retry, once it is past the time limit", async () => {
+    const runId = await previewed();
+    runs[0].status = "APPLYING";
+    runs[0].idempotencyKey = KEY;
+    runs[0].confirmedAt = new Date(NOW.getTime() - 20 * 60_000);
+    const { summary, file } = await confirmBulkAction(viewer(), runId, KEY);
+    expect(file).toBeNull();
+    expect(summary).toMatchObject({ status: "APPLIED", counts: { failed: 3 } });
+    expect(runs[0].status).toBe("APPLIED");
+    expect(mocks.applyTag).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog.mock.calls.at(-1)![0].action).toBe("BULK_ACTION_APPLIED");
+  });
+
+  it("still says in progress for a run that only just started", async () => {
+    const runId = await previewed();
+    runs[0].status = "APPLYING";
+    runs[0].idempotencyKey = KEY;
+    runs[0].confirmedAt = new Date(NOW.getTime() - 60_000);
+    expect((await refusal(confirmBulkAction(viewer(), runId, KEY))).code).toBe("IN_PROGRESS");
+  });
+
+  it("replaces the typed search text once the run is confirmed or expires", async () => {
+    const confirmed = await previewed(tagInput({ query: "q=Uniquesurname" }));
+    expect(runs[0].queryString).toContain("Uniquesurname");
+    await confirmBulkAction(viewer(), confirmed, KEY);
+    expect(runs[0].queryString).toBe("q=%5Btext%5D");
+    const expired = await previewed(tagInput({ query: "q=Othername" }));
+    vi.setSystemTime(new Date(NOW.getTime() + 31 * 60_000));
+    await refusal(confirmBulkAction(viewer(), expired, "another-key-0002"));
+    expect(runs[1].queryString).toBe("q=%5Btext%5D");
+  });
+});
+
+describe("removing an inactive tag", () => {
+  it("is allowed, as for a single registration, while applying one is not", async () => {
+    mocks.listActiveTags.mockResolvedValue([]);
+    mocks.listTags.mockResolvedValue([{ ...TAG, isActive: false }]);
+    assigned.add(`reg-1|${TAG.id}`);
+    expect((await refusal(createBulkPreview(viewer(), tagInput()))).code).toBe("TAG_UNAVAILABLE");
+    const runId = await previewed(tagInput({ action: "REMOVE_TAG" }));
+    const { summary } = await confirmBulkAction(viewer(), runId, KEY);
+    expect(summary.counts).toMatchObject({ completed: 1, skipped: 2 });
+  });
+
+  it("is refused for a deleted tag", async () => {
+    mocks.listTags.mockResolvedValue([]);
+    expect((await refusal(createBulkPreview(viewer(), tagInput({ action: "REMOVE_TAG" })))).code).toBe("TAG_UNAVAILABLE");
+  });
+});
+
 describe("export", () => {
   it("returns a formula-safe CSV once, with only the chosen fields", async () => {
     regs.get("reg-1")!.contactSnapshot.firstName = '=HYPERLINK("http://example.test","click")';
@@ -522,7 +616,32 @@ describe("export", () => {
   it("adds balance and payment state for finance viewers", async () => {
     const runId = await previewed(exportInput(["code", "balance", "paymentState", "attendeeCount", "status", "submittedAt"]));
     const { file } = await confirmBulkAction(viewer(), runId, KEY);
-    expect(file!.body.split("\r\n")[1]).toBe('"CODE0001","60.00","PARTIAL","2","CONFIRMED","2027-01-15T12:00:00.000Z"');
+    expect(file!.body.split("\r\n")[1]).toBe('"CODE0001","60.00","Balance due","2","CONFIRMED","2027-01-15T12:00:00.000Z"');
+  });
+
+  it("counts only succeeded payments and refunds, and uses the finance words", async () => {
+    regs.get("reg-1")!.payments = [
+      { amount: 40, status: "SUCCEEDED", refunds: [{ amount: 10, status: "SUCCEEDED" }, { amount: 30, status: "PENDING" }] },
+      { amount: 60, status: "FAILED", refunds: [] },
+      { amount: 50, status: "PENDING", refunds: [] },
+    ];
+    regs.get("reg-2")!.payments = [{ amount: 100, status: "SUCCEEDED", refunds: [{ amount: 5, status: "FAILED" }] }];
+    regs.get("reg-3")!.totalAmount = 0;
+    regs.get("reg-3")!.payments = [];
+    const runId = await previewed(exportInput(["code", "balance", "paymentState"]));
+    const { file } = await confirmBulkAction(viewer(), runId, KEY);
+    expect(file!.body.trim().split("\r\n").slice(1)).toEqual(['"CODE0001","70.00","Balance due"', '"CODE0002","0.00","Paid in full"', '"CODE0003","0.00","No charge"']);
+  });
+
+  it("shows no balance for a church- or organization-billed registration, and says who is billed", async () => {
+    regs.get("reg-1")!.event = { billingMode: "DEFERRED_ORGANIZATION_INVOICE" };
+    regs.get("reg-1")!.payments = [];
+    regs.get("reg-2")!.event = { billingMode: "DEFERRED_ORGANIZATION_INVOICE" };
+    regs.get("reg-2")!.groupRegistration = { id: "group-1" };
+    regs.get("reg-2")!.payments = [];
+    const runId = await previewed(exportInput(["code", "balance", "paymentState"]));
+    const { file } = await confirmBulkAction(viewer(), runId, KEY);
+    expect(file!.body.trim().split("\r\n").slice(1, 3)).toEqual(['"CODE0001","0.00","Billed to church"', '"CODE0002","0.00","Billed to group contact"']);
   });
 
   it("leaves out records that changed or no longer match, and counts them", async () => {

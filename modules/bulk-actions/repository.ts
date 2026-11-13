@@ -14,6 +14,7 @@ import {
   BulkActionError,
   EXPORT_FIELDS,
   NOT_COMPLETED_LIST_MAX,
+  APPLYING_STALE_MINUTES,
   PREVIEW_TTL_MINUTES,
   auditQueryString,
   canonicalBulkQuery,
@@ -38,9 +39,11 @@ import {
   type SnapshotEntry,
   type StoredParams,
 } from "@/modules/bulk-actions/domain";
+import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
+import { registrationMoneyStatus } from "@/modules/registrations/status-words";
 import { enumerateOperationsRegistrationIds } from "@/modules/registrations/operations-search-repository";
 import { toCsv } from "@/modules/reporting/csv";
-import { applyRegistrationTag, listActiveTags, removeRegistrationTag, TagConfigurationError } from "@/modules/tags/repository";
+import { applyRegistrationTag, listActiveTags, listTags, removeRegistrationTag, TagConfigurationError } from "@/modules/tags/repository";
 
 /**
  * Reviewed bulk actions over registrations, the database half (#182).
@@ -70,12 +73,13 @@ type ActionHandler = {
   /** Candidates the action would skip right now, shown in the preview. */
   skipsFor(eventId: string, params: BulkActionParams, ids: readonly string[]): Promise<PreviewSkip[]>;
   /** Apply to records that passed the apply-time checks. One record failing never stops the rest. */
-  apply(input: { eventId: string; actorUserId: string; runId: string; params: BulkActionParams; ids: readonly string[] }): Promise<{ outcomes: RecordOutcome[]; file?: ExportFile; exportRowCount?: number }>;
+  apply(input: { eventId: string; actorUserId: string; runId: string; params: BulkActionParams; ids: readonly string[]; /** Each record's outcome is pushed here as it is reached, so a throw part-way keeps what was done. */ sink: RecordOutcome[] }): Promise<{ file?: ExportFile; exportRowCount?: number }>;
 };
 
-async function requireActiveTag(eventId: string, tagId: string) {
-  // listActiveTags leaves out recognition tags and inactive ones, so a tag that was deactivated or deleted is not found.
-  const tag = (await listActiveTags(eventId)).find((candidate) => candidate.id === tagId);
+async function requireTag(eventId: string, tagId: string, applying: boolean) {
+  // Both lists leave out recognition tags. Applying needs an active tag; removing works for an inactive one too, as it does
+  // for a single registration, so a retired tag can still be cleaned off. A deleted tag is in neither list.
+  const tag = (await (applying ? listActiveTags(eventId) : listTags(eventId))).find((candidate) => candidate.id === tagId);
   if (!tag) throw new BulkActionError("TAG_UNAVAILABLE", "That tag is no longer available. Choose another tag and preview again.", 409);
   return tag;
 }
@@ -83,7 +87,7 @@ async function requireActiveTag(eventId: string, tagId: string) {
 const tagHandler: ActionHandler = {
   async assertReady(viewer, params) {
     if (params.action === "EXPORT_FIELDS") throw new BulkActionError("INVALID_REQUEST", "Choose a tag.");
-    const tag = await requireActiveTag(viewer.eventId, params.tagId);
+    const tag = await requireTag(viewer.eventId, params.tagId, params.action === "APPLY_TAG");
     return { proposed: params.action === "APPLY_TAG" ? `Apply the tag "${tag.name}"` : `Remove the tag "${tag.name}"` };
   },
   async skipsFor(eventId, params, ids) {
@@ -92,10 +96,10 @@ const tagHandler: ActionHandler = {
     return ids.filter((id) => (params.action === "APPLY_TAG" ? have.has(id) : !have.has(id)))
       .map((id) => ({ id, reason: (params.action === "APPLY_TAG" ? "ALREADY_APPLIED" : "NOT_APPLIED") as BulkReasonCode }));
   },
-  async apply({ eventId, actorUserId, runId, params, ids }) {
-    if (params.action === "EXPORT_FIELDS") return { outcomes: [] };
+  async apply({ eventId, actorUserId, runId, params, ids, sink }) {
+    if (params.action === "EXPORT_FIELDS") return {};
     const have = await activeAssignments(getPrisma(), eventId, params.tagId, ids);
-    const outcomes: RecordOutcome[] = [];
+    const outcomes = sink;
     for (const registrationId of ids) {
       const applying = params.action === "APPLY_TAG";
       if (applying === have.has(registrationId)) {
@@ -117,7 +121,7 @@ const tagHandler: ActionHandler = {
         outcomes.push({ registrationId, outcome: "FAILED", reason: "WRITE_FAILED" });
       }
     }
-    return { outcomes };
+    return {};
   },
 };
 
@@ -146,8 +150,8 @@ const exportHandler: ActionHandler = {
   async skipsFor() {
     return [];
   },
-  async apply({ eventId, params, ids }) {
-    if (params.action !== "EXPORT_FIELDS") return { outcomes: [] };
+  async apply({ eventId, params, ids, sink }) {
+    if (params.action !== "EXPORT_FIELDS") return {};
     const fields = params.fields;
     const wants = (key: ExportFieldKey) => fields.includes(key);
     const needsContact = wants("contactName") || wants("contactEmail") || wants("contactPhone");
@@ -163,7 +167,13 @@ const exportHandler: ActionHandler = {
         ...(wants("attendeeCount") ? { _count: { select: { attendees: true } } } : {}),
         ...(needsContact ? { contactSnapshot: true, accountHolderPerson: { select: { firstName: true, lastName: true, normalizedEmail: true, phone: true } } } : {}),
         ...(wants("tags") ? { tagAssignments: { where: { removedAt: null, tag: { recognitionItem: null } }, select: { tag: { select: { name: true } } } } } : {}),
-        ...(needsMoney ? { totalAmount: true, payments: { select: { amount: true, refunds: { select: { amount: true } } } } } : {}),
+        // Money counts what the finance views count: succeeded payments less succeeded refunds only.
+        ...(needsMoney ? {
+          totalAmount: true,
+          event: { select: { billingMode: true } },
+          groupRegistration: { select: { id: true } },
+          payments: { where: { status: "SUCCEEDED" as const }, select: { amount: true, refunds: { where: { status: "SUCCEEDED" as const }, select: { amount: true } } } },
+        } : {}),
       },
     });
     // Which columns were read depends on the chosen fields, so the row is typed by what each field reads.
@@ -177,6 +187,8 @@ const exportHandler: ActionHandler = {
       accountHolderPerson?: { firstName: string; lastName: string; normalizedEmail: string | null; phone: string | null };
       tagAssignments: Array<{ tag: { name: string } }>;
       totalAmount: { toString(): string };
+      event?: { billingMode: string };
+      groupRegistration?: { id: string } | null;
       payments: Array<{ amount: { toString(): string }; refunds: Array<{ amount: { toString(): string } }> }>;
     };
     const byId = new Map<string, Row>((rows as unknown as Row[]).map((row) => [row.id, row]));
@@ -195,7 +207,9 @@ const exportHandler: ActionHandler = {
         ? row.payments.reduce((sum, payment) => sum + moneyToCents(payment.amount) - payment.refunds.reduce((refunded, refund) => refunded + moneyToCents(refund.amount), 0), 0)
         : 0;
       const totalCents = needsMoney ? moneyToCents(row.totalAmount) : 0;
-      const balanceCents = Math.max(totalCents - paidCents, 0);
+      const deferredBilling = row.event?.billingMode === "DEFERRED_ORGANIZATION_INVOICE";
+      // A church- or organization-billed registration owes nothing online, so its balance is $0 (the same rule as the lists).
+      const balanceCents = attendeeBalanceCents({ balanceCents: Math.max(totalCents - paidCents, 0), isDeferredOrganizationBilling: deferredBilling });
       const cell = (key: ExportFieldKey): string | number => {
         switch (key) {
           case "code": return row.confirmationCode;
@@ -207,7 +221,8 @@ const exportHandler: ActionHandler = {
           case "contactPhone": return text(snapshot.phone) || person?.phone || "";
           case "tags": return row.tagAssignments.map((assignment) => assignment.tag.name).sort().join("; ");
           case "balance": return (balanceCents / 100).toFixed(2);
-          case "paymentState": return paidCents <= 0 ? "UNPAID" : balanceCents > 0 ? "PARTIAL" : "PAID";
+          // The existing finance words: "Balance due", "Paid in full", "No charge", "Billed to church".
+          case "paymentState": return registrationMoneyStatus({ totalCents, balanceCents, deferredBilling, isGroup: Boolean(row.groupRegistration), audience: "staff" });
         }
       };
       // toCsv guards a cell that starts with = + - @ or a control character, so a typed name cannot run as a formula.
@@ -215,7 +230,9 @@ const exportHandler: ActionHandler = {
       outcomes.push({ registrationId, outcome: "COMPLETED" });
     }
     const file: ExportFile = { body: toCsv([header, ...body]) };
-    return { outcomes, file, exportRowCount: body.length };
+    // The file exists only once every row is built, so the outcomes are recorded together with it.
+    sink.push(...outcomes);
+    return { file, exportRowCount: body.length };
   },
 };
 
@@ -481,9 +498,10 @@ export async function confirmBulkAction(
   if (run.actorUserId !== viewer.userId) throw new BulkActionError("WRONG_ACTOR", "Only the person who previewed this action can confirm it.", 403);
 
   // Already confirmed: the same key gets the stored result and changes nothing; another key is refused.
-  if (run.status === "APPLIED" || run.status === "APPLYING") return replay(prisma, run, idempotencyKey);
+  if (run.status === "APPLIED" || run.status === "APPLYING") return replay(prisma, run, idempotencyKey, now);
   if (run.status === "EXPIRED" || isExpired(run, now)) {
-    await prisma.bulkActionRun.updateMany({ where: { id: run.id, status: "PREVIEWED" }, data: { status: "EXPIRED" } });
+    // Typed search text is not kept once the run can no longer be applied.
+    await prisma.bulkActionRun.updateMany({ where: { id: run.id, status: "PREVIEWED" }, data: { status: "EXPIRED", queryString: auditQueryString(run.queryString) } });
     throw new BulkActionError("EXPIRED", "This preview has expired. Preview again to continue.", 409);
   }
 
@@ -506,7 +524,8 @@ export async function confirmBulkAction(
   try {
     claimed = await prisma.bulkActionRun.updateMany({
       where: { id: run.id, eventId: viewer.eventId, actorUserId: viewer.userId, status: "PREVIEWED", expiresAt: { gt: now } },
-      data: { status: "APPLYING", idempotencyKey, confirmedAt: now },
+      // Once the run leaves PREVIEWED the typed search text is replaced; the search above already ran with it.
+      data: { status: "APPLYING", idempotencyKey, confirmedAt: now, queryString: auditQueryString(run.queryString) },
     });
   } catch (error) {
     if (isUniqueViolation(error)) throw new BulkActionError("KEY_IN_USE", "That confirmation key was already used for a different action. Reload the page and try again.", 409);
@@ -514,29 +533,54 @@ export async function confirmBulkAction(
   }
   if (claimed.count === 0) {
     const current = await loadRun(prisma, viewer.eventId, runId);
-    if (current && (current.status === "APPLIED" || current.status === "APPLYING")) return replay(prisma, current, idempotencyKey);
+    if (current && (current.status === "APPLIED" || current.status === "APPLYING")) return replay(prisma, current, idempotencyKey, now);
     throw new BulkActionError("EXPIRED", "This preview has expired. Preview again to continue.", 409);
   }
 
-  const versions = await prisma.registration.findMany({ where: { eventId: viewer.eventId, id: { in: snapshotIds } }, select: { id: true, updatedAt: true } });
-  const currentVersion = new Map(versions.map((row) => [row.id, row.updatedAt.toISOString()]));
-  const outcomes: RecordOutcome[] = [];
-  const eligible: string[] = [];
-  for (const entry of snapshot) {
-    if (!stillMatching.has(entry.id)) outcomes.push({ registrationId: entry.id, outcome: "OBSOLETE", reason: "NO_LONGER_MATCHES" });
-    else if (currentVersion.get(entry.id) !== entry.v) outcomes.push({ registrationId: entry.id, outcome: "CONFLICT", reason: "RECORD_CHANGED" });
-    else eligible.push(entry.id);
-  }
-  const applied = await handler.apply({ eventId: viewer.eventId, actorUserId: viewer.userId, runId: run.id, params, ids: eligible });
-  outcomes.push(...applied.outcomes);
+  // The confirmation is on record before anything is changed, so a run that stops part-way is never unexplained.
+  await writeAuditLog({
+    eventId: viewer.eventId,
+    actorUserId: viewer.userId,
+    action: "BULK_ACTION_CONFIRMED",
+    entityType: "BulkActionRun",
+    entityId: run.id,
+    correlationId: run.id,
+    summary: `Confirmed a bulk action (${BULK_ACTION_CATALOG[action].label}) on ${run.candidateCount} ${run.recordUnit}.`,
+    metadata: { action, params: storedParams(params), queryString: auditQueryString(run.queryString), scopeKind: run.scopeKind, candidateCount: run.candidateCount, actorUserId: viewer.userId } as Prisma.InputJsonValue,
+  });
 
+  const outcomes: RecordOutcome[] = [];
+  let extras: { file?: ExportFile; exportRowCount?: number } = {};
+  try {
+    const versions = await prisma.registration.findMany({ where: { eventId: viewer.eventId, id: { in: snapshotIds } }, select: { id: true, updatedAt: true } });
+    const currentVersion = new Map(versions.map((row) => [row.id, row.updatedAt.toISOString()]));
+    const eligible: string[] = [];
+    for (const entry of snapshot) {
+      if (!stillMatching.has(entry.id)) outcomes.push({ registrationId: entry.id, outcome: "OBSOLETE", reason: "NO_LONGER_MATCHES" });
+      else if (currentVersion.get(entry.id) !== entry.v) outcomes.push({ registrationId: entry.id, outcome: "CONFLICT", reason: "RECORD_CHANGED" });
+      else eligible.push(entry.id);
+    }
+    extras = await handler.apply({ eventId: viewer.eventId, actorUserId: viewer.userId, runId: run.id, params, ids: eligible, sink: outcomes });
+  } catch (error) {
+    // A handler that throws still ends the run: what it did stays recorded and the records it did not reach are FAILED.
+    logError("A bulk action stopped part-way", error, { runId: run.id });
+    extras = {};
+  }
+  const reached = new Set(outcomes.map((row) => row.registrationId));
+  for (const entry of snapshot) if (!reached.has(entry.id)) outcomes.push({ registrationId: entry.id, outcome: "FAILED", reason: "INTERRUPTED" });
+  const summary = await finishRun(prisma, run, viewer.userId, params, outcomes, extras);
+  return { summary, file: extras.file ?? null };
+}
+
+/** Writes the outcomes, ends the run as APPLIED with its counts, and audits it. */
+async function finishRun(prisma: Db, run: RunRow, actorUserId: string, params: BulkActionParams, outcomes: RecordOutcome[], extras: { file?: ExportFile; exportRowCount?: number }) {
   await prisma.bulkActionRecordOutcome.createMany({
     data: outcomes.map((row) => ({ runId: run.id, registrationId: row.registrationId, outcome: row.outcome, reason: row.reason ?? null })),
     skipDuplicates: true,
   });
   const counts = tallyOutcomes(outcomes);
   const completedAt = new Date();
-  const exportRowCount = applied.file ? applied.exportRowCount ?? 0 : null;
+  const exportRowCount = extras.file ? extras.exportRowCount ?? 0 : null;
   await prisma.bulkActionRun.updateMany({
     where: { id: run.id, status: "APPLYING" },
     data: {
@@ -552,36 +596,49 @@ export async function confirmBulkAction(
   });
   const stored = storedParams(params);
   await writeAuditLog({
-    eventId: viewer.eventId,
-    actorUserId: viewer.userId,
+    eventId: run.eventId,
+    actorUserId,
     action: "BULK_ACTION_APPLIED",
     entityType: "BulkActionRun",
     entityId: run.id,
     correlationId: run.id,
-    summary: `Applied a bulk action (${BULK_ACTION_CATALOG[action].label}): ${counts.completed} completed, ${counts.skipped} skipped, ${counts.conflict} changed since preview, ${counts.failed} failed, ${counts.obsolete} no longer matching.`,
+    summary: `Applied a bulk action (${BULK_ACTION_CATALOG[run.action].label}): ${counts.completed} completed, ${counts.skipped} skipped, ${counts.conflict} changed since preview, ${counts.failed} failed, ${counts.obsolete} no longer matching.`,
     metadata: {
-      action,
+      action: run.action,
       params: stored,
       queryString: auditQueryString(run.queryString),
       scopeKind: run.scopeKind,
       recordUnit: run.recordUnit,
       candidateCount: run.candidateCount,
       counts,
-      actorUserId: viewer.userId,
-      ...(applied.file ? { export: { fields: "fields" in stored ? stored.fields : [], filters: auditQueryString(run.queryString), rowCount: exportRowCount, exportedAt: completedAt.toISOString() } } : {}),
+      actorUserId,
+      ...(extras.file ? { export: { fields: "fields" in stored ? stored.fields : [], filters: auditQueryString(run.queryString), rowCount: exportRowCount, exportedAt: completedAt.toISOString() } } : {}),
     } as Prisma.InputJsonValue,
   });
-
-  const final = await loadRun(prisma, viewer.eventId, run.id);
-  const summary = await summarize(prisma, final ?? { ...run, status: "APPLIED", completedAt, completedCount: counts.completed, skippedCount: counts.skipped, conflictCount: counts.conflict, failedCount: counts.failed, obsoleteCount: counts.obsolete, exportRowCount }, false);
-  return { summary, file: applied.file ?? null };
+  const final = await loadRun(prisma, run.eventId, run.id);
+  return summarize(prisma, final ?? { ...run, status: "APPLIED", completedAt, completedCount: counts.completed, skippedCount: counts.skipped, conflictCount: counts.conflict, failedCount: counts.failed, obsoleteCount: counts.obsolete, exportRowCount }, false);
 }
 
-async function replay(prisma: Db, run: RunRow, idempotencyKey: string): Promise<BulkConfirmResult> {
+async function replay(prisma: Db, run: RunRow, idempotencyKey: string, now: Date): Promise<BulkConfirmResult> {
   if (run.idempotencyKey !== idempotencyKey) {
     throw new BulkActionError("ALREADY_CONFIRMED", "This action was already confirmed. Its result is in Recent bulk actions. Preview again to run it again.", 409);
   }
-  if (run.status === "APPLYING") throw new BulkActionError("IN_PROGRESS", "This action is still being applied. Check Recent bulk actions in a moment.", 409);
+  if (run.status === "APPLYING") {
+    const started = run.confirmedAt?.getTime() ?? 0;
+    if (now.getTime() - started < APPLYING_STALE_MINUTES * 60_000) {
+      throw new BulkActionError("IN_PROGRESS", "This action is still being applied. Check Recent bulk actions in a moment.", 409);
+    }
+    // Applying for too long: the process that was doing it is gone. End the run so it is never stuck. Records with no
+    // outcome are FAILED ("interrupted"), because it cannot be known whether the change was made.
+    const done = await prisma.bulkActionRecordOutcome.findMany({ where: { runId: run.id }, select: { registrationId: true, outcome: true, reason: true } });
+    const reached = new Set(done.map((row) => row.registrationId));
+    const outcomes: RecordOutcome[] = [
+      ...done.map((row) => ({ registrationId: row.registrationId, outcome: row.outcome as BulkActionOutcomeKey, reason: (row.reason ?? undefined) as BulkReasonCode | undefined })),
+      ...parseSnapshot(run.snapshot).filter((entry) => !reached.has(entry.id)).map((entry) => ({ registrationId: entry.id, outcome: "FAILED" as const, reason: "INTERRUPTED" as const })),
+    ];
+    const summary = await finishRun(prisma, run, run.actorUserId, paramsFromStored(run.action, run.params), outcomes, {});
+    return { summary: { ...summary, replayed: true }, file: null };
+  }
   // No second change and no second file.
   return { summary: await summarize(prisma, run, true), file: null };
 }

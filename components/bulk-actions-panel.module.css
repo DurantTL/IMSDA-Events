@@ -46,9 +46,6 @@
 }
 .countNumber { color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1.125rem); font-weight: 700; }
 .tableWrap { max-width: 100%; overflow-x: auto; }
-.table { width: 100%; border-collapse: collapse; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.table th, .table td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
-.table th { color: var(--muted); font-weight: 700; }
 .empty { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 @media (max-width: 640px) {
   .card { padding: 12px; }
