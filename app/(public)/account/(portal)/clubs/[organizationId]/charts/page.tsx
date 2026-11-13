@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { canSwitchClubFeatures } from "@/modules/club-features/domain";
 import { BackLink } from "@/components/back-link";
 import { clubAccessClosed } from "@/components/club-access-closed";
 import { ClubRosterCharts } from "@/components/club-roster-charts";
@@ -41,7 +42,7 @@ export default async function ClubRosterChartsPage({
         <p className="quiet-copy">
           Counts of the active people on your roster this club year. Each chart has a table you can open under it. Nothing is
           stored or sent.
-          {access.capabilities.editProfile && <> You can turn this off in <a href={`${base}/club-info#club-optional-features`}>Club settings</a>.</>}
+          {canSwitchClubFeatures(access.capabilities) && <> You can turn this off in <a href={`${base}/club-info#club-optional-features`}>Club settings</a>.</>}
         </p>
         <ClubRosterCharts action={`${base}/charts`} view={view} />
       </section>

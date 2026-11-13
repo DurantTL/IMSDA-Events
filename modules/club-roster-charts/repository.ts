@@ -74,7 +74,7 @@ export async function rosterChartsAvailable(organizationId: string, capabilities
 export async function loadRosterCharts(
   organizationId: string,
   capabilities: Pick<ClubCapabilities, "roster" | "seeBirthDates">,
-  options: { month?: number; actor?: RosterChartsActor } = {},
+  options: { month?: number; actor: RosterChartsActor },
   now = new Date(),
 ): Promise<RosterChartsView | null> {
   if (!(await rosterChartsAvailable(organizationId, capabilities))) return null;
@@ -123,7 +123,7 @@ export async function loadRosterCharts(
     };
     // Age groups and month/day together can rebuild a full birth date, so each view that shows birthdays is audited
     // (ADR 0005 Addendum A). The entry holds counts and ids only: no name and no date.
-    if (options.actor) await auditBirthdaysViewed(organizationId, clubYear, month, birthdayView.birthdays.length, options.actor);
+    await auditBirthdaysViewed(organizationId, clubYear, month, birthdayView.birthdays.length, options.actor);
   }
 
   return {
