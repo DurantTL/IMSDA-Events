@@ -1,0 +1,9 @@
+.card { display: grid; gap: 12px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.photo,
+.initials { width: 96px; height: 96px; flex: none; border-radius: var(--radius-pill); }
+.photo { object-fit: cover; background: var(--imsda-navy-soft); }
+.initials { display: grid; place-items: center; background: var(--imsda-navy-soft); color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1.5rem); font-weight: 700; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button { min-height: 44px; }
+.help { margin: 0; }

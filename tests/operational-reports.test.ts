@@ -403,4 +403,28 @@ describe("operational reports", () => {
     ]);
     expect(operationalReportCsv(report, "volunteer-roster")).toContain("515-555-0100");
   });
+
+  it("counts a Not attending seminar answer apart from every seminar rank (#893)", () => {
+    const base = registration();
+    const report = buildOperationalReport([registration({
+      publicSubmission: {
+        ...base.publicSubmission!,
+        attendeeResponses: [
+          { rank_the_sessions_654: ["Prayer", "Service"] },
+          { rank_the_sessions_654: ["__not_attending__"] },
+        ],
+      },
+    })]);
+
+    expect(report.seminars[0].notAttending).toBe(1);
+    expect(report.seminars[0].choices).toEqual([
+      { label: "Prayer", firstChoice: 1, secondChoice: 0, totalInterest: 1 },
+      { label: "Service", firstChoice: 0, secondChoice: 1, totalInterest: 1 },
+    ]);
+    expect(report.seminars[0].totalInterest).toBe(2);
+    const csv = operationalReportCsv(report, "seminars");
+    expect(csv).toContain("Not attending (no seat)");
+    expect(csv).toContain("People not attending");
+    expect(csv).not.toContain("__not_attending__");
+  });
 });

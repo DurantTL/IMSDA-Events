@@ -34,6 +34,7 @@ import {
   type ChoiceUsage,
   type FormCalculation,
   type RegistrationFormDefinition,
+  realChoiceValues,
 } from "@/modules/forms/definition";
 import {
   calendarDateInTimeZone,
@@ -526,7 +527,8 @@ function selectedCapacityChoices(
       for (const participant of participants) {
         if (!isFieldVisible(field, participant.responses)) continue;
         const value = participant.responses[field.key];
-        const options = Array.isArray(value) ? value.map(String) : typeof value === "string" && value ? [value] : [];
+        // "Not attending" (#893) is never a selection, so it takes no seat or interest row.
+        const options = realChoiceValues(value);
         options.forEach((optionValue, rank) => selections.push({
           fieldId: field.id,
           fieldKey: field.key,

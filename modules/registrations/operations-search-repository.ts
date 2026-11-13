@@ -126,7 +126,7 @@ export async function loadOperationsSearchCatalog(viewer: SearchViewer): Promise
     prisma.eventLocation.findMany({ where: { eventId }, select: { id: true, name: true }, orderBy: { name: "asc" }, take: 200 }),
     viewerCanUseDomain(viewer, "identity") ? loadEventOrganizations(eventId) : Promise.resolve([]),
     viewerCanUseDomain(viewer, "tags")
-      ? prisma.eventTag.findMany({ where: { eventId }, select: { id: true, name: true, isActive: true }, orderBy: { name: "asc" }, take: 500 })
+      ? prisma.eventTag.findMany({ where: { eventId, recognitionItem: null }, select: { id: true, name: true, isActive: true }, orderBy: { name: "asc" }, take: 500 })
       : Promise.resolve([]),
     viewerCanUseDomain(viewer, "formAnswers") ? loadFilterableQuestions(eventId) : Promise.resolve([]),
   ]);

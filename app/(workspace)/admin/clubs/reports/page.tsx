@@ -18,6 +18,8 @@ import { REVIEW_FILTER, recordsToReview } from "@/modules/club-reports/review-do
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { MonthlyRecordReminders } from "@/components/monthly-record-reminders";
+import { MonthlyRecordAreaReview } from "@/components/monthly-record-area-review";
+import { getAreaReviewSwitch } from "@/modules/club-reports/area-review";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { getMonthlyRecordReminderOverview } from "@/modules/club-reports/monthly-reminders";
 import {
@@ -60,6 +62,7 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
     sort: reminderSorting.order,
     page: Number(one(search[sortParamNames(REMINDER_LOG_PREFIX).page]) ?? 1) || 1,
   });
+  const areaReview = await getAreaReviewSwitch(now);
   const reminderPageHref = (page: number) => {
     const params = new URLSearchParams();
     for (const [name, value] of Object.entries(search)) if (typeof value === "string") params.set(name, value);
@@ -98,6 +101,7 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
         isSystemAdmin={user.globalRole === "SYSTEM_ADMIN"}
         sorting={reminderSorting}
       />
+      <MonthlyRecordAreaReview clubYear={areaReview.clubYear} enabled={areaReview.enabled} />
     </>
   );
 }

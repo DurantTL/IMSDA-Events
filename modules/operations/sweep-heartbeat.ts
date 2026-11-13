@@ -29,6 +29,7 @@ export const CLASS_WAITLIST_SWEEP_JOB = "class-waitlist-sweep";
 export const INSTRUCTOR_CLASS_EMAILS_JOB = "instructor-class-emails";
 export const HONOR_WATCH_SUMMARIES_JOB = "honor-watch-summaries";
 export const MONTHLY_RECORD_REMINDERS_JOB = "monthly-record-reminders";
+export const CLUB_DRAFT_REMINDERS_JOB = "club-draft-reminders";
 export const HEALTH_SNAPSHOT_SWEEP_JOB = "health-snapshot-sweep";
 export const RETENTION_CLEANUP_JOB = "retention-cleanup";
 export const GOOGLE_KEYS_REACHABILITY_JOB = "google-keys-reachability";

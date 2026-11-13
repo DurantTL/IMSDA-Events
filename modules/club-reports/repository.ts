@@ -4,6 +4,7 @@ import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-mi
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { areaReturnAllowsChange, supersedeCurrentReviews } from "@/modules/club-reports/area-review";
 import {
   clubReportClosedMessage,
   clubJoinSelect,
@@ -146,6 +147,10 @@ export async function getClubReportYear(organizationId: string, clubYear: string
  * due date; after that, including a reopened draft, only staff (not act-as)
  * can (#640). On-time points come from the first time a report
  * reaches SUBMITTED, and never change on later edits, reopens, or resubmits.
+ *
+ * One narrow exception (#1701): with Area Coordinator review on for the report's club year and a current returned
+ * item, the club may change and resubmit after the due date. Any save as SUBMITTED supersedes the coordinator's
+ * current decisions; a draft save keeps them so the director still sees the notes.
  */
 export async function saveClubReport(
   organizationId: string,
@@ -181,8 +186,10 @@ export async function saveClubReport(
     // A report that was never submitted can still go in late; a first
     // submission earns no on-time points. Only conference staff (not "act as")
     // can change a closed report.
+    let afterAreaReturn = false;
     if (existing?.firstSubmittedAt && isClub && pastDue) {
-      throw new ClubReportError("CLUB_REPORT_LOCKED", clubReportClosedMessage(reportMonth));
+      afterAreaReturn = await areaReturnAllowsChange(tx, { id: existing.id, clubYear });
+      if (!afterAreaReturn) throw new ClubReportError("CLUB_REPORT_LOCKED", clubReportClosedMessage(reportMonth));
     }
     const becomingSubmittedNow = input.status === "SUBMITTED" && !existing?.firstSubmittedAt;
     const firstSubmittedAt = input.status === "SUBMITTED" ? (existing?.firstSubmittedAt ?? now) : (existing?.firstSubmittedAt ?? null);
@@ -219,6 +226,8 @@ export async function saveClubReport(
     const saved = existing
       ? await tx.clubMonthlyReport.update({ where: { id: existing.id }, data, select: reportSelect })
       : await tx.clubMonthlyReport.create({ data: { ...data, organizationId, reportMonth }, select: reportSelect });
+    // A save that leaves the record SUBMITTED needs a fresh look from the coordinator (#1701).
+    const supersededDecisions = existing && input.status === "SUBMITTED" ? await supersedeCurrentReviews(tx, existing.id, now) : 0;
     const action = input.status === "DRAFT" ? "CLUB_REPORT_DRAFT_SAVED" : becomingSubmittedNow ? "CLUB_REPORT_SUBMITTED" : "CLUB_REPORT_UPDATED";
     await writeAuditLog({
       ...("userId" in actor ? { actorUserId: actor.userId } : {}),
@@ -237,6 +246,8 @@ export async function saveClubReport(
           ? { previousTotalPoints: existing.totalPoints, previousOnTimePoints: existing.onTimePoints }
           : {}),
         ...(existing?.reviewedAt ? { reviewCleared: true } : {}),
+        ...(afterAreaReturn ? { afterAreaReturn: true } : {}),
+        ...(supersededDecisions > 0 ? { areaDecisionsSuperseded: supersededDecisions } : {}),
         ...(!isClub && pastDue && input.status === "SUBMITTED" && existing?.firstSubmittedAt && existing.status === "DRAFT"
           ? { resubmittedAfterDueDate: true }
           : {}),
@@ -250,15 +261,21 @@ export async function saveClubReport(
 /**
  * Reopens a SUBMITTED report to DRAFT so a director can change it (#426).
  * Allowed until the report's due date — the same rule that already locks a
- * club out of editing (`isLockedForClub`); after that only staff can act.
+ * club out of editing (`isLockedForClub`); after that only staff can act, except
+ * for a record with a current returned item (#1701).
  * `firstSubmittedAt` and any on-time credit already earned stay untouched.
  */
 export async function reopenClubReport(organizationId: string, reportMonth: string, actor: ClubReportActor, now = new Date()) {
-  if (isLockedForClub(reportMonth, now)) {
-    throw new ClubReportError("CLUB_REPORT_LOCKED", clubReportClosedMessage(reportMonth));
-  }
+  const pastDue = isLockedForClub(reportMonth, now);
   const prisma = getPrisma();
   return prisma.$transaction(async (tx) => {
+    // After the due date, only a record with a current returned item (switch on, #1701) can be reopened.
+    let afterAreaReturn = false;
+    if (pastDue) {
+      const report = await tx.clubMonthlyReport.findUnique({ where: { organizationId_reportMonth: { organizationId, reportMonth } }, select: { id: true } });
+      afterAreaReturn = report ? await areaReturnAllowsChange(tx, { id: report.id, clubYear: clubYearFor(new Date(`${reportMonth}-15T12:00:00Z`)) }) : false;
+      if (!afterAreaReturn) throw new ClubReportError("CLUB_REPORT_LOCKED", clubReportClosedMessage(reportMonth));
+    }
     const club = await tx.organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true } });
     if (!club || club.type !== "CLUB") throw new ClubReportError("CLUB_NOT_FOUND", "That club could not be found.");
     const existing = await tx.clubMonthlyReport.findUnique({
@@ -287,6 +304,7 @@ export async function reopenClubReport(organizationId: string, reportMonth: stri
         totalPoints: saved.totalPoints,
         onTimePoints: saved.onTimePoints,
         ...(existing.reviewedAt ? { reviewCleared: true } : {}),
+        ...(afterAreaReturn ? { afterAreaReturn: true } : {}),
         ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : actor.actAsId ? { actAsId: actor.actAsId } : {}),
       },
     }, tx);

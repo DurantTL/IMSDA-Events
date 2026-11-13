@@ -11,7 +11,7 @@ import {
 
 export class TagConfigurationError extends Error {
   constructor(
-    public readonly code: "NOT_FOUND" | "NAME_CONFLICT" | "INACTIVE_TAG" | "CROSS_EVENT_REFERENCE",
+    public readonly code: "NOT_FOUND" | "NAME_CONFLICT" | "INACTIVE_TAG" | "CROSS_EVENT_REFERENCE" | "RECOGNITION_TAG",
     message: string,
   ) {
     super(message);
@@ -32,13 +32,14 @@ function serializeTag(tag: { id: string; name: string; color: string; descriptio
   return { id: tag.id, name: tag.name, color: tag.color, description: tag.description, isActive: tag.isActive };
 }
 
+/** The event's ordinary tags. Recognition tags (#1683) have their own list and are left out here. */
 export async function listTags(eventId: string) {
-  const tags = await getPrisma().eventTag.findMany({ where: { eventId }, orderBy: tagOrder });
+  const tags = await getPrisma().eventTag.findMany({ where: { eventId, recognitionItem: null }, orderBy: tagOrder });
   return tags.map(serializeTag);
 }
 
 export async function listActiveTags(eventId: string) {
-  const tags = await getPrisma().eventTag.findMany({ where: { eventId, isActive: true }, orderBy: tagOrder });
+  const tags = await getPrisma().eventTag.findMany({ where: { eventId, isActive: true, recognitionItem: null }, orderBy: tagOrder });
   return tags.map(serializeTag);
 }
 
@@ -62,7 +63,7 @@ export async function createTag(eventId: string, actorUserId: string, rawInput: 
 
 export async function updateTag(eventId: string, tagId: string, actorUserId: string, rawInput: unknown) {
   const input = tagUpdateSchema.parse(rawInput);
-  const existing = await getPrisma().eventTag.findFirst({ where: { id: tagId, eventId } });
+  const existing = await getPrisma().eventTag.findFirst({ where: { id: tagId, eventId, recognitionItem: null } });
   if (!existing) throw new TagConfigurationError("NOT_FOUND", "That tag was not found for this event.");
   try {
     return await getPrisma().$transaction(async (tx) => {
@@ -85,9 +86,17 @@ export async function updateTag(eventId: string, tagId: string, actorUserId: str
   } catch (error) { return conflict(error); }
 }
 
-async function activeTag(eventId: string, tagId: string) {
+/** A recognition tag (#1683) is marked and undone only from the Recognitions page, which passes `allowRecognition`. */
+function refuseRecognitionTag(tag: { recognitionItem: unknown }, allowRecognition: boolean) {
+  if (tag.recognitionItem !== null && !allowRecognition) {
+    throw new TagConfigurationError("RECOGNITION_TAG", "That is a recognition. Mark and undo it from the Recognitions page.");
+  }
+}
+
+async function activeTag(eventId: string, tagId: string, allowRecognition = false) {
   const tag = await getPrisma().eventTag.findFirst({ where: { id: tagId, eventId } });
   if (!tag) throw new TagConfigurationError("NOT_FOUND", "That tag was not found for this event.");
+  refuseRecognitionTag(tag, allowRecognition);
   if (!tag.isActive) throw new TagConfigurationError("INACTIVE_TAG", "That tag is no longer active and cannot be applied.");
   return tag;
 }
@@ -186,9 +195,9 @@ export async function removeRegistrationTag(eventId: string, registrationId: str
   });
 }
 
-export async function applyAttendeeTag(eventId: string, attendeeId: string, tagId: string, actorUserId: string) {
+export async function applyAttendeeTag(eventId: string, attendeeId: string, tagId: string, actorUserId: string, options: { allowRecognition?: boolean } = {}) {
   const prisma = getPrisma();
-  const tag = await activeTag(eventId, tagId);
+  const tag = await activeTag(eventId, tagId, options.allowRecognition === true);
   const attendee = await prisma.registrationAttendee.findFirst({ where: { id: attendeeId, eventId }, select: { id: true } });
   if (!attendee) throw new TagConfigurationError("NOT_FOUND", "That attendee was not found for this event.");
 
@@ -213,13 +222,14 @@ export async function applyAttendeeTag(eventId: string, attendeeId: string, tagI
   });
 }
 
-export async function removeAttendeeTag(eventId: string, attendeeId: string, tagId: string, actorUserId: string) {
+export async function removeAttendeeTag(eventId: string, attendeeId: string, tagId: string, actorUserId: string, options: { allowRecognition?: boolean } = {}) {
   const prisma = getPrisma();
   const existingActive = await prisma.attendeeTagAssignment.findFirst({
     where: { eventId, attendeeId, tagId, removedAt: null },
     include: { tag: true },
   });
   if (!existingActive) throw new TagConfigurationError("NOT_FOUND", "That tag is not currently applied to this attendee.");
+  refuseRecognitionTag(existingActive.tag, options.allowRecognition === true);
 
   return prisma.$transaction(async (tx) => {
     const removed = await tx.attendeeTagAssignment.update({

@@ -10,3 +10,6 @@
 .cisPanelList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .cisPanelList li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .cisPanelList li > div { min-width: 0; flex: 1 1 16rem; overflow-wrap: anywhere; }
+.cisPanelGate { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px 12px; }
+.cisPanelGate > p { flex: 1 1 16rem; }
+.cisPanelSwitch { min-height: 44px; }

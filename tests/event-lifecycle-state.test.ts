@@ -12,6 +12,7 @@ import {
   legacyLifecycleState,
   normalizeLifecycleReason,
   type EventLifecycleStateName,
+  rulePermissions,
 } from "@/modules/events/lifecycle-state";
 
 const started = { started: true, ended: false };
@@ -94,7 +95,13 @@ const allowedTable: Array<[EventLifecycleStateName, EventLifecycleStateName, Eve
   ["IN_PROGRESS", "COMPLETE", "CONFIGURE_EVENT"],
   ["COMPLETE", "FINANCIAL_RECONCILIATION", "MANAGE_FINANCE"],
   ["FINANCIAL_RECONCILIATION", "CLOSED", "MANAGE_FINANCE"],
+  ["CLOSED", "FINANCIAL_RECONCILIATION", "MANAGE_FINANCE"],
 ];
+
+// The closeout moves (#1515) accept either finance permission: every permission a rule lets through.
+const closeoutAnyOf: Array<EventPermission> = ["MANAGE_FINANCE", "FINALIZE_INVOICES"];
+const permissionsFor = (rule: { from: EventLifecycleStateName; to: EventLifecycleStateName; permission: EventPermission }) =>
+  rule.from === "FINANCIAL_RECONCILIATION" || rule.from === "CLOSED" ? closeoutAnyOf : [rule.permission];
 
 describe("declared transitions", () => {
   it("declares exactly the agreed table", () => {
@@ -102,12 +109,37 @@ describe("declared transitions", () => {
   });
 
   it.each(allowedTable)("%s -> %s needs %s", (from, to, permission) => {
-    const holds = decideLifecycleTransition({ from, to, permissions: [permission], time: ended, readinessComplete: true });
-    expect(holds.allowed).toBe(true);
-    const others = eventPermissions.filter((candidate) => candidate !== permission);
+    const accepted = permissionsFor({ from, to, permission });
+    for (const held of accepted) expect(decideLifecycleTransition({ from, to, permissions: [held], time: ended, readinessComplete: true }).allowed, held).toBe(true);
+    const others = eventPermissions.filter((candidate) => !accepted.includes(candidate));
     const denied = decideLifecycleTransition({ from, to, permissions: others, time: ended, readinessComplete: true });
     expect(denied).toMatchObject({ allowed: false, refusal: { code: "PERMISSION_DENIED", permission } });
     expect(decideLifecycleTransition({ from, to, permissions: [], time: ended, readinessComplete: true }).allowed).toBe(false);
+  });
+
+  it("lets either finance permission close out or reopen an event, and nobody else (#1515)", () => {
+    for (const [from, to] of [["FINANCIAL_RECONCILIATION", "CLOSED"], ["CLOSED", "FINANCIAL_RECONCILIATION"]] as const) {
+      const rule = eventLifecycleTransitions.find((candidate) => candidate.from === from && candidate.to === to)!;
+      expect(rulePermissions(rule)).toEqual(["MANAGE_FINANCE", "FINALIZE_INVOICES"]);
+      expect(rule.closeoutAction).toBe(from === "CLOSED" ? "REOPEN" : "SIGN_OFF");
+      for (const permission of ["MANAGE_FINANCE", "FINALIZE_INVOICES"] as const) {
+        expect(decideLifecycleTransition({ from, to, permissions: [permission], time: ended }).allowed, `${from} -> ${to} ${permission}`).toBe(true);
+      }
+      expect(decideLifecycleTransition({ from, to, permissions: ["CONFIGURE_EVENT", "VIEW_REPORTS", "MANAGE_REGISTRATION"], time: ended })).toMatchObject({ allowed: false, refusal: { code: "PERMISSION_DENIED", permission: "MANAGE_FINANCE" } });
+    }
+  });
+
+  it("keeps every other rule on its single permission, with no closeout action", () => {
+    for (const rule of eventLifecycleTransitions.filter((candidate) => candidate.from !== "FINANCIAL_RECONCILIATION" && candidate.from !== "CLOSED")) {
+      expect(rule.anyOf, `${rule.from} -> ${rule.to}`).toBeUndefined();
+      expect(rule.closeoutAction, `${rule.from} -> ${rule.to}`).toBeUndefined();
+      expect(rulePermissions(rule)).toEqual([rule.permission]);
+    }
+  });
+
+  it("does not offer the closeout moves as generic next states", () => {
+    expect(allowedNextStates({ from: "FINANCIAL_RECONCILIATION", permissions: ["MANAGE_FINANCE", "FINALIZE_INVOICES"], time: ended })).toEqual([]);
+    expect(allowedNextStates({ from: "CLOSED", permissions: ["MANAGE_FINANCE", "FINALIZE_INVOICES"], time: ended })).toEqual([]);
   });
 
   it("refuses every move that is not declared, with UNKNOWN_TRANSITION", () => {

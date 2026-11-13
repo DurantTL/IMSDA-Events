@@ -265,6 +265,8 @@ export function FinanceWorkspace({
         description="Search by attendee or payer, record offline payments, review Square card payments, and track confirmed refunds."
         extra={<span className="count-badge"><WalletCards aria-hidden="true" size={17} /> {registrations.length} registrations</span>}
         tools={[
+          { href: `/finance/money-report?event=${eventId}`, label: "Event money report" },
+          { href: `/finance/closeout?event=${eventId}`, label: "Event closeout" },
           { href: `/finance/church-owed?event=${eventId}`, label: "Owed by churches" },
           { href: `/finance/billing-responsibility?event=${eventId}`, label: "Billing responsibility" },
           { href: `/finance/attendance-reconciliation?event=${eventId}`, label: "Attendance reconciliation" },

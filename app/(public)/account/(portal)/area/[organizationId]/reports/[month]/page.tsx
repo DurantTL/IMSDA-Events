@@ -5,7 +5,8 @@ import { ClubReportForm } from "@/components/club-report-form";
 import { getPrisma } from "@/lib/prisma";
 import { formatDueDate, noSubmittedReportMessage, isReportMonth, reportDueDate, reportMonthLabel } from "@/modules/club-reports/domain";
 import { getClubReport, reportPrefill } from "@/modules/club-reports/repository";
-import { currentAreaCoordinatorMaySeeClub } from "@/modules/organizations/area-coordinators";
+import { getItemDecisionsForRecord } from "@/modules/club-reports/area-review";
+import { currentAreaCoordinator, currentAreaCoordinatorMaySeeClub } from "@/modules/organizations/area-coordinators";
 
 export const metadata: Metadata = { title: "Monthly Record", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -29,9 +30,15 @@ export default async function AreaClubReportPage({ params }: { params: Promise<{
   }
   const rosterPrefill = await reportPrefill(organizationId, new Date());
   const prefill = { ...rosterPrefill, averageAttendance: null, honors: [] };
+  // Item-by-item review (#1701): only while the conference switch is on for this record's year. Controls are for a real
+  // coordinator (checked here and again in the route); staff acting as one see the decisions and nothing to press.
+  const { switchOn, decisions } = await getItemDecisionsForRecord(organizationId, month);
+  const coordinator = switchOn ? await currentAreaCoordinator() : null;
 
   return (
     <ClubReportForm
+        areaReviewTarget={coordinator ? { organizationId, month, version: report.updatedAt } : undefined}
+        itemDecisions={switchOn ? decisions : undefined}
         clubKind={club.clubKind}
       dueLabel={formatDueDate(reportDueDate(month))}
       endpoint="/api/attendee/area-report-read-only"
@@ -40,7 +47,7 @@ export default async function AreaClubReportPage({ params }: { params: Promise<{
       monthLabel={reportMonthLabel(month)}
       prefill={prefill}
       readOnly
-      readOnlyNote="View only. The club files and changes its own reports."
+      readOnlyNote={coordinator ? "The club files and changes its own reports. You can mark each item OK or return it with a note." : "View only. The club files and changes its own reports."}
     />
   );
 }

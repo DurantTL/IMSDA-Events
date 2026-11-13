@@ -41,6 +41,7 @@ vi.mock("@/modules/system-admin/pending-invites", () => ({
 }));
 vi.mock("@/modules/organizations/area-coordinator-invites", () => ({ countPendingAreaCoordinatorInvites: async () => 0 }));
 vi.mock("@/modules/account-merge/account-link", () => ({ isUnifiedSignInEnabled: async () => false }));
+vi.mock("@/modules/profile-photos/repository", () => ({ getProfilePhotoState: async () => ({ hasPhoto: false, version: null, removedByStaffAt: null }) }));
 vi.mock("@/modules/people/person-merge-repository", () => ({ listActivePersonMerges: mocks.listActivePersonMerges }));
 vi.mock("@/modules/people/duplicate-match-repository", () => ({ listOpenMatchCandidates: mocks.listOpenMatchCandidates }));
 // The section header looks the viewer's role up in the database; its own tests cover it.

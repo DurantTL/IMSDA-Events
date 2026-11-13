@@ -1,5 +1,6 @@
 "use client";
 
+import { choiceDisplayLabel } from "@/modules/forms/definition";
 import { ListPager } from "@/components/list-pager";
 import { ExactValue, Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
@@ -107,7 +108,7 @@ function answerLabel(key: string) {
 }
 
 function answerValue(value: unknown) {
-  if (Array.isArray(value)) return value.join(", ");
+  if (Array.isArray(value)) return value.map((entry) => choiceDisplayLabel(String(entry))).join(", ");
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (value === null || value === undefined || value === "") return "Not provided";
   return String(value);

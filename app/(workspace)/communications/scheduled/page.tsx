@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
 import { PageHeader } from "@/components/page-header";
+import { ClubDraftReminderSettings } from "@/components/club-draft-reminder-settings";
 import { ScheduledEmailsWorkspace } from "@/components/scheduled-emails-workspace";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { getClubDraftReminderOverview } from "@/modules/club-registrations/draft-reminders";
 import { listScheduledEmails } from "@/modules/communications/scheduled-email-repository";
 import { resolveEventContext } from "@/modules/events/selection";
 
@@ -33,15 +35,22 @@ export default async function ScheduledEmailsPage({
       </>
     );
   }
-  const schedules = await listScheduledEmails(event.id);
+  const [schedules, draftReminders] = await Promise.all([listScheduledEmails(event.id), getClubDraftReminderOverview(event.id)]);
   return (
-    <ScheduledEmailsWorkspace
-      key={event.id}
-      eventId={event.id}
-      eventName={event.name}
-      eventTimezone={event.timezone}
-      initialSchedules={schedules}
-      openNew={openNew === "1"}
-    />
+    <>
+      <ScheduledEmailsWorkspace
+        key={event.id}
+        eventId={event.id}
+        eventName={event.name}
+        eventTimezone={event.timezone}
+        initialSchedules={schedules}
+        openNew={openNew === "1"}
+      />
+      {draftReminders && (
+        <div className="page-stack">
+          <ClubDraftReminderSettings key={`reminders-${event.id}`} eventId={event.id} eventTimezone={event.timezone} initial={draftReminders} />
+        </div>
+      )}
+    </>
   );
 }
