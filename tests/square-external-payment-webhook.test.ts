@@ -71,6 +71,8 @@ function transactionClient() {
       create: vi.fn().mockResolvedValue({}),
     },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
+    // The event's stored state, read to decide whether money recorded now needs a closed-event flag.
+    $queryRaw: vi.fn().mockResolvedValue([{ lifecycleState: "FINANCIAL_RECONCILIATION" }]),
   };
 }
 

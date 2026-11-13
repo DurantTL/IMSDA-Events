@@ -111,6 +111,8 @@ vi.mock("@/lib/prisma", () => ({
         payment: { findFirst: mocks.paymentFindFirst, update: mocks.paymentUpdate, create: mocks.paymentCreate },
         importRecord: { update: mocks.importRecordUpdate },
         auditLog: { create: mocks.auditLogCreate },
+        // The event's stored state, read before a payment or refund row is written.
+        $queryRaw: vi.fn().mockResolvedValue([{ lifecycleState: "FINANCIAL_RECONCILIATION" }]),
       };
       return callback(tx);
     },

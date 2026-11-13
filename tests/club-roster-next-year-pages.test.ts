@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/club-roster-charts/repository", () => ({ rosterChartsAvailable: async () => false }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: mocks.getRosterAccessStateForPage }));
 vi.mock("@/modules/club-rosters/carry-forward", () => ({ getCarryForwardOffer: mocks.getCarryForwardOffer }));

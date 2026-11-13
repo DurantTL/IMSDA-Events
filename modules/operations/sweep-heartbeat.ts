@@ -36,6 +36,8 @@ export const GOOGLE_KEYS_REACHABILITY_JOB = "google-keys-reachability";
 export const BREACH_SERVICE_REACHABILITY_JOB = "breach-service-reachability";
 export const APPLE_PAY_FILE_REACHABILITY_JOB = "apple-pay-file-reachability";
 export const CALENDAR_FEED_REACHABILITY_JOB = "calendar-feed-reachability";
+/** Publishes the event page sections whose scheduled time has come (#1514). */
+export const EVENT_PAGE_SCHEDULED_PUBLISH_JOB = "event-page-scheduled-publish";
 
 /**
  * Calendar refresh and message file cleanup run on every five-minute sweep, so twelve missed runs (an hour without a

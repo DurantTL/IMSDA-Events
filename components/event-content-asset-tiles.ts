@@ -23,6 +23,8 @@ export type SectionDraft = {
   /** Per-kind content of the #816 blocks. Absent for the older kinds. */
   data?: Record<string, unknown>;
   isPublished: boolean;
+  /** When an unpublished section publishes itself (#1514), as an ISO time; null or absent for none. */
+  scheduledPublishAt?: string | null;
   links: LinkDraft[];
 };
 

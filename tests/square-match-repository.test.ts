@@ -68,6 +68,8 @@ function transactionClient() {
       create: vi.fn().mockResolvedValue({ id: "payment-9" }),
     },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
+    // The event's stored state, read in the transaction before the payment is written.
+    $queryRaw: vi.fn().mockResolvedValue([{ lifecycleState: "FINANCIAL_RECONCILIATION" }]),
   };
 }
 

@@ -25,4 +25,7 @@ export const tokenRoutePrefixes: readonly (readonly string[])[] = [
   // The Pay on Square return id is an opaque bearer id for a status view (`/pay/square/return/<returnId>`).
   ["pay", "square", "return"],
   ["api", "public", "square-return"],
+  // A private preview of an event page's unpublished changes (#1514).
+  ["event-preview"],
+  ["api", "public", "event-preview"],
 ];

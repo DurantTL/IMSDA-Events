@@ -50,6 +50,8 @@ export default async function EventContentPage({
             <ul className={styles.anchors}>
               <li><a href="#event-content-uploads">Uploads</a></li>
               <li><a href="#event-content-sections">Sections</a></li>
+              <li><a href="#event-content-preview-link">Preview link</a></li>
+              <li><a href="#event-content-versions">Published versions</a></li>
             </ul>
           </nav>
         }

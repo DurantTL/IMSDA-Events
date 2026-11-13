@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/club-roster-charts/repository", () => ({ rosterChartsAvailable: async () => false }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ clubRosterMember: { findMany: mocks.rosterFindMany }, tltProfile: { findMany: mocks.profileFindMany } }) }));
 vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: mocks.getRosterAccessStateForPage }));

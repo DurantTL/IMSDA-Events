@@ -38,8 +38,8 @@ function hrefOf(tag: string): string | undefined {
   return expression ? `{${expression[1]}}` : undefined;
 }
 
-// The homepage's header lives in a component (#111) so the real page and the staff preview draw the same markup.
-const filesWithBrandLink = [...listTsxFiles(appDir), join(process.cwd(), "components/public-home-page.tsx")]
+// The homepage and the event page headers live in components (#111, #1514) so the real page and the staff preview draw the same markup.
+const filesWithBrandLink = [...listTsxFiles(appDir), join(process.cwd(), "components/public-home-page.tsx"), join(process.cwd(), "components/public-event-landing-view.tsx")]
   .filter((file) => readFileSync(file, "utf8").includes(BRAND_CLASS))
   .map((file) => relative(process.cwd(), file))
   .sort();
@@ -51,7 +51,7 @@ describe("public header logo links (#470)", () => {
       "app/not-found.tsx",
       "app/(public)/clubs/page.tsx",
       "app/(public)/calendar/page.tsx",
-      "app/(public)/events/[eventSlug]/page.tsx",
+      "components/public-event-landing-view.tsx",
       "app/(public)/manage/[token]/page.tsx",
     ]) {
       expect(filesWithBrandLink).toContain(known);

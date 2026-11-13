@@ -1,7 +1,8 @@
 import { ClipboardCheck, WalletCards } from "lucide-react";
+import { ClosedMoneyReview } from "@/components/closed-money-review";
 import { EventCloseoutActions } from "@/components/event-closeout-actions";
 import { withCurrentEvent } from "@/components/staff-navigation";
-import { CLOSEOUT_NOTE_MAX_LENGTH, checkLabels, closeoutStateWords, type CloseoutCheck } from "@/modules/events/closeout-domain";
+import { CLOSED_MONEY_CLEAR_NOTE_MAX_LENGTH, CLOSEOUT_NOTE_MAX_LENGTH, checkLabels, closeoutStateWords, type CloseoutCheck } from "@/modules/events/closeout-domain";
 import type { CloseoutView } from "@/modules/events/closeout-repository";
 import { LIFECYCLE_REASON_MAX_LENGTH } from "@/modules/events/lifecycle-state";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
@@ -66,6 +67,14 @@ export function EventCloseoutView({ data, canSignOff, canManageFinance, canOpenM
         {data.stateLabel}. {summaryText}
       </p>
 
+      {closed && data.closedMoney.length > 0 ? (
+        <p className={`${styles.summary} ${styles.summaryBlocking}`} role="alert" data-testid="closeout-closed-money-notice">
+          {canSignOff
+            ? "Money arrived after this event was closed. A finance admin must mark it reviewed below. Reopen the event only if something needs to change."
+            : "Money arrived after this event was closed. A finance admin must review it."}
+        </p>
+      ) : null}
+
       <section className={styles.panel} aria-labelledby="closeout-checks">
         <h3 className={styles.panelHeading} id="closeout-checks">Checklist</h3>
         <p className={styles.note}>Blocking checks stop the sign-off. Warnings can be signed off once you have reviewed them. A check that could not be read is never shown as ready.</p>
@@ -85,6 +94,8 @@ export function EventCloseoutView({ data, canSignOff, canManageFinance, canOpenM
           })}
         </ul>
       </section>
+
+      <ClosedMoneyReview eventId={data.eventId} items={data.closedMoney} canReview={canSignOff} noteMaxLength={CLOSED_MONEY_CLEAR_NOTE_MAX_LENGTH} />
 
       <section className={styles.panel} aria-labelledby="closeout-signoff">
         <h3 className={styles.panelHeading} id="closeout-signoff"><ClipboardCheck aria-hidden="true" size={18} /> Sign-off</h3>

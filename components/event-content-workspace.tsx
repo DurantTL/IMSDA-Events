@@ -24,6 +24,10 @@ import {
   type EventContentTone,
 } from "@/modules/events/content-schemas";
 import { EVENT_GUIDE_STARTER_EVENT } from "@/components/event-content-starter-button";
+import { EventPagePreviewLinkPanel } from "@/components/event-page-preview-link-panel";
+import { EventPageVersionsPanel } from "@/components/event-page-versions-panel";
+import { centralLocalToIso, centralScheduleLabel, isoToCentralLocal } from "@/modules/events/content-schedule";
+import publishing from "@/components/event-page-publishing.module.css";
 import styles from "@/components/event-content-workspace.module.css";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
@@ -261,6 +265,7 @@ function draftsFrom(sections: EventContentSectionRecord[]): SectionDraft[] {
     placement: section.placement,
     items: section.items.map((item) => ({ ...item })),
     isPublished: section.isPublished,
+    scheduledPublishAt: section.isPublished ? null : section.scheduledPublishAt,
     links: section.links.map((link) => ({ ...link })),
     // Only the #816 blocks carry data; the older kinds save exactly as before.
     ...(isNewBlockKind(section.kind) && section.kind !== "CUSTOM_HTML" && section.kind !== "FORMATTED_TEXT"
@@ -314,6 +319,8 @@ export function EventContentWorkspace({
   // and what stays, before the click that will only take effect once the
   // page is saved.
   const [removeSectionIndex, setRemoveSectionIndex] = useState<number | null>(null);
+  // Bumped after a save so the published-versions list reloads (#1514).
+  const [versionsRefresh, setVersionsRefresh] = useState(0);
 
   const dirty = JSON.stringify(sections) !== JSON.stringify(saved);
   // Unsaved page edits are backed up in this browser and come back after a reload (#1263).
@@ -485,6 +492,17 @@ export function EventContentWorkspace({
     }
   }
 
+  function onVersionRestored(result: { sections: EventContentSectionRecord[]; sanitizedHtml?: Record<string, SanitizedHtml>; versionNumber: number }) {
+    const next = draftsFrom(result.sections);
+    setSections(next);
+    setSaved(next);
+    if (result.sanitizedHtml) setSanitizedHtml(result.sanitizedHtml);
+    setVersionsRefresh((count) => count + 1);
+    allowNextNavigation();
+    setError("");
+    setNotice(`Restored version ${result.versionNumber}. Visitors now see those published sections; your unpublished sections were kept.`);
+  }
+
   async function save(submitEvent?: React.FormEvent<HTMLFormElement>) {
     submitEvent?.preventDefault();
     if (saving) return;
@@ -507,6 +525,7 @@ export function EventContentWorkspace({
       setSections(next);
       setSaved(next);
       if (result.sanitizedHtml) setSanitizedHtml(result.sanitizedHtml);
+      setVersionsRefresh((count) => count + 1);
       allowNextNavigation();
       // Where each file is used just changed; refresh it for the file list and
       // delete dialog. Best effort: the server re-checks on delete anyway.
@@ -607,6 +626,9 @@ export function EventContentWorkspace({
                 <span className={styles.chips}>
                   <span className="status-chip neutral">{kindLabels[section.kind]}</span>
                   <span className={`status-chip ${section.isPublished ? "green" : "gold"}`}>{section.isPublished ? "Published" : "Draft"}</span>
+                  {!section.isPublished && section.scheduledPublishAt ? (
+                    <span className="status-chip purple">Scheduled for {centralScheduleLabel(section.scheduledPublishAt)}</span>
+                  ) : null}
                   {section.kind === "CUSTOM_HTML" && !isSystemAdmin ? <span className="status-chip purple">System administrator only</span> : null}
                 </span>
               </div>
@@ -757,13 +779,41 @@ export function EventContentWorkspace({
                 type="checkbox"
                 checked={section.isPublished}
                 disabled={section.kind === "CUSTOM_HTML" && !isSystemAdmin}
-                onChange={(event) => updateSection(index, { isPublished: event.target.checked })}
+                onChange={(event) => updateSection(index, event.target.checked ? { isPublished: true, scheduledPublishAt: null } : { isPublished: false })}
               />
               <span>
                 <strong>Publish this section</strong>
                 <small>Unpublished sections are kept here and are never sent to a visitor. Where it appears depends on its placement.</small>
               </span>
             </label>
+            {!section.isPublished && (
+              <div className={publishing.scheduleField}>
+                <label>
+                  Publish at (Central time)
+                  <input
+                    type="datetime-local"
+                    value={isoToCentralLocal(section.scheduledPublishAt)}
+                    disabled={section.kind === "CUSTOM_HTML" && !isSystemAdmin}
+                    onChange={(event) => updateSection(index, { scheduledPublishAt: centralLocalToIso(event.target.value) })}
+                  />
+                </label>
+                <div className={publishing.scheduleControls}>
+                  {section.scheduledPublishAt && (
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={section.kind === "CUSTOM_HTML" && !isSystemAdmin}
+                      onClick={() => updateSection(index, { scheduledPublishAt: null })}
+                    >
+                      Remove publish time
+                    </button>
+                  )}
+                </div>
+                <p className={publishing.scheduleHelp}>
+                  Optional. The section publishes itself at this time once the page is saved. Leave it empty to publish by hand.
+                </p>
+              </div>
+            )}
           </section>
         ))}
 
@@ -819,6 +869,9 @@ export function EventContentWorkspace({
           </button>
         </div>
       </form>
+
+      <EventPagePreviewLinkPanel eventId={eventId} dirty={dirty} />
+      <EventPageVersionsPanel eventId={eventId} refreshKey={versionsRefresh} dirty={dirty} onRestored={onVersionRestored} />
 
       <ConfirmDialog
         busy={false}

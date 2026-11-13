@@ -1,0 +1,11 @@
+/* Roster charts and birthdays (#1704). Sizes, colours and radii come from the shared tokens. */
+.grid { display: grid; align-items: start; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.section { display: grid; gap: 12px; min-width: 0; }
+.filter { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.filter label { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.filter select { min-height: 44px; }
+.filter button { min-height: 44px; }
+.birthdays { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.birthday { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); padding: 10px 12px; }
+.birthdayDay { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.empty { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { logError } from "@/lib/logger";
 import { AccessDeniedError } from "@/modules/access/authorization";
+import { EventClosedError } from "@/modules/events/money-lock";
 import { CancellationExecutionError } from "@/modules/cancellation-execution/repository";
 
 /** Error responses for the staff "Carry out" route (#171). Private and uncached like the rest of the finance routes. */
@@ -18,6 +19,9 @@ export function executionError(error: unknown) {
     return executionJson({ error: "INVALID_JSON", message: "The request is not valid JSON." }, { status: 400 });
   }
   if (error instanceof AccessDeniedError) {
+    return executionJson({ error: error.code, message: error.message }, { status: error.status });
+  }
+  if (error instanceof EventClosedError) {
     return executionJson({ error: error.code, message: error.message }, { status: error.status });
   }
   if (error instanceof CancellationExecutionError) {
