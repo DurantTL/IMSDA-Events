@@ -52,7 +52,8 @@ export default async function ClubCertificatesPage({
         <GetFilterForm action={`${base}/certificates`} className={styles.filters}>
           <div className={styles.field}>
             <label htmlFor="certificates-kind">Kind</label>
-            <select defaultValue={filter.kind} id="certificates-kind" name="kind">
+            {/* Keyed: React ignores a select's new defaultValue after mount, so the form's reset would otherwise go back to the first value. */}
+            <select defaultValue={filter.kind} id="certificates-kind" key={filter.kind} name="kind">
               <option value="ALL">Honors and classes</option>
               <option value="HONOR">Honors only</option>
               <option value="CLASS">Classes only</option>
