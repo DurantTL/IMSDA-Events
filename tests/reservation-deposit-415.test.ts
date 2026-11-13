@@ -434,7 +434,10 @@ describe("staff-recorded check deposit (#415)", () => {
     });
 
     expect(attempts).toBe(2);
-    expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+    // Each attempt reads the event's state (the money lock) and then locks the registration: two attempts, two registration locks.
+    const queries = tx.$queryRaw.mock.calls.map(([strings]) => (strings as string[]).join("?"));
+    expect(queries.filter((sql) => /FROM "Registration"/.test(sql))).toHaveLength(2);
+    expect(queries.filter((sql) => /FROM "Event"/.test(sql))).toHaveLength(2);
     expect(tx.payment.create).toHaveBeenCalledTimes(1);
     expect(tx.auditLog.create).toHaveBeenCalledTimes(1);
   });

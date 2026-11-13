@@ -3,6 +3,7 @@ import { AccessDeniedError, requirePermission } from "@/modules/access/authoriza
 import { getCurrentSession } from "@/modules/access/current-session";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { findActiveMembership } from "@/modules/events/repository";
+import { EventClosedError } from "@/modules/events/money-lock";
 import { PaymentOperationError, recordRefund } from "@/modules/payments/repository";
 import { refundInputSchema } from "@/modules/payments/schemas";
 import { logError } from "@/lib/logger";
@@ -23,6 +24,7 @@ async function postHandler(
   } catch (error) {
     if (error instanceof z.ZodError) return Response.json({ error: "INVALID_REFUND", issues: error.issues }, { status: 400 });
     if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
+    if (error instanceof EventClosedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
     if (error instanceof PaymentOperationError) {
       const status = error.code === "REFUND_EXCEEDS_AVAILABLE"
         ? 400

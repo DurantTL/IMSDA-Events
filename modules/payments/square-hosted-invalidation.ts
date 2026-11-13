@@ -35,6 +35,7 @@ export type HostedInvalidationReason =
   | "REGISTRATION_NOT_PAYABLE"
   | "SUPERSEDED_BY_NEW_LINK"
   | "SETTING_OFF"
+  | "EVENT_CLOSED"
   | "EXPIRED";
 
 /**
