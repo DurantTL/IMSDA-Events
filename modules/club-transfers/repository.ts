@@ -8,6 +8,7 @@ import { crossSitePickCount } from "@/modules/honors/locations";
 import { EventLocationError, locationTransactionTimeoutMs } from "@/modules/event-locations/errors";
 import "server-only";
 
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -341,7 +342,7 @@ export async function isGuestClub(organizationId: string) {
 /** Active clubs a director may name as the member's current club (the club picker). No roster data. */
 export async function listTransferClubOptions(excludingOrganizationId: string) {
   return getPrisma().organization.findMany({
-    where: { type: "CLUB", isActive: true, guestEventId: null, id: { not: excludingOrganizationId } },
+    where: { ...conferenceClubWhere(), id: { not: excludingOrganizationId } },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
@@ -388,7 +389,7 @@ async function requestTransferOnce(toOrganizationId: string, input: RequestTrans
   const clubYear = clubYearFor(now);
   return getPrisma().$transaction(async (tx) => {
     const [fromClub, toClub] = await Promise.all([
-      tx.organization.findFirst({ where: { id: input.fromOrganizationId, type: "CLUB", isActive: true, guestEventId: null }, select: { id: true, name: true } }),
+      tx.organization.findFirst({ where: { ...conferenceClubWhere(), id: input.fromOrganizationId }, select: { id: true, name: true } }),
       tx.organization.findUniqueOrThrow({ where: { id: toOrganizationId }, select: { name: true, guestEventId: true } }),
     ]);
     if (toClub.guestEventId) throw new MemberTransferError("GUEST_CLUB", "A visiting club can't request member transfers.");

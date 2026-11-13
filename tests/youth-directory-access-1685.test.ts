@@ -164,7 +164,7 @@ describe("the CSV export route", () => {
     as(people.systemAdmin!);
     await get();
     const args = mocks.memberFindMany.mock.calls[0]![0];
-    expect(args.where).toEqual({ clubYear: "2026-27", status: "ACTIVE", attendeeType: "YOUTH", organization: { type: "CLUB", isActive: true } });
+    expect(args.where).toEqual({ clubYear: "2026-27", status: "ACTIVE", attendeeType: "YOUTH", organization: { type: "CLUB", isActive: true, guestEventId: null } });
     const selected = JSON.stringify(args.select);
     expect(selected).not.toMatch(/gender|guardian|health|createdBy|sourceRegistration/i);
     expect(Object.keys(args.select).sort()).toEqual(["attendeeType", "churchMember", "classLevel", "id", "isTlt", "organization", "person", "reportedAge", "schoolGrade", "schoolType", "sealedBirthDate"]);

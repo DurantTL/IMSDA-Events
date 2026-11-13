@@ -57,17 +57,17 @@ const attendee = { account: { id: "acct-1" }, via: "attendee", sessionId: "s1" }
 const signedOut = { account: null, via: null, sessionId: null };
 
 /** The viewer's own club grants as listDirectedClubs reads them (the same findMany, filtered by account). */
-function viewerGrants(roles: string[]) {
-  return roles.map((role) => ({ role, organization: { id: `club-${role}`, name: `Club ${role}`, parentOrganization: null } }));
+function viewerGrants(roles: string[], guestEventId: string | null = null) {
+  return roles.map((role) => ({ role, organization: { id: `club-${role}`, name: `Club ${role}`, guestEventId, parentOrganization: null } }));
 }
 
-function setup(options: { enabled?: boolean; who?: "attendee" | "staffActAs" | "anonymous"; roles?: string[]; areaCoordinator?: boolean; secondStep?: "OK" | "VERIFY" }) {
+function setup(options: { guest?: boolean; enabled?: boolean; who?: "attendee" | "staffActAs" | "anonymous"; roles?: string[]; areaCoordinator?: boolean; secondStep?: "OK" | "VERIFY" }) {
   mocks.settingsFindUnique.mockResolvedValue({ leaderDirectoryEnabled: options.enabled ?? true });
   const who = options.who ?? "attendee";
   mocks.getCurrentAttendee.mockResolvedValue(who === "attendee" ? attendee : signedOut);
   mocks.accountNeedsSecondStep.mockResolvedValue(options.secondStep ?? "OK");
   // listDirectedClubs asks for the viewer's own grants; the directory read asks for everyone's.
-  mocks.grantFindMany.mockImplementation(async (args: { where: { attendeeAccountId?: string } }) => (args.where.attendeeAccountId ? viewerGrants(options.roles ?? []) : []));
+  mocks.grantFindMany.mockImplementation(async (args: { where: { attendeeAccountId?: string } }) => (args.where.attendeeAccountId ? viewerGrants(options.roles ?? [], options.guest ? "event-guest" : null) : []));
   mocks.areaGrantFindUnique.mockResolvedValue(options.areaCoordinator ? { revokedAt: null, expiresAt: null } : null);
 }
 
@@ -99,6 +99,13 @@ describe("who can open the leader directory (#1707)", () => {
     const viewer = await currentLeaderDirectoryViewer();
     expect(Boolean(viewer)).toBe(allowed);
     if (allowed) expect(viewer).toEqual({ accountId: "acct-1" });
+  });
+
+  it("does not let a visiting club's director or deputy in, but an Area Coordinator still can", async () => {
+    setup({ roles: ["DIRECTOR", "DEPUTY"], guest: true });
+    await expect(currentLeaderDirectoryViewer()).resolves.toBeNull();
+    setup({ roles: ["DIRECTOR"], guest: true, areaCoordinator: true });
+    await expect(currentLeaderDirectoryViewer()).resolves.toEqual({ accountId: "acct-1" });
   });
 
   it("reads no grants at all while the switch is off", async () => {
@@ -181,7 +188,7 @@ describe("the directory read (#1707)", () => {
     expect(where.revokedAt).toBeNull();
     expect(where.effectiveFrom).toEqual({ lte: now });
     expect(where.OR).toEqual([{ effectiveTo: null }, { effectiveTo: { gt: now } }]);
-    expect(where.organization).toEqual({ type: "CLUB", isActive: true });
+    expect(where.organization).toEqual({ type: "CLUB", isActive: true, guestEventId: null });
     expect(where.attendeeAccount.OR).toContainEqual({ leaderDirectoryPreference: { is: { listed: true } } });
   });
 
