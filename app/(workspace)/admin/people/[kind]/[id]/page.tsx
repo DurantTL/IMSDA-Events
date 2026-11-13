@@ -5,6 +5,8 @@ import { parseGrantParam, parsePeopleQuery, planGrantItems } from "@/modules/sys
 import { PendingInvites } from "@/components/pending-invites";
 import { PersonAccess, PersonIdentity } from "@/components/person-access";
 import { DetailPage } from "@/components/page-templates/detail-page";
+import { AdminProfilePhoto } from "@/components/admin-profile-photo";
+import { getProfilePhotoState } from "@/modules/profile-photos/repository";
 import { PersonGrantPanel } from "@/components/person-grant-panel";
 import { listPendingInvites } from "@/modules/system-admin/pending-invites";
 import { AdminPageHeader } from "@/components/admin-page-header";
@@ -51,6 +53,8 @@ export default async function PersonAccessPage({
     activeEvents: (person.events ?? []).filter((event) => event.active).map((event) => ({ eventId: event.eventId, role: event.role })),
     clubRoles: person.clubs.filter((club) => club.status === "active" || club.status === "scheduled").map((club) => ({ organizationId: club.organizationId, role: club.role })),
   });
+  // A system administrator can remove an inappropriate staff photo (#1640); nobody else sees it here.
+  const photo = full && person.staffId ? await getProfilePhotoState(person.staffId) : null;
   const cleanHref = `/admin/people/${kind}/${encodeURIComponent(id)}${from ? `?from=${encodeURIComponent(from)}` : ""}`;
   return (
     <>
@@ -64,6 +68,11 @@ export default async function PersonAccessPage({
           below: <PersonIdentity person={person} />,
         }}
       >
+        {photo?.hasPhoto && photo.version !== null && person.staffId ? (
+          <div className={styles.wrap}>
+            <AdminProfilePhoto displayName={person.staff?.displayName ?? person.name} userId={person.staffId} version={photo.version} />
+          </div>
+        ) : null}
         {grantRows.length > 0 || pending.invites.length > 0 ? (
           <div className={styles.wrap}>
             {grantRows.length > 0 ? (

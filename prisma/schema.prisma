@@ -978,6 +978,9 @@ model User {
   /// The person this staff account is explicitly linked to, if any. Grants
   /// nothing by itself — see `UserPersonLink`.
   personLink                        UserPersonLink?              @relation("UserPersonLinkUser")
+  /// The staff account's own profile photo (#1640), and the photos a system administrator removed.
+  profilePhoto                      ProfilePhoto?                @relation("ProfilePhotoOwner")
+  removedProfilePhotos              ProfilePhoto[]               @relation("ProfilePhotoRemovedBy")
   actorOnUserPersonLinks             UserPersonLink[]             @relation("UserPersonLinkActor")
   actorOnAttendeeAccountPersonLinks  AttendeeAccountPersonLink[]  @relation("AttendeeAccountPersonLinkActorUser")
   staffActAs                         StaffActAs[]                 @relation("StaffActAsUser")
@@ -2935,6 +2938,36 @@ model AttendeeAccountPersonLink {
 
   @@unique([accountId])
   @@index([personId])
+}
+
+/// A staff account's profile photo (#1640). One row per account. The row holds only storage keys and bookkeeping,
+/// never image bytes; the files live in the shared asset storage under the `profile-photos` partition and are served
+/// only through a signed-in route that checks the viewer may see that person.
+/// Both storage keys NULL means no photo. `removedByStaffAt` set while the keys are NULL is a tombstone: a system
+/// administrator removed the photo, and the person is told on their profile page until they add a new one.
+model ProfilePhoto {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  /// The 512 px square, stored as WebP with all camera metadata (location included) dropped.
+  storageKey        String?   @unique
+  /// The 128 px square used in lists and the header.
+  thumbStorageKey   String?   @unique
+  /// Size of the 512 px file in bytes.
+  byteSize          Int?
+  /// SHA-256 of the 512 px file.
+  checksum          String?
+  /// When the current photo was stored; also the cache-busting version in photo URLs.
+  uploadedAt        DateTime?
+  /// When a system administrator removed the photo, kept until the person adds a new one.
+  removedByStaffAt  DateTime?
+  removedByUserId   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user      User  @relation("ProfilePhotoOwner", fields: [userId], references: [id], onDelete: Cascade)
+  removedBy User? @relation("ProfilePhotoRemovedBy", fields: [removedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([removedByUserId])
 }
 
 /// Explicit, provenance-carrying link from a staff `User` to a `Person`.

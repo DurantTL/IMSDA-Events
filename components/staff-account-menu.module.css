@@ -15,3 +15,9 @@ div.popover:focus-visible { outline: 3px solid var(--imsda-purple); outline-offs
 .close { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); padding: 0 12px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; cursor: pointer; }
 .close:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
 .head .close { width: auto; flex: none; }
+
+/* The person's profile photo (#1640): round, in the header button and next to the name in the popover. */
+.photo { width: 36px; height: 36px; border-radius: var(--radius-pill); object-fit: cover; }
+.identity { display: flex; align-items: center; gap: 12px; }
+.identity p { margin: 0; }
+.photoLarge { width: 48px; height: 48px; flex: none; border-radius: var(--radius-pill); object-fit: cover; }

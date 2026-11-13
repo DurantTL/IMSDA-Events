@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AccountAnnouncementBanner } from "@/components/account-announcement-banner";
 import { AttendeeAccountSettings } from "@/components/attendee-account-settings";
 import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
+import { ProfilePhotoCard } from "@/components/profile-photo-card";
 import { MfaManager } from "@/components/mfa-manager";
 import { SessionManager } from "@/components/session-manager";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -52,6 +53,7 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
           </dl>
           <p className="field-help profile-readonly-note">Your name and email are managed by a system administrator, so they cannot be edited here.</p>
         </section>
+        {data.profilePhoto && <ProfilePhotoCard displayName={staff.displayName} photo={data.profilePhoto} />}
         <MfaManager initialStatus={mfaStatus} />
         <StaffPasskeyManager
           available={passkeySettings.available}

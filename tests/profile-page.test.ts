@@ -25,6 +25,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/profile-photos/repository", () => ({ getProfilePhotoState: async () => ({ hasPhoto: false, version: null, removedByStaffAt: null }) }));
+vi.mock("@/components/profile-photo-card", () => ({ ProfilePhotoCard: () => null }));
 vi.mock("@/modules/account-merge/person", () => ({
   // The one-sign-in switch is off here (#554): no link is ever resolved.
   resolvePersonFrom: async ({ staff, attendee }: { staff: unknown; attendee: { account: unknown } }) => ({

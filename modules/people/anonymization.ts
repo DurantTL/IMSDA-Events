@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { removeProfilePhotosForPerson } from "@/modules/profile-photos/repository";
 import { isDisclosureAllowed, staffIdentityAudience } from "@/modules/people/disclosure-matrix";
 
 /**
@@ -61,7 +62,7 @@ export async function anonymizePerson(input: AnonymizePersonInput) {
     throw new PersonAnonymizationError("INVALID_REFERENCE", "An approval reference of at least five characters is required.");
   }
 
-  return getPrisma().$transaction(async (tx) => {
+  const result = await getPrisma().$transaction(async (tx) => {
     // The same lock merge and unmerge take (kept as a literal so this file stays free of merge imports), so an
     // anonymization cannot commit between a merge's anonymized check and the merge's own commit.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('person-merge', 0))`;
@@ -106,4 +107,8 @@ export async function anonymizePerson(input: AnonymizePersonInput) {
     }, tx);
     return { personId: person.id, alreadyAnonymized: false as const };
   }, { timeout: 15000 });
+  // The anonymization has committed. Profile photos of staff accounts linked to this person are deleted too (#1640);
+  // it also runs on a repeat call so a failed cleanup can be retried, and never throws, so a file problem cannot undo or fail the anonymization.
+  await removeProfilePhotosForPerson(result.personId);
+  return result;
 }
