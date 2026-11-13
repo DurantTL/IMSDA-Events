@@ -56,7 +56,7 @@ describe("gate mode domain (#1684)", () => {
 
 describe("gate mode schema (#1684)", () => {
   const schema = readFileSync("prisma/schema.prisma", "utf8");
-  const migration = readFileSync("prisma/migrations/20270160100000_check_in_gate_mode/migration.sql", "utf8");
+  const migration = readFileSync("prisma/migrations/20270167100000_check_in_gate_mode/migration.sql", "utf8");
 
   it("is off by default and stores arrivals with a unique key", () => {
     expect(schema).toMatch(/checkInGateModeEnabled\s+Boolean\s+@default\(false\)/);
