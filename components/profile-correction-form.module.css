@@ -61,3 +61,24 @@
   margin: 0;
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--touch-target);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.check input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.loading {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}

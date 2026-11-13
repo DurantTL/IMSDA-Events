@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { ageOn, parseCalendarDate } from "@/modules/club-rosters/domain";
+import { BIRTH_DATE_FIELD_KEYS, todayDateValue } from "@/modules/forms/definition";
 
 /**
  * Where an attendee's saved profile and what they entered on a registration disagree (#1512).
@@ -11,8 +13,10 @@ import { createHash } from "node:crypto";
  * offered or kept: they are not in `reviewableFields`, so no answer to a dietary question can reach this code.
  * Email is never compared or changed by this feature either.
  *
- * Only REGISTRATION-scope answers are passed in. An ATTENDEE-scope answer (for example a first name on a roster
- * row) may belong to another person, such as a child, so it says nothing about the signed-in account's profile.
+ * Registration-scope answers are always compared. An ATTENDEE-scope answer (for example a first name on a roster
+ * row) may belong to another person, such as a child, so it is compared only when exactly one adult attendee is
+ * provably the signed-in account holder (`accountHolderAttendeeIndex`). Registration answers win; the holder's
+ * attendee answers only fill what the registration answers leave blank.
  */
 
 export const reviewableFields = [
@@ -52,6 +56,21 @@ export const personalReviewFields = [
 export const valueKeptFields = ["firstName", "lastName", "phone", "shirtSize"] as const;
 export type ValueKeptField = (typeof valueKeptFields)[number];
 
+/**
+ * Address and emergency contact fields a system administrator may correct. Only a STAFF_CORRECTION row keeps their old
+ * and new values; every other source keeps the field name alone. The database check
+ * (`AttendeeProfileChange_value_retention_check`, migration 20270178100000) lists the same names.
+ */
+export const staffPersonalValueFields = [
+  ...personalReviewFields,
+  "emergencyContactRelationship",
+] as const;
+export type StaffPersonalValueField = (typeof staffPersonalValueFields)[number];
+
+export function isStaffPersonalValueField(field: string): field is StaffPersonalValueField {
+  return (staffPersonalValueFields as readonly string[]).includes(field);
+}
+
 export function isValueKeptField(field: string): field is ValueKeptField {
   return (valueKeptFields as readonly string[]).includes(field);
 }
@@ -87,8 +106,8 @@ type FieldSource =
   | { kind: "address"; component: string; keys: readonly string[] };
 
 const fieldSources: Record<ReviewableField, FieldSource> = {
-  firstName: { kind: "text", keys: ["first_name", "primary_contact_first_name"] },
-  lastName: { kind: "text", keys: ["last_name", "primary_contact_last_name"] },
+  firstName: { kind: "text", keys: ["first_name", "primary_contact_first_name", "primary_first_name"] },
+  lastName: { kind: "text", keys: ["last_name", "primary_contact_last_name", "primary_last_name"] },
   phone: { kind: "text", keys: ["phone", "phone_number", "attendee_phone"] },
   shirtSize: { kind: "text", keys: ["shirt_size"] },
   mailingLine1: { kind: "address", component: "line1", keys: ["address_line_1"] },
@@ -129,13 +148,20 @@ function activeFields(includePersonal: boolean): readonly ReviewableField[] {
     : reviewableFields.filter((field) => !isPersonalReviewField(field));
 }
 
-/** What the registration answers say for each reviewable field; an empty string means nothing was entered. */
+/**
+ * What the answers say for each reviewable field; an empty string means nothing was entered. The registration answers
+ * win; the account holder's attendee answers (when there is one) only fill a field the registration answers leave blank.
+ */
 export function enteredProfileValues(
   responses: Record<string, unknown>,
   includePersonal: boolean,
+  holderResponses: Record<string, unknown> = {},
 ): Partial<ReviewableProfile> {
   return Object.fromEntries(
-    activeFields(includePersonal).map((field) => [field, enteredFor(field, responses)]),
+    activeFields(includePersonal).map((field) => [
+      field,
+      enteredFor(field, responses) || enteredFor(field, holderResponses),
+    ]),
   );
 }
 
@@ -167,8 +193,9 @@ export function profileConflicts(
   profile: ReviewableProfile,
   responses: Record<string, unknown>,
   includePersonal: boolean,
+  holderResponses: Record<string, unknown> = {},
 ): ProfileConflict[] {
-  const entered = enteredProfileValues(responses, includePersonal);
+  const entered = enteredProfileValues(responses, includePersonal, holderResponses);
   const conflicts: ProfileConflict[] = [];
   for (const field of activeFields(includePersonal)) {
     const enteredValue = entered[field] ?? "";
@@ -187,16 +214,17 @@ export function profileConflicts(
 }
 
 /**
- * A fingerprint of the stored profile values and the entered values the review was computed from. A review
- * applied against a different fingerprint is stale: the profile or the registration answers changed since the
- * person looked. The value is a hash and carries no readable data.
+ * A fingerprint of the stored profile values and the entered values the review was computed from (the registration
+ * answers merged with the account holder's attendee answers, as compared). A review applied against a different
+ * fingerprint is stale: the profile or the answers changed since the person looked. The value is a hash and carries no readable data.
  */
 export function profileReviewVersion(
   profile: ReviewableProfile,
   responses: Record<string, unknown>,
   includePersonal: boolean,
+  holderResponses: Record<string, unknown> = {},
 ): string {
-  const entered = enteredProfileValues(responses, includePersonal);
+  const entered = enteredProfileValues(responses, includePersonal, holderResponses);
   const fields = activeFields(includePersonal);
   const material = fields.map((field) => [field, clean(profile[field]), entered[field] ?? ""]);
   return createHash("sha256").update(JSON.stringify(material)).digest("hex");
@@ -210,16 +238,77 @@ export type ProfileHistoryEntry = {
 
 /**
  * One history row per changed field, honouring the retention rule: name, phone and shirt size keep both values;
- * anything else keeps the field name only. A health field is dropped, so it can never be recorded by mistake.
+ * address and emergency contact keep them only for a STAFF_CORRECTION row; anything else keeps the field name only.
+ * A health field is dropped, so it can never be recorded by mistake.
  */
 export function historyEntriesFor(
   changes: ReadonlyArray<{ field: string; oldValue: string; newValue: string }>,
+  source?: "SELF_EDIT" | "REGISTRATION_REVIEW" | "STAFF_CORRECTION",
 ): ProfileHistoryEntry[] {
   return changes
     .filter((change) => change.field !== "dietaryNeeds" && change.field !== "accessibilityNeeds")
     .map((change) => (
-      isValueKeptField(change.field)
+      isValueKeptField(change.field) || (source === "STAFF_CORRECTION" && isStaffPersonalValueField(change.field))
         ? { field: change.field, oldValue: change.oldValue || null, newValue: change.newValue || null }
         : { field: change.field, oldValue: null, newValue: null }
     ));
+}
+
+// ---------------------------------------------------------------------------------------------
+// The account holder among a registration's attendees
+// ---------------------------------------------------------------------------------------------
+
+const attendeeEmailKeys = ["email", "attendee_email"] as const;
+const contactFirstNameKeys = ["primary_contact_first_name", "contact_first_name", "registrant_first_name", "primary_first_name"] as const;
+const contactLastNameKeys = ["primary_contact_last_name", "contact_last_name", "registrant_last_name", "primary_last_name"] as const;
+const ADULT_AGE = 18;
+
+function firstClean(responses: Record<string, unknown>, keys: readonly string[]): string {
+  for (const key of keys) {
+    const value = clean(responses[key]);
+    if (value) return value;
+  }
+  return "";
+}
+
+/**
+ * True when the attendee's own birth-date answer is a real calendar date showing 18 or over on `today` (a YYYY-MM-DD
+ * calendar date in America/Chicago). No birth date, an unreadable one or one in the future is not an adult: nothing
+ * else (an age number, the attendee type, a "minor" flag) is evidence.
+ */
+function isAdultByBirthDate(attendee: Record<string, unknown>, today: string): boolean {
+  const raw = firstClean(attendee, BIRTH_DATE_FIELD_KEYS);
+  if (!raw || !parseCalendarDate(raw)) return false;
+  const age = ageOn(raw, today);
+  return age !== null && age >= ADULT_AGE;
+}
+
+/**
+ * The index of the one attendee who is the signed-in account holder, else null.
+ *
+ * An attendee counts when (a) an attendee-scope email answer equals the account's verified email, or (b) their first
+ * and last name answers match the registration's primary contact name; and, in both cases, their birth-date answer
+ * shows an adult today. A child is never the holder. If more than one attendee counts, nobody does.
+ */
+export function accountHolderAttendeeIndex(input: {
+  verifiedEmail: string;
+  registrationAnswers: Record<string, unknown>;
+  attendeeAnswers: ReadonlyArray<Record<string, unknown>>;
+  /** Today's calendar date in America/Chicago; defaults to now. */
+  today?: string;
+}): number | null {
+  const today = input.today ?? todayDateValue();
+  const email = clean(input.verifiedEmail).toLowerCase();
+  const contactFirst = firstClean(input.registrationAnswers, contactFirstNameKeys).toLowerCase();
+  const contactLast = firstClean(input.registrationAnswers, contactLastNameKeys).toLowerCase();
+  const holders: number[] = [];
+  input.attendeeAnswers.forEach((attendee, index) => {
+    if (!isAdultByBirthDate(attendee, today)) return;
+    const emailMatch = email !== "" && attendeeEmailKeys.some((key) => clean(attendee[key]).toLowerCase() === email);
+    const nameMatch = contactFirst !== "" && contactLast !== ""
+      && clean(attendee.first_name).toLowerCase() === contactFirst
+      && clean(attendee.last_name).toLowerCase() === contactLast;
+    if (emailMatch || nameMatch) holders.push(index);
+  });
+  return holders.length === 1 ? holders[0]! : null;
 }

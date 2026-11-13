@@ -56,3 +56,10 @@
   color: var(--muted);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
+
+.paging {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
