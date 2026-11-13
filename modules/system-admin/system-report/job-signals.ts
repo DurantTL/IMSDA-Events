@@ -89,7 +89,7 @@ export function generalLinkExpiryFields(key: string, run: JobRun, readAt: Date):
   return { key, state: "ok", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: `${expired} waiting ${expired === 1 ? "team" : "teams"} expired across ${events} ${events === 1 ? "event" : "events"}.` };
 }
 
-/** Visiting clubs' roles ended 30 days after their event (#835). Counts only; a quiet run (0 ended) is normal. */
+/** Visiting clubs' roles ended, and the clubs marked inactive, 30 days after their event (#835). Counts only; a quiet run (0 ended) is normal. */
 export function visitingClubAccessEndFields(key: string, run: JobRun, readAt: Date): Fields {
   const problem = runProblem(key, run, readAt, "the visiting club access step");
   if (problem) return problem;
@@ -98,7 +98,9 @@ export function visitingClubAccessEndFields(key: string, run: JobRun, readAt: Da
   if (ended === null || clubs === null) {
     return { key, state: "watch", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: "It ran, but its counts were not recorded." };
   }
-  return { key, state: "ok", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: `${ended} visiting club ${ended === 1 ? "role" : "roles"} ended across ${clubs} ${clubs === 1 ? "club" : "clubs"}.` };
+  const inactive = num(run.summary, "clubsDeactivated");
+  const marked = inactive === null ? "" : ` ${inactive} ${inactive === 1 ? "club" : "clubs"} marked inactive.`;
+  return { key, state: "ok", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: `${ended} visiting club ${ended === 1 ? "role" : "roles"} ended across ${clubs} ${clubs === 1 ? "club" : "clubs"}.${marked}` };
 }
 
 /* ---------- The rest of the sweep's steps (#1377) ---------- */
