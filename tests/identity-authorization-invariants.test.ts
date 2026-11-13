@@ -169,6 +169,8 @@ describe("the identity routes refuse staff without identity permission and retur
       "matches/route.ts",
       "merges/[mergeId]/unmerge/route.ts",
       "merges/route.ts",
+      // Staff correction of an attendee account's name, phone and shirt size (#1512): system administrators only, no Person data.
+      "profile-updates/route.ts",
     ]);
   });
 });

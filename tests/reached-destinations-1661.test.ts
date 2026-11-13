@@ -62,6 +62,7 @@ describe("the registry", () => {
       "/admin/event-templates/from-event": `${notSearchable}: setup step`,
       "/event-setup/from-template": `${notSearchable}: setup step`,
       "/people/matches": `${notSearchable}: identity merging stays a human decision`,
+      "/people/profile-updates": `${notSearchable}: system administrators only, like the identity queue`,
       "/help/glossary": `${notSearchable}: already in search`,
       "/admin/clubs/health-import": inClubsMenu,
       "/admin/clubs/import": inClubsMenu,

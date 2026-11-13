@@ -453,6 +453,7 @@ const pages: PageSpec[] = [
   staff("responsible-adults", "/people/responsible-adults"),
   staff("directory-review", "/people/directory-review"),
   staff("person-matches", "/people/matches", "system-admin"),
+  staff("profile-updates", "/people/profile-updates", "system-admin"),
   staff("promo-codes", "/more/promo-codes"),
   staff("tags", "/more/tags"),
   staff("event-settings", "/more/event-settings"),

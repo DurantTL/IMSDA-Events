@@ -36,7 +36,8 @@ const input = {
 };
 
 const attendeeAccount = { findUniqueOrThrow: vi.fn(), update: vi.fn() };
-const tx = { attendeeAccount };
+const attendeeProfileChange = { createMany: vi.fn() };
+const tx = { attendeeAccount, attendeeProfileChange, $queryRaw: vi.fn() };
 
 function dataSaved() {
   return attendeeAccount.update.mock.calls[0]![0].data as Record<string, unknown>;

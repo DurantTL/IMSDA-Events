@@ -879,6 +879,7 @@ enum ProgramUnassignedReason {
 
 model User {
   id            String            @id @default(cuid())
+  attendeeProfileChangesMade   AttendeeProfileChange[]       @relation("AttendeeProfileChangeActorUser")
   personMergesActed            PersonMerge[]                 @relation("PersonMergeActor")
   personMergesReversed         PersonMerge[]                 @relation("PersonMergeReversedBy")
   personAnonymizationsApproved PersonAnonymization[]         @relation("PersonAnonymizationApprovedBy")
@@ -1220,9 +1221,43 @@ model PasswordResetToken {
  * contact address matches it and nothing else, so the address is stored already
  * normalised and is only load-bearing once `emailVerifiedAt` is set.
  */
+enum AttendeeProfileChangeSource {
+  SELF_EDIT
+  REGISTRATION_REVIEW
+  STAFF_CORRECTION
+}
+
+/// One field of an attendee's own saved profile that changed (#1512). Values are kept ONLY for `firstName`,
+/// `lastName`, `phone` and `shirtSize`. A row for any other field (mailing address, emergency contact) stores the field
+/// name alone with null values, and dietary and accessibility needs are never recorded here at all. The database
+/// enforces both rules. A staff correction always names the staff user and a reason.
+model AttendeeProfileChange {
+  id                     String                      @id @default(cuid())
+  accountId              String
+  field                  String
+  oldValue               String?
+  newValue               String?
+  source                 AttendeeProfileChangeSource
+  registrationId         String?
+  actorAttendeeAccountId String?
+  actorUserId            String?
+  reason                 String?
+  createdAt              DateTime                    @default(now())
+
+  account              AttendeeAccount  @relation("AttendeeProfileChangeAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  registration         Registration?    @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  actorAttendeeAccount AttendeeAccount? @relation("AttendeeProfileChangeActorAccount", fields: [actorAttendeeAccountId], references: [id], onDelete: SetNull)
+  actorUser            User?            @relation("AttendeeProfileChangeActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([accountId, createdAt])
+  @@index([createdAt])
+}
+
 model AttendeeAccount {
   id                 String                @id @default(cuid())
   healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]
+  profileChanges AttendeeProfileChange[] @relation("AttendeeProfileChangeAccount")
+  profileChangesMade AttendeeProfileChange[] @relation("AttendeeProfileChangeActorAccount")
   monthlyRecordItemReviews ClubMonthlyReportItemReview[]
   leaderDirectoryPreference LeaderDirectoryPreference?
   teamPermissionDecisions ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedByAccount")
@@ -3867,6 +3902,7 @@ model Registration {
   attendees               RegistrationAttendee[]
   payments                Payment[]
   publicFormSubmission    PublicRegistrationSubmission?
+  attendeeProfileChanges  AttendeeProfileChange[]
   capacityReservations    RegistrationCapacityReservation[]
   messages                MessageOutbox[]
   waitlistEntry           RegistrationWaitlistEntry?

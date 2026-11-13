@@ -9,7 +9,8 @@ export const CROSS_EVENT_READ_ID_CAP = 100;
 export type CrossEventReadSurface =
   | "MERGED_PERSON_VIEW"
   | "ACTIVE_MERGES_LIST"
-  | "OPEN_MATCH_CANDIDATES";
+  | "OPEN_MATCH_CANDIDATES"
+  | "ATTENDEE_PROFILE_CHANGES";
 
 /**
  * Records that an identity read crossed an event boundary (#128). Ids only:

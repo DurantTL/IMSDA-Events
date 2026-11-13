@@ -158,6 +158,7 @@ import { FieldError } from "@/components/field-error";
 import { labelledFieldMessage } from "@/lib/field-validation";
 import { FormErrorSummary, type ErrorSummaryItem } from "@/components/form-error-summary";
 import { InformationBlock } from "@/components/information-block";
+import { RegistrationProfileReview } from "@/components/registration-profile-review";
 import { summarizeRosterAttendees } from "@/modules/forms/roster-summary";
 import {
   draftsAllowed,
@@ -258,6 +259,8 @@ type Confirmation = {
   notificationStatus: "PENDING" | "CAPTURED" | "SENT" | "FAILED" | "DISABLED";
   managePath: string | null;
   manageLinkExpiresAt: string | null;
+  /** The submitter's own registration, for the profile review (#1512). */
+  registrationId?: string;
   attendeeCount: number;
   attendeeNames: string[];
   registrationStatus: "SUBMITTED" | "WAITLISTED";
@@ -325,6 +328,8 @@ export type PublicRegistrationFormProps = {
   disableDrafts?: boolean;
   /** Server decision: offer a passkey on the confirmation (#219). */
   passkeyOffer?: boolean;
+  /** True when the visitor is signed in as an attendee: the confirmation may offer a reviewed profile update (#1512). */
+  attendeeSignedIn?: boolean;
   /**
    * The Turnstile "Security check" for the public submit (#1399), from `securityCheckConfigForPage()`; null or absent while
    * it is off. Shown only on the review step, and never on a club registration (a signed-in director's own endpoint).
@@ -538,6 +543,7 @@ export function PublicRegistrationForm({
   topContent,
   disableDrafts = false,
   passkeyOffer = false,
+  attendeeSignedIn = false,
   club,
   group,
   securityCheck = null,
@@ -3506,6 +3512,7 @@ export function PublicRegistrationForm({
                 </small>
               </span>
             </div>
+            {attendeeSignedIn && confirmation.registrationId && <RegistrationProfileReview registrationId={confirmation.registrationId} />}
             <dl className={`public-registration-confirmation-details${teamConfirmation ? " is-compact" : ""}`}>
               {confirmationDetailRows({
                 team: teamConfirmation ? { teamName: group?.teamName ?? "", club: enteredClub, location: group?.locationName ?? null } : null,
