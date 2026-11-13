@@ -1,5 +1,6 @@
 export type StaffDraftErrorCode =
   | "DRAFT_NOT_FOUND"
+  | "FORM_NOT_FOUND"
   | "FORM_NOT_AVAILABLE"
   | "CLUB_EVENT"
   | "DRAFT_NOT_EDITABLE"
@@ -10,6 +11,7 @@ export type StaffDraftErrorCode =
 
 const statusByCode: Record<StaffDraftErrorCode, number> = {
   DRAFT_NOT_FOUND: 404,
+  FORM_NOT_FOUND: 404,
   FORM_NOT_AVAILABLE: 409,
   CLUB_EVENT: 409,
   DRAFT_NOT_EDITABLE: 409,

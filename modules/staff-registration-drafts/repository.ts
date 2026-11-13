@@ -9,7 +9,7 @@ import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { AccountEmailNotConfiguredError, getAccountEmailSender } from "@/modules/communications/account-email";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
 import { evaluateEventRegistrationPhase } from "@/modules/events/lifecycle";
-import { registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
+import { isFieldVisible, registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { publicRegistrationInputSchema } from "@/modules/forms/public-domain";
 import { checkPublicRegistration, PublicRegistrationError, type PublicRegistrationCheck } from "@/modules/forms/public-repository";
@@ -61,6 +61,11 @@ function responsesFromJson(value: Prisma.JsonValue): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
+function sameAnswers(left: Record<string, unknown>, right: Record<string, unknown>) {
+  const canonical = (value: Record<string, unknown>) => JSON.stringify(Object.keys(value).sort().map((key) => [key, value[key]]));
+  return canonical(left) === canonical(right);
+}
+
 function toSummary(row: DraftRow) {
   const definition = registrationFormDefinitionSchema.parse(row.formVersion.definition);
   const contact = staffDraftContact(definition, responsesFromJson(row.responses));
@@ -102,7 +107,7 @@ async function publishedFormForEvent(client: Pick<Client, "registrationForm">, e
       },
     },
   });
-  if (!form) throw new StaffDraftError("FORM_NOT_AVAILABLE", "That form is not available for this event.");
+  if (!form) throw new StaffDraftError("FORM_NOT_FOUND", "That form could not be found for this event.");
   // A club event takes registrations through the club portal and the event's general link, never an individual draft.
   if (form.event.audience === "CLUB") throw new StaffDraftError("CLUB_EVENT", "Phone and paper registrations are for events open to individuals, not club events.");
   const version = form.versions[0];
@@ -225,7 +230,11 @@ export async function updateStaffDraft(eventId: string, draftId: string, actorUs
     if (row.status !== "OPEN" && row.status !== "HANDED_OFF") {
       throw new StaffDraftError("DRAFT_NOT_EDITABLE", "This registration was already sent or discarded, so it can't be changed.");
     }
-    const linkRevoked = row.status === "HANDED_OFF";
+    // Only a real change withdraws the link the registrant already has: the cleaned answers or the source differ from what is stored.
+    const stored = sanitizeStaffDraftResponses(definition, responsesFromJson(row.responses));
+    const changed = !sameAnswers(stored, responses) || Boolean(input.source && input.source !== row.source);
+    const linkRevoked = row.status === "HANDED_OFF" && changed;
+    if (!changed && row.formVersionId === version.id) return { id: draftId, linkRevoked: false, changed: false };
     if (linkRevoked) await cancelPendingLinkMessage(tx, row.handOffMessageId);
     await tx.staffRegistrationDraft.update({
       where: { id: draftId },
@@ -234,7 +243,7 @@ export async function updateStaffDraft(eventId: string, draftId: string, actorUs
         formVersionId: version.id,
         updatedByUserId: actorUserId,
         ...(input.source ? { source: input.source } : {}),
-        // Editing a draft already sent withdraws its link: the registrant would otherwise open answers that have changed.
+        // Changing a draft already sent withdraws its link: the registrant would otherwise open answers that have changed.
         ...(linkRevoked ? { status: "OPEN", handOffTokenHash: null, handOffExpiresAt: null, handOffMessageId: null } : {}),
       },
     });
@@ -246,7 +255,7 @@ export async function updateStaffDraft(eventId: string, draftId: string, actorUs
       summary: linkRevoked ? "Changed a registration that had been sent; its private link was withdrawn." : "Changed a registration staff started.",
       metadata: { formVersionId: version.id, answerCount: Object.keys(responses).length, linkRevoked, movedToNewVersion: row.formVersionId !== version.id },
     });
-    return { id: draftId, linkRevoked };
+    return { id: draftId, linkRevoked, changed };
   });
 }
 
@@ -274,8 +283,9 @@ export async function discardStaffDraft(eventId: string, draftId: string, actorU
 }
 
 export type StaffDraftCheckResult =
-  | { ok: true; check: PublicRegistrationCheck }
-  | { ok: false; kind: "NEEDS_ANSWERS"; message: string; lines: StaffDraftCheckLines }
+  /** An estimate: answers only the registrant gives (a birth date, a payment choice) can change the price. `registrantFills` names the required ones. */
+  | { ok: true; check: PublicRegistrationCheck; registrantFills: string[] }
+  | { ok: false; kind: "NEEDS_ANSWERS"; message: string; lines: StaffDraftCheckLines; /** A roster form is priced only once the registrant adds the people. */ rosterPending: boolean }
   | { ok: false; kind: "UNAVAILABLE"; message: string };
 
 /**
@@ -302,11 +312,15 @@ export async function checkStaffDraft(eventId: string, draftId: string, actorUse
   });
   let outcome: StaffDraftCheckResult;
   try {
-    outcome = { ok: true, check: await checkPublicRegistration(event.slug, form.slug, input) };
+    const registrantFills = staffDraftPlan(pinned).sections
+      .flatMap((section) => section.fields)
+      .filter((entry) => !entry.editable && entry.field.required && isFieldVisible(entry.field, input.responses))
+      .map((entry) => entry.field.label);
+    outcome = { ok: true, check: await checkPublicRegistration(event.slug, form.slug, input), registrantFills };
   } catch (error) {
     if (!(error instanceof PublicRegistrationError)) throw error;
     outcome = error.code === "INVALID_SUBMISSION" || error.code === "CAPACITY_REACHED"
-      ? { ok: false, kind: "NEEDS_ANSWERS", message: error.message, lines: staffDraftCheckLines(error.issues, pinned) }
+      ? { ok: false, kind: "NEEDS_ANSWERS", message: error.message, lines: staffDraftCheckLines(error.issues, pinned), rosterPending: roster }
       : { ok: false, kind: "UNAVAILABLE", message: error.message };
   }
   await auditDraft(prisma, {

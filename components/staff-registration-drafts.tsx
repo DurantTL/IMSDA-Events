@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AmendmentField } from "@/components/registration-amendment-editor";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { promoCodeField } from "@/modules/promo-codes/domain";
 import { isFieldVisible, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { formatCents } from "@/modules/payments/format-cents";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
@@ -40,13 +43,15 @@ type Detail = {
 };
 
 type CheckResult =
-  | { ok: true; check: { registrationStatus: "SUBMITTED" | "WAITLISTED"; waitlistPosition: number | null; totalCents?: number; discountAmountCents?: number; promoCode: string | null; lineItems: Array<{ key: string; label: string; amountCents: number; pricingLabel?: string }>; pricingDate: string } }
-  | { ok: false; kind: "NEEDS_ANSWERS"; message: string; lines: StaffDraftCheckLines }
+  | { ok: true; registrantFills: string[]; check: { registrationStatus: "SUBMITTED" | "WAITLISTED"; waitlistPosition: number | null; totalCents?: number; discountAmountCents?: number; promoCode: string | null; lineItems: Array<{ key: string; label: string; amountCents: number; pricingLabel?: string }>; pricingDate: string } }
+  | { ok: false; kind: "NEEDS_ANSWERS"; message: string; lines: StaffDraftCheckLines; rosterPending: boolean }
   | { ok: false; kind: "UNAVAILABLE"; message: string };
 
 type Responses = Record<string, unknown>;
 
-const updatedFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+/** Central time, labeled (site rule B13). */
+const updatedAtLabel = (iso: string) => formatInConferenceTime(iso, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const PROMO_HELP = "The promo code is checked when you select Check.";
 
 function bodyMessage(body: Record<string, unknown>, fallback: string) {
   return typeof body.message === "string" && body.message ? body.message : fallback;
@@ -74,7 +79,11 @@ export function StaffRegistrationDrafts({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [check, setCheck] = useState<CheckResult | null>(null);
-  const [confirm, setConfirm] = useState<"send" | "discard" | null>(null);
+  const [confirm, setConfirm] = useState<"send" | "discard" | "save-sent" | "leave" | null>(null);
+  // What the confirm dialog will do next once the staff member agrees: save-then-check, or open/start another draft.
+  const afterConfirm = useRef<(() => Promise<void>) | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const [focusEditor, setFocusEditor] = useState(0);
   const [confirmError, setConfirmError] = useState("");
 
   async function refreshList() {
@@ -99,11 +108,23 @@ export function StaffRegistrationDrafts({
       setDetail(body);
       setResponses(body.responses);
       setDirty(false);
+      if (!keepMessage) setFocusEditor((count) => count + 1);
     } catch {
       setError("We could not reach the site. Try again.");
     } finally {
       setBusy("");
     }
+  }
+
+  /** Opening another draft, or starting one, while this one has unsaved answers asks first (site rule B6). */
+  function guarded(action: () => Promise<void>) {
+    if (dirty) {
+      afterConfirm.current = action;
+      setConfirmError("");
+      setConfirm("leave");
+      return;
+    }
+    void action();
   }
 
   async function start() {
@@ -133,19 +154,27 @@ export function StaffRegistrationDrafts({
       setError(result.unavailable ? unavailableMessage(result) : bodyMessage(result.body, "The draft could not be saved."));
       return false;
     }
-    if (announce) {
-      setMessage(result.body.linkRevoked
-        ? "Saved. The registrant's earlier link no longer works; send it again when you are ready."
-        : "Saved.");
-    }
+    // A withdrawn link is always said, even from the save that runs before a check.
+    if (result.body.linkRevoked) setMessage("Saved. The registrant's earlier link no longer works; send a new one when you are ready.");
+    else if (announce) setMessage("Saved.");
     await refreshList();
     await open(detail.draft.id, true);
     return true;
   }
 
+  /** Saving real changes to a draft already sent stops its link, so it is confirmed first. */
+  function saveWithConfirm(then?: () => Promise<void>) {
+    if (dirty && detail?.draft.status === "HANDED_OFF") {
+      afterConfirm.current = async () => { if (await save(!then)) await then?.(); };
+      setConfirmError("");
+      setConfirm("save-sent");
+      return;
+    }
+    void (async () => { if (await save(!then)) await then?.(); })();
+  }
+
   async function runCheck() {
     if (!detail) return;
-    if (dirty && !(await save(false))) return;
     setBusy("check");
     setError("");
     setCheck(null);
@@ -200,16 +229,16 @@ export function StaffRegistrationDrafts({
     await refreshList();
   }
 
-  // A draft opened with answers on screen warns before the page goes away.
+  // Leaving the page with unsaved answers warns first (site rule B6).
+  useUnsavedChangesGuard(dirty);
+  // After Open or Start, focus moves to the editor heading so a keyboard or screen reader user lands on the draft.
   useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
+    if (focusEditor > 0) headingRef.current?.focus();
+  }, [focusEditor]);
 
   const editable = detail && (detail.draft.status === "OPEN" || detail.draft.status === "HANDED_OFF");
   const sections = useMemo(() => detail?.plan.sections ?? [], [detail]);
+  const promo = useMemo(() => (detail ? promoCodeField(detail.definition) : null), [detail]);
 
   return (
     <div className={styles.stack}>
@@ -235,7 +264,7 @@ export function StaffRegistrationDrafts({
                 {STAFF_DRAFT_SOURCES.map((value) => <option key={value} value={value}>{STAFF_DRAFT_SOURCE_LABELS[value]}</option>)}
               </select>
             </label>
-            <button className="primary-button" type="button" disabled={busy !== "" || !formId} onClick={start}>
+            <button className="primary-button" type="button" disabled={busy !== "" || !formId} onClick={() => guarded(start)}>
               {busy === "start" ? "Starting…" : "Start"}
             </button>
           </div>
@@ -254,10 +283,10 @@ export function StaffRegistrationDrafts({
                   <span className={styles.rowTitle}>{row.registrantName ?? "Name not entered yet"}</span>
                   <p className={styles.rowMeta}>{row.registrantEmail ?? "Email not entered yet"}</p>
                   <p className={styles.rowMeta}>
-                    {STAFF_DRAFT_SOURCE_LABELS[row.source]} · {row.formName} · {STAFF_DRAFT_STATUS_LABELS[row.status]} · updated {updatedFormat.format(new Date(row.updatedAt))} by {row.updatedByName}
+                    {STAFF_DRAFT_SOURCE_LABELS[row.source]} · {row.formName} · {STAFF_DRAFT_STATUS_LABELS[row.status]} · updated {updatedAtLabel(row.updatedAt)} by {row.updatedByName}
                   </p>
                 </div>
-                <button className={`secondary-button ${styles.rowOpen}`} type="button" disabled={busy !== ""} onClick={() => open(row.id)}>
+                <button className={`secondary-button ${styles.rowOpen}`} type="button" disabled={busy !== ""} onClick={() => guarded(() => open(row.id))}>
                   Open<span className="sr-only"> the registration for {row.registrantName ?? "an unnamed registrant"}</span>
                 </button>
               </li>
@@ -271,7 +300,7 @@ export function StaffRegistrationDrafts({
 
       {detail && (
         <section className={styles.panel} aria-labelledby="staff-draft-edit">
-          <h2 id="staff-draft-edit">{detail.draft.registrantName ?? "New registration"} <span className={styles.chip}>{STAFF_DRAFT_STATUS_LABELS[detail.draft.status]}</span></h2>
+          <h2 id="staff-draft-edit" ref={headingRef} tabIndex={-1}>{detail.draft.registrantName ?? "New registration"} <span className={styles.chip}>{STAFF_DRAFT_STATUS_LABELS[detail.draft.status]}</span></h2>
           <p className={styles.note}>
             {STAFF_DRAFT_SOURCE_LABELS[detail.draft.source]} · {detail.draft.formName}. Answers marked &ldquo;{STAFF_DRAFT_REGISTRANT_FILLS_IN}&rdquo; are never kept in a draft.
           </p>
@@ -290,7 +319,7 @@ export function StaffRegistrationDrafts({
                   canType ? (
                     <AmendmentField
                       key={field.id}
-                      field={field}
+                      field={promo?.key === field.key ? { ...field, helpText: PROMO_HELP } : field}
                       values={responses}
                       locked={!editable}
                       onChange={(value) => { setResponses((current) => ({ ...current, [field.key]: value })); setDirty(true); }}
@@ -308,8 +337,8 @@ export function StaffRegistrationDrafts({
 
           {editable && (
             <div className={styles.actions}>
-              <button className="primary-button" type="button" disabled={busy !== ""} onClick={() => save()}>{busy === "save" ? "Saving…" : "Save"}</button>
-              <button className="secondary-button" type="button" disabled={busy !== "" || detail.formChanged} onClick={runCheck}>{busy === "check" ? "Checking…" : "Check"}</button>
+              <button className="primary-button" type="button" disabled={busy !== ""} onClick={() => saveWithConfirm()}>{busy === "save" ? "Saving…" : "Save"}</button>
+              <button className="secondary-button" type="button" disabled={busy !== "" || detail.formChanged} onClick={() => (dirty ? saveWithConfirm(runCheck) : void runCheck())}>{busy === "check" ? "Checking…" : "Check"}</button>
               <button className="secondary-button" type="button" disabled={busy !== ""} onClick={() => { setConfirmError(""); setConfirm("send"); }}>
                 {detail.draft.status === "HANDED_OFF" ? "Send again" : "Send to registrant"}
               </button>
@@ -335,6 +364,25 @@ export function StaffRegistrationDrafts({
           One email with a private link goes to {detail?.draft.registrantEmail ?? "the registrant"}. It names you and the event and holds none of the answers.
           {detail?.draft.status === "HANDED_OFF" ? " The link sent before stops working." : ""} Nothing is registered until the registrant submits the form.
         </p>
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={confirm === "save-sent"}
+        title="Stop the link already sent?"
+        confirmLabel="Save changes"
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => { setConfirm(null); void afterConfirm.current?.(); }}
+      >
+        <p>Saving changes stops the link already sent to {detail?.draft.registrantEmail ?? "the registrant"}. You can send a new one after.</p>
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={confirm === "leave"}
+        title="Leave without saving?"
+        confirmLabel="Leave without saving"
+        destructive
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => { setConfirm(null); setDirty(false); void afterConfirm.current?.(); }}
+      >
+        <p>The answers you changed on this registration have not been saved.</p>
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm === "discard"}
@@ -374,7 +422,8 @@ function CheckView({ result }: { result: CheckResult }) {
             <ul>{registrantFills.map((line) => <li key={line}>{line}</li>)}</ul>
           </>
         )}
-        {staffNeeds.length === 0 && registrantFills.length === 0 && <p className={styles.note}>{result.message}</p>}
+        {result.rosterPending && <p className={styles.note}>A price shows once the registrant adds the people attending.</p>}
+        {staffNeeds.length === 0 && registrantFills.length === 0 && !result.rosterPending && <p className={styles.note}>{result.message}</p>}
       </div>
     );
   }
@@ -393,9 +442,15 @@ function CheckView({ result }: { result: CheckResult }) {
         </ul>
       )}
       {typeof check.totalCents === "number"
-        ? <p className={styles.total}>Total {formatCents(check.totalCents)}</p>
+        ? <p className={styles.total}>Estimated total {formatCents(check.totalCents)}</p>
         : <p className={styles.note}>This event bills the church, so no total is shown.</p>}
-      <p className={styles.note}>Nothing was saved and nothing was charged.</p>
+      {result.registrantFills.length > 0 && (
+        <>
+          <p className={styles.note}>The registrant fills these in:</p>
+          <ul>{result.registrantFills.map((line) => <li key={line}>{line}</li>)}</ul>
+        </>
+      )}
+      <p className={styles.note}>This is an estimate. Answers the registrant gives, such as a birth date or a payment choice, can change the price. Nothing was saved and nothing was charged.</p>
     </div>
   );
 }

@@ -191,6 +191,10 @@ jobs:
       # submission and staff routines, the eligible subtotal, per-person and staff
       # use, unrestricted codes unchanged, and the last use going to one submission (#102).
       - run: npm run test:promo-attendee-types
+      # Real-database check of staff-started registration drafts: a check that prices
+      # and writes nothing, the registrant's private link linking the draft to the real
+      # submission, replay and repeat refusal, expired and wrong-form links, no payment (#1510).
+      - run: npm run test:staff-registration-drafts
       # Real-database check of locations inside one event: the required pick on a
       # real club submit, per-location capacity under the location row lock (two
       # clubs racing for the last seats, exactly one wins), per-location closing

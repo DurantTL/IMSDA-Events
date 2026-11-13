@@ -145,6 +145,30 @@ describe("starting and saving a staff draft (#1510)", () => {
     expect(mocks.outboxUpdateMany).toHaveBeenCalledWith({ where: { id: "message-0", status: "PENDING" }, data: { status: "CANCELLED" } });
   });
 
+  it("a save that changes nothing keeps the registrant's link", async () => {
+    mocks.draftFindFirst.mockResolvedValue(draftRow({ status: "HANDED_OFF", handOffMessageId: "message-0" }));
+    mocks.queryRaw.mockResolvedValue([{ id: "draft-1" }]);
+    const result = await updateStaffDraft("event-1", "draft-1", "staff-2", {
+      source: "PHONE",
+      responses: { email: "avery@example.test", last_name: "Example", first_name: "Avery", allergies: "dropped on save" },
+    });
+    expect(result).toMatchObject({ linkRevoked: false, changed: false });
+    expect(mocks.draftUpdate).not.toHaveBeenCalled();
+    expect(mocks.outboxUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("changing the source alone is a change", async () => {
+    mocks.draftFindFirst.mockResolvedValue(draftRow({ status: "HANDED_OFF", handOffMessageId: "message-0" }));
+    mocks.queryRaw.mockResolvedValue([{ id: "draft-1" }]);
+    const result = await updateStaffDraft("event-1", "draft-1", "staff-2", { source: "PAPER", responses: { first_name: "Avery", last_name: "Example", email: "avery@example.test" } });
+    expect(result.linkRevoked).toBe(true);
+  });
+
+  it("a form not on this event is not found", async () => {
+    mocks.formFindFirst.mockResolvedValue(null);
+    await expect(createStaffDraft("event-1", "staff-1", { formId: "other", source: "PHONE" })).rejects.toMatchObject({ code: "FORM_NOT_FOUND" });
+  });
+
   it("will not edit a submitted draft", async () => {
     mocks.draftFindFirst.mockResolvedValue(draftRow({ status: "SUBMITTED" }));
     await expect(updateStaffDraft("event-1", "draft-1", "staff-1", { responses: {} })).rejects.toMatchObject({ code: "DRAFT_NOT_EDITABLE" });
@@ -248,7 +272,7 @@ describe("checking a staff draft (#1510)", () => {
     mocks.checkPublicRegistration.mockResolvedValue({ registrationStatus: "SUBMITTED", waitlistPosition: null, attendeeCount: 1, totalCents: 12_500, promoCode: null, lineItems: [], pricingDate: "2026-11-13" });
     const first = await checkStaffDraft("event-1", "draft-1", "staff-1");
     const second = await checkStaffDraft("event-1", "draft-1", "staff-1");
-    expect(first).toMatchObject({ ok: true, check: { totalCents: 12_500 } });
+    expect(first).toMatchObject({ ok: true, check: { totalCents: 12_500 }, registrantFills: expect.arrayContaining(["Birth date", "I agree to the waiver"]) });
     const [slug, formSlug, input] = mocks.checkPublicRegistration.mock.calls[0]!;
     expect([slug, formSlug]).toEqual(["camp", "camp-form"]);
     expect(input).toMatchObject({ versionId: "v1", responses: { first_name: "Avery", last_name: "Example", email: "avery@example.test" } });
@@ -271,6 +295,7 @@ describe("checking a staff draft (#1510)", () => {
       kind: "NEEDS_ANSWERS",
       message: "Review the highlighted fields and submit again.",
       lines: { staffNeeds: ["Email: Enter a valid email."], registrantFills: ["I agree to the waiver: Required."] },
+      rosterPending: false,
     });
   });
 

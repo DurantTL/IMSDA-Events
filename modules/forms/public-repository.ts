@@ -82,6 +82,7 @@ import { signatureFields } from "@/modules/signatures/fields";
 import { recordSubmissionSignatures } from "@/modules/signatures/repository";
 import type { AcknowledgmentDisplay } from "@/modules/acknowledgments/domain";
 import { hashOpaqueToken, hashUserAgent } from "@/modules/access/tokens";
+import { draftExcludedKeys } from "@/modules/forms/public-draft";
 import { LodgingError } from "@/modules/lodging/errors";
 import { lodgingTransactionTimeoutMs } from "@/modules/lodging/service";
 import { getPublicMerchandiseOffer, getRegistrationMerchandiseSummary, recordRegistrationMerchandiseOrder } from "@/modules/merchandise/registration-orders";
@@ -1139,11 +1140,17 @@ async function createPublicRegistrationTransaction(
   const actAsAcknowledgmentKeys = club?.submittedByUserId
     ? new Set([...acknowledgmentFields(definition), ...signatureFields(definition)].map((field) => field.key))
     : new Set<string>();
-  const canonicalInput = actAsAcknowledgmentKeys.size > 0
+  // A staff check (#1510) works like that: the answers a staff draft can never hold (medical, consent, signature, payment choice,
+  // birth date, notes) are left out and not required, so the check can still reach pricing and show an estimate. Only when
+  // `checkOnly` is set; a real submit asks for every one of them as before. With no payment choice, nothing is priced as card.
+  const optionalKeys = options.checkOnly
+    ? new Set([...actAsAcknowledgmentKeys, ...draftExcludedKeys(definition)])
+    : actAsAcknowledgmentKeys;
+  const canonicalInput = optionalKeys.size > 0
     ? {
         ...withoutDeferredPayment,
-        responses: dropKeys(withoutDeferredPayment.responses, actAsAcknowledgmentKeys),
-        attendees: withoutDeferredPayment.attendees?.map((attendee) => ({ ...attendee, responses: dropKeys(attendee.responses, actAsAcknowledgmentKeys) })),
+        responses: dropKeys(withoutDeferredPayment.responses, optionalKeys),
+        attendees: withoutDeferredPayment.attendees?.map((attendee) => ({ ...attendee, responses: dropKeys(attendee.responses, optionalKeys) })),
       }
     : withoutDeferredPayment;
   const prepared = preparePublicRegistration(definition, canonicalInput, {
@@ -1154,7 +1161,7 @@ async function createPublicRegistrationTransaction(
     ignoredFieldKeys: deferredPaymentFieldKey
       ? [deferredPaymentFieldKey]
       : undefined,
-    optionalFieldKeys: actAsAcknowledgmentKeys.size > 0 ? [...actAsAcknowledgmentKeys] : undefined,
+    optionalFieldKeys: optionalKeys.size > 0 ? [...optionalKeys] : undefined,
   });
   if (!prepared.isValid || !prepared.identity) {
     const capacityIssue = prepared.issues.some((issue) => issue.message.includes("reached its limit"));
@@ -1929,7 +1936,9 @@ async function createPublicRegistrationTransaction(
   };
   if (options.checkOnly) {
     // Everything above ran against this transaction only (no file, email or provider call happens inside it), so rolling it
-    // back leaves no registration, payment, hold, promo claim, message or audit row behind.
+    // back leaves no registration, payment, hold, promo claim, message or audit row behind. The one exception is a database
+    // sequence: a check can use meal-ticket sequence numbers, and sequences do not roll back. The gaps are harmless
+    // (see modules/meals/ticket-repository.ts).
     throw new CheckOnlyRollback({
       registrationStatus: builtConfirmation.registrationStatus,
       waitlistPosition: builtConfirmation.waitlistPosition,

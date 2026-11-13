@@ -36,6 +36,7 @@
     "test:event-templates": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-templates.ts",
     "test:seeded-form-templates": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-seeded-form-templates.ts",
     "test:church-promo-codes": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-church-promo-codes.ts",
+    "test:staff-registration-drafts": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-staff-registration-drafts.ts",
     "test:promo-attendee-types": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-promo-attendee-types.ts",
     "test:church-code-invoices": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-church-code-invoices.ts",
     "test:group-registration": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-group-registration.ts",

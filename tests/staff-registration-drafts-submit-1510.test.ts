@@ -208,6 +208,27 @@ describe("staff check runs the public submit and keeps nothing (#1510)", () => {
     expect(dependencies.finishFormNotifications).not.toHaveBeenCalled();
   });
 
+  it("reaches pricing without an answer only the registrant gives, and a real submit still needs it", async () => {
+    const { prisma } = transactionFixture();
+    dependencies.getPrisma.mockReturnValue(prisma);
+    const { payment_method: _omitted, ...withoutPayment } = payLater.responses as Record<string, unknown>;
+    void _omitted;
+    const noPaymentChoice = { ...payLater, responses: withoutPayment };
+
+    // The payment choice is registrant-only (never kept in a draft): the check still prices the registration, with no card fee.
+    const result = await checkPublicRegistration("summer-retreat", "attendee", noPaymentChoice, submittedAt);
+    expect(result).toMatchObject({ registrationStatus: "SUBMITTED", totalCents: 10_000 });
+
+    // The real submit path is unchanged: the same answers are refused.
+    const real = transactionFixture();
+    dependencies.getPrisma.mockReturnValue(real.prisma);
+    await expect(submitPublicRegistration("summer-retreat", "attendee", noPaymentChoice, submittedAt)).rejects.toMatchObject({
+      code: "INVALID_SUBMISSION",
+      issues: expect.arrayContaining([expect.objectContaining({ key: "payment_method" })]),
+    });
+    expect(real.tx.registration.create).not.toHaveBeenCalled();
+  });
+
   it("never touches a draft, even when a token is passed", async () => {
     const { prisma, tx } = transactionFixture();
     dependencies.getPrisma.mockReturnValue(prisma);
