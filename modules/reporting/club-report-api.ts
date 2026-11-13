@@ -59,6 +59,12 @@ export async function handleClubReportRequest(input: {
   if ((request.action === "save-layout" || request.action === "delete-layout") && input.canManageLayouts === false) {
     throw new AccessDeniedError("View-only access can't change saved layouts.", 403, "PERMISSION_DENIED");
   }
+  if (request.action === "save-layout" || request.action === "delete-layout") {
+    // The path is exempt so reports still run on an archived event, but saved layouts are event data (#159).
+    const { refuseIfEventArchived } = await import("@/modules/events/archived-read-only-guard");
+    const archived = await refuseIfEventArchived(input.eventId);
+    if (archived) return archived;
+  }
   if (request.action === "save-layout") {
     const layout = await saveClubReportLayout(input.eventId, input.viewer, input.actor, request);
     return Response.json({ layout, layouts: await listClubReportLayouts(input.eventId, input.viewer) }, { status: 201, headers: noStore });

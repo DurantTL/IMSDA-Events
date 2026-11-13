@@ -8,6 +8,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    setupFiles: ["tests/setup/archived-guard-passthrough.ts"],
     // The suite never opens a connection, but code under test validates the
     // whole server environment. Declaring it here keeps a clean checkout green
     // without a preconfigured shell; a real DATABASE_URL still wins.
