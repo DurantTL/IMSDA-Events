@@ -71,8 +71,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
-      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
-      NODE_OPTIONS: --max-old-space-size=6144
+      # `next build` type-checks the whole app; that alone peaks near 6.4 GB, more than
+      # Node's default ~4 GB heap (#214). 10 GB leaves room to grow on the 16 GB runner.
+      NODE_OPTIONS: --max-old-space-size=10240
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -129,8 +130,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
-      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
-      NODE_OPTIONS: --max-old-space-size=6144
+      # `next build` type-checks the whole app; that alone peaks near 6.4 GB, more than
+      # Node's default ~4 GB heap (#214). 10 GB leaves room to grow on the 16 GB runner.
+      NODE_OPTIONS: --max-old-space-size=10240
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -334,8 +336,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
-      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
-      NODE_OPTIONS: --max-old-space-size=6144
+      # `next build` type-checks the whole app; that alone peaks near 6.4 GB, more than
+      # Node's default ~4 GB heap (#214). 10 GB leaves room to grow on the 16 GB runner.
+      NODE_OPTIONS: --max-old-space-size=10240
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -525,8 +528,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
-      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
-      NODE_OPTIONS: --max-old-space-size=6144
+      # `next build` type-checks the whole app; that alone peaks near 6.4 GB, more than
+      # Node's default ~4 GB heap (#214). 10 GB leaves room to grow on the 16 GB runner.
+      NODE_OPTIONS: --max-old-space-size=10240
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -623,8 +627,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
-      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
-      NODE_OPTIONS: --max-old-space-size=6144
+      # `next build` type-checks the whole app; that alone peaks near 6.4 GB, more than
+      # Node's default ~4 GB heap (#214). 10 GB leaves room to grow on the 16 GB runner.
+      NODE_OPTIONS: --max-old-space-size=10240
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -729,8 +734,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
-      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
-      NODE_OPTIONS: --max-old-space-size=6144
+      # `next build` type-checks the whole app; that alone peaks near 6.4 GB, more than
+      # Node's default ~4 GB heap (#214). 10 GB leaves room to grow on the 16 GB runner.
+      NODE_OPTIONS: --max-old-space-size=10240
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -852,8 +858,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
-      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
-      NODE_OPTIONS: --max-old-space-size=6144
+      # `next build` type-checks the whole app; that alone peaks near 6.4 GB, more than
+      # Node's default ~4 GB heap (#214). 10 GB leaves room to grow on the 16 GB runner.
+      NODE_OPTIONS: --max-old-space-size=10240
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
