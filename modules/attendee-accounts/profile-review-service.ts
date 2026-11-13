@@ -111,7 +111,7 @@ async function currentAnswers(client: AnswerClient, registrationId: string, veri
         take: 1,
         select: { afterSnapshot: true },
       },
-      attendees: { orderBy: [{ position: "asc" }, { id: "asc" }], select: { formResponses: true, attendeeTypeDefinition: { select: { minimumAge: true } } } },
+      attendees: { orderBy: [{ position: "asc" }, { id: "asc" }], select: { formResponses: true, attendeeTypeDefinition: { select: { minimumAge: true, maximumAge: true } } } },
     },
   });
   const submission = registration?.publicFormSubmission;
@@ -127,7 +127,7 @@ async function currentAnswers(client: AnswerClient, registrationId: string, veri
   const attendeeAnswers = registration.attendees.map((attendee) => keep(record(attendee.formResponses), attendeeKeys));
   const attendees = registration.attendees.map((attendee, index) => ({
     answers: attendeeAnswers[index]!,
-    typeMinimumAge: attendee.attendeeTypeDefinition?.minimumAge ?? null,
+    type: attendee.attendeeTypeDefinition ?? null,
   }));
   const holderIndex = accountHolderAttendeeIndex({ verifiedEmail, registrationAnswers, attendees, today: todayDateValue() });
   return { registration: registrationAnswers, holder: holderIndex === null ? {} : attendeeAnswers[holderIndex]! };

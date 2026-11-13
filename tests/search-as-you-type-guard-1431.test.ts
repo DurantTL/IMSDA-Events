@@ -181,7 +181,7 @@ describe("search boxes search as you type (#1431)", () => {
   });
 
   it("the account search on Profile updates is an approved exception to S1, S2 and S4 (#1512)", () => {
-    // Approved on purpose (docs/SITE-RULES.md S10, Caleb, November 13, 2026): Enter or button, three characters, nothing listed when
+    // Reviewed exception (docs/SITE-RULES.md S10, awaiting Caleb's confirmation of the search-box behavior, #1512): Enter or button, three characters, nothing listed when
     // empty, twenty results, and every search and opened account is audited. Not a type="search" or name="q" box.
     const source = fs.readFileSync(path.join(root, "components/profile-account-search.tsx"), "utf8");
     expect(searchInputs(source)).toHaveLength(0);
@@ -189,7 +189,7 @@ describe("search boxes search as you type (#1431)", () => {
     expect(source.match(/<input\b/g)).toHaveLength(1);
     expect(source).toContain("onSubmit={(event) => void search(event)}");
     expect(source).not.toMatch(/useDebouncedSearch|\.schedule\(/);
-    expect(fs.readFileSync(path.join(root, "docs/SITE-RULES.md"), "utf8")).toMatch(/\| S10 \| Approved exception to S1, S2 and S4/);
+    expect(fs.readFileSync(path.join(root, "docs/SITE-RULES.md"), "utf8")).toMatch(/\| S10 \| Exception to S1, S2 and S4/);
   });
 
   it("converted boxes are not on the allowlist", () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PhoneInput } from "@/components/phone-input";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
@@ -51,7 +51,7 @@ function fieldOfIssue(path: unknown): FieldKey | null {
  * not on the page until the correction is opened: opening it fetches that one account's values (an audited read), and
  * closing it or saving drops them again. The correction needs a reason and the statement that the person asked for it.
  */
-export function ProfilePersonalCorrectionForm({ accountId }: { accountId: string }) {
+export function ProfilePersonalCorrectionForm({ accountId, onDirtyChange }: { accountId: string; onDirtyChange?: (dirty: boolean) => void }) {
   const id = useId();
   const router = useRouter();
   const [loaded, setLoaded] = useState<Values | null>(null);
@@ -68,10 +68,13 @@ export function ProfilePersonalCorrectionForm({ accountId }: { accountId: string
   const buttonId = `${id}-save`;
   const inputId = (key: FieldKey) => `${id}-${key}`;
 
-  useUnsavedChangesGuard(
-    loaded !== null && values !== null
-      && (reason.trim() !== "" || personRequested || fields.some((field) => values[field.key] !== loaded[field.key])),
-  );
+  const dirty = loaded !== null && values !== null
+    && (reason.trim() !== "" || personRequested || fields.some((field) => values[field.key] !== loaded[field.key]));
+  useUnsavedChangesGuard(dirty);
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    return () => onDirtyChange?.(false);
+  }, [dirty, onDirtyChange]);
 
   function discard() {
     setLoaded(null);

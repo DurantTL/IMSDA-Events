@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PhoneInput } from "@/components/phone-input";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
@@ -31,7 +31,7 @@ function fieldOfIssue(path: unknown): FieldKey | null {
  * A staff correction of one attendee's name, phone or shirt size (#1512). It sends the values it was loaded with, so the
  * server can refuse the correction if the profile has changed since, and a reason, which is kept with the change.
  */
-export function ProfileCorrectionForm({ accountId, current, onSaved }: { accountId: string; current: Values; onSaved?: () => void }) {
+export function ProfileCorrectionForm({ accountId, current, onSaved, onDirtyChange }: { accountId: string; current: Values; onSaved?: () => void; onDirtyChange?: (dirty: boolean) => void }) {
   const id = useId();
   const router = useRouter();
   const currentKey = JSON.stringify(current);
@@ -51,7 +51,12 @@ export function ProfileCorrectionForm({ accountId, current, onSaved }: { account
     setValues(current);
   }
 
-  useUnsavedChangesGuard(reason.trim() !== "" || fields.some((field) => values[field.key] !== current[field.key]));
+  const dirty = reason.trim() !== "" || fields.some((field) => values[field.key] !== current[field.key]);
+  useUnsavedChangesGuard(dirty);
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    return () => onDirtyChange?.(false);
+  }, [dirty, onDirtyChange]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();

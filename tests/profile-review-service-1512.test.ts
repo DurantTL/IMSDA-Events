@@ -73,14 +73,14 @@ function storedAnswers(
   responses: Record<string, unknown>,
   amended?: Record<string, unknown>,
   attendees: Array<Record<string, unknown>> = [],
-  typeMinimumAges: Array<number | null> = [],
+  typeAges: Array<{ minimumAge: number | null; maximumAge?: number | null } | null> = [],
 ) {
   registration.findUnique.mockResolvedValue({
     publicFormSubmission: { responses, formVersion: { definition } },
     operations: amended ? [{ afterSnapshot: { registrationResponses: amended } }] : [],
     attendees: attendees.map((formResponses, index) => ({
       formResponses,
-      attendeeTypeDefinition: typeMinimumAges[index] === undefined ? null : { minimumAge: typeMinimumAges[index] },
+      attendeeTypeDefinition: typeAges[index] ? { maximumAge: null, ...typeAges[index] } : null,
     })),
   });
 }
@@ -278,7 +278,7 @@ describe("the account holder's attendee answers", () => {
     await getRegistrationProfileReview(account, "reg-1");
     expect(registration.findUnique.mock.calls[0]![0].select.attendees).toEqual({
       orderBy: [{ position: "asc" }, { id: "asc" }],
-      select: { formResponses: true, attendeeTypeDefinition: { select: { minimumAge: true } } },
+      select: { formResponses: true, attendeeTypeDefinition: { select: { minimumAge: true, maximumAge: true } } },
     });
   });
 
@@ -301,9 +301,11 @@ describe("the account holder's attendee answers", () => {
 
   it("compares an adult-type holder who has no birth date, but not a youth-type one", async () => {
     const noBirthDate = { ...holder, birth_date: "" };
-    storedAnswers({}, undefined, [noBirthDate], [18]);
+    storedAnswers({}, undefined, [noBirthDate], [{ minimumAge: 18 }]);
     expect((await getRegistrationProfileReview(account, "reg-1"))?.conflicts.length).toBeGreaterThan(0);
-    storedAnswers({}, undefined, [noBirthDate], [13]);
+    storedAnswers({}, undefined, [noBirthDate], [{ minimumAge: 13 }]);
+    expect((await getRegistrationProfileReview(account, "reg-1"))?.conflicts).toEqual([]);
+    storedAnswers({}, undefined, [noBirthDate], [{ minimumAge: 18, maximumAge: 12 }]);
     expect((await getRegistrationProfileReview(account, "reg-1"))?.conflicts).toEqual([]);
     storedAnswers({}, undefined, [noBirthDate], [null]);
     expect((await getRegistrationProfileReview(account, "reg-1"))?.conflicts).toEqual([]);

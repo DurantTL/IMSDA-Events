@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ProfileCorrectionForm } from "@/components/profile-correction-form";
 import { ProfilePersonalCorrectionForm } from "@/components/profile-personal-correction-form";
 import styles from "@/components/profile-account-search.module.css";
@@ -8,7 +8,7 @@ import styles from "@/components/profile-account-search.module.css";
 /** Kept in step with `modules/attendee-accounts/account-search-staff.ts` (a test compares them). */
 export const ACCOUNT_SEARCH_MIN = 3;
 
-type Result = { accountId: string; displayName: string; email: string };
+type Result = { accountId: string; displayName: string; email: string; note: string | null };
 type Opened = { accountId: string; accountName: string; current: { firstName: string; lastName: string; phone: string; shirtSize: string } };
 
 /**
@@ -26,29 +26,44 @@ export function ProfileAccountSearch() {
   const [busy, setBusy] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [opened, setOpened] = useState<Opened | null>(null);
-  const [message, setMessage] = useState<string>("");
-  const [isError, setIsError] = useState(false);
+  const [error, setError] = useState("");
+  const [tooShort, setTooShort] = useState(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const focusPanel = useRef(false);
+  const dirty = useRef({ correction: false, personal: false });
+  const onCorrectionDirty = useCallback((value: boolean) => { dirty.current.correction = value; }, []);
+  const onPersonalDirty = useCallback((value: boolean) => { dirty.current.personal = value; }, []);
 
-  function say(textToShow: string, error = false) {
-    setMessage(textToShow);
-    setIsError(error);
+  // Once an account has loaded for an Open click, focus moves to its panel heading.
+  useEffect(() => {
+    if (opened && focusPanel.current) {
+      focusPanel.current = false;
+      headingRef.current?.focus();
+    }
+  }, [opened]);
+
+  function say(textToShow: string, isError = false) {
+    setError(isError ? textToShow : "");
+    if (!isError) setTooShort(false);
   }
 
   async function search(event: React.FormEvent) {
     event.preventDefault();
     const query = text.trim();
-    setOpened(null);
+    // An opened account stays open while searching, so typed corrections are not lost.
+    setTooShort(false);
     if (query.length < ACCOUNT_SEARCH_MIN) {
       setSearched(null);
       setResults([]);
-      say(`Type at least ${ACCOUNT_SEARCH_MIN} characters of a name or email, then search.`, true);
+      setTooShort(true);
+      setError(`Type at least ${ACCOUNT_SEARCH_MIN} characters of a name or email, then search.`);
       inputRef.current?.focus();
       return;
     }
     setBusy(true);
     say("");
     try {
-      const response = await fetch(`/api/people/profile-updates/accounts/search?q=${encodeURIComponent(query)}`, { credentials: "same-origin" });
+      const response = await fetch(`/api/people/profile-updates/accounts/search?q=${encodeURIComponent(query)}`, { credentials: "same-origin", cache: "no-store" });
       const body = await response.json().catch(() => ({})) as { message?: string; results?: Result[]; limit?: number };
       if (!response.ok) {
         setSearched(null);
@@ -69,16 +84,20 @@ export function ProfileAccountSearch() {
     }
   }
 
-  async function open(accountId: string) {
+  async function open(accountId: string, reload = false) {
+    if (openingId !== null) return;
+    if (!reload && (dirty.current.correction || dirty.current.personal)
+      && !window.confirm("You have unsaved corrections for the account that is open. Open another account and discard them?")) return;
     setOpeningId(accountId);
     say("");
     try {
-      const response = await fetch(`/api/people/profile-updates/accounts/${encodeURIComponent(accountId)}`, { credentials: "same-origin" });
+      const response = await fetch(`/api/people/profile-updates/accounts/${encodeURIComponent(accountId)}`, { credentials: "same-origin", cache: "no-store" });
       const body = await response.json().catch(() => ({})) as Partial<Opened> & { message?: string };
       if (!response.ok || !body.accountId || !body.current) {
         say(body.message ?? "That account could not be opened.", true);
         return;
       }
+      if (!reload) focusPanel.current = true;
       setOpened(body as Opened);
     } catch {
       say("That account could not be opened. Check your connection and try again.", true);
@@ -92,7 +111,7 @@ export function ProfileAccountSearch() {
     ? results.length === 0
       ? `No accounts match “${searched}”. Check the spelling, or try part of the email address.`
       : results.length >= limit && limit > 0
-        ? `Showing the first ${results.length} matches. Type more of the name or email to narrow them.`
+        ? `The first ${results.length} matches are listed. Add more of the name or email to narrow them.`
         : `${results.length} ${results.length === 1 ? "account matches" : "accounts match"}.`
     : "";
 
@@ -114,14 +133,16 @@ export function ProfileAccountSearch() {
             name="account-lookup"
             autoComplete="off"
             maxLength={100}
-            aria-describedby={`${id}-help`}
+            aria-describedby={tooShort ? `${id}-help ${id}-error` : `${id}-help`}
+            aria-invalid={tooShort || undefined}
             value={text}
             onChange={(event) => setText(event.target.value)}
           />
           <button type="submit" className="secondary-button" disabled={busy}>{busy ? "Searching…" : "Search"}</button>
         </div>
       </form>
-      <p className={isError ? styles.error : styles.status} role={isError ? "alert" : "status"}>{isError ? message : message || status}</p>
+      <p className={styles.status} role="status">{error ? "" : status}</p>
+      <p id={`${id}-error`} className={styles.error} role="alert">{error}</p>
       {shown && results.length > 0 ? (
         <ul className={styles.list}>
           {results.map((result) => (
@@ -129,11 +150,13 @@ export function ProfileAccountSearch() {
               <div className={styles.who}>
                 <span className={styles.name} translate="no">{result.displayName}</span>
                 <span className={styles.meta} translate="no">{result.email}</span>
+                {result.note ? <span className={styles.note}>{result.note}</span> : null}
               </div>
               <button
                 type="button"
                 className="secondary-button"
-                disabled={openingId !== null}
+                aria-disabled={openingId !== null || undefined}
+                aria-busy={openingId === result.accountId || undefined}
                 aria-label={`Open corrections for ${result.displayName}`}
                 onClick={() => void open(result.accountId)}
               >
@@ -145,9 +168,9 @@ export function ProfileAccountSearch() {
       ) : null}
       {opened ? (
         <div className={styles.opened} aria-label={`Corrections for ${opened.accountName}`}>
-          <h3 className={styles.name} translate="no">{opened.accountName}</h3>
-          <ProfileCorrectionForm key={opened.accountId} accountId={opened.accountId} current={opened.current} onSaved={() => void open(opened.accountId)} />
-          <ProfilePersonalCorrectionForm key={`${opened.accountId}-personal`} accountId={opened.accountId} />
+          <h3 ref={headingRef} tabIndex={-1} className={styles.name} translate="no">{opened.accountName}</h3>
+          <ProfileCorrectionForm key={opened.accountId} accountId={opened.accountId} current={opened.current} onSaved={() => void open(opened.accountId, true)} onDirtyChange={onCorrectionDirty} />
+          <ProfilePersonalCorrectionForm key={`${opened.accountId}-personal`} accountId={opened.accountId} onDirtyChange={onPersonalDirty} />
         </div>
       ) : null}
     </section>

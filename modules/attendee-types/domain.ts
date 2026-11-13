@@ -123,3 +123,17 @@ export function planAttendeeTypeBackfill(
     };
   });
 }
+
+/**
+ * How an attendee type's configured age range classifies its attendees. Decided from the type only (ADR 0005 Addendum A:
+ * never from a birth date). Fail closed: only a type whose minimum age is 18 or more is ADULT. A maximum age under 18 is
+ * MINOR (checked first, so a contradictory range is never ADULT); everything else is UNKNOWN: no age range, an open-ended
+ * range such as 10 and over, or no type definition at all.
+ */
+export type AttendeeAgeClass = "ADULT" | "MINOR" | "UNKNOWN";
+
+export function classifyAttendeeType(type: { minimumAge: number | null; maximumAge: number | null }): AttendeeAgeClass {
+  if (type.maximumAge !== null && type.maximumAge < 18) return "MINOR";
+  if (type.minimumAge !== null && type.minimumAge >= 18) return "ADULT";
+  return "UNKNOWN";
+}

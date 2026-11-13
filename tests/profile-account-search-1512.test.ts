@@ -37,8 +37,8 @@ beforeEach(() => {
   mocks.getPrisma.mockReturnValue({ attendeeAccount });
   mocks.writeAuditLog.mockResolvedValue(undefined);
   attendeeAccount.findMany.mockResolvedValue([
-    { id: "acct-1", displayName: "Avery Person", email: "avery@example.test" },
-    { id: "acct-2", displayName: "Averil Sample", email: "averil@example.test" },
+    { id: "acct-1", displayName: "Avery Person", email: "avery@example.test", status: "ACTIVE", disabledAt: null },
+    { id: "acct-2", displayName: "Averil Sample", email: "averil@example.test", status: "PENDING_VERIFICATION", disabledAt: null },
   ]);
   attendeeAccount.findUnique.mockResolvedValue({ displayName: "Avery Person", firstName: "Avery", lastName: "Person", phone: null, shirtSize: "M" });
   session("SYSTEM_ADMIN");
@@ -74,19 +74,30 @@ describe("GET account search", () => {
     const contains = { contains: "AVER", mode: "insensitive" };
     expect(call.where).toEqual({ OR: [{ displayName: contains }, { firstName: contains }, { lastName: contains }, { email: contains }] });
     expect(call.take).toBe(ACCOUNT_SEARCH_RESULT_LIMIT);
-    expect(call.select).toEqual({ id: true, displayName: true, email: true });
+    expect(call.select).toEqual({ id: true, displayName: true, email: true, status: true, disabledAt: true });
   });
 
   it("returns only the account id, display name and email, nothing personal", async () => {
     attendeeAccount.findMany.mockResolvedValue([
-      { id: "acct-1", displayName: "Avery Person", email: "avery@example.test", phone: "(515) 555-0100", mailingLine1: "1 Example Way", emergencyContactName: "Casey" },
+      { id: "acct-1", displayName: "Avery Person", email: "avery@example.test", status: "ACTIVE", disabledAt: null, phone: "(515) 555-0100", mailingLine1: "1 Example Way", emergencyContactName: "Casey" },
     ]);
     const body = await (await doSearch("avery")).json();
     expect(body).toEqual({
-      results: [{ accountId: "acct-1", displayName: "Avery Person", email: "avery@example.test" }],
+      results: [{ accountId: "acct-1", displayName: "Avery Person", email: "avery@example.test", note: null }],
       limit: ACCOUNT_SEARCH_RESULT_LIMIT,
     });
     expect(JSON.stringify(body)).not.toMatch(/555|Example Way|Casey|person(Id|Merge)/);
+  });
+
+  it("notes accounts that are disabled or not verified, in plain words", async () => {
+    attendeeAccount.findMany.mockResolvedValue([
+      { id: "a", displayName: "A One", email: "a@example.test", status: "ACTIVE", disabledAt: new Date("2027-01-01") },
+      { id: "b", displayName: "B Two", email: "b@example.test", status: "PENDING_VERIFICATION", disabledAt: null },
+      { id: "c", displayName: "C Three", email: "c@example.test", status: "ACTIVE", disabledAt: null },
+    ]);
+    const body = await (await doSearch("exam")).json();
+    expect(body.results.map((result: { note: string | null }) => result.note)).toEqual(["Disabled", "Not verified", null]);
+    expect(JSON.stringify(body)).not.toMatch(/disabledAt|2027/);
   });
 
   it("writes the audit with ids and the query length only, never the query, names or emails", async () => {

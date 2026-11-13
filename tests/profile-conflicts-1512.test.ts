@@ -185,10 +185,10 @@ describe("holder answers fill blanks only", () => {
 describe("accountHolderAttendeeIndex", () => {
   const today = "2027-03-01";
   const find = (attendeeAnswers: Array<Record<string, unknown>>, registrationAnswers: Record<string, unknown> = {}, verifiedEmail = "avery@example.test") =>
-    accountHolderAttendeeIndex({ verifiedEmail, registrationAnswers, attendees: attendeeAnswers.map((answers) => ({ answers, typeMinimumAge: null })), today });
+    accountHolderAttendeeIndex({ verifiedEmail, registrationAnswers, attendees: attendeeAnswers.map((answers) => ({ answers, type: null })), today });
   /** One attendee who matches by email, with the given answers and attendee-type minimum age. */
-  const findTyped = (answers: Record<string, unknown>, typeMinimumAge: number | null) =>
-    accountHolderAttendeeIndex({ verifiedEmail: "avery@example.test", registrationAnswers: {}, attendees: [{ answers: { email: "avery@example.test", ...answers }, typeMinimumAge }], today });
+  const findTyped = (answers: Record<string, unknown>, typeMinimumAge: number | null, maximumAge: number | null = null) =>
+    accountHolderAttendeeIndex({ verifiedEmail: "avery@example.test", registrationAnswers: {}, attendees: [{ answers: { email: "avery@example.test", ...answers }, type: typeMinimumAge === null && maximumAge === null ? null : { minimumAge: typeMinimumAge, maximumAge } }], today });
   const adult = { birth_date: "1990-05-05" };
 
   it("matches an adult whose email is the verified email, ignoring case and spaces", () => {
@@ -227,13 +227,25 @@ describe("accountHolderAttendeeIndex", () => {
     it("an adult type (minimum age 18 or more) is the holder", () => {
       expect(findTyped({}, 18)).toBe(0);
       expect(findTyped({ birth_date: "" }, 21)).toBe(0);
-      expect(findTyped({ birth_date: "1990-02-31" }, 18)).toBe(0);
+      expect(findTyped({ birth_date: "   " }, 18)).toBe(0);
     });
 
     it("a teen, youth or child type is not the holder", () => {
       expect(findTyped({}, 13)).toBeNull();
       expect(findTyped({}, 0)).toBeNull();
       expect(findTyped({}, 17)).toBeNull();
+    });
+
+    it("a contradictory range (minimum 18, maximum 12) is not adult", () => {
+      expect(findTyped({}, 18, 12)).toBeNull();
+      expect(findTyped({}, 18, 17)).toBeNull();
+      expect(findTyped({}, 18, 99)).toBe(0);
+    });
+
+    it("a birth date that is present but unreadable or in the future is unclear: not adult, and never falls to the type", () => {
+      for (const birth_date of ["1990-02-31", "05/05/1990", "not a date", "2099-01-01"]) {
+        expect(findTyped({ birth_date }, 18), birth_date).toBeNull();
+      }
     });
 
     it("a type with no minimum age, or no type at all, is not the holder", () => {
@@ -252,8 +264,8 @@ describe("accountHolderAttendeeIndex", () => {
         verifiedEmail: "avery@example.test",
         registrationAnswers: { contact_first_name: "Avery", contact_last_name: "Person" },
         attendees: [
-          { answers: { email: "avery@example.test" }, typeMinimumAge: 18 },
-          { answers: { first_name: "Avery", last_name: "Person" }, typeMinimumAge: 18 },
+          { answers: { email: "avery@example.test" }, type: { minimumAge: 18, maximumAge: null } },
+          { answers: { first_name: "Avery", last_name: "Person" }, type: { minimumAge: 18, maximumAge: null } },
         ],
         today,
       })).toBeNull();
@@ -283,7 +295,7 @@ describe("accountHolderAttendeeIndex", () => {
   });
 
   it("defaults to today's Chicago date", () => {
-    expect(accountHolderAttendeeIndex({ verifiedEmail: "a@example.test", registrationAnswers: {}, attendees: [{ answers: { email: "a@example.test", birth_date: "1990-01-01" }, typeMinimumAge: null }] })).toBe(0);
+    expect(accountHolderAttendeeIndex({ verifiedEmail: "a@example.test", registrationAnswers: {}, attendees: [{ answers: { email: "a@example.test", birth_date: "1990-01-01" }, type: null }] })).toBe(0);
   });
 });
 

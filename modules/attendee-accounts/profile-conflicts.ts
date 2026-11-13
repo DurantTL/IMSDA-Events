@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { ageOn, parseCalendarDate } from "@/modules/club-rosters/domain";
+import { classifyAttendeeType } from "@/modules/attendee-types/domain";
 import { BIRTH_DATE_FIELD_KEYS, todayDateValue } from "@/modules/forms/definition";
 
 /**
@@ -272,27 +273,28 @@ function firstClean(responses: Record<string, unknown>, keys: readonly string[])
 }
 
 /**
- * Whether an attendee is an adult, as far as the registration can prove it. A birth-date answer that is a real calendar
- * date decides: 18 or over on `today` is an adult, anything else is not, even when the attendee type says adult.
- * Without a usable birth-date answer, the attendee's linked attendee type decides: an adult type has a minimum age of
- * 18 or more. A type with no minimum age, a younger minimum (teen, youth, child), or no linked type is not an adult.
- * Free-text labels, age numbers and "minor" flags are never evidence.
+ * Whether an attendee is an adult, as far as the registration can prove it. A birth-date answer that is present
+ * decides, and only a real calendar date on or before `today` showing 18 or over is an adult: an unreadable or future
+ * birth date is unclear, so not an adult, and never falls through to the type. Only a fully absent birth date lets the
+ * linked attendee type decide, through the shared `classifyAttendeeType` (adult means a minimum age of 18 or more and no
+ * maximum under 18). No type, no age range, a younger range or an open-ended one is not an adult. Free-text labels, age
+ * numbers and "minor" flags are never evidence.
  */
 function isAdultAttendee(attendee: AccountHolderAttendee, today: string): boolean {
   const raw = firstClean(attendee.answers, BIRTH_DATE_FIELD_KEYS);
-  if (raw && parseCalendarDate(raw)) {
+  if (raw) {
+    if (!parseCalendarDate(raw)) return false;
     const age = ageOn(raw, today);
     return age !== null && age >= ADULT_AGE;
   }
-  const minimumAge = attendee.typeMinimumAge;
-  return typeof minimumAge === "number" && Number.isFinite(minimumAge) && minimumAge >= ADULT_AGE;
+  return attendee.type ? classifyAttendeeType(attendee.type) === "ADULT" : false;
 }
 
-/** One attendee on the registration: the attendee-scope answers and the minimum age of the linked attendee type. */
+/** One attendee on the registration: the attendee-scope answers and the age range of the linked attendee type. */
 export type AccountHolderAttendee = {
   answers: Record<string, unknown>;
-  /** `EventAttendeeType.minimumAge` of the attendee's type; null when there is no type or it sets no minimum. */
-  typeMinimumAge: number | null;
+  /** The attendee's `EventAttendeeType` age range; null when there is no linked type. */
+  type: { minimumAge: number | null; maximumAge: number | null } | null;
 };
 
 /**
