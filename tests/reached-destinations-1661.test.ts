@@ -42,9 +42,9 @@ function passing(entry: ReachedDestination): DestinationSearchContext {
 }
 
 describe("the registry", () => {
-  it("lists the 36 pages once each", () => {
-    expect(reachedDestinations).toHaveLength(36);
-    expect(reachedRoutes.size).toBe(36);
+  it("lists the 37 pages once each", () => {
+    expect(reachedDestinations).toHaveLength(37);
+    expect(reachedRoutes.size).toBe(37);
     expect(systemEntries).toHaveLength(6);
   });
 
@@ -104,8 +104,15 @@ describe("the registry", () => {
         expect(source, entry.route).toContain("closeoutPermissions.some");
         continue;
       }
-      expect(entry.permissions, entry.route).toHaveLength(1);
-      expect(source, entry.route).toContain(`!permissions.includes("${entry.permissions[0]}")`);
+      // Most pages accept one permission; a page that accepts either of two (the Event money report, #1962) denies only
+      // when the viewer holds neither.
+      if (entry.permissions.length > 1) {
+        expect(entry.permissions, entry.route).toHaveLength(2);
+        const [first, second] = entry.permissions;
+        expect(source, entry.route).toContain(`!permissions.includes("${first}") && !permissions.includes("${second}")`);
+      } else {
+        expect(source, entry.route).toContain(`!permissions.includes("${entry.permissions[0]}")`);
+      }
       // A page that is for one audience says "Not available" on the other.
       if (entry.audience) expect(source, entry.route).toContain(`event.audience !== "${entry.audience}"`);
     }
@@ -176,8 +183,14 @@ describe("search finds each page for a viewer who may open it", () => {
 
   it("shows only the finance pages, the meal closeout and the item closeout to a finance-only viewer", () => {
     const routes = routesIn(as("MANAGE_FINANCE"));
-    expect(routes).toHaveLength(12);
+    expect(routes).toHaveLength(13);
     expect(routes.filter((route) => !route.startsWith("/finance/") && route !== "/more/ledger-health").sort()).toEqual(["/more/issued-assets/closeout", "/more/kitchen-report/closeout"]);
+  });
+
+  it("shows the Event money report to a reports-only viewer as well (#1962)", () => {
+    expect(routesIn(as("VIEW_REPORTS"))).toContain("/finance/money-report");
+    expect(routesIn(as("MANAGE_FINANCE"))).toContain("/finance/money-report");
+    expect(routesIn(as("VIEW_EVENT"))).not.toContain("/finance/money-report");
   });
 
   it("shows nothing to a restricted viewer", () => {

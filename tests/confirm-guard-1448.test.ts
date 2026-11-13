@@ -75,6 +75,7 @@ const unconfirmedDeleteAllowlist: Record<string, string> = {
   // Low-stakes by design: nothing is lost and the action is trivially reversible.
   "components/registration-notes-tags-panel.tsx": "Removes one tag chip; re-adding the tag restores it, no data is lost.",
   "components/staff-home-board.tsx": "Reset only puts the person's own Home layout back to its default (#1705); no record is lost and they can rearrange it again.",
+  "components/recognitions-workspace.tsx": "Undo is itself the reversal of a mark (it keeps who marked and removed it and when); a confirm on every tap would slow marking at the event.",
   "components/session-manager.tsx": "Ends sessions only; no data is deleted and the devices can sign in again.",
 };
 

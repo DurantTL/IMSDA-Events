@@ -108,8 +108,8 @@ describe("the registration provider", () => {
     };
   }
 
-  it("declares its five rows and a section", () => {
-    expect(provider.signals.map((row) => row.key)).toEqual(["pricing-self-test", "capacity-holds-released", "open-without-form", "registrations-received", "general-link-expiry"]);
+  it("declares its six rows and a section", () => {
+    expect(provider.signals.map((row) => row.key)).toEqual(["pricing-self-test", "capacity-holds-released", "open-without-form", "registrations-received", "general-link-expiry", "visiting-club-access-end"]);
   });
 
   it("shows the database rows as unavailable, never OK, when reads fail; the pricing self-test still runs", async () => {
@@ -122,7 +122,7 @@ describe("the registration provider", () => {
     const rows = await provider.load(now, createReportContext(now));
     const byKey = new Map(rows.map((row) => [row.key, row]));
     expect(byKey.get("pricing-self-test")?.state).toBe("ok");
-    for (const key of ["capacity-holds-released", "open-without-form", "registrations-received", "general-link-expiry"]) {
+    for (const key of ["capacity-holds-released", "open-without-form", "registrations-received", "general-link-expiry", "visiting-club-access-end"]) {
       expect(byKey.get(key)?.state, key).toBe("unavailable");
       expect(byKey.get(key)?.whenLabel).toBe("Tried");
     }
@@ -146,7 +146,7 @@ describe("the registration provider", () => {
       registrationCapacityReservation: { groupBy },
       publicRegistrationSubmission: { count },
     });
-    mocks.getJobRun.mockResolvedValue({ status: "ok", lastSucceededAt: at, lastFailedAt: null, ageMs: 1000, summary: { expired: 0, events: 0 } });
+    mocks.getJobRun.mockResolvedValue({ status: "ok", lastSucceededAt: at, lastFailedAt: null, ageMs: 1000, summary: { expired: 0, events: 0, ended: 0, clubs: 0 } });
     const rows = await provider.load(now, createReportContext(now));
     const byKey = new Map(rows.map((row) => [row.key, row]));
     expect(byKey.get("capacity-holds-released")).toMatchObject({ state: "watch", fixHref: "/people?event=e1" });

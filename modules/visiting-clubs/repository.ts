@@ -11,7 +11,9 @@ import { isAccountEmailConfigured } from "@/modules/communications/account-email
 import { normalizeOrganizationName } from "@/modules/organizations/domain";
 import {
   VISITING_CLUB_INVITE_LIFETIME_DAYS,
+  VISITING_CLUB_PAST_WINDOW_MESSAGE,
   VISITING_DECLINE_REASON_MAX,
+  visitingClubPastWindow,
   cleanVisitingText,
   visitingClubSourceOrgType,
   visitingInviteState,
@@ -47,7 +49,8 @@ export type VisitingClubErrorCode =
   | "REQUEST_NOT_FOUND"
   | "ALREADY_DECIDED"
   | "INVALID_REASON"
-  | "ACCOUNT_NOT_FOUND";
+  | "ACCOUNT_NOT_FOUND"
+  | "EVENT_ENDED";
 
 export class VisitingClubError extends Error {
   constructor(public readonly code: VisitingClubErrorCode, message: string) {
@@ -412,8 +415,11 @@ export async function decideVisitingClubRequest(
 
     if (decision.decision === "approve") {
       // Re-checked on every approval: the event may have been archived or changed since the request was sent.
-      const event = await tx.event.findFirst({ where: { id: request.eventId, ...CLUB_EVENT_GATE }, select: { id: true } });
+      const event = await tx.event.findFirst({ where: { id: request.eventId, ...CLUB_EVENT_GATE }, select: { id: true, endsAt: true } });
       if (!event) throw new VisitingClubError("EVENT_NOT_FOUND", EVENT_NOT_AVAILABLE);
+      if (visitingClubPastWindow({ guestEventId: event.id, guestEvent: { endsAt: event.endsAt } }, now)) {
+        throw new VisitingClubError("EVENT_ENDED", VISITING_CLUB_PAST_WINDOW_MESSAGE);
+      }
       const account = await tx.attendeeAccount.findUnique({ where: { id: request.submittedByAccountId }, select: { id: true, disabledAt: true } });
       if (!account || account.disabledAt) {
         throw new VisitingClubError("ACCOUNT_NOT_FOUND", "The director's account is no longer available, so the club can't be approved.");

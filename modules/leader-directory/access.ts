@@ -20,7 +20,8 @@ export async function currentLeaderDirectoryViewer(now = new Date()): Promise<Le
   const { account, via, sessionId } = await getCurrentAttendee();
   if (!account || via !== "attendee") return null;
   if ((await accountNeedsSecondStep(account.id, sessionId)) !== "OK") return null;
-  const clubs = await listDirectedClubs(account.id, now);
+  // Conference clubs only: a visiting club's director keeps their own club portal but is not a leader directory viewer.
+  const clubs = (await listDirectedClubs(account.id, now)).filter((club) => !club.guestEventId);
   if (canViewLeaderDirectory({ enabled: true, directedRoles: clubs.map((club) => club.role), areaCoordinator: false })) {
     return { accountId: account.id };
   }

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { getPrisma } from "@/lib/prisma";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import type { AuthenticatedUser } from "@/modules/access/authorization";
@@ -21,7 +22,7 @@ async function getChurchClubSummary(churchId: string, clubYear: string, now = ne
   const church = await prisma.organization.findUnique({ where: { id: churchId }, select: { id: true, name: true, type: true } });
   if (!church || church.type !== "CHURCH") return null;
   const clubs = await prisma.organization.findMany({
-    where: { type: "CLUB", isActive: true, parentOrganizationId: churchId },
+    where: { ...conferenceClubWhere(), parentOrganizationId: churchId },
     orderBy: { name: "asc" },
     select: { id: true, name: true, ...clubJoinSelect },
   });

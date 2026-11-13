@@ -1,5 +1,6 @@
 import "server-only";
 
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { Prisma } from "@prisma/client";
 import { formatPersonName } from "@/lib/person-name";
 import { getPrisma } from "@/lib/prisma";
@@ -83,7 +84,7 @@ export async function listTltDirectoryRows(now = new Date()): Promise<TltDirecto
       isTlt: true,
       status: "ACTIVE",
       personId: { not: null },
-      organization: { type: "CLUB", isActive: true, guestEventId: null },
+      organization: conferenceClubWhere(),
     },
     select: {
       id: true,
@@ -456,7 +457,7 @@ export async function confirmTltMoveUp(input: TltMoveUpRequest, actor: TltDirect
         attendeeType: "YOUTH",
         isTlt: true,
         status: "ACTIVE",
-        organization: { type: "CLUB", isActive: true, guestEventId: null },
+        organization: conferenceClubWhere(),
       },
       select: { personId: true },
     });
