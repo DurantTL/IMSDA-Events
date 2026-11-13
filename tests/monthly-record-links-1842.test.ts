@@ -22,6 +22,8 @@ vi.mock("@/modules/club-reports/repository", () => ({
   getClubReport: mocks.getClubReport,
   reportPrefill: async () => ({ rosterSize: 10, adultCount: 2, honors: [], averageAttendance: null }),
 }));
+// Area Coordinator review (#1701) is off by default: nothing extra for the staff page to show.
+vi.mock("@/modules/club-reports/area-review", () => ({ getItemDecisionsForRecord: async () => ({ switchOn: false, decisions: [] }) }));
 vi.mock("@/modules/club-reports/review", () => ({ getClubReportReview: mocks.getClubReportReview }));
 vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }));
 vi.mock("@/components/club-report-form", () => ({ ClubReportForm: () => createElement("div", { "data-testid": "form" }) }));

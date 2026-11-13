@@ -1,5 +1,6 @@
 import "server-only";
 
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { randomUUID } from "node:crypto";
 import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
@@ -76,7 +77,7 @@ async function parseAndMatch(files: Array<{ bytes: Uint8Array }>, now: Date): Pr
   const parsed = readExport(files);
   const prisma = getPrisma();
   const organizations = await prisma.organization.findMany({
-    where: { type: "CLUB", isActive: true },
+    where: conferenceClubWhere(),
     select: { id: true, name: true, normalizedName: true, parentOrganization: { select: { name: true } } },
   });
   const clubs: MatchClub[] = organizations.map((club) => ({
@@ -267,7 +268,7 @@ export async function applyHealthImport(
           // The member's row is locked so two imports (or an import and a director's save) for one member run in turn.
           await tx.$queryRaw`SELECT "id" FROM "ClubRosterMember" WHERE "id" = ${memberId} FOR UPDATE`;
           const member = await tx.clubRosterMember.findFirst({
-            where: { id: memberId, organizationId, clubYear, status: "ACTIVE", organization: { type: "CLUB", isActive: true } },
+            where: { id: memberId, organizationId, clubYear, status: "ACTIVE", organization: conferenceClubWhere() },
             select: { id: true, personId: true },
           });
           if (!member) {

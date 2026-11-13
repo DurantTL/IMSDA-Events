@@ -1,3 +1,4 @@
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { CLUB_ROLE_LABELS, CLUB_ROLE_VALUES, parsePeopleId, type ClubRoleValue } from "@/modules/system-admin/people-directory-model";
 import { firstParam } from "@/lib/search-params";
 
@@ -62,7 +63,7 @@ export function buildLeadersWhere(filters: ClubLeaderFilters, now = new Date()) 
     effectiveFrom: { lte: now },
     OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
     role: filters.role ? filters.role : { in: [...CLUB_ROLE_VALUES] },
-    organization: { type: "CLUB", isActive: true, ...(filters.clubId ? { id: filters.clubId } : {}) },
+    organization: { ...conferenceClubWhere(), ...(filters.clubId ? { id: filters.clubId } : {}) },
   };
 }
 

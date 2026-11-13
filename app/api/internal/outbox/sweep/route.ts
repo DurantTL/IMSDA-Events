@@ -13,8 +13,10 @@ import { sweepClassWaitlists } from "@/modules/honors/waitlist-repository";
 import { sendDueClassChangeEmails } from "@/modules/honors/class-change-emails";
 import { sendDueHonorWatchSummaries } from "@/modules/honors/watch-emails";
 import { sendDueMonthlyRecordReminders } from "@/modules/club-reports/monthly-reminders";
+import { sendDueClubDraftReminders } from "@/modules/club-registrations/draft-reminders";
 import { runHealthSnapshotSweep, sealedCopiesEnabled } from "@/modules/health-records/snapshot-hooks";
 import { expireStalePendingTeams } from "@/modules/general-link-registrations/repository";
+import { endVisitingClubAccess } from "@/modules/visiting-clubs/access-end";
 import { runAlertScan } from "@/modules/operations/alert-scan";
 import { sweepHostedCheckouts } from "@/modules/payments/square-hosted-invalidation";
 import { recordJobRun, recordSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
@@ -24,12 +26,14 @@ import {
   CLASS_WAITLIST_SWEEP_JOB,
   DEADLINE_REMINDER_PREPARATION_JOB,
   GENERAL_LINK_EXPIRY_JOB,
+  VISITING_CLUB_ACCESS_END_JOB,
   HEALTH_SNAPSHOT_SWEEP_JOB,
   HONOR_WATCH_SUMMARIES_JOB,
   INSTRUCTOR_CLASS_EMAILS_JOB,
   LOCATION_WAITLIST_DIGEST_JOB,
   MESSAGE_FILE_CLEANUP_JOB,
   MONTHLY_RECORD_REMINDERS_JOB,
+  CLUB_DRAFT_REMINDERS_JOB,
   PAY_ON_SQUARE_LINK_SWEEP_JOB,
   RETENTION_CLEANUP_JOB,
 } from "@/modules/operations/sweep-heartbeat";
@@ -262,6 +266,30 @@ async function postHandler(request: Request) {
           }
         : undefined,
     );
+    // Club registration reminders (#164): for events whose staff turned them on (off until then), a director and deputy whose
+    // club registration is started but not submitted get up to a few reminders, only between 9:00 and 19:00 where the event is
+    // held. At most one per draft and attempt (a unique log row is claimed with the emails), so running it on every sweep is
+    // safe. Its failure must not make a successful sweep look failed.
+    const clubDraftReminders = await sendDueClubDraftReminders().catch((error) => {
+      logError("The club registration reminder step failed after a successful outbox sweep", error);
+      return null;
+    });
+    await recordStep(
+      CLUB_DRAFT_REMINDERS_JOB,
+      "club registration reminder",
+      clubDraftReminders !== null && clubDraftReminders.failed === 0,
+      clubDraftReminders
+        ? {
+            status: clubDraftReminders.status,
+            events: clubDraftReminders.events,
+            reminded: clubDraftReminders.reminded,
+            noRecipient: clubDraftReminders.noRecipient,
+            skippedEmailOff: clubDraftReminders.skippedEmailOff,
+            failed: clubDraftReminders.failed,
+            delivered: clubDraftReminders.delivered,
+          }
+        : undefined,
+    );
     // Sealed health copies (#924): the event-start copies that are due, and the daily deletion of copies whose
     // keep-until date has passed (never one under a legal hold). A no-op with HEALTH_RECORDS_ENABLED off, safe on
     // every sweep, and it reports counts only. Its failure must not make a successful sweep look failed.
@@ -298,6 +326,18 @@ async function postHandler(request: Request) {
       "pending-team expiry",
       generalLinkRetention !== null,
       generalLinkRetention ? { expired: generalLinkRetention.expired, events: generalLinkRetention.events } : undefined,
+    );
+    // Visiting clubs (#835): their roles end 30 days after their event ends. Safe on every sweep; it reports counts only.
+    // Its failure must not make a successful sweep look failed.
+    const visitingAccess = await endVisitingClubAccess().catch((error) => {
+      logError("The visiting club access step failed after a successful outbox sweep", error);
+      return null;
+    });
+    await recordStep(
+      VISITING_CLUB_ACCESS_END_JOB,
+      "visiting club access end",
+      visitingAccess !== null,
+      visitingAccess ? { ended: visitingAccess.ended, clubs: visitingAccess.clubs, invitesCancelled: visitingAccess.invitesCancelled, clubsDeactivated: visitingAccess.clubsDeactivated } : undefined,
     );
     // Message files (#845): uploads nothing refers to. It only REPORTS what it would delete unless a human set
     // MESSAGE_FILE_SWEEP_DELETE=true, never touches a file inside the grace period (24 hours at the least) or one
@@ -355,6 +395,7 @@ async function postHandler(request: Request) {
       instructorClassEmails,
       honorWatchSummaries,
       monthlyRecordReminders,
+      clubDraftReminders,
       healthSnapshots,
       generalLinkRetention,
       messageFiles,

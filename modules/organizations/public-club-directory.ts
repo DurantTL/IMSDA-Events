@@ -1,5 +1,6 @@
 import "server-only";
 
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { getPrisma } from "@/lib/prisma";
 
 /**
@@ -48,8 +49,7 @@ export type PublicClubListing = {
 export async function listPublicClubs(): Promise<PublicClubListing[]> {
   const clubs = await getPrisma().organization.findMany({
     where: {
-      type: "CLUB",
-      isActive: true,
+      ...conferenceClubWhere(),
       clubProfile: { listPublicly: true },
       parentOrganization: { isActive: true },
     },

@@ -183,8 +183,8 @@ const liveVersionWhere = { status: { not: "DISCARDED" } } satisfies Prisma.Invoi
  * `getInvoicesView`: church promo-code invoices left out, discarded versions ignored, and an invoice counts when its
  * latest version is a draft. Events not billed to organizations have none.
  */
-export async function countOpenInvoiceDrafts(eventId: string): Promise<number> {
-  const prisma = getPrisma();
+export async function countOpenInvoiceDrafts(eventId: string, client: Prisma.TransactionClient | PrismaClient = getPrisma()): Promise<number> {
+  const prisma = client;
   const event = await prisma.event.findUnique({ where: { id: eventId }, select: { billingMode: true } });
   if (!event) throw new InvoiceError("That event does not exist.", "EVENT_NOT_FOUND");
   if (event.billingMode !== "DEFERRED_ORGANIZATION_INVOICE") return 0;

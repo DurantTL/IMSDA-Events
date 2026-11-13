@@ -327,6 +327,9 @@ const pages: PageSpec[] = [
   { ...club("letters", "/letters"), expectText: /Letters and certificates/ },
   club("letter-print", `/letters/${clubLetterId}/print?people=${P}_person_a_07,${P}_person_a_14`),
   club("certificate-print", `/letters/${clubCertificateId}/print?people=${P}_person_a_07`),
+  // Optional class and honor certificates (#1696): switched on for the club by this script's seed.
+  { ...club("certificates", "/certificates"), expectText: /Class and honor certificates/ },
+  club("certificates-print", "/certificates/print"),
   // Optional roster charts and birthdays (#1704): switched on for the club by this script's seed.
   { ...club("charts", "/charts"), expectText: /Roster charts/ },
   // Area Coordinator.
@@ -341,6 +344,8 @@ const pages: PageSpec[] = [
   { ...area("budget", `/account/area-clubs/events/${clubEventId}/budget`), expectText: /Budget sheet/ },
   // Master Guide approvals (#1698): the coordinator's list of candidates the club approved.
   { ...area("master-guide", "/account/area-clubs/master-guide"), expectText: /Master Guide approvals/ },
+  // The optional Recognitions tool (#1683): the name list with its mark buttons, the add form, the totals and the hand-out list (switched on in seedRecognitions).
+  { ...staff("recognitions", `/more/recognitions?event=${clubEventId}`, "system-admin"), expectText: /Recognitions/ },
   // The optional Event staffing sheet (#1678): the coordinator's switch, the activities, the gaps and the people (switched on in seedEventStaffing).
   { ...area("event-staffing", `/account/area-clubs/events/${clubEventId}/staffing`), expectText: /Event staffing/ },
   // The optional Inspections tool (#1896): the switch, the phone score entry and the CSV import (switched on in seedInspections).
@@ -382,6 +387,10 @@ const pages: PageSpec[] = [
   staff("finance-scholarship-fund", "/finance/scholarship-fund"),
   staff("finance-cancellation-policy", "/finance/cancellation-policy"),
   staff("finance-square-payments", "/finance/square-payments"),
+  // Event money report (#1962): charges, paid and refunded, outstanding, the reconciliation and the owing list. Square may be unreachable locally, which the page shows as Unavailable.
+  { ...staff("finance-money-report", "/finance/money-report"), expectText: /Event money report/ },
+  // Event closeout (#1515): the checklist, sign-off and history. Square may be unreachable locally, which the checklist shows as a warning.
+  { ...staff("finance-closeout", "/finance/closeout"), expectText: /Event closeout/ },
   // More money tools (#1575): the other finance pages as grouped cards. The Refunds view is the cancellation queue, audited below as cancellation-staff-queue.
   { ...staff("finance-tools", "/finance/tools"), expectText: /Invoices and churches/ },
   // Review queues (#1574): the registration review pages as grouped cards.
@@ -461,6 +470,20 @@ const pages: PageSpec[] = [
       await page.getByLabel(/confirmation code/i).fill("MOBSTA1");
       await page.getByRole("button", { name: /Find family/i }).click();
       await page.getByRole("status").first().waitFor({ timeout: 5000 }).catch(() => undefined);
+      await page.waitForTimeout(500);
+    },
+  },
+  // Gate mode on the station (#1684): the Check-in | Gate switch, a name search and its result cards.
+  {
+    name: "station-gate",
+    path: "/check-in-station",
+    role: "station",
+    expectText: /Check-in station/i,
+    prepare: async (page) => {
+      await page.getByRole("button", { name: /^Gate$/ }).click();
+      await page.getByLabel(/Search a name or scan a pass/i).fill("Quillfeather");
+      await page.getByRole("button", { name: /Look up/i }).click();
+      await page.getByText(/Registered/).first().waitFor({ timeout: 5000 }).catch(() => undefined);
       await page.waitForTimeout(500);
     },
   },
@@ -1089,7 +1112,10 @@ async function cleanupHistoryAccount(prisma: PrismaClient) {
  * check-in station (#892) shows its real family list and payment panel. Idempotent.
  */
 async function seedStationEvent(prisma: PrismaClient) {
-  if (await prisma.event.findUnique({ where: { id: stationEventId }, select: { id: true } })) return;
+  if (await prisma.event.findUnique({ where: { id: stationEventId }, select: { id: true } })) {
+    await prisma.event.update({ where: { id: stationEventId }, data: { checkInGateModeEnabled: true } });
+    return;
+  }
   const { addDays, calendarDateIn } = await import("../modules/calendar/domain");
   const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
   const today = calendarDateIn(new Date());
@@ -1099,6 +1125,8 @@ async function seedStationEvent(prisma: PrismaClient) {
       data: {
         id: stationEventId, slug: `${P}-station-weekend`, name: "Mobilecheck Station Weekend",
         startsAt: new Date(`${addDays(today, -1)}T12:00:00Z`), endsAt: new Date(`${addDays(today, 1)}T12:00:00Z`), timezone: "America/Chicago",
+        // Gate mode (#1684) is on for this event so the station shows its Check-in | Gate switch.
+        checkInGateModeEnabled: true,
         // Unpublished: a station does not need it, and a published event dated today would join the public calendar's pages.
         isPublished: false, billingMode: "ATTENDEE_PAY",
       },
@@ -1288,6 +1316,16 @@ async function seedBaptismFollowUp(prisma: PrismaClient): Promise<void> {
   await prisma.baptismFollowUpSetting.upsert({
     where: { eventId: clubEventId },
     create: { eventId: clubEventId, leadEmails: ["lead@example.test"] },
+    update: {},
+  });
+}
+
+/** Recognitions (#1683) switched on for the club weekend with one synthetic recognition, so the page shows the search list and the add form and not only the off notice. */
+async function seedRecognitions(prisma: PrismaClient): Promise<void> {
+  await prisma.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "recognitions" }], skipDuplicates: true });
+  await prisma.eventTag.upsert({
+    where: { eventId_normalizedName: { eventId: clubEventId, normalizedName: "memory verses" } },
+    create: { eventId: clubEventId, name: "Memory verses", normalizedName: "memory verses", color: "#1D4ED8", recognitionItem: "PIN" },
     update: {},
   });
 }
@@ -1857,6 +1895,12 @@ async function seedSynthetic(prisma: PrismaClient) {
     where: { organizationId_featureKey: { organizationId: clubA, featureKey: "fill-in-letters" } },
     update: {},
     create: { organizationId: clubA, featureKey: "fill-in-letters" },
+  });
+  // #1696: class and honor certificates are switched on for the audit club so their pages can be audited (undone in cleanupSynthetic).
+  await prisma.clubOptionalFeature.upsert({
+    where: { organizationId_featureKey: { organizationId: clubA, featureKey: "completion-certificates" } },
+    update: {},
+    create: { organizationId: clubA, featureKey: "completion-certificates" },
   });
   // #1704: roster charts and birthdays are switched on for the audit club (undone in cleanupSynthetic).
   await prisma.clubOptionalFeature.upsert({
@@ -4976,6 +5020,7 @@ async function main() {
     await seedBudgetSheet(prisma);
     await seedLeaderDirectory(prisma);
     await seedBaptismFollowUp(prisma);
+    await seedRecognitions(prisma);
     await seedEventStaffing(prisma);
     await seedInspections(prisma);
     pages.push(...await seedEventTemplatePages(prisma));

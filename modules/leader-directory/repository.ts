@@ -1,5 +1,6 @@
 import "server-only";
 
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
@@ -50,7 +51,7 @@ export async function readLeaderDirectory(filters: LeaderFilters, now = new Date
       revokedAt: null,
       effectiveFrom: { lte: now },
       OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
-      organization: { type: "CLUB", isActive: true },
+      organization: conferenceClubWhere(),
       attendeeAccount: {
         disabledAt: null,
         OR: [{ leaderDirectoryPreference: { is: null } }, { leaderDirectoryPreference: { is: { listed: true } } }],

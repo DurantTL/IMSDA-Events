@@ -89,6 +89,20 @@ export function generalLinkExpiryFields(key: string, run: JobRun, readAt: Date):
   return { key, state: "ok", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: `${expired} waiting ${expired === 1 ? "team" : "teams"} expired across ${events} ${events === 1 ? "event" : "events"}.` };
 }
 
+/** Visiting clubs' roles ended, and the clubs marked inactive, 30 days after their event (#835). Counts only; a quiet run (0 ended) is normal. */
+export function visitingClubAccessEndFields(key: string, run: JobRun, readAt: Date): Fields {
+  const problem = runProblem(key, run, readAt, "the visiting club access step");
+  if (problem) return problem;
+  const ended = num(run.summary, "ended");
+  const clubs = num(run.summary, "clubs");
+  if (ended === null || clubs === null) {
+    return { key, state: "watch", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: "It ran, but its counts were not recorded." };
+  }
+  const inactive = num(run.summary, "clubsDeactivated");
+  const marked = inactive === null ? "" : ` ${inactive} ${inactive === 1 ? "club" : "clubs"} marked inactive.`;
+  return { key, state: "ok", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: `${ended} visiting club ${ended === 1 ? "role" : "roles"} ended across ${clubs} ${clubs === 1 ? "club" : "clubs"}.${marked}` };
+}
+
 /* ---------- The rest of the sweep's steps (#1377) ---------- */
 
 const COUNTS_MISSING = "It ran, but its counts were not recorded.";
@@ -209,6 +223,16 @@ export function monthlyRecordReminderFields(key: string, run: JobRun, readAt: Da
   if (status !== "RAN" || !c) return ranFields(key, run, "watch", COUNTS_MISSING);
   const text = `${c.reminded} clubs reminded, ${c.noRecipient} with nobody to email, ${c.summaries} coordinator summaries, ${c.delivered} delivered, ${c.failed} failed.`;
   return ranFields(key, run, c.failed > 0 ? "watch" : "ok", c.failed > 0 ? `${text} A club that failed is tried again on the next sweep.` : text);
+}
+
+export function clubDraftReminderFields(key: string, run: JobRun, readAt: Date): Fields {
+  const problem = runProblem(key, run, readAt, "the club registration reminders");
+  if (problem) return problem;
+  const c = counts(run, ["events", "reminded", "noRecipient", "skippedEmailOff", "failed", "delivered"]);
+  if (run.summary?.status !== "RAN" || !c) return ranFields(key, run, "watch", COUNTS_MISSING);
+  if (c.events === 0) return ranFields(key, run, "info", "No event has club registration reminders turned on. Nothing is sent until event staff turn them on.");
+  const text = `${c.events} ${c.events === 1 ? "event" : "events"} checked, ${c.reminded} registrations reminded, ${c.noRecipient} with nobody to email, ${c.skippedEmailOff} events with email off, ${c.delivered} delivered, ${c.failed} failed.`;
+  return ranFields(key, run, c.failed > 0 ? "watch" : "ok", c.failed > 0 ? `${text} A reminder that failed is tried again on the next sweep.` : text);
 }
 
 /**

@@ -22,6 +22,7 @@ import {
   DEADLINE_REMINDER_PREPARATION_JOB,
   EMAIL_REACHABILITY_JOB,
   GENERAL_LINK_EXPIRY_JOB,
+  VISITING_CLUB_ACCESS_END_JOB,
   GOOGLE_KEYS_REACHABILITY_JOB,
   HEALTH_SNAPSHOT_SWEEP_JOB,
   HONOR_WATCH_SUMMARIES_JOB,
@@ -29,6 +30,7 @@ import {
   LOCATION_WAITLIST_DIGEST_JOB,
   MESSAGE_FILE_CLEANUP_JOB,
   MONTHLY_RECORD_REMINDERS_JOB,
+  CLUB_DRAFT_REMINDERS_JOB,
   RETENTION_CLEANUP_JOB,
   SQUARE_REACHABILITY_JOB,
   SWEEP_STEP_STALE_AFTER_MS,
@@ -63,12 +65,14 @@ import {
   diskFields,
   dockerCleanupFields,
   generalLinkExpiryFields,
+  visitingClubAccessEndFields,
   healthSnapshotFields,
   honorWatchSummaryFields,
   instructorClassEmailFields,
   locationWaitlistDigestFields,
   messageFileCleanupFields,
   monthlyRecordReminderFields,
+  clubDraftReminderFields,
   reachabilityFields,
   retentionCleanupFields,
   runtimeGuardFields,
@@ -473,6 +477,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("instructor-class-emails", "Instructor class emails", "The emails telling instructors who joined or left their classes.", "/admin/email", "Open email settings"),
     m("honor-watch-summaries", "Honor watch summaries", "The daily watch summaries of who joined or left classes.", "/admin/email", "Open email settings"),
     m("monthly-record-reminders", "Monthly Record reminders", "The automatic reminders to clubs that have not submitted last month's Monthly Record, sent from the day after the record is due.", "/admin/clubs/reports#monthly-record-reminders", "Open Monthly Records", systemSetupFor("account-email")),
+    m("club-draft-reminders", "Club registration reminders", "The reminders to club directors about a club registration that was started and not submitted, for events whose staff turned them on.", "/communications/scheduled", "Open scheduled emails"),
     m("health-snapshots", "Sealed health copies", "The sweep that seals event-start health copies and deletes expired ones.", null, serverFix),
     m("retention-cleanups", "Retention clean-ups", "The clean-ups of old community posts, alert feed items and analytics.", null, serverFix),
     m("server-autodeploy", "Auto-deploy", "The server's deploy timer checked for a new version in the last 30 minutes and the latest run did not fail.", null, serverFix, systemSetupFor("heartbeat-token")),
@@ -493,6 +498,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     await jobRow(ctx, INSTRUCTOR_CLASS_EMAILS_JOB, "instructor-class-emails", instructorClassEmailFields),
     await jobRow(ctx, HONOR_WATCH_SUMMARIES_JOB, "honor-watch-summaries", honorWatchSummaryFields),
     await jobRow(ctx, MONTHLY_RECORD_REMINDERS_JOB, "monthly-record-reminders", monthlyRecordReminderFields),
+    await jobRow(ctx, CLUB_DRAFT_REMINDERS_JOB, "club-draft-reminders", clubDraftReminderFields),
     await jobRow(ctx, HEALTH_SNAPSHOT_SWEEP_JOB, "health-snapshots", (key, run, readAt) => healthSnapshotFields(key, run, readAt, healthRecordsSwitchedOn())),
     await jobRow(ctx, RETENTION_CLEANUP_JOB, "retention-cleanups", retentionCleanupFields),
     await jobRow(ctx, SERVER_AUTODEPLOY_JOB, "server-autodeploy", autodeployFields, SERVER_AUTODEPLOY_STALE_AFTER_MS),
@@ -698,6 +704,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("open-without-form", "Open events have a form", "Every event that is open for registration has a published registration form.", "/registration-builder", "Open the form builder"),
     m("registrations-received", "Registrations received", "Public registration submissions in the last 24 hours for open events. A count only.", "/people", "Open registrations"),
     m("general-link-expiry", "Pending-team expiry", "The last sweep's expiry of general-link teams still waiting 30 days after their event ended.", "/admin/events", "Open events"),
+    m("visiting-club-access-end", "Visiting club access end", "The last sweep's ending of visiting club roles, and marking the clubs inactive, 30 days after their event ended.", "/admin/events", "Open events"),
   ], async (ctx) => {
     let pricing: Awaited<ReturnType<Reader>>[number];
     try {
@@ -749,7 +756,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
         : registrationsReceivedFields("registrations-received", { count: count.value, openCount: opened.value.length, readAt: iso(count.readAt) });
     }
 
-    return [pricing, holds, noForm, received, await jobRow(ctx, GENERAL_LINK_EXPIRY_JOB, "general-link-expiry", generalLinkExpiryFields)];
+    return [pricing, holds, noForm, received, await jobRow(ctx, GENERAL_LINK_EXPIRY_JOB, "general-link-expiry", generalLinkExpiryFields), await jobRow(ctx, VISITING_CLUB_ACCESS_END_JOB, "visiting-club-access-end", visitingClubAccessEndFields)];
   }),
   ...buildMoneyProviders({ defineProvider, reportEvents, perEvent, tried, iso, m, jobRow, couldNotReadNote, eventHref }),
   ...buildCommunicationsProviders({ defineProvider, tried, iso, m }),

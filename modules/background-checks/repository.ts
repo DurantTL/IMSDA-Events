@@ -2211,7 +2211,7 @@ export async function listEventBackgroundFlags(eventId: string, options: { organ
       issueReasons: options.includeNotes ? describeIssues(check?.issuesNote, todayInChicago) : [],
     });
   }
-  return { adults: adultAttendees.length, people, lastDay };
+  return { adults: adultAttendees.length, adultAttendeeIds: adultAttendees.map((attendee) => attendee.id), people, lastDay };
 }
 
 function contactEmailFor(attendee: { profileSnapshot: unknown; person: { normalizedEmail?: string | null; attendeeAccountLinks?: Array<{ account: { email: string } }> | null } }) {
@@ -2231,6 +2231,22 @@ export async function checkInBlocksForAttendees(eventId: string, attendeeIds: st
   if (attendeeIds.length === 0) return new Map<string, Exclude<BackgroundCheckState, "CURRENT">>();
   const flags = await listEventBackgroundFlags(eventId, { attendeeIds });
   return new Map((flags?.people ?? []).map((person) => [person.attendeeId, person.state]));
+}
+
+/**
+ * Sterling status for the gate (#1684), as attendee id to `true` (current) or `false` (not current). Only adults at an
+ * event that checks adult backgrounds are in the map; a youth, or any person at an event that doesn't check, is left
+ * out, so the gate says nothing about them. Same adult rules and same current/not-current answer as the check-in
+ * gate, because it reads `listEventBackgroundFlags`.
+ */
+export async function gateSterlingStatusForAttendees(eventId: string, attendeeIds: string[]) {
+  const result = new Map<string, boolean>();
+  if (attendeeIds.length === 0) return result;
+  const flags = await listEventBackgroundFlags(eventId, { attendeeIds });
+  if (!flags) return result;
+  const notCurrent = new Set(flags.people.map((person) => person.attendeeId));
+  for (const id of flags.adultAttendeeIds) result.set(id, !notCurrent.has(id));
+  return result;
 }
 
 /** Just the attendee IDs to flag, for rosters and check-in. Empty when the event doesn't check. */

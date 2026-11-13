@@ -13,6 +13,7 @@ import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-se
 import { listAccountBannerAnnouncements } from "@/modules/communications/account-banner";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import type { MfaStatus } from "@/components/mfa-manager";
+import { getProfilePhotoState } from "@/modules/profile-photos/repository";
 import { staffSessionCookie } from "@/modules/security/session-cookies";
 
 /**
@@ -85,11 +86,16 @@ export async function loadProfileData(sessions: ProfileSessions, twoStep: string
   }
   // The staff member's own signed-in devices (#741), moved here from the More page.
   const staffSessions = staff ? await listUserSessions(staff.id, staffSessionCookie.read(await cookies())) : [];
+  // The staff member's own photo (#1640): the version for the URL and any "a staff member removed it" notice.
+  const photoState = staff ? await getProfilePhotoState(staff.id) : null;
+  const profilePhoto = photoState && staff
+    ? { userId: staff.id, version: photoState.version, removedByStaffAt: photoState.removedByStaffAt?.toISOString() ?? null }
+    : null;
   const clubs = attendeeAccount && !secondStepPending ? await listDirectedClubs(attendeeAccount.id) : [];
   const bannerAnnouncements = attendeeAccount && !secondStepPending
     ? await listAccountBannerAnnouncements(attendeeAccount, clubs)
     : [];
-  return { staff, attendeeAccount, sessionId, linkedAttendee, staffSessions, sessionIdleTimeoutSeconds: SESSION_IDLE_TIMEOUT_SECONDS, secondStepPending, mfaStatus, passkeySettings, showTwoStepOn, clubs, bannerAnnouncements };
+  return { staff, attendeeAccount, sessionId, linkedAttendee, staffSessions, profilePhoto, sessionIdleTimeoutSeconds: SESSION_IDLE_TIMEOUT_SECONDS, secondStepPending, mfaStatus, passkeySettings, showTwoStepOn, clubs, bannerAnnouncements };
 }
 
 export type ProfileData = Awaited<ReturnType<typeof loadProfileData>>;

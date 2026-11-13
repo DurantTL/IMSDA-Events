@@ -46,13 +46,15 @@ visiting club**, and its director **confirms their own conference's adult screen
 - `VisitingClubInvite` (token hash only) and `VisitingClubRequest`; the director's phone and the home conference and church are visible
   to system administrators and Clubs Administrators only.
 - Audit rows hold ids only (`VISITING_CLUB_INVITE_SENT`, `_INVITE_CANCELLED`, `VISITING_CLUB_REQUEST_SUBMITTED`, `_APPROVED`,
-  `_DECLINED`, and the club's `ORGANIZATION_CREATED`). Names, phones, emails and the decline reason never go there.
+  `_DECLINED`, the club's `ORGANIZATION_CREATED`, and after the window `VISITING_CLUB_ACCESS_ENDED`,
+  `VISITING_CLUB_INVITE_CANCELLED` and `ORGANIZATION_MARKED_INACTIVE`). Names, phones, emails and the decline reason never go there.
 - The submit is same-origin only (CSRF) and rate limited per client and per account; opening a link is rate limited per client and token.
 
 ## Left for later
 
 - An office notification when a request arrives (staff see requests on the Visiting clubs view; no email or feed item yet).
-- Ending a guest club after its event (it stays, inactive-by-hand if staff want it gone) and reusing a guest club for a later event.
+- Reusing a guest club for a later event. (Ending one is done: 30 days after its event the outbox sweep ends its roles and
+  open invites and marks the club inactive; its registrations and billing stay.)
 - A billing contact prompt for a new guest club, and an invoice view that groups guest clubs together.
 - Event-by-event pages other than the registration workflow (for example class waitlists) rely on the club having a registration
   for that event, which a guest club can have for its own event only.

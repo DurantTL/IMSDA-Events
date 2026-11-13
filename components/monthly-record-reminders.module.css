@@ -6,3 +6,4 @@
 .switchRow button { min-height: 44px; min-width: 44px; }
 .state { font-weight: 700; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .problem { margin: 0; color: var(--coral); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.spaced { margin-top: 16px; }

@@ -234,7 +234,7 @@ export type SourceConfiguration = {
   }>;
   /** Message templates with no published version. */
   messageTemplatesWithoutPublishedVersion: number;
-  tags: Array<{ name: string; normalizedName: string; color: string; description: string; isActive: boolean }>;
+  tags: Array<{ name: string; normalizedName: string; color: string; description: string; isActive: boolean; recognitionItem?: "PIN" | "PATCH" | "STAR" | null }>;
   promoCodes: Array<{
     id: string;
     code: string;

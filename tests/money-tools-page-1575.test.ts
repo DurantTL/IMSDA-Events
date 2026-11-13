@@ -27,14 +27,14 @@ describe("More money tools page access (#1575)", () => {
     expect(dependencies.loadMoneyToolMetrics).not.toHaveBeenCalled();
   });
 
-  it("shows the eight cards with the event on every link and a status in words, for a finance manager", async () => {
+  it("shows the ten cards with the event on every link and a status in words, for a finance manager", async () => {
     dependencies.resolveEventContext.mockResolvedValue({ event: { id: "evt_1", name: "Event" }, permissions: ["MANAGE_FINANCE"], user: { globalRole: null } });
     const html = await render();
     expect(dependencies.resolveEventContext).toHaveBeenCalledWith("evt_1");
     expect(dependencies.loadMoneyToolMetrics).toHaveBeenCalledWith({ permissions: ["MANAGE_FINANCE"], isSystemAdmin: false }, "evt_1");
     for (const heading of ["Invoices and churches", "Funds and matching", "Rules and checks"]) expect(html).toContain(heading);
-    expect(html.match(/data-testid="hub-card"/g)).toHaveLength(8);
-    expect(html.match(/href="[^"]*\?event=evt_1"/g)).toHaveLength(8);
+    expect(html.match(/data-testid="hub-card"/g)).toHaveLength(10);
+    expect(html.match(/href="[^"]*\?event=evt_1"/g)).toHaveLength(10);
     expect(html).toContain("2 need the finance office");
     expect(html).toContain("Balance $50.00");
     expect(html).toContain("All match");

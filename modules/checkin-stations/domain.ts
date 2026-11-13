@@ -332,3 +332,90 @@ export function stationSummarySuffix(label: string) {
   const clean = label.trim().slice(0, STATION_LABEL_MAX_LENGTH);
   return clean ? ` (check-in station "${clean}")` : " (check-in station)";
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Gate mode (#1684): an optional per-event view of the station for the person at the gate. It answers one question,
+// "is this person registered for this event?", and shows the least that answers it.
+// ---------------------------------------------------------------------------------------------------------------
+
+export const GATE_MODE_OFF_MESSAGE =
+  "Gate mode is off for this event. Ask a staff member to turn it on from Check-in.";
+
+export const GATE_NAME_OR_PASS_MESSAGE = "The gate looks people up by name or by pass, not by confirmation code. Type the person's name or scan their pass.";
+
+export const GATE_NAME_MIN_LENGTH = 2;
+export const GATE_NAME_MAX_LENGTH = 80;
+export const GATE_NAME_MESSAGE = `Type at least ${GATE_NAME_MIN_LENGTH} letters of the name.`;
+export const GATE_RESULT_LIMIT = 10;
+
+/** Staff turn gate mode on or off for one event. */
+export const gateModeToggleSchema = z.strictObject({ enabled: z.boolean() });
+
+export const gateLookupSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("pass"), value: z.string().trim().min(1).max(768) }),
+  z.strictObject({
+    kind: z.literal("name"),
+    value: z.string().trim().min(GATE_NAME_MIN_LENGTH, GATE_NAME_MESSAGE).max(GATE_NAME_MAX_LENGTH, GATE_NAME_MESSAGE),
+  }),
+]);
+
+export const gateArrivalSchema = z.strictObject({
+  attendeeId: z.string().trim().min(1).max(100),
+  /** One per tap of "Log arrival at gate"; kept across retries of that tap. */
+  idempotencyKey: z.uuid(),
+});
+
+/** Green, yellow or red. A person with no registration is the red state and never appears in a result list. */
+export type GateState = "REGISTERED" | "STERLING_NOT_CURRENT" | "NOT_REGISTERED";
+
+/** Pure: `sterlingCurrent` is null unless the person is an adult at an event that checks backgrounds. */
+export function gateStateFor(sterlingCurrent: boolean | null): Exclude<GateState, "NOT_REGISTERED"> {
+  return sterlingCurrent === false ? "STERLING_NOT_CURRENT" : "REGISTERED";
+}
+
+export function gateStateLabel(state: GateState) {
+  switch (state) {
+    case "REGISTERED": return "Registered";
+    case "STERLING_NOT_CURRENT": return "Registered: Sterling not current";
+    default: return "Not registered";
+  }
+}
+
+export function gateStateReminder(state: GateState) {
+  switch (state) {
+    case "REGISTERED": return "Let them in.";
+    case "STERLING_NOT_CURRENT": return "Call the event lead before letting them in.";
+    default: return "Send them to registration or call the event lead.";
+  }
+}
+
+/** The only fields a gate lookup returns about a person. No dates of birth, ages, health, payment or contact details. */
+export type GateResult = {
+  attendeeId: string;
+  displayName: string;
+  clubName: string | null;
+  /** True or false only for an adult at an event that checks backgrounds; null says nothing about Sterling. */
+  sterlingCurrent: boolean | null;
+  state: Exclude<GateState, "NOT_REGISTERED">;
+  /** When "Arrived at gate" was last logged, in the event's time zone ("3:42 PM CDT"), or null. */
+  arrivedAtLabel: string | null;
+};
+
+export type GateLookupResponse = {
+  /** MATCHES has at least one result; SEARCH_BY_NAME means a club pass named no one person; NAME_OR_PASS_ONLY means a confirmation code was typed. */
+  outcome: "MATCHES" | "NOT_REGISTERED" | "SEARCH_BY_NAME" | "NAME_OR_PASS_ONLY";
+  results: GateResult[];
+  /** More people matched than are listed; the volunteer should type more of the name. */
+  moreAvailable: boolean;
+  message: string | null;
+};
+
+export type GateArrivalResponse = { attendeeId: string; arrivedAtLabel: string };
+
+/** Pure: a pass-looking entry (a long dotted token with no spaces) is a pass, anything else is a name. */
+export function classifyGateEntry(raw: string): z.infer<typeof gateLookupSchema> | null {
+  const value = raw.trim();
+  if (!value) return null;
+  const looksLikePass = value.length >= 20 && value.includes(".") && !/\s/.test(value);
+  return { kind: looksLikePass ? "pass" : "name", value };
+}
