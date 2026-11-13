@@ -314,6 +314,8 @@ export type PublicRegistrationFormProps = {
   merchandise?: PublicMerchandiseOffer | null;
   initialResponses?: FormResponses;
   initialAttendeeResponses?: FormResponses;
+  /** The private link's token when staff started this registration for the registrant (#1510); sent with the submit so it is linked back. */
+  staffDraftToken?: string;
   embedded?: boolean;
   /** Published info cards for the top of the form (#652); rendered by the server page. */
   topContent?: React.ReactNode;
@@ -530,6 +532,7 @@ export function PublicRegistrationForm({
   merchandise = null,
   initialResponses = {},
   initialAttendeeResponses = {},
+  staffDraftToken,
   embedded = false,
   topContent,
   disableDrafts = false,
@@ -3306,6 +3309,7 @@ export function PublicRegistrationForm({
           ...(responsibleAdultMinors.length > 0 ? { responsibleAdults: responsibleAdultValues } : {}),
           ...(lodgingSubmission ? { lodging: lodgingSubmission } : {}),
           ...(merchandiseSubmission.length > 0 ? { merchandise: merchandiseSubmission } : {}),
+          ...(staffDraftToken && !club && !group ? { staffDraftToken } : {}),
           ...(club?.locationId ? { locationId: club.locationId } : {}),
           ...(club?.teamName ? { teamName: club.teamName } : {}),
           ...(club?.draftKey ? { draftKey: club.draftKey } : {}),

@@ -50,6 +50,7 @@ page that replaced them.
 | `/register/[eventSlug]/[formSlug]` | Anyone, while registration is open | The register button on the event page | An event registration form |
 | `/register/[eventSlug]/general` | Anyone, while registration is open | The event's general registration link | General registration link (`docs/GENERAL-REGISTRATION-LINK.md`) |
 | `/register/[eventSlug]/group` | Anyone, while registration is open | The event's group registration link | Register a group |
+| `/register/finish/[token]` | The registrant staff started a registration for | Private link in an email from staff | Finish a registration staff started (the public form, prefilled) |
 | `/manage/[token]` | The person given the registration's private link | Link in registration emails | Manage one registration |
 | `/recover-registration` | Anyone | "Find a registration made with another email" | Find a registration or get its link again |
 | `/pay/square/return/[returnId]` | The person who just paid | Square sends people back here after checkout | Payment status after card checkout |

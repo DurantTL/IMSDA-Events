@@ -81,7 +81,7 @@ import { acknowledgmentFields } from "@/modules/acknowledgments/domain";
 import { signatureFields } from "@/modules/signatures/fields";
 import { recordSubmissionSignatures } from "@/modules/signatures/repository";
 import type { AcknowledgmentDisplay } from "@/modules/acknowledgments/domain";
-import { hashUserAgent } from "@/modules/access/tokens";
+import { hashOpaqueToken, hashUserAgent } from "@/modules/access/tokens";
 import { LodgingError } from "@/modules/lodging/errors";
 import { lodgingTransactionTimeoutMs } from "@/modules/lodging/service";
 import { getPublicMerchandiseOffer, getRegistrationMerchandiseSummary, recordRegistrationMerchandiseOrder } from "@/modules/merchandise/registration-orders";
@@ -112,7 +112,11 @@ export type PublicRegistrationErrorCode =
   /** A club-audience event's form was posted to the generic public route (#931): clubs register through the portal or the event's general link. */
   | "CLUB_ENTRY_REQUIRED"
   | "GROUP_REGISTRATION_UNAVAILABLE"
-  | "GROUP_ATTENDEES_INVALID";
+  | "GROUP_ATTENDEES_INVALID"
+  /** The private link from a registration staff started (#1510) was used, withdrawn or has expired. */
+  | "STAFF_DRAFT_LINK_UNAVAILABLE"
+  /** The registration behind that link was already sent. */
+  | "STAFF_DRAFT_ALREADY_SUBMITTED";
 
 /**
  * A club registration (#358) runs through this same transaction so it gets the
@@ -804,6 +808,33 @@ export type SubmissionRequestContext = {
   ipAddress?: string | null;
 };
 
+/**
+ * Thrown at the very end of a check-only run (#1510) to roll the whole transaction back. It carries what the registrant
+ * would have been shown; nothing it wrote is kept.
+ */
+class CheckOnlyRollback extends Error {
+  constructor(public readonly result: PublicRegistrationCheck) {
+    super("Check-only registration rolled back.");
+    this.name = "CheckOnlyRollback";
+  }
+}
+
+/** What a check shows staff: the same total, lines and seat decision the public submit would produce. */
+export type PublicRegistrationCheck = {
+  registrationStatus: "SUBMITTED" | "WAITLISTED";
+  waitlistPosition: number | null;
+  attendeeCount: number;
+  totalCents?: number;
+  subtotalCents?: number;
+  discountAmountCents?: number;
+  promoCode: string | null;
+  lineItems: FormCalculation["lineItems"];
+  pricingDate: string;
+};
+
+const staffDraftLinkUnavailableMessage = "This link has been used or has expired.";
+const staffDraftAlreadySubmittedMessage = "This registration was already sent. Check your email for the confirmation.";
+
 async function createPublicRegistrationTransaction(
   tx: Prisma.TransactionClient,
   eventSlug: string,
@@ -813,6 +844,8 @@ async function createPublicRegistrationTransaction(
   bulk: BulkSubmissionContext | undefined,
   requestContext: SubmissionRequestContext | undefined,
   notifications: { staffCopyEnabled: boolean; notifyApprovers: boolean; formNotificationsEnabled: boolean; existingClubIds: ReadonlySet<string> },
+  /** `checkOnly` (#1510): run every step, then roll everything back with the computed confirmation (see `checkPublicRegistration`). */
+  options: { checkOnly?: boolean } = {},
 ) {
   const group = bulk && "group" in bulk ? bulk : undefined;
   const club = bulk && !("group" in bulk) ? bulk : undefined;
@@ -881,6 +914,33 @@ async function createPublicRegistrationTransaction(
   const requestHash = submissionHash(input);
   const replay = await findExistingConfirmation(tx, version.id, input.idempotencyKey, requestHash, definition, churchBilledDisplay);
   if (replay) return replay;
+  // A registration staff started (#1510): the draft is checked after the replay, so the same key still replays, and a new
+  // key on a draft already sent is refused here rather than creating a second registration. A check never touches drafts.
+  let staffDraftId: string | null = null;
+  if (input.staffDraftToken && !options.checkOnly) {
+    if (bulk) throw new PublicRegistrationError("STAFF_DRAFT_LINK_UNAVAILABLE", staffDraftLinkUnavailableMessage);
+    const locked = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "StaffRegistrationDraft"
+      WHERE "handOffTokenHash" = ${hashOpaqueToken(input.staffDraftToken)}
+      FOR UPDATE
+    `;
+    const draft = locked[0]
+      ? await tx.staffRegistrationDraft.findUnique({
+        where: { id: locked[0].id },
+        select: { id: true, eventId: true, formId: true, status: true, handOffExpiresAt: true },
+      })
+      : null;
+    if (!draft || draft.eventId !== form.eventId || draft.formId !== form.id) {
+      throw new PublicRegistrationError("STAFF_DRAFT_LINK_UNAVAILABLE", staffDraftLinkUnavailableMessage);
+    }
+    if (draft.status === "SUBMITTED") {
+      throw new PublicRegistrationError("STAFF_DRAFT_ALREADY_SUBMITTED", staffDraftAlreadySubmittedMessage);
+    }
+    if (draft.status !== "HANDED_OFF" || !draft.handOffExpiresAt || draft.handOffExpiresAt <= now) {
+      throw new PublicRegistrationError("STAFF_DRAFT_LINK_UNAVAILABLE", staffDraftLinkUnavailableMessage);
+    }
+    staffDraftId = draft.id;
+  }
   if (club) {
     // The team rules, read inside this Serializable transaction (#809): a save of the rules that races this submit makes one
     // of them fail rather than letting a team be registered on an event that has just stopped taking teams, or the reverse.
@@ -1658,6 +1718,26 @@ async function createPublicRegistrationTransaction(
     },
   });
 
+  if (staffDraftId) {
+    // The provenance link (#1510): same transaction as the registration, so it is linked or it does not exist. The answers
+    // and the token are dropped; the token's hash stays so a repeat is told it was already sent.
+    await tx.staffRegistrationDraft.update({
+      where: { id: staffDraftId },
+      data: { status: "SUBMITTED", registrationId: registration.id, submittedAt: now, responses: {}, handOffExpiresAt: null },
+    });
+    await tx.auditLog.create({
+      data: {
+        eventId: form.eventId,
+        action: "STAFF_REGISTRATION_DRAFT_SUBMITTED",
+        entityType: "StaffRegistrationDraft",
+        entityId: staffDraftId,
+        correlationId: randomUUID(),
+        summary: `The registrant sent the registration staff started (${confirmationCode}).`,
+        metadata: { registrationId: registration.id, formVersionId: version.id, paymentCollected: false },
+      },
+    });
+  }
+
   // Meal tickets (#210): the form priced them into the total above; the meal selections record what was ordered.
   await syncFormMealSelections(tx, {
     eventId: form.eventId,
@@ -1832,22 +1912,38 @@ async function createPublicRegistrationTransaction(
     },
   });
 
+  const builtConfirmation = {
+    ...confirmationFromSnapshot(
+      definition,
+      confirmationCode,
+      identity.email,
+      snapshot,
+      queuedMessages.deliveryMode === "DISABLED" ? "DISABLED" : "PENDING",
+      isWaitlisted ? "WAITLISTED" : "SUBMITTED",
+      waitlistPosition,
+      churchBilledDisplay,
+    ),
+    ...(merchandiseSummary ? { merchandise: merchandiseSummary } : {}),
+    managePath: access.managePath,
+    manageLinkExpiresAt: access.expiresAt.toISOString(),
+  };
+  if (options.checkOnly) {
+    // Everything above ran against this transaction only (no file, email or provider call happens inside it), so rolling it
+    // back leaves no registration, payment, hold, promo claim, message or audit row behind.
+    throw new CheckOnlyRollback({
+      registrationStatus: builtConfirmation.registrationStatus,
+      waitlistPosition: builtConfirmation.waitlistPosition,
+      attendeeCount: builtConfirmation.attendeeCount,
+      ...(builtConfirmation.totalCents !== undefined ? { totalCents: builtConfirmation.totalCents } : {}),
+      ...(builtConfirmation.subtotalCents !== undefined ? { subtotalCents: builtConfirmation.subtotalCents } : {}),
+      ...(builtConfirmation.discountAmountCents !== undefined ? { discountAmountCents: builtConfirmation.discountAmountCents } : {}),
+      promoCode: builtConfirmation.promoCode,
+      lineItems: builtConfirmation.lineItems,
+      pricingDate: builtConfirmation.pricingDate,
+    });
+  }
   return {
-    confirmation: {
-      ...confirmationFromSnapshot(
-        definition,
-        confirmationCode,
-        identity.email,
-        snapshot,
-        queuedMessages.deliveryMode === "DISABLED" ? "DISABLED" : "PENDING",
-        isWaitlisted ? "WAITLISTED" : "SUBMITTED",
-        waitlistPosition,
-        churchBilledDisplay,
-      ),
-      ...(merchandiseSummary ? { merchandise: merchandiseSummary } : {}),
-      managePath: access.managePath,
-      manageLinkExpiresAt: access.expiresAt.toISOString(),
-    },
+    confirmation: builtConfirmation,
     pendingMessageIds: [...queuedMessages.pendingMessageIds, ...formNotifications.pendingMessageIds, ...teamPermissionMessageIds],
     registrantMessageIds: queuedMessages.registrantMessageIds,
     // The confirmation and staff copy that wait for the PDF; none for a waitlist notice (#1082).
@@ -2014,4 +2110,44 @@ export async function submitPublicRegistration(
     }
   }
   throw new PublicRegistrationError("SUBMISSION_CONFLICT", "Another registration changed availability at the same time. Review the form and submit again.");
+}
+
+/**
+ * Runs the whole public submit for `input` and rolls it back (#1510): the same validation, price windows, promo codes,
+ * capacity and waitlist decision, in the same kind of Serializable transaction, and then nothing is kept. Nothing after the
+ * commit runs (no PDF, notification, message processing or background-check match), because nothing commits. The caller
+ * supplies a fresh random idempotency key, so a check never replays or is replayed.
+ */
+export async function checkPublicRegistration(
+  eventSlug: string,
+  formSlug: string,
+  input: PublicRegistrationInput,
+  now = new Date(),
+): Promise<PublicRegistrationCheck> {
+  const prisma = getPrisma();
+  const notifications = { staffCopyEnabled: false, notifyApprovers: false, formNotificationsEnabled: false, existingClubIds: new Set<string>() };
+  // The staff check never carries a draft token: drafts are not touched by a check.
+  const { staffDraftToken: _ignored, ...checked } = input;
+  void _ignored;
+  for (let attempt = 0; attempt < submitAttempts; attempt += 1) {
+    try {
+      await prisma.$transaction(
+        (tx) => createPublicRegistrationTransaction(tx, eventSlug, formSlug, checked, now, undefined, undefined, notifications, { checkOnly: true }),
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          timeout: Math.max(submissionGateTimeoutMs, lodgingTransactionTimeoutMs),
+          maxWait: Math.max(submissionGateTimeoutMs, lodgingTransactionTimeoutMs),
+        },
+      );
+      throw new Error("A check-only registration finished without rolling back.");
+    } catch (error) {
+      if (error instanceof CheckOnlyRollback) return error.result;
+      if (isLockTimeoutError(error) || (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2028")) {
+        throw new PublicRegistrationError("SUBMISSION_CONFLICT", submissionBusyMessage);
+      }
+      if (!retryableTransactionError(error)) throw error;
+      if (attempt < submitAttempts - 1) await pauseBeforeRetry(attempt);
+    }
+  }
+  throw new PublicRegistrationError("SUBMISSION_CONFLICT", "Another registration changed availability at the same time. Try the check again.");
 }

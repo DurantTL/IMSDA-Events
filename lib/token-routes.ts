@@ -16,6 +16,8 @@ export const tokenRoutePrefixes: readonly (readonly string[])[] = [
   ["staff-invite"],
   ["unsubscribe"],
   ["clubs", "register"],
+  // The private link from a registration staff started for someone (#1510): `/register/finish/<token>`.
+  ["register", "finish"],
   ["account", "visiting-club"],
   ["api", "public", "manage"],
   ["api", "public", "club-forms"],

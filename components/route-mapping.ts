@@ -200,6 +200,7 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/people/duplicates", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
   ["/people/pending-teams", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
   ["/people/responsible-adults", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
+  ["/people/staff-drafts", "/people", "app/(workspace)/people/page.tsx"],
   ["/people/staff-invitations", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
   ["/people/staff-invitations/approvals", "/people/staff-invitations", "app/(workspace)/people/staff-invitations/page.tsx"],
 ];
