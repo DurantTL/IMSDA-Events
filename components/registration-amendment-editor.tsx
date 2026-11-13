@@ -130,7 +130,7 @@ const ACKNOWLEDGMENT_STATUS_LABEL: Record<string, string> = {
   WITHDRAWN: "Withdrawn",
 };
 
-function AmendmentField({
+export function AmendmentField({
   field,
   values,
   stored,

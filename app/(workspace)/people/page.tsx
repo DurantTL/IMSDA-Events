@@ -39,7 +39,7 @@ import { StaffContextualHelp } from "@/components/contextual-help-slot";
 import { PageHeader } from "@/components/page-header";
 import { ExportLink } from "@/components/export-link";
 import listStyles from "@/components/people-list.module.css";
-import { ClipboardCheck, CopyCheck, Download, ExternalLink, FileUp, ListChecks } from "lucide-react";
+import { ClipboardCheck, CopyCheck, Download, ExternalLink, FileUp, ListChecks, Phone } from "lucide-react";
 
 export const metadata: Metadata = { title: staffPageTitles.registrations };
 
@@ -129,6 +129,8 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
         {/* Attendee list and Imports left the sidebar (#964); this page reaches them. The list needs the same permission as this page. */}
         <li><a href={`/people/attendees?event=${encodeURIComponent(event.id)}`}><ListChecks aria-hidden="true" size={16} /> Attendee list</a></li>
         {permissions.includes("MANAGE_IMPORTS") && <li><a href={`/imports?event=${encodeURIComponent(event.id)}`}><FileUp aria-hidden="true" size={16} /> Imports</a></li>}
+        {/* Registrations staff start for someone by phone, on paper or at the door (#1510): a draft the registrant finishes. */}
+        {canEdit && event.audience !== "CLUB" && <li><a href={`/people/staff-drafts?event=${encodeURIComponent(event.id)}`}><Phone aria-hidden="true" size={16} /> Phone and paper registrations</a></li>}
         {/* Find duplicates, Directory review, Teams waiting for a club, Staff invitations and Responsible adults are cards on one page now (#1574). */}
         <li><a href={`/people/review-queues?event=${encodeURIComponent(event.id)}`}><ClipboardCheck aria-hidden="true" size={16} /> Review queues</a></li>
         {/* The cross-event identity queue lives beside the event's own review queues, not in the sidebar; the page checks the role again. */}

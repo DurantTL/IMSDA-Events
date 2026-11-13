@@ -54,7 +54,9 @@ describe("where evidence is written", () => {
     expect(publicRepository).not.toContain("recordedByUserId: club");
     // Act-as answers are dropped and not required, so the registration is made with no evidence.
     expect(publicRepository).toContain("const actAsAcknowledgmentKeys = club?.submittedByUserId");
-    expect(publicRepository).toContain("optionalFieldKeys: actAsAcknowledgmentKeys.size > 0");
+    // A real submit makes only the act-as keys optional; the registrant-only keys are added for a staff check alone (#1510).
+    expect(publicRepository).toContain("const optionalKeys = options.checkOnly\n    ? new Set([...actAsAcknowledgmentKeys, ...draftExcludedKeys(definition)])\n    : actAsAcknowledgmentKeys;");
+    expect(publicRepository).toContain("optionalFieldKeys: optionalKeys.size > 0");
     expect(publicRepository).toContain("This form asks each attendee for a recorded acknowledgment, which club and group events cannot take.");
   });
 

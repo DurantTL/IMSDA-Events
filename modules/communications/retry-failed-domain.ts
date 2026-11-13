@@ -24,6 +24,7 @@ export type RetryFailedSkipReason =
   | "LINK_CLUB_FORM"
   | "LINK_HEALTH_RECORD"
   | "LINK_CLUB_INVITE"
+  | "LINK_STAFF_DRAFT"
   | "BALANCE_REMINDER"
   | "SCHEDULED_EMAIL"
   | "ACCESS_RECOVERY"
@@ -40,6 +41,7 @@ export const RETRY_FAILED_SKIP_LABELS: Record<RetryFailedSkipReason, string> = {
   INVOICE: "Invoice emails are resent from Finance, Invoices",
   LINK_CLUB_FORM: "Club form links are sent again from More, Club forms (the link belongs to the original message)",
   LINK_HEALTH_RECORD: "Health record links are sent again from More, Health (the link belongs to the original message)",
+  LINK_STAFF_DRAFT: "A registration link is sent again from the staff draft, People, Phone and paper registrations (the link belongs to the original message)",
   LINK_CLUB_INVITE: "New club application invites are sent again from Admin, Club applications (the link belongs to the original message)",
   BALANCE_REMINDER: "Send a fresh balance reminder instead (the amount may have changed)",
   SCHEDULED_EMAIL: "A scheduled email is checked again before every send by its schedule, which owns retries; create a new schedule if it is still wanted",
@@ -59,6 +61,7 @@ const LINK_EMAIL_REASONS: Record<string, RetryFailedSkipReason> = {
   HEALTH_RECORD_LINK: "LINK_HEALTH_RECORD",
   NEW_CLUB_APPLICATION_INVITE: "LINK_CLUB_INVITE",
   VISITING_CLUB_INVITE: "LINK_CLUB_INVITE",
+  STAFF_REGISTRATION_DRAFT_LINK: "LINK_STAFF_DRAFT",
 };
 
 export type RetryFailedSkippedSummary = {

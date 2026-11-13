@@ -56,6 +56,11 @@ import {
   retireClubFormLinkForMessage,
 } from "@/modules/club-forms/link-email";
 import {
+  STAFF_DRAFT_LINK_TEMPLATE_KEY,
+  prepareStaffDraftLinkBodyForDelivery,
+  retireStaffDraftLinkForMessage,
+} from "@/modules/staff-registration-drafts/link-email";
+import {
   NEW_CLUB_APPLICATION_INVITE_TEMPLATE_KEY,
   prepareNewClubInviteBodyForDelivery,
   retireNewClubInviteForMessage,
@@ -1231,6 +1236,13 @@ async function retireUndeliveredLinks(prisma: DeliveryPrisma, message: ClaimedMe
       logError("Unable to withdraw a club form link after its email finally failed.", retireError);
     }
   }
+  if (message.templateKey === STAFF_DRAFT_LINK_TEMPLATE_KEY) {
+    try {
+      await retireStaffDraftLinkForMessage(prisma as unknown as PrismaClient, message.id, at);
+    } catch (retireError) {
+      logError("Unable to withdraw a staff-started registration link after its email finally failed.", retireError);
+    }
+  }
   if (message.templateKey === NEW_CLUB_APPLICATION_INVITE_TEMPLATE_KEY) {
     try {
       await retireNewClubInviteForMessage(prisma as unknown as PrismaClient, message.id, at);
@@ -1702,6 +1714,14 @@ async function prepareAccountEmailBody(
   // A Health Record private link (#611): the token is minted here, at delivery.
   if (input.templateKey === HEALTH_RECORD_LINK_TEMPLATE_KEY) {
     return prepareHealthRecordLinkBodyForDelivery({
+      messageId: input.messageId,
+      bodyText: input.bodyText,
+      now: input.now,
+    });
+  }
+  // A staff-started registration's private link (#1510): the token is minted here, at delivery.
+  if (input.templateKey === STAFF_DRAFT_LINK_TEMPLATE_KEY) {
+    return prepareStaffDraftLinkBodyForDelivery({
       messageId: input.messageId,
       bodyText: input.bodyText,
       now: input.now,
