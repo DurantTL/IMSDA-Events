@@ -110,9 +110,10 @@ function validTokens(input: unknown): RegistrationThemeTokens {
   return normalizeThemeTokens(parsed.data);
 }
 
-/** A unique-index collision (two drafts or two published versions at once), or the immutability trigger refusing a change (SQLSTATE 23001). */
+/** A unique-index collision (two drafts or two published versions at once), a row changed in between, or the immutability trigger refusing a change (SQLSTATE 23001). */
 export function isThemeWriteConflict(error: unknown) {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return true;
+  // P2025: the draft a save was updating was discarded or published in between.
+  if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2002" || error.code === "P2025")) return true;
   return error instanceof Prisma.PrismaClientUnknownRequestError && error.message.includes('"23001"');
 }
 
@@ -194,7 +195,9 @@ export async function discardRegistrationThemeDraft(eventId: string, actorUserId
   await guardedWrite(() => getPrisma().$transaction(async (tx) => {
     const draft = await tx.registrationThemeVersion.findFirst({ where: { eventId, status: "DRAFT" }, select: { id: true, versionNumber: true } });
     if (!draft) throw new RegistrationThemeError("NO_DRAFT", "There is no draft to discard.");
-    await tx.registrationThemeVersion.deleteMany({ where: { id: draft.id, status: "DRAFT" } });
+    const deleted = await tx.registrationThemeVersion.deleteMany({ where: { id: draft.id, status: "DRAFT" } });
+    // A publish that landed after the read leaves nothing to delete: report a conflict, not a discard that didn't happen.
+    if (deleted.count !== 1) throw conflict();
     await writeAuditLog({
       eventId, actorUserId, action: "REGISTRATION_THEME_DRAFT_DISCARDED", entityType: "RegistrationThemeVersion", entityId: draft.id,
       summary: `Discarded the draft registration look (version ${draft.versionNumber}).`, metadata: { versionNumber: draft.versionNumber },

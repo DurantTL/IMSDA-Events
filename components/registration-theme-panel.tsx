@@ -163,6 +163,11 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
         {published ? describeVersion(published) : "This event uses the platform look."}
         {state.draft ? ` A draft (version ${state.draft.versionNumber}) is saved and not public yet.` : ""}
       </p>
+      {published && (!published.tokens || !checkThemeContrast(published.tokens).passes) ? (
+        <p className={styles.status} data-testid="registration-theme-fallback">
+          The published look no longer passes every check, so the public pages show the platform look instead. Save and publish a look that passes.
+        </p>
+      ) : null}
 
 
       <div className={styles.layout}>

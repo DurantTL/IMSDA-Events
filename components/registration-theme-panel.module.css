@@ -197,8 +197,7 @@
 
 .passing summary {
   min-height: 44px;
-  display: flex;
-  align-items: center;
+  padding: 12px 0;
   cursor: pointer;
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }

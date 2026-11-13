@@ -59,7 +59,9 @@ function database(initial: Row[] = []) {
         return { count: hit.length };
       }),
       deleteMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
-        for (let index = rows.length - 1; index >= 0; index -= 1) if (matches(rows[index]!, where)) rows.splice(index, 1);
+        let count = 0;
+        for (let index = rows.length - 1; index >= 0; index -= 1) if (matches(rows[index]!, where)) { rows.splice(index, 1); count += 1; }
+        return { count };
       }),
     },
   };
@@ -171,6 +173,7 @@ describe("registration theme repository", () => {
 
   it.each([
     ["a unique-index collision", () => new Prisma.PrismaClientKnownRequestError("Unique constraint failed", { code: "P2002", clientVersion: "test" })],
+    ["a row that changed in between", () => new Prisma.PrismaClientKnownRequestError("Record to update not found", { code: "P2025", clientVersion: "test" })],
     ["the database refusing to change a published look", () => new Prisma.PrismaClientUnknownRequestError('QueryError(PostgresError { code: "23001", message: "A published registration look cannot be changed." })', { clientVersion: "test" })],
   ])("answers %s with a conflict", async (_name, makeError) => {
     const { tx } = database([row({ id: "draft" })]);
@@ -208,6 +211,15 @@ describe("registration theme repository", () => {
     expect(rows.map((entry) => entry.id)).toEqual(["pub"]);
     expect((await POST(request("POST", { action: "discard" }), context)).status).toBe(404);
     expect(rows.map((entry) => entry.id)).toEqual(["pub"]);
+  });
+
+  it("answers a discard that lost a race with a publish with a conflict and no audit row", async () => {
+    const { tx } = database([row({ id: "draft", versionNumber: 1, status: "DRAFT" })]);
+    tx.registrationThemeVersion.deleteMany.mockResolvedValueOnce({ count: 0 });
+    mocks.writeAuditLog.mockClear();
+    const raced = await POST(request("POST", { action: "discard" }), context);
+    expect(raced.status).toBe(409);
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
   it("reverts to the platform look by archiving the published version", async () => {
