@@ -170,8 +170,8 @@ describe("seminar choices block", () => {
     const attendees = await loadSeminarAttendees(tx as never, { eventId: "event-1", registrationId: "registration-1" });
 
     expect(attendees.map((attendee) => attendee.name)).toEqual(["Ann Synthetic", "Bo [Click](https://evil.example)"]);
-    expect(attendees[0].fields[0]).toEqual({ label: "Seminar preferences", choices: ["Service", "Prayer"], assigned: ["Prayer"] });
-    expect(attendees[1].fields[0]).toEqual({ label: "Seminar preferences", choices: ["Music", "Service"], assigned: [] });
+    expect(attendees[0].fields[0]).toEqual({ label: "Seminar preferences", choices: ["Service", "Prayer"], assigned: ["Prayer"], notAttending: false });
+    expect(attendees[1].fields[0]).toEqual({ label: "Seminar preferences", choices: ["Music", "Service"], assigned: [], notAttending: false });
     expect(tx.programAttendeeAssignment.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         outcome: "ASSIGNED",
