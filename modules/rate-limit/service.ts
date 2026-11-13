@@ -1068,6 +1068,27 @@ export async function checkClubStaffTrainingRateLimit(
 }
 
 /**
+ * A club leader adding, changing or deleting a club calendar item, or changing its reminder setting (#1700): per client,
+ * per signed-in leader (an attendee account, or a staff user acting as director), and per club. Generous: this is data
+ * entry, and the limits only stop scripted hammering.
+ */
+export async function checkClubCalendarRateLimit(
+  request: Request,
+  actorKey: string,
+  organizationId: string,
+) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const actor = hashRateLimitIdentifier("club-calendar-actor", actorKey, configuration);
+  const club = hashRateLimitIdentifier("club-calendar-club", organizationId, configuration);
+  return evaluate([
+    { policy: "club-calendar.write.client", limit: 120, windowSeconds: oneHour, identifierHashes: [client] },
+    { policy: "club-calendar.write.actor", limit: 120, windowSeconds: oneHour, identifierHashes: [actor] },
+    { policy: "club-calendar.write.club", limit: 400, windowSeconds: oneDay, identifierHashes: [club] },
+  ], configuration);
+}
+
+/**
  * A club leader adding, changing or deleting a fill-in letter or certificate (#1708): per client, per signed-in leader
  * (an attendee account, or a staff user acting as director), and per club. Generous: this is data entry, and the limits
  * only stop scripted hammering.

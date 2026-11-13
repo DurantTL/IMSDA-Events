@@ -235,6 +235,18 @@ export function clubDraftReminderFields(key: string, run: JobRun, readAt: Date):
   return ranFields(key, run, c.failed > 0 ? "watch" : "ok", c.failed > 0 ? `${text} A reminder that failed is tried again on the next sweep.` : text);
 }
 
+export function clubCalendarReminderFields(key: string, run: JobRun, readAt: Date): Fields {
+  const problem = runProblem(key, run, readAt, "the club calendar reminders");
+  if (problem) return problem;
+  const c = counts(run, ["clubs", "reminded", "noRecipient", "failed", "delivered"]);
+  if (run.summary?.status === "EMAIL_NOT_CONFIGURED") return { ...ranFields(key, run, "attention", "Email isn't set up, so reminders can't go out. Ask a system administrator."), needsSetup: true };
+  if (run.summary?.status === "NOT_DUE") return ranFields(key, run, "info", "Checked before 8 a.m. Central, when reminders do not go out.");
+  if (run.summary?.status !== "RAN" || !c) return ranFields(key, run, "watch", COUNTS_MISSING);
+  if (c.clubs === 0) return ranFields(key, run, "info", "No club has calendar reminders turned on. Nothing is sent until a club director or deputy turns them on.");
+  const text = `${c.clubs} ${c.clubs === 1 ? "club" : "clubs"} with reminders on, ${c.reminded} items reminded, ${c.noRecipient} with nobody to email, ${c.delivered} delivered, ${c.failed} failed.`;
+  return ranFields(key, run, c.failed > 0 ? "watch" : "ok", c.failed > 0 ? `${text} A reminder that failed is tried again on the next sweep.` : text);
+}
+
 /**
  * Sealed health copies. With health records switched off nothing new is sealed, which is a choice and not a problem, so
  * the row reads "Off" as a count-only note (never OK, never a warning). The sweep still deletes expired copies while off,

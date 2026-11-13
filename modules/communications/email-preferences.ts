@@ -23,6 +23,14 @@ export const ANNOUNCEMENT_OPT_OUT_TEMPLATE_KEY = "EVENT_ANNOUNCEMENT";
 /** The reminder (#164) to a club's directors that a club registration is started but not submitted. Event-scoped, and opt-out eligible like an announcement. */
 export const CLUB_DRAFT_REMINDER_OPT_OUT_TEMPLATE_KEY = "CLUB_DRAFT_REMINDER";
 
+/**
+ * The reminder (#1700) to a club's role holders that a club calendar item is coming up. Event-less mail, like the deadline
+ * reminder, and it honours an opt-out of ALL IMAdventist announcements (never an event-scoped one, which has no event
+ * here), both when queued and again at delivery. Not in `isOptOutEligibleTemplate`: that list is for event-scoped mail
+ * with an unsubscribe link and the audience picker.
+ */
+export const CLUB_CALENDAR_REMINDER_TEMPLATE_KEY = "CLUB_CALENDAR_REMINDER";
+
 /** The deadline reminder (#910): event-less mail to club role holders and Area Coordinators. */
 export const DEADLINE_REMINDER_TEMPLATE_KEY = "DEADLINE_REMINDER";
 
@@ -94,6 +102,11 @@ export function reminderOptOutSkipMessage(scope: AnnouncementOptOutScope) {
 /** Why an unfinished-registration reminder was not sent, as recorded on the outbox row (#164). */
 export function clubDraftReminderOptOutSkipMessage(scope: AnnouncementOptOutScope) {
   return `${ANNOUNCEMENT_OPT_OUT_REASON[scope]}; the registration reminder was not sent.`;
+}
+
+/** Why a club calendar reminder was not sent, as recorded on the outbox row (#1700). */
+export function clubCalendarReminderOptOutSkipMessage(scope: AnnouncementOptOutScope) {
+  return `${ANNOUNCEMENT_OPT_OUT_REASON[scope]}; the club calendar reminder was not sent.`;
 }
 
 /** Why a message was not sent, as recorded on the outbox row. */
