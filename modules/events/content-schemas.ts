@@ -416,7 +416,8 @@ export const eventContentSectionInputSchema = z.object({
   isPublished: z.boolean().default(false),
   /**
    * When an unpublished section publishes itself (#1514), as an ISO time. Empty or null means no schedule. Only
-   * meaningful while the section is unpublished; a published section stores none.
+   * meaningful while the section is unpublished: a save stores none on a published section (only the sweep leaves the
+   * time on a row it published, until the next save).
    */
   scheduledPublishAt: z.union([z.literal(""), z.iso.datetime({ offset: true, message: "Choose a valid publish date and time." })])
     .nullable().optional(),

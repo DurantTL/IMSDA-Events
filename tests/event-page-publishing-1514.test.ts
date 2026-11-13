@@ -175,6 +175,22 @@ describe("scheduledPublishAt on a section", () => {
     expect(db.sections[0]).toMatchObject({ isPublished: true, scheduledPublishAt: null });
   });
 
+  it("still refuses an event administrator's change to custom HTML the sweep published", async () => {
+    const html = { kind: "CUSTOM_HTML", title: "Banner", body: "<p>Hi</p>", isPublished: false, scheduledPublishAt: "2027-03-12T15:00:00.000Z" };
+    await save([html], { isSystemAdmin: true });
+    await publishDueEventPageSections({ now: new Date("2027-03-12T15:05:00.000Z") });
+    vi.setSystemTime(new Date("2027-03-12T15:10:00.000Z"));
+    // Unpublish it.
+    await expect(save([{ ...html, scheduledPublishAt: null }])).rejects.toMatchObject({ code: "CUSTOM_HTML_FORBIDDEN" });
+    // Its old time, with changed HTML.
+    await expect(save([{ ...html, body: "<p>Changed</p>" }])).rejects.toMatchObject({ code: "CUSTOM_HTML_FORBIDDEN" });
+    // A different draft block with the same heading and the swept block's time.
+    await expect(save([{ ...html, isPublished: true, scheduledPublishAt: null }, { ...html, body: "<p>Other</p>" }]))
+      .rejects.toMatchObject({ code: "CUSTOM_HTML_FORBIDDEN" });
+    expect(db.sections).toHaveLength(1);
+    expect(db.sections[0]).toMatchObject({ body: "<p>Hi</p>", isPublished: true });
+  });
+
   it("refuses unpublishing a live section with a past time instead of quietly keeping it live", async () => {
     await save([text("Hours")]);
     vi.setSystemTime(new Date("2027-03-12T15:10:00.000Z"));

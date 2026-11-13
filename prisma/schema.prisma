@@ -1611,8 +1611,9 @@ model EventContentSection {
   data        Json                    @default("{}")
   position    Int
   isPublished Boolean                 @default(false)
-  /// When an unpublished section publishes itself (#1514). Set only while `isPublished` is false; the scheduled sweep
-  /// publishes it and clears this. Never copied when an event is cloned.
+  /// When an unpublished section publishes itself (#1514). A save stores it only on an unpublished section. The scheduled
+  /// sweep publishes the section and keeps the time on that row until the next save, so a save from an editor opened
+  /// before the sweep is recognised as the same section. Never copied when an event is cloned.
   scheduledPublishAt DateTime?
   createdAt   DateTime                @default(now())
   updatedAt   DateTime                @updatedAt
