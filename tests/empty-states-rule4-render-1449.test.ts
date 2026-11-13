@@ -68,7 +68,7 @@ function registration(index: number): RegistrationRecord {
     id: `registration-${index}`, confirmationCode: `TEST-${String(index).padStart(4, "0")}`, status: "CONFIRMED",
     accountHolder: { firstName: "Pat", lastName: `Example${index}`, email: `pat${index}@example.test`, phone: "" },
     attendees: [{ id: `attendee-${index}`, firstName: "Casey", lastName: `Sample${index}`, email: "", phone: "", attendeeType: "ATTENDEE", checkedIn: false, checkedInAt: null }],
-    payments: [], totalAmountCents: 0, balanceCents: 0, attendeeCount: 1, checkedInCount: 0, messages: [], adjustments: [],
+    payments: [], totalAmountCents: 0, balanceCents: 0, attendeeCount: 1, checkedInCount: 0, adjustments: [],
   } as unknown as RegistrationRecord;
 }
 

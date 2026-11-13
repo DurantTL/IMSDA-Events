@@ -10,7 +10,8 @@ export type CrossEventReadSurface =
   | "MERGED_PERSON_VIEW"
   | "ACTIVE_MERGES_LIST"
   | "OPEN_MATCH_CANDIDATES"
-  | "ATTENDEE_PROFILE_CHANGES";
+  | "ATTENDEE_PROFILE_CHANGES"
+  | "PERSON_COMMUNICATIONS";
 
 /**
  * Records that an identity read crossed an event boundary (#128). Ids only:

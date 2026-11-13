@@ -1,0 +1,10 @@
+/* A person's communication history across events (#179): a plain list of metadata, never message text. */
+.section { display: grid; gap: 10px; }
+.section h2 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1.125rem); }
+.section p { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.note { color: var(--muted); }
+.open { display: inline-flex; align-items: center; min-height: 44px; width: fit-content; color: var(--imsda-purple); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.row { display: grid; gap: 4px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); padding: 10px 12px; }
+.row strong { overflow-wrap: anywhere; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.row span { overflow-wrap: anywhere; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

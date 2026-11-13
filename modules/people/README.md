@@ -150,8 +150,9 @@ household or a shared identity grants no staff permission and no access to
 another event's records (attendees reach registrations by verified email only).
 
 Every identity read that crosses an event boundary (`getMergedPersonView`,
-`listActivePersonMerges`, `listOpenMatchCandidates`, so also
-`GET /api/people/merges` and the review queue) takes the acting user and
+`listActivePersonMerges`, `listOpenMatchCandidates`, `loadPersonCommunications`,
+so also `GET /api/people/merges`, the review queue and the person page's
+communication history) takes the acting user and
 writes a `PERSON_CROSS_EVENT_READ` audit entry before returning: actor,
 surface and ids only, never names, contact details or reasons. A failed audit
 write fails the read.
