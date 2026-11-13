@@ -73,11 +73,15 @@ function storedAnswers(
   responses: Record<string, unknown>,
   amended?: Record<string, unknown>,
   attendees: Array<Record<string, unknown>> = [],
+  typeMinimumAges: Array<number | null> = [],
 ) {
   registration.findUnique.mockResolvedValue({
     publicFormSubmission: { responses, formVersion: { definition } },
     operations: amended ? [{ afterSnapshot: { registrationResponses: amended } }] : [],
-    attendees: attendees.map((formResponses) => ({ formResponses })),
+    attendees: attendees.map((formResponses, index) => ({
+      formResponses,
+      attendeeTypeDefinition: typeMinimumAges[index] === undefined ? null : { minimumAge: typeMinimumAges[index] },
+    })),
   });
 }
 
@@ -274,7 +278,7 @@ describe("the account holder's attendee answers", () => {
     await getRegistrationProfileReview(account, "reg-1");
     expect(registration.findUnique.mock.calls[0]![0].select.attendees).toEqual({
       orderBy: [{ position: "asc" }, { id: "asc" }],
-      select: { formResponses: true },
+      select: { formResponses: true, attendeeTypeDefinition: { select: { minimumAge: true } } },
     });
   });
 
@@ -293,6 +297,16 @@ describe("the account holder's attendee answers", () => {
     const result = await applyRegistrationProfileReview(account, { registrationId: "reg-1", fields: ["shirtSize"], version: review!.version });
     expect(result.applied).toEqual(["shirtSize"]);
     expect(attendeeAccount.update.mock.calls[0]![0].data).toEqual({ shirtSize: "XL" });
+  });
+
+  it("compares an adult-type holder who has no birth date, but not a youth-type one", async () => {
+    const noBirthDate = { ...holder, birth_date: "" };
+    storedAnswers({}, undefined, [noBirthDate], [18]);
+    expect((await getRegistrationProfileReview(account, "reg-1"))?.conflicts.length).toBeGreaterThan(0);
+    storedAnswers({}, undefined, [noBirthDate], [13]);
+    expect((await getRegistrationProfileReview(account, "reg-1"))?.conflicts).toEqual([]);
+    storedAnswers({}, undefined, [noBirthDate], [null]);
+    expect((await getRegistrationProfileReview(account, "reg-1"))?.conflicts).toEqual([]);
   });
 
   it("stops comparing attendee answers once the holder is no longer an adult on the record", async () => {

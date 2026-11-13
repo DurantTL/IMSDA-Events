@@ -1,0 +1,98 @@
+.section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), var(--heading-section));
+}
+
+.help,
+.status,
+.error,
+.meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.error {
+  color: var(--danger, var(--ink));
+  font-weight: 700;
+}
+
+.form {
+  display: grid;
+  gap: 4px;
+}
+
+.label {
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.input {
+  flex: 1 1 220px;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: 8px 12px;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-element);
+  background: var(--field-bg);
+  color: var(--ink);
+  font: inherit;
+}
+
+.list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+
+.who {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.name {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  font-weight: 700;
+}
+
+.opened {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}

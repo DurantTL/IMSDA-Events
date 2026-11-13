@@ -202,9 +202,12 @@ This edits the signed-in attendee account's own profile columns only. It never l
   account holder. An attendee counts when (a) an attendee-scope email answer (`email`, `attendee_email`) equals the
   verified email, or (b) their first and last name answers equal the registration's primary contact name
   (`primary_contact_*`, `contact_*`, `registrant_*`, `primary_first_name`/`primary_last_name`); and in both cases their
-  birth-date answer is a real date showing 18 or over today (America/Chicago). No or unreadable birth date, a child,
-  or more than one qualifying attendee means nobody: only the registration answers are compared. Age numbers, attendee
-  type and minor flags are never evidence. The holder's answers only fill fields the registration answers leave blank,
+  they are an adult: a birth-date answer that is a real date showing 18 or over today (America/Chicago), or, when
+  there is no usable birth date, a linked attendee type (`RegistrationAttendee.attendeeTypeDefinition`) whose
+  `minimumAge` is 18 or more. A birth date always decides over the type (a child's birth date with an adult type is
+  not the holder; an adult's with a child type is). A type with no minimum age, a younger one (teen, youth, child) or
+  no linked type is not adult, and a child or more than one qualifying attendee means nobody: only the registration
+  answers are compared. Free-text labels, age numbers and minor flags are never evidence. The holder's answers only fill fields the registration answers leave blank,
   and the review version covers the merged values, so a change to either makes an open review stale. They are read
   from the attendees now on the registration (`RegistrationAttendee.formResponses` in roster order, where an
   amendment writes them), keeping only keys the stored form version defines at attendee scope.
@@ -230,5 +233,16 @@ This edits the signed-in attendee account's own profile columns only. It never l
   when changed), phones go through `phoneToStore`, and the audit entry records the changed field names, the reason and
   `personRequested: true`.
 
-Left open: a form whose name fields are attendee-scope and has no birth-date question offers no name conflict (no
-birth date, no comparison).
+- **Account search** (`account-search-staff.ts`, `GET /api/people/profile-updates/accounts/search?q=`, `GET
+  /api/people/profile-updates/accounts/[accountId]`; slice 3): system administrators only, for an account that is not on
+  the Profile updates list (someone who phones in). The search matches display name, first name, last name or email,
+  case-insensitively, needs 3 or more characters (trimmed, at most 100) and returns at most 20 results of id, display
+  name and email only: never address, emergency contact, health answers or person and merge data. Each search is written
+  to the cross-event identity read audit (surface `ATTENDEE_ACCOUNT_SEARCH`: result ids, count and the query length, never
+  the query, a name or an email) before the results are returned, and a failure to write it fails the search. Opening a
+  result loads that one account's name, phone and shirt size, audited first (surface `ATTENDEE_ACCOUNT_OPENED`,
+  entity id the account), and shows the same two corrections; the address and emergency contact form still audits its own
+  load (`ATTENDEE_PROFILE_PERSONAL`). The box searches on Enter or the button (docs/SITE-RULES.md S10).
+
+Left open: a form with no birth-date question and no adult attendee type (for example one without attendee types)
+offers no attendee-answer comparison.

@@ -24,7 +24,7 @@ export default async function ProfileUpdatesPage({ searchParams }: { searchParam
     <section className="page-stack">
       <PageHeader
         title="Profile updates"
-        description="Recent changes attendees made to their saved profile, and corrections staff made. Name, phone and shirt size show their values, and so does a staff correction of address or emergency contact. Address and emergency contact changes the attendee made themselves are not listed."
+        description="Recent changes attendees made to their saved profile, and corrections staff made. Name, phone and shirt size show their values, and so does a staff correction of address or emergency contact. Address and emergency contact changes the attendee made themselves are not listed. To correct an account that is not listed, find it by name or email; each search and each account you open is recorded in the audit log."
       />
       <ProfileUpdatesReview changes={changes} accounts={accounts} slice={slice} />
     </section>

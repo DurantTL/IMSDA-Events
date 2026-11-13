@@ -31,7 +31,7 @@ function fieldOfIssue(path: unknown): FieldKey | null {
  * A staff correction of one attendee's name, phone or shirt size (#1512). It sends the values it was loaded with, so the
  * server can refuse the correction if the profile has changed since, and a reason, which is kept with the change.
  */
-export function ProfileCorrectionForm({ accountId, current }: { accountId: string; current: Values }) {
+export function ProfileCorrectionForm({ accountId, current, onSaved }: { accountId: string; current: Values; onSaved?: () => void }) {
   const id = useId();
   const router = useRouter();
   const currentKey = JSON.stringify(current);
@@ -83,6 +83,7 @@ export function ProfileCorrectionForm({ accountId, current }: { accountId: strin
       setMessage({ tone: "success", text: savedMessage("The old and new values are kept with the reason.") });
       setReason("");
       router.refresh();
+      onSaved?.();
     } catch {
       setMessage({ tone: "error", text: notSavedMessage("Check your connection and try again.") });
     } finally {
