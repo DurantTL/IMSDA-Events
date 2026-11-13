@@ -182,6 +182,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/people/profile-updates` | Page link | Admin | System administration | - | More, Areas | Admin menu | - | `app/(workspace)/people/profile-updates/page.tsx` |
 | `/people/responsible-adults` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/responsible-adults/page.tsx` |
 | `/people/review-queues` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/review-queues/page.tsx` |
+| `/people/staff-drafts` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/staff-drafts/page.tsx` |
 | `/people/staff-invitations` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/staff-invitations/page.tsx` |
 | `/people/staff-invitations/approvals` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/staff-invitations/approvals/page.tsx` |
 | `/registration-builder` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/registration-builder/page.tsx` |

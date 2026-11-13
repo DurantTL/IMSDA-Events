@@ -151,6 +151,11 @@ const nextConfig: NextConfig = {
         headers: privateRegistrationHeaders,
       },
       {
+        // The private link from a registration staff started for someone (#1510): never cached, never indexed, no referrer.
+        source: "/register/finish/:path*",
+        headers: privateRegistrationHeaders,
+      },
+      {
         // A new club application's single-use private link (#817): never cached, never indexed, no referrer.
         source: "/clubs/register/:token",
         headers: privateRegistrationHeaders,

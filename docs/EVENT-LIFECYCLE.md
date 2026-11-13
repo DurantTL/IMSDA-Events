@@ -1,7 +1,7 @@
 # Event lifecycle (#156)
 
 Slice 1 of the event lifecycle: explicit states, validated transitions and an immutable history. Closeout checks and
-the finance sign-off came later (#1515, see Closeout below). No cloning and no read-only archive.
+the finance sign-off came later (#1515, see Closeout below). An archived event is read-only (#159, see below).
 
 ## States
 
@@ -108,6 +108,46 @@ moves the event back to Financial reconciliation and audits `EVENT_CLOSEOUT_REOP
 (database trigger: no UPDATE, DELETE only with the event), so the page lists every sign-off with its reopening: "Signed off
 by X on date; reopened by Y on date: reason". The people are plain ids with no foreign key, so deleting an account leaves the
 rows and the names. `npm run test:event-closeout` proves the flow on a synthetic event.
+
+## Archived is read-only (#159)
+
+An archived event (`archivedAt` set) refuses staff writes. `withRequestContext` checks the URL first
+(`modules/events/archived-read-only.ts`, pure) and only then reads the event's `archivedAt` (one primary-key read in
+`archived-read-only-guard.ts`), so the handler never runs. The refusal is `409` with
+`{ error: "EVENT_ARCHIVED", message }`; the message tells staff to unarchive in Event settings. If the state read fails
+the request gets `503 EVENT_STATE_UNAVAILABLE` (nothing changed) rather than slipping past the rule.
+
+The refusal is only given to someone who may act on the event (a system administrator or an active member). Anyone else
+gets what the route gives them. The check is made just before the change, so a save already in progress when the event is
+archived can still finish.
+
+Refused: every non-GET/HEAD/OPTIONS request to `/api/events/<eventId>` or below it, including settings, lifecycle,
+closeout sign-off and reopen, imports, form test submissions, message sends and tests, and payments and refunds.
+Closing out or reopening an archived event means unarchiving it first.
+
+Not refused, and why:
+
+- `archive` and `unarchive`: the archive actions themselves; unarchive must always work.
+- `DELETE /api/events/<eventId>`: the separate, confirmed system-administrator deletion of an event with nothing attached.
+- `cancellation-policy/preview`, `content/html-preview`, `attendee-passes/resolve`, `forms/<id>/field-answer-counts`,
+  `general-link/teams/<id>/similar-clubs`, `club-reports/columns` (POST): they carry
+  a body but only read, and reporting must stay available. Reads (GET) and exports always work.
+
+Billing containers (`isBillingContainer`, #1688) are created archived and can never be unarchived, so the check
+lets them through; staff invoice work for them runs on the normal event routes.
+
+Saving or deleting a club report layout (the `save-layout` and `delete-layout` actions of `club-reports/columns` and the
+attendee-side `report-columns` route) is refused with the same 409 even though the path is exempt; running a report is not.
+
+The Area Coordinator and TLT director event routes already refuse archived events (404) through `loadScopedToolEvent`.
+
+Not yet covered: check-in station writes (`/api/check-in-station/...`, the event is not in the path) and attendee
+self-service writes.
+
+Unarchiving restores everything. The money lock for Closed events (see Closeout) still applies after unarchive.
+
+Rollback: there is no schema change; archive is the existing `archivedAt` column. An older release ignores the rule and
+simply does not refuse. `tests/archived-read-only-159.test.ts` fails if an event write route skips `withRequestContext`.
 
 ## Compatibility with the old fields
 

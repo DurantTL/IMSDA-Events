@@ -42,9 +42,9 @@ function passing(entry: ReachedDestination): DestinationSearchContext {
 }
 
 describe("the registry", () => {
-  it("lists the 38 pages once each", () => {
-    expect(reachedDestinations).toHaveLength(38);
-    expect(reachedRoutes.size).toBe(38);
+  it("lists the 39 pages once each", () => {
+    expect(reachedDestinations).toHaveLength(39);
+    expect(reachedRoutes.size).toBe(39);
     expect(systemEntries).toHaveLength(6);
   });
 

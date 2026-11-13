@@ -1455,8 +1455,8 @@ export function EventSettingsWorkspace({
                     <summary>More detail</summary>
                     <p>
                       {initialEvent.archivedAt
-                        ? "This event is archived: hidden from pickers and the public site, with registration closed. Unarchiving restores it exactly."
-                        : "Hides this event from pickers and the public site and closes registration, without deleting anything. Reports and exports still work from the Archived events list, and you can unarchive it later."}
+                        ? "This event is archived and read-only: hidden from pickers and the public site, with registration closed. Unarchiving restores it exactly."
+                        : "Hides this event from pickers and the public site and closes registration, without deleting anything. It becomes read-only. Reports and exports still work from the Archived events list, and you can unarchive it later."}
                     </p>
                   </details>
                   <button className="secondary-button danger-outline-button full-button" onClick={() => setArchiveDialogOpen(true)} type="button">

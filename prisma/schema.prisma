@@ -718,6 +718,8 @@ enum MessageTemplateKey {
   MONTHLY_RECORD_REMINDER_SUMMARY
   /// The reminder (#164) to a club's director and deputy that a club registration for an event is started but not submitted. Names the club and the event and links to the sign-in-protected registration page; never carries an answer. Event-scoped.
   CLUB_DRAFT_REMINDER
+  /// The one email that hands a staff-started registration to its registrant (#1510): a private link, no answers. No event slice, like club form links.
+  STAFF_REGISTRATION_DRAFT_LINK
 }
 
 enum MessageTemplateStatus {
@@ -1024,6 +1026,9 @@ model User {
   eventTemplateVersionSources        EventTemplateVersionSource[] @relation("EventTemplateVersionSourceActor")
   enabledClubFormTemplates           ClubFormTemplate[]           @relation("ClubFormTemplateEnabledBy")
   createdClubFormLinks               ClubFormLink[]               @relation("ClubFormLinkCreatedByUser")
+  createdStaffRegistrationDrafts     StaffRegistrationDraft[]     @relation("StaffRegistrationDraftCreatedBy")
+  updatedStaffRegistrationDrafts     StaffRegistrationDraft[]     @relation("StaffRegistrationDraftUpdatedBy")
+  handedOffStaffRegistrationDrafts   StaffRegistrationDraft[]     @relation("StaffRegistrationDraftHandedOffBy")
   enteredClubFormSubmissions         ClubFormSubmission[]         @relation("ClubFormSubmissionEnteredByUser")
   verifiedBillingContacts      OrganizationBillingContact[]              @relation("BillingContactVerifiedBy")
   createdBillingContacts       OrganizationBillingContact[]              @relation("BillingContactCreatedBy")
@@ -2121,6 +2126,7 @@ model Event {
   staffingAssignments                 EventStaffingAssignment[]        @relation("EventStaffingAssignments")
   formTestSubmissions                 FormTestSubmission[]
   publicFormSubmissions               PublicRegistrationSubmission[]
+  staffRegistrationDrafts             StaffRegistrationDraft[]
   capacityReservations                RegistrationCapacityReservation[]
   messageSettings                     EventMessageSettings?
   messageTemplates                    EventMessageTemplate[]
@@ -3906,6 +3912,7 @@ model Registration {
   payments                Payment[]
   publicFormSubmission    PublicRegistrationSubmission?
   attendeeProfileChanges  AttendeeProfileChange[]
+  staffDraft              StaffRegistrationDraft?
   capacityReservations    RegistrationCapacityReservation[]
   messages                MessageOutbox[]
   waitlistEntry           RegistrationWaitlistEntry?
@@ -5224,6 +5231,7 @@ model RegistrationForm {
   capacityReservations  RegistrationCapacityReservation[]
   programAssignmentRuns ProgramAssignmentRun[]
   notifications         RegistrationFormNotification[]
+  staffRegistrationDrafts StaffRegistrationDraft[]
 
   @@unique([eventId, slug])
   @@index([eventId, status, updatedAt])
@@ -5244,6 +5252,7 @@ model RegistrationFormVersion {
   createdBy             User                              @relation("RegistrationFormVersionCreatedBy", fields: [createdByUserId], references: [id])
   testSubmissions       FormTestSubmission[]
   publicSubmissions     PublicRegistrationSubmission[]
+  staffRegistrationDrafts StaffRegistrationDraft[]
   capacityReservations  RegistrationCapacityReservation[]
   programAssignmentRuns ProgramAssignmentRun[]
   acknowledgmentEvidence AcknowledgmentEvidence[]
@@ -5525,6 +5534,63 @@ model PublicRegistrationSubmission {
   @@unique([formVersionId, idempotencyKey])
   @@index([eventId, createdAt])
   @@index([formVersionId, createdAt])
+}
+
+/// Where a staff-started registration came from (#1510).
+enum StaffRegistrationDraftSource {
+  PHONE
+  PAPER
+  WALK_IN
+}
+
+/// OPEN: staff are still entering it. HANDED_OFF: the registrant has a private link. SUBMITTED: the registrant sent it
+/// through the public form. DISCARDED: staff dropped it.
+enum StaffRegistrationDraftStatus {
+  OPEN
+  HANDED_OFF
+  SUBMITTED
+  DISCARDED
+}
+
+/// A registration staff started for someone by phone, on paper or at the door (#1510). It holds only the answers the
+/// browser-draft rule allows (no medical, consent, signature, payment, birth-date, long-text, address or notes), pinned
+/// to the form version it was started on. It never creates a registration, a payment or a charge: the registrant opens a
+/// private link, finishes the normal public form and submits it, and that submit links the registration back here.
+model StaffRegistrationDraft {
+  id                String                       @id @default(cuid())
+  eventId           String
+  formId            String
+  /// The published form version the draft was started on; the final submit uses the form as published at that time.
+  formVersionId     String
+  source            StaffRegistrationDraftSource
+  status            StaffRegistrationDraftStatus @default(OPEN)
+  /// Registration-scope answers to saveable fields only; cleared on submit and on discard.
+  responses         Json                         @default("{}")
+  createdByUserId   String
+  updatedByUserId   String
+  /// SHA-256 of the private link's token; the token itself is never stored. Kept after submit so a repeat gets a clear answer.
+  handOffTokenHash  String?                      @unique
+  handOffExpiresAt  DateTime?
+  handedOffAt       DateTime?
+  handedOffByUserId String?
+  /// The outbox message that carries the link, for delivery-time minting.
+  handOffMessageId  String?                      @unique
+  /// The registration the registrant's submit created; the provenance link.
+  registrationId    String?                      @unique
+  submittedAt       DateTime?
+  discardedAt       DateTime?
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+
+  event        Event                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  form         RegistrationForm        @relation(fields: [formId], references: [id], onDelete: Cascade)
+  formVersion  RegistrationFormVersion @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
+  createdBy    User                    @relation("StaffRegistrationDraftCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy    User                    @relation("StaffRegistrationDraftUpdatedBy", fields: [updatedByUserId], references: [id])
+  handedOffBy  User?                   @relation("StaffRegistrationDraftHandedOffBy", fields: [handedOffByUserId], references: [id], onDelete: SetNull)
+  registration Registration?           @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, status, updatedAt])
 }
 
 model RegistrationCapacityReservation {

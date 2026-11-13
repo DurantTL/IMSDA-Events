@@ -44,6 +44,11 @@ export const publicRegistrationInputSchema = z.object({
   lodging: registrationLodgingSchema.optional(),
   /** Optional merchandise (#146): variant ids and quantities only. Ordered separately, priced on the server, not charged with the registration. */
   merchandise: registrationMerchandiseSchema.optional(),
+  /**
+   * The private link's token when the registrant opened a registration staff started for them (#1510). Only its hash is
+   * ever looked up. Not part of the replay hash: it names where the answers came from, not what was answered.
+   */
+  staffDraftToken: z.string().trim().min(1).max(100).optional(),
   website: z.literal("", { error: "We couldn't send this form. Clear your browser's autofill and try again." }).optional(),
 }).strict().superRefine((input, context) => {
   const clientIds = new Set<string>();
