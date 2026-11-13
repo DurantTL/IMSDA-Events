@@ -32,6 +32,8 @@ import {
   summarizeChoiceUsage,
   type FormCalculation,
   type RegistrationFormDefinition,
+  isNotAttendingAnswer,
+  realChoiceValues,
 } from "@/modules/forms/definition";
 import {
   preparePublicRegistration,
@@ -628,11 +630,8 @@ function selectedCapacityChoices(
     for (const participant of participants) {
       if (!isFieldVisible(field, participant.responses)) continue;
       const value = participant.responses[field.key];
-      const options = Array.isArray(value)
-        ? value.map(String)
-        : typeof value === "string" && value
-          ? [value]
-          : [];
+      // "Not attending" (#893) is never a selection, so it takes no seat or interest row.
+      const options = realChoiceValues(value);
       options.forEach((optionValue, rank) => selections.push({
         fieldId: field.id,
         fieldKey: field.key,
@@ -644,6 +643,77 @@ function selectedCapacityChoices(
     }
   }
   return selections;
+}
+
+type ChoiceSelectionRow = ReturnType<typeof selectedCapacityChoices>[number];
+
+async function upsertChoiceSelections(
+  tx: Prisma.TransactionClient,
+  scope: { eventId: string; formId: string; formVersionId: string; registrationId: string },
+  selections: ChoiceSelectionRow[],
+) {
+  for (const selection of selections) {
+    await tx.registrationCapacityReservation.upsert({
+      where: {
+        registrationId_participantKey_fieldId_optionValue: {
+          registrationId: scope.registrationId,
+          participantKey: selection.participantKey,
+          fieldId: selection.fieldId,
+          optionValue: selection.optionValue,
+        },
+      },
+      update: {
+        registrationAttendeeId: selection.registrationAttendeeId,
+        fieldKey: selection.fieldKey,
+        rank: selection.rank,
+        releasedAt: null,
+      },
+      create: { ...scope, ...selection },
+    });
+  }
+}
+
+/**
+ * Re-syncs only the named attendees' selection rows for the named choice fields (#893): their old rows for those fields are
+ * released, then the answers now stored are written. Other people's rows and other fields are left alone. "Not attending"
+ * writes no row, so moving to it only releases. A waitlisted registration only releases, as a first submission on the
+ * waitlist writes no rows (`writeSelections: false`).
+ */
+export async function syncAttendeeChoiceSelections(
+  tx: Prisma.TransactionClient,
+  input: {
+    eventId: string;
+    formId: string;
+    formVersionId: string;
+    registrationId: string;
+    definition: RegistrationFormDefinition;
+    registrationResponses: Record<string, unknown>;
+    attendees: Array<{ attendeeId: string; responses: Record<string, unknown> }>;
+    fieldKeys: string[];
+    now: Date;
+    writeSelections?: boolean;
+  },
+) {
+  if (input.attendees.length === 0 || input.fieldKeys.length === 0) return;
+  await tx.registrationCapacityReservation.updateMany({
+    where: {
+      registrationId: input.registrationId,
+      registrationAttendeeId: { in: input.attendees.map((attendee) => attendee.attendeeId) },
+      fieldKey: { in: input.fieldKeys },
+      releasedAt: null,
+    },
+    data: { releasedAt: input.now },
+  });
+  if (input.writeSelections === false) return;
+  const keys = new Set(input.fieldKeys);
+  const selections = selectedCapacityChoices(input.definition, input.registrationResponses, input.attendees)
+    .filter((selection) => selection.registrationAttendeeId !== null && keys.has(selection.fieldKey));
+  await upsertChoiceSelections(tx, {
+    eventId: input.eventId,
+    formId: input.formId,
+    formVersionId: input.formVersionId,
+    registrationId: input.registrationId,
+  }, selections);
 }
 
 export function applyStoredPromo(
@@ -1834,31 +1904,12 @@ async function amendRegistrationInner(
           prepared.prepared.registrationResponses,
           committedAttendees,
         );
-        for (const selection of selections) {
-          await tx.registrationCapacityReservation.upsert({
-            where: {
-              registrationId_participantKey_fieldId_optionValue: {
-                registrationId,
-                participantKey: selection.participantKey,
-                fieldId: selection.fieldId,
-                optionValue: selection.optionValue,
-              },
-            },
-            update: {
-              registrationAttendeeId: selection.registrationAttendeeId,
-              fieldKey: selection.fieldKey,
-              rank: selection.rank,
-              releasedAt: null,
-            },
-            create: {
-              eventId,
-              formId: prepared.registration.publicFormSubmission!.formVersion.form.id,
-              formVersionId: prepared.registration.publicFormSubmission!.formVersionId,
-              registrationId,
-              ...selection,
-            },
-          });
-        }
+        await upsertChoiceSelections(tx, {
+          eventId,
+          formId: prepared.registration.publicFormSubmission!.formVersion.form.id,
+          formVersionId: prepared.registration.publicFormSubmission!.formVersionId,
+          registrationId,
+        }, selections);
 
         // Meal tickets (#210): the form re-priced them above, so the meal selections follow the answers (history and
         // ledger entries only; the registration total is already the amended one).
@@ -2028,6 +2079,7 @@ async function amendRegistrationInner(
                       const value = attendee.responses[field.key];
                       return {
                         label: field.label,
+                        notAttending: isNotAttendingAnswer(value),
                         choices: Array.isArray(value)
                           ? value.flatMap((label) => (
                               typeof label === "string" && field.options.includes(label)

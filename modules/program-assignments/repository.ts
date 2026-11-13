@@ -252,6 +252,7 @@ function summaryFromJson(value: unknown) {
     lowerChoiceAssigned: numberValue("lowerChoiceAssigned"),
     unassigned: numberValue("unassigned"),
     noRankedChoices: numberValue("noRankedChoices"),
+    notAttending: numberValue("notAttending"),
     limitedOptions: numberValue("limitedOptions"),
     unlimitedOptions: numberValue("unlimitedOptions"),
   };
@@ -614,6 +615,7 @@ export async function getAppliedAssignmentRoster(
     fieldLabel: run.fieldLabelSnapshot,
     appliedAt: run.appliedAt.toISOString(),
     appliedByName: run.appliedByNameSnapshot,
+    notAttending: summaryFromJson(run.summarySnapshot).notAttending,
     assignments: run.assignments.map(storedAssignment),
   };
 }

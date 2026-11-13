@@ -130,6 +130,36 @@ export function getAvailabilityMode(field: Pick<RegistrationFormField, "type" | 
   return "NONE";
 }
 
+/**
+ * The stored answer for "Not attending" on a seminar field (#893). It is saved as the one-element list `[SEMINAR_NOT_ATTENDING]`,
+ * is never one of the field's options, and never takes a seminar seat or interest row.
+ */
+export const SEMINAR_NOT_ATTENDING = "__not_attending__";
+export const SEMINAR_NOT_ATTENDING_LABEL = "Not attending";
+
+/** A seminar field: a ranked-interest choice asked of each attendee (the definition #100 builds on). */
+export function isSeminarPreferenceField(field: Pick<RegistrationFormField, "type" | "scope" | "choiceLimits" | "availabilityMode">) {
+  return field.scope === "ATTENDEE"
+    && field.type === "RANKED_CHOICE"
+    && getAvailabilityMode(field) === "RANKED_INTEREST";
+}
+
+/** True when a stored or submitted answer is the "Not attending" pick, alone. */
+export function isNotAttendingAnswer(value: unknown) {
+  return Array.isArray(value) && value.length === 1 && value[0] === SEMINAR_NOT_ATTENDING;
+}
+
+/** The answer's choices as option values, leaving out "Not attending" so it can never become a selection or seat. */
+export function realChoiceValues(value: unknown): string[] {
+  const list = Array.isArray(value) ? value.map(String) : typeof value === "string" && value ? [value] : [];
+  return list.filter((entry) => entry !== SEMINAR_NOT_ATTENDING);
+}
+
+/** The readable text for one stored choice value: "Not attending" for the stored marker, else the value itself. */
+export function choiceDisplayLabel(value: string) {
+  return value === SEMINAR_NOT_ATTENDING ? SEMINAR_NOT_ATTENDING_LABEL : value;
+}
+
 /** The longest acknowledgment statement a form can carry as plain text (#150); longer wording belongs in a policy version. */
 export const ACKNOWLEDGMENT_TEXT_MAX = 4000;
 
@@ -2259,6 +2289,12 @@ export function validateTestResponses(
         const minimum = !requiredHere && field.required
           ? 1
           : field.minSelections ?? (field.required ? (field.type === "RANKED_CHOICE" ? Math.min(2, maximum) : 1) : 0);
+        const notAttending = selections.includes(SEMINAR_NOT_ATTENDING);
+        if (notAttending && isSeminarPreferenceField(field)) {
+          // "Not attending" stands alone: it satisfies the required count and cannot be mixed with seminar picks (#893).
+          if (!isNotAttendingAnswer(value)) issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)}: choose "${SEMINAR_NOT_ATTENDING_LABEL}" or pick seminars, not both.` });
+          continue;
+        }
         if (!Array.isArray(value) || selections.some((selection) => !field.options.includes(selection))) issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} contains an invalid choice.` });
         else if (new Set(selections).size !== selections.length) issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} cannot contain duplicate choices.` });
         else if (selections.length < minimum) issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} requires ${minimum} choices.` });

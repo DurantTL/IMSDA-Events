@@ -1,7 +1,8 @@
 import { formatAddressDisplay, isPlainAddressObject } from "@/modules/forms/address";
-import type {
-  RegistrationFormDefinition,
-  RegistrationFormField,
+import {
+  choiceDisplayLabel,
+  type RegistrationFormDefinition,
+  type RegistrationFormField,
 } from "@/modules/forms/definition";
 
 export type PublicRegistrationStepId = string;
@@ -149,7 +150,7 @@ export function getPublicRegistrationStepPlan(
 export function formatPublicRegistrationAnswer(
   value: unknown,
 ) {
-  if (Array.isArray(value)) return value.length > 0 ? value.join(" → ") : null;
+  if (Array.isArray(value)) return value.length > 0 ? value.map((entry) => (typeof entry === "string" ? choiceDisplayLabel(entry) : entry)).join(" → ") : null;
   if (typeof value === "boolean") return value ? "Accepted" : "Not accepted";
   if (typeof value === "string") return value.trim() || null;
   if (isPlainAddressObject(value)) return formatAddressDisplay(value) || null;

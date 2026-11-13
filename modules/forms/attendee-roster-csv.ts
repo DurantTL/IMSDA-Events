@@ -5,9 +5,13 @@ import {
   validateAddressValue,
   type AddressValue,
 } from "@/modules/forms/address";
-import type {
-  RegistrationFormDefinition,
-  RegistrationFormField,
+import {
+  SEMINAR_NOT_ATTENDING,
+  SEMINAR_NOT_ATTENDING_LABEL,
+  choiceDisplayLabel,
+  isSeminarPreferenceField,
+  type RegistrationFormDefinition,
+  type RegistrationFormField,
 } from "@/modules/forms/definition";
 import { csvCell, toCsv } from "@/modules/reporting/csv";
 import { hasVisibilityRule } from "@/modules/forms/visibility-rule";
@@ -116,6 +120,10 @@ function convertValue(field: RegistrationFormField, rawValue: string, rowNumber:
     return canonicalChoice(field, value, rowNumber);
   }
   if (field.type === "MULTISELECT" || field.type === "RANKED_CHOICE") {
+    // "Not attending" (#893) is the only answer a seminar column may hold when it is used.
+    if (isSeminarPreferenceField(field) && value.toLowerCase() === SEMINAR_NOT_ATTENDING_LABEL.toLowerCase()) {
+      return [SEMINAR_NOT_ATTENDING];
+    }
     const choices = value
       .split("|")
       .map((choice) => choice.trim())
@@ -251,7 +259,7 @@ export function attendeeRosterExportColumns(
 
 function exportCell(field: RegistrationFormField, value: unknown): string[] {
   if (field.type === "ADDRESS") return addressCsvValues(value);
-  if (Array.isArray(value)) return [value.map(String).join("; ")];
+  if (Array.isArray(value)) return [value.map((entry) => choiceDisplayLabel(String(entry))).join("; ")];
   if (typeof value === "boolean") return [value ? "Yes" : "No"];
   if (value === undefined || value === null) return [""];
   return [String(value)];

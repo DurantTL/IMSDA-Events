@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { toCsv } from "@/modules/reporting/csv";
+import { isNotAttendingAnswer } from "@/modules/forms/definition";
 
 export type RankedAssignmentParticipantSource = {
   attendeeId: string;
@@ -78,6 +79,8 @@ export type RankedAssignmentPreview = {
     lowerChoiceAssigned: number;
     unassigned: number;
     noRankedChoices: number;
+    /** People who chose "Not attending" (#893): not placed, not counted as unassigned. */
+    notAttending: number;
     limitedOptions: number;
     unlimitedOptions: number;
   };
@@ -217,6 +220,8 @@ export function assignmentSourceFingerprint(
       lastName: participant.lastName,
       attendeeType: participant.attendeeType,
       preferences: rankedPreferences(participant.preferences, configuredOptions),
+      // Only present when true, so a fingerprint taken before "Not attending" existed still matches.
+      ...(isNotAttendingAnswer(participant.preferences) ? { notAttending: true } : {}),
     })),
   };
   return createHash("sha256")
@@ -237,7 +242,10 @@ export function buildRankedAssignmentPreview(
 ): RankedAssignmentPreview {
   const options = normalizeOptions(source.options);
   const configuredOptions = new Set(options);
-  const participants = stableParticipants(source.participants).map((participant) => ({
+  const stable = stableParticipants(source.participants);
+  // "Not attending" (#893) is a stated choice, not a missing one: those people are left out of the run and counted apart.
+  const notAttendingCount = stable.filter((participant) => isNotAttendingAnswer(participant.preferences)).length;
+  const participants = stable.filter((participant) => !isNotAttendingAnswer(participant.preferences)).map((participant) => ({
     ...participant,
     firstName: normalizeText(participant.firstName, "Unknown"),
     lastName: normalizeText(participant.lastName, "attendee"),
@@ -403,6 +411,7 @@ export function buildRankedAssignmentPreview(
       noRankedChoices: assignments.filter((assignment) => (
         assignment.unassignedReason === "NO_RANKED_CHOICES"
       )).length,
+      notAttending: notAttendingCount,
       limitedOptions: choices.filter((choice) => choice.capacityMode === "LIMITED").length,
       unlimitedOptions: choices.filter((choice) => choice.capacityMode === "UNLIMITED_MISSING").length,
     },
@@ -419,6 +428,8 @@ export type AppliedAssignmentRoster = {
   fieldLabel: string;
   appliedAt: string;
   appliedByName: string;
+  /** People who chose "Not attending" when the run was applied (#893); they are not in `assignments`. */
+  notAttending: number;
   assignments: RankedAttendeeAssignment[];
 };
 
@@ -447,5 +458,8 @@ export function programAssignmentRosterCsv(roster: AppliedAssignmentRoster) {
           : "Assigned",
     ]);
   }
+  // A separate line so the count never reads as a seminar or as unassigned (#893).
+  rows.push([]);
+  rows.push(["Not attending (not placed)", roster.notAttending]);
   return toCsv(rows);
 }

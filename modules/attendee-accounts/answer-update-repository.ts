@@ -8,6 +8,8 @@ import {
   isSeminarPreferenceField,
   prepareTieredAttendeeAnswerUpdate,
 } from "@/modules/attendee-accounts/registration-answer-policy";
+import { syncAttendeeChoiceSelections } from "@/modules/registrations/amendments-repository";
+import { isNotAttendingAnswer } from "@/modules/forms/definition";
 import { enqueueRegistrationUpdatedMessage } from "@/modules/communications/transactional-messages";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { ClubTeamError } from "@/modules/club-teams/errors";
@@ -60,6 +62,7 @@ export async function updateTieredRegistrationAnswersWithClient(
     },
     select: {
       id: true,
+      status: true,
       eventId: true,
       confirmationCode: true,
       updatedAt: true,
@@ -282,6 +285,21 @@ export async function updateTieredRegistrationAnswersWithClient(
         data: { formResponses: update.responses as Prisma.InputJsonValue },
       });
     }
+    // Choice rows follow the saved answers for just the people and fields that changed (#893), in this transaction.
+    await syncAttendeeChoiceSelections(tx, {
+      eventId: registration.eventId,
+      formId: submission.formVersion.formId,
+      formVersionId: submission.formVersionId,
+      registrationId: registration.id,
+      definition,
+      registrationResponses: recordFromJson(submission.responses),
+      attendees: prepared
+        .filter((update) => update.changedKeys.length > 0)
+        .map((update) => ({ attendeeId: update.attendee.id, responses: update.responses })),
+      fieldKeys: changedFields,
+      now: input.now,
+      writeSelections: registration.status !== "WAITLISTED",
+    });
     // A team registration keeps its event's team rules whoever edits it (#809); nothing is saved if they break.
     let teamMessageIds: string[] = [];
     try {
@@ -345,6 +363,7 @@ export async function updateTieredRegistrationAnswersWithClient(
               const value = update.responses[field.key];
               return {
                 label: field.label,
+                notAttending: isNotAttendingAnswer(value),
                 choices: Array.isArray(value)
                   ? value.flatMap((label) => (
                       typeof label === "string" && field.options.includes(label)

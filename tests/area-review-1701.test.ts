@@ -39,6 +39,8 @@ const client = {
   $queryRaw: async () => { db.locks += 1; return []; },
   monthlyRecordAreaReviewSetting: {
     findUnique: async ({ where }: { where: { clubYear: string } }) => db.settings.find((row) => row.clubYear === where.clubYear) ?? null,
+    findFirst: async ({ where }: { where: { clubYear: { lt: string } } }) =>
+      [...db.settings].filter((row) => (row.clubYear as string) < where.clubYear.lt).sort((a, b) => (b.clubYear as string).localeCompare(a.clubYear as string))[0] ?? null,
     upsert: async ({ where, update, create }: { where: { clubYear: string }; update: Row; create: Row }) => {
       const found = db.settings.find((row) => row.clubYear === where.clubYear);
       if (found) Object.assign(found, update); else db.settings.push({ ...create });
@@ -147,7 +149,7 @@ function seed() {
     { id: "club-closed", type: "CLUB", name: "Closed Pathfinders", clubKind: "PATHFINDER", isActive: false, guestEventId: null },
   );
   for (const id of ["club-1", "club-adv", "club-visiting", "club-closed"]) {
-    db.reports.push({ id: `report-${id}`, organizationId: id, clubYear: "2026-27", reportMonth: "2026-10", status: "SUBMITTED", firstSubmittedAt: new Date("2026-11-05T15:00:00Z"), submittedAt: new Date("2026-11-05T15:00:00Z"), totalPoints: 100, onTimePoints: 25, reviewedAt: null, updatedAt: new Date("2026-11-05T15:00:00Z"), honors: [], points: {}, classLevels: [] });
+    db.reports.push({ id: `report-${id}`, organizationId: id, clubYear: "2026-27", reportMonth: "2026-10", status: "SUBMITTED", firstSubmittedAt: new Date("2026-11-05T15:00:00Z"), submittedAt: new Date("2026-11-05T15:00:00Z"), totalPoints: 100, onTimePoints: 25, reviewedAt: null, updatedAt: new Date("2026-11-05T15:00:00Z"), honors: [], points: { staffMeeting: 25, ratio: 0 }, classLevels: [], meetingPlace: "", meetingSchedule: "", averageAttendance: null, pathfinderCount: null, tltCount: null, staffCount: null, investitureDate: null });
   }
   db.settings.push({ clubYear: "2026-27", enabled: true });
   db.grants.push({ attendeeAccountId: "acct-ac", revokedAt: null, expiresAt: null, ministries: ["PATHFINDER"] });
@@ -438,6 +440,127 @@ describe("the past-due exception for a returned record", () => {
     await reopenClubReport("club-1", "2026-10", club, now);
     await saveClubReport("club-1", "2026-10", input(), club, now);
     expect(db.reports[0]!.onTimePoints).toBe(0);
+  });
+});
+
+describe("a return reopens only the returned items", () => {
+  const refusedWith = async (work: Promise<unknown>, ...names: string[]) => {
+    const error = await work.then(() => null, (caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ClubReportError);
+    expect((error as ClubReportError).code).toBe("CLUB_REPORT_ITEMS_LOCKED");
+    for (const name of names) expect((error as ClubReportError).message).toContain(name);
+  };
+  const base = { points: { staffMeeting: 25, ratio: 0 } };
+
+  it("lets the director change anything before the due date", async () => {
+    stage("report-club-1", "RETURNED");
+    await saveClubReport("club-1", "2026-10", input({ ...base, points: { staffMeeting: 0, ratio: 25, devotions: 50 }, meetingPlace: "New hall", averageAttendance: 12, classLevels: ["FRIEND"] }), club, beforeDue);
+    expect(db.reports[0]).toMatchObject({ meetingPlace: "New hall", averageAttendance: 12 });
+  });
+
+  it("lets a returned item change after the due date, and the signature too", async () => {
+    stage("report-club-1", "RETURNED");
+    await saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 25, ratio: 25 }, signatureName: "Sam Example", signedOn: "2026-11-12" }), club, now);
+    expect(db.reports[0]).toMatchObject({ points: { staffMeeting: 25, ratio: 25 }, signatureName: "Sam Example", status: "SUBMITTED" });
+  });
+
+  it("refuses a change to an item that is not returned, with nothing written", async () => {
+    stage("report-club-1", "RETURNED");
+    stage("report-club-1", "OK", "staffMeeting");
+    const before = JSON.stringify(db.reports[0]);
+    await refusedWith(saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 0, ratio: 25 } }), club, now), "Monthly staff meeting");
+    await refusedWith(saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 25, ratio: 25, devotions: 50 } }), club, now), "Daily devotions");
+    expect(JSON.stringify(db.reports[0])).toBe(before);
+    expect(current("report-club-1")).toHaveLength(2);
+    expect(db.audit).toHaveLength(0);
+  });
+
+  it("applies the same rule to a draft save", async () => {
+    stage("report-club-1", "RETURNED");
+    await refusedWith(saveClubReport("club-1", "2026-10", input({ status: "DRAFT", points: { staffMeeting: 0, ratio: 25 } }), club, now), "Monthly staff meeting");
+    await saveClubReport("club-1", "2026-10", input({ status: "DRAFT", points: { staffMeeting: 25, ratio: 25 } }), club, now);
+    expect(db.reports[0]!.status).toBe("DRAFT");
+  });
+
+  it("refuses a change to the club facts and the investiture date", async () => {
+    stage("report-club-1", "RETURNED");
+    const changed = { points: { staffMeeting: 25, ratio: 25 } };
+    await refusedWith(saveClubReport("club-1", "2026-10", input({ ...changed, meetingPlace: "Elsewhere" }), club, now), "Meeting place");
+    await refusedWith(saveClubReport("club-1", "2026-10", input({ ...changed, meetingSchedule: "Fridays" }), club, now), "Meeting day and time");
+    await refusedWith(saveClubReport("club-1", "2026-10", input({ ...changed, averageAttendance: 9, pathfinderCount: 3, tltCount: 1, staffCount: 2 }), club, now), "Average attendance", "Number of TLTs", "Number of staff");
+    await refusedWith(saveClubReport("club-1", "2026-10", input({ ...changed, investitureDate: "2026-10-20" }), club, now), "Investiture date");
+    expect(db.reports[0]).toMatchObject({ meetingPlace: "", averageAttendance: null, points: { staffMeeting: 25, ratio: 0 } });
+  });
+
+  it("lets the honors list change only when the honors item is returned, and class levels only with theirs", async () => {
+    const honors = [{ name: "Knots", participants: 4 }];
+    stage("report-club-1", "RETURNED");
+    await refusedWith(saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 25, ratio: 25 }, honors }), club, now), "Honors worked on");
+    await refusedWith(saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 25, ratio: 25 }, classLevels: ["FRIEND"] }), club, now), "Class levels worked on");
+    stage("report-club-1", "RETURNED", "honors");
+    stage("report-club-1", "RETURNED", "classLevel");
+    await saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 25, ratio: 25, honors: 25, classLevel: 25 }, honors, classLevels: ["FRIEND"] }), club, now);
+    expect(db.reports[0]).toMatchObject({ honors: [{ name: "Knots", participants: 4 }], classLevels: ["FRIEND"] });
+  });
+
+  it("gives a staff member acting as the director the same refusal, naming the club's noun", async () => {
+    stage("report-club-1", "RETURNED");
+    const actAs = { userId: "staff-1", actAsId: "act-1" };
+    await refusedWith(saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 25, ratio: 25 }, pathfinderCount: 4 }), actAs, now), "Number of Pathfinders");
+    await saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 25, ratio: 25 } }), actAs, now);
+    expect(db.reports[0]).toMatchObject({ points: { staffMeeting: 25, ratio: 25 } });
+  });
+
+  it("still lets staff (not acting as a director) change a locked field past the due date with a return open", async () => {
+    stage("report-club-1", "RETURNED");
+    await saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 0, ratio: 0 }, meetingPlace: "Staff fix" }), { userId: "staff-1" }, now);
+    expect(db.reports[0]).toMatchObject({ meetingPlace: "Staff fix", points: { staffMeeting: 0, ratio: 0 } });
+  });
+
+  it("keeps the whole lock with the switch off or no returned item", async () => {
+    await lockedMessage(saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 25, ratio: 25 } }), club, now));
+    stage("report-club-1", "OK");
+    await lockedMessage(saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 25, ratio: 25 } }), club, now));
+    stage("report-club-1", "RETURNED");
+    db.settings[0]!.enabled = false;
+    await lockedMessage(saveClubReport("club-1", "2026-10", input({ points: { staffMeeting: 25, ratio: 25 } }), club, now));
+  });
+
+  const lockedMessage = async (work: Promise<unknown>) => {
+    const error = await work.then(() => null, (caught: unknown) => caught);
+    expect((error as ClubReportError).code).toBe("CLUB_REPORT_LOCKED");
+  };
+
+  it("maps the refusal to a 409 for the route", async () => {
+    const { clubReportApiError } = await import("@/modules/club-reports/api-errors");
+    const response = clubReportApiError(new ClubReportError("CLUB_REPORT_ITEMS_LOCKED", "Locked: Meeting place."), "Saving");
+    expect(response.status).toBe(409);
+  });
+});
+
+describe("the switch carries over to the next club year", () => {
+  it("uses the latest earlier year's row when this year has none, and a row for this year decides", async () => {
+    db.settings.length = 0;
+    db.settings.push({ clubYear: "2024-25", enabled: false }, { clubYear: "2025-26", enabled: true });
+    expect(await getAreaReviewSwitch(now)).toEqual({ clubYear: "2026-27", enabled: true });
+    db.settings.push({ clubYear: "2026-27", enabled: false });
+    expect(await getAreaReviewSwitch(now)).toEqual({ clubYear: "2026-27", enabled: false });
+  });
+
+  it("stays off with no row anywhere, and ignores later years", async () => {
+    db.settings.length = 0;
+    db.settings.push({ clubYear: "2027-28", enabled: true });
+    expect(await getAreaReviewSwitch(now)).toEqual({ clubYear: "2026-27", enabled: false });
+  });
+
+  it("turning it off writes a row for the current year, audited, and later years follow it", async () => {
+    db.settings.length = 0;
+    db.settings.push({ clubYear: "2025-26", enabled: true });
+    expect(await setMonthlyRecordAreaReviewEnabled(true, "user-1", now)).toMatchObject({ changed: false });
+    expect(await setMonthlyRecordAreaReviewEnabled(false, "user-1", now)).toMatchObject({ changed: true, enabled: false });
+    expect(db.settings.find((row) => row.clubYear === "2026-27")).toMatchObject({ enabled: false });
+    expect(db.audit[0]).toMatchObject({ action: "MONTHLY_RECORD_AREA_REVIEW_TURNED_OFF", entityId: "2026-27" });
+    expect(await getAreaReviewSwitch(new Date("2027-10-15T15:00:00Z"))).toEqual({ clubYear: "2027-28", enabled: false });
   });
 });
 

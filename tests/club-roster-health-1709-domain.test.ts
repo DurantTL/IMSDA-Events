@@ -29,7 +29,7 @@ const complete: RosterHealthInput = {
 
 describe("optional club feature keys", () => {
   it("lists the optional features and accepts nothing else", () => {
-    expect([...CLUB_OPTIONAL_FEATURE_KEYS]).toEqual(["roster-health-flags", "staff-training-records", "master-guide-tracking", "fill-in-letters", "completion-certificates"]);
+    expect([...CLUB_OPTIONAL_FEATURE_KEYS]).toEqual(["roster-health-flags", "staff-training-records", "master-guide-tracking", "fill-in-letters", "completion-certificates", "roster-charts"]);
     expect(isClubOptionalFeatureKey("roster-health-flags")).toBe(true);
     expect(isClubOptionalFeatureKey("anything-else")).toBe(false);
     expect(isClubOptionalFeatureKey(undefined)).toBe(false);
