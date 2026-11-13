@@ -17,7 +17,8 @@ A preview is not a grant. At confirm the route resolves the person's membership 
 - A record whose `updatedAt` differs from the preview: CONFLICT, never overwritten.
 - Tag already on (apply) or not on (remove): SKIPPED.
 - One record failing: FAILED, and the rest continue.
-- The handler itself stopping: the confirmation is already in the audit log, the run still ends APPLIED, and every record not reached is FAILED ("interrupted"). A run left in APPLYING for more than 10 minutes is ended the same way on the next retry with its key.
+- The handler itself stopping: the confirmation is already in the audit log, the run still ends APPLIED, and every record not reached is FAILED ("interrupted"; if the apply failed before anything was written the reason is "Nothing was changed for this one."). Outcomes are saved as the run goes (every 25 records), so a stall or crash keeps what was done.
+- A run left in APPLYING for more than 10 minutes is ended by one atomic recovery that stamps a fresh time, so only one caller takes it. It is run by a retry with the run's key and by the page load. Only the request whose status update changes the row audits the end; the original request, if it is still running, finds it no longer owns the run at its next check (every 25 records) and stops.
 
 The version check reads all current versions once, just before the writes. A change landing in the few milliseconds between that read and one record's write is not detected; the tag writes themselves are idempotent, so the worst case is a tag applied to a record that changed a moment ago.
 
@@ -42,6 +43,6 @@ Requesting information and queueing a message are later slices. Adding one is a 
 
 ## Privacy
 
-Runs store keys, ids, versions and counts. They never store a registrant's name, email or phone number, or the exported file. The run's query string can hold the search text staff typed while the run is PREVIEWED; it is replaced with `[text]` as soon as the run is confirmed or expires. The audit metadata always uses the replaced form. The summaries list non-completed records by confirmation code and a reason code only.
+Runs store keys, ids, versions and counts. They never store a registrant's name, email or phone number, or the exported file. The run's query string can hold the search text staff typed while the run is PREVIEWED; it is replaced with `[text]` as soon as the run is confirmed, and previews past their time are expired in bulk (on the page load and on each new preview) with the same replacement. The audit metadata always uses the replaced form. The summaries list non-completed records by confirmation code and a reason code only.
 
 `domain.ts` is pure; `repository.ts` is server-only; `http.ts` maps errors to responses.

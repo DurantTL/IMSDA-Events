@@ -379,6 +379,8 @@ const pages: PageSpec[] = [
   staff("attendee-listing", "/people/attendees"),
   staff("attendee-listing-meals", "/people/attendees?view=meals"),
   staff("duplicates", "/people/duplicates"),
+  // Bulk actions (#182): the scope, the action picker, and the recent runs table as cards on a phone.
+  { ...staff("people-bulk-actions", "/people/bulk-actions"), expectText: /Bulk actions/ },
   staff("event-staff", "/staff"),
   staff("finance", "/finance"),
   staff("finance-invoices", "/finance/invoices"),

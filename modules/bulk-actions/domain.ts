@@ -65,6 +65,7 @@ export const REASON_LABELS = {
   RECORD_CHANGED: "It changed after the preview, so it was left alone.",
   NO_LONGER_MATCHES: "It no longer matches the filter.",
   WRITE_FAILED: "The change could not be saved.",
+  NOT_CHANGED: "Nothing was changed for this one.",
   INTERRUPTED: "The action stopped before this one. Check it before trying again.",
 } as const;
 export type BulkReasonCode = keyof typeof REASON_LABELS;

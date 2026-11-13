@@ -272,7 +272,7 @@ export function BulkActionsPanel(props: Props) {
             ))}
           </ul>
           {summary.notCompleted.length > 0 && (
-            <div className={styles.tableWrap}>
+            <div className="report-table-wrap">
               <table role="table" className="report-table table-cards">
                 <caption className="sr-only">Registrations that were not completed, by confirmation code</caption>
                 <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Confirmation code</th><th role="columnheader" scope="col">What happened</th><th role="columnheader" scope="col">Why</th></tr></thead>
@@ -291,7 +291,7 @@ export function BulkActionsPanel(props: Props) {
       <section className={styles.card} aria-labelledby="bulk-recent-title">
         <h2 className={styles.title} id="bulk-recent-title">Recent bulk actions</h2>
         {recent.length === 0 ? <p className={styles.empty}>No bulk actions have been run for this event yet.</p> : (
-          <div className={styles.tableWrap}>
+          <div className="report-table-wrap">
             <table role="table" className="report-table table-cards">
               <caption className="sr-only">The last bulk actions for this event, newest first</caption>
               <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">When</th><th role="columnheader" scope="col">Who</th><th role="columnheader" scope="col">Action</th><th role="columnheader" scope="col">Scope</th><th role="columnheader" scope="col">Result</th></tr></thead>

@@ -65,6 +65,10 @@ type Db = ReturnType<typeof getPrisma>;
 
 type RecordOutcome = { registrationId: string; outcome: BulkActionOutcomeKey; reason?: BulkReasonCode };
 type ExportFile = { body: string };
+/** Where a handler reports each record as it is reached. `checkpoint` saves what is pending and says whether this run is still the one applying. */
+type OutcomeSink = { push(row: RecordOutcome): void; checkpoint(): Promise<boolean> };
+/** How often the tag loop saves its progress and checks that the run has not been ended under it. */
+const CHECKPOINT_EVERY = 25;
 type PreviewSkip = { id: string; reason: BulkReasonCode };
 
 type ActionHandler = {
@@ -73,7 +77,7 @@ type ActionHandler = {
   /** Candidates the action would skip right now, shown in the preview. */
   skipsFor(eventId: string, params: BulkActionParams, ids: readonly string[]): Promise<PreviewSkip[]>;
   /** Apply to records that passed the apply-time checks. One record failing never stops the rest. */
-  apply(input: { eventId: string; actorUserId: string; runId: string; params: BulkActionParams; ids: readonly string[]; /** Each record's outcome is pushed here as it is reached, so a throw part-way keeps what was done. */ sink: RecordOutcome[] }): Promise<{ file?: ExportFile; exportRowCount?: number }>;
+  apply(input: { eventId: string; actorUserId: string; runId: string; params: BulkActionParams; ids: readonly string[]; /** Each record's outcome is pushed here as it is reached, so a throw part-way keeps what was done. */ sink: OutcomeSink }): Promise<{ file?: ExportFile; exportRowCount?: number }>;
 };
 
 async function requireTag(eventId: string, tagId: string, applying: boolean) {
@@ -100,7 +104,9 @@ const tagHandler: ActionHandler = {
     if (params.action === "EXPORT_FIELDS") return {};
     const have = await activeAssignments(getPrisma(), eventId, params.tagId, ids);
     const outcomes = sink;
-    for (const registrationId of ids) {
+    for (const [index, registrationId] of ids.entries()) {
+      // Save progress now and then, and stop if the run was ended by someone else (a recovery after a long stall).
+      if (index > 0 && index % CHECKPOINT_EVERY === 0 && !(await sink.checkpoint())) return {};
       const applying = params.action === "APPLY_TAG";
       if (applying === have.has(registrationId)) {
         outcomes.push({ registrationId, outcome: "SKIPPED", reason: applying ? "ALREADY_APPLIED" : "NOT_APPLIED" });
@@ -231,7 +237,7 @@ const exportHandler: ActionHandler = {
     }
     const file: ExportFile = { body: toCsv([header, ...body]) };
     // The file exists only once every row is built, so the outcomes are recorded together with it.
-    sink.push(...outcomes);
+    for (const row of outcomes) sink.push(row);
     return { file, exportRowCount: body.length };
   },
 };
@@ -326,6 +332,7 @@ export async function createBulkPreview(
 ): Promise<BulkPreview> {
   const now = options.now ?? new Date();
   if (!viewer.permissions.includes(BULK_BASE_PERMISSION)) throw denied(["viewing registration records"]);
+  await sweep(viewer.eventId, now);
   const action = refuseUnknownAction(input.action);
   const params = parseBulkParams(action, input.params);
   requireBulkAccess(viewer, params);
@@ -549,39 +556,69 @@ export async function confirmBulkAction(
     metadata: { action, params: storedParams(params), queryString: auditQueryString(run.queryString), scopeKind: run.scopeKind, candidateCount: run.candidateCount, actorUserId: viewer.userId } as Prisma.InputJsonValue,
   });
 
-  const outcomes: RecordOutcome[] = [];
+  const pending: RecordOutcome[] = [];
+  const flush = async () => {
+    const batch = pending.splice(0, pending.length);
+    if (batch.length > 0) await writeOutcomes(prisma, run.id, batch);
+  };
+  const sink: OutcomeSink = {
+    push: (row) => { pending.push(row); },
+    checkpoint: async () => {
+      // Still this confirmation's run: applying, and not taken over by a recovery (which stamps a new time).
+      const current = await loadRun(prisma, viewer.eventId, run.id);
+      if (!current || current.status !== "APPLYING" || current.confirmedAt?.getTime() !== now.getTime()) return false;
+      await flush();
+      return true;
+    },
+  };
   let extras: { file?: ExportFile; exportRowCount?: number } = {};
+  // Nothing is written until the handler starts, so a failure before that leaves every record untouched.
+  let missingReason: BulkReasonCode = "NOT_CHANGED";
   try {
     const versions = await prisma.registration.findMany({ where: { eventId: viewer.eventId, id: { in: snapshotIds } }, select: { id: true, updatedAt: true } });
     const currentVersion = new Map(versions.map((row) => [row.id, row.updatedAt.toISOString()]));
     const eligible: string[] = [];
     for (const entry of snapshot) {
-      if (!stillMatching.has(entry.id)) outcomes.push({ registrationId: entry.id, outcome: "OBSOLETE", reason: "NO_LONGER_MATCHES" });
-      else if (currentVersion.get(entry.id) !== entry.v) outcomes.push({ registrationId: entry.id, outcome: "CONFLICT", reason: "RECORD_CHANGED" });
+      if (!stillMatching.has(entry.id)) pending.push({ registrationId: entry.id, outcome: "OBSOLETE", reason: "NO_LONGER_MATCHES" });
+      else if (currentVersion.get(entry.id) !== entry.v) pending.push({ registrationId: entry.id, outcome: "CONFLICT", reason: "RECORD_CHANGED" });
       else eligible.push(entry.id);
     }
-    extras = await handler.apply({ eventId: viewer.eventId, actorUserId: viewer.userId, runId: run.id, params, ids: eligible, sink: outcomes });
+    await flush();
+    missingReason = "INTERRUPTED";
+    extras = await handler.apply({ eventId: viewer.eventId, actorUserId: viewer.userId, runId: run.id, params, ids: eligible, sink });
   } catch (error) {
     // A handler that throws still ends the run: what it did stays recorded and the records it did not reach are FAILED.
     logError("A bulk action stopped part-way", error, { runId: run.id });
     extras = {};
   }
-  const reached = new Set(outcomes.map((row) => row.registrationId));
-  for (const entry of snapshot) if (!reached.has(entry.id)) outcomes.push({ registrationId: entry.id, outcome: "FAILED", reason: "INTERRUPTED" });
-  const summary = await finishRun(prisma, run, viewer.userId, params, outcomes, extras);
-  return { summary, file: extras.file ?? null };
+  try { await flush(); } catch (error) { logError("Bulk action progress could not be saved", error, { runId: run.id }); }
+  const { summary, won } = await finishRun(prisma, run, viewer.userId, params, extras, missingReason);
+  // A run that was ended under this request (a recovery) has already been accounted for; its file is not handed out.
+  return { summary, file: won ? extras.file ?? null : null };
 }
 
-/** Writes the outcomes, ends the run as APPLIED with its counts, and audits it. */
-async function finishRun(prisma: Db, run: RunRow, actorUserId: string, params: BulkActionParams, outcomes: RecordOutcome[], extras: { file?: ExportFile; exportRowCount?: number }) {
+async function writeOutcomes(prisma: Db, runId: string, batch: readonly RecordOutcome[]) {
   await prisma.bulkActionRecordOutcome.createMany({
-    data: outcomes.map((row) => ({ runId: run.id, registrationId: row.registrationId, outcome: row.outcome, reason: row.reason ?? null })),
+    data: batch.map((row) => ({ runId, registrationId: row.registrationId, outcome: row.outcome, reason: row.reason ?? null })),
     skipDuplicates: true,
   });
-  const counts = tallyOutcomes(outcomes);
+}
+
+/**
+ * Ends the run as APPLIED. Records with no outcome row yet are FAILED with `missingReason`; the counts are read back from
+ * the stored rows, so an outcome saved earlier is never replaced. Only the request whose status update changes the one row
+ * audits it and returns its own summary; any other gets the stored summary.
+ */
+async function finishRun(prisma: Db, run: RunRow, actorUserId: string, params: BulkActionParams, extras: { file?: ExportFile; exportRowCount?: number }, missingReason: BulkReasonCode): Promise<{ summary: BulkSummary; won: boolean }> {
+  const have = await prisma.bulkActionRecordOutcome.findMany({ where: { runId: run.id }, select: { registrationId: true } });
+  const reached = new Set(have.map((row) => row.registrationId));
+  const missing = parseSnapshot(run.snapshot).filter((entry) => !reached.has(entry.id)).map((entry): RecordOutcome => ({ registrationId: entry.id, outcome: "FAILED", reason: missingReason }));
+  if (missing.length > 0) await writeOutcomes(prisma, run.id, missing);
+  const rows = await prisma.bulkActionRecordOutcome.findMany({ where: { runId: run.id }, select: { outcome: true } });
+  const counts = tallyOutcomes(rows);
   const completedAt = new Date();
   const exportRowCount = extras.file ? extras.exportRowCount ?? 0 : null;
-  await prisma.bulkActionRun.updateMany({
+  const updated = await prisma.bulkActionRun.updateMany({
     where: { id: run.id, status: "APPLYING" },
     data: {
       status: "APPLIED",
@@ -594,6 +631,10 @@ async function finishRun(prisma: Db, run: RunRow, actorUserId: string, params: B
       exportRowCount,
     },
   });
+  if (updated.count !== 1) {
+    const stored = await loadRun(prisma, run.eventId, run.id);
+    return { summary: await summarize(prisma, stored ?? run, true), won: false };
+  }
   const stored = storedParams(params);
   await writeAuditLog({
     eventId: run.eventId,
@@ -616,7 +657,19 @@ async function finishRun(prisma: Db, run: RunRow, actorUserId: string, params: B
     } as Prisma.InputJsonValue,
   });
   const final = await loadRun(prisma, run.eventId, run.id);
-  return summarize(prisma, final ?? { ...run, status: "APPLIED", completedAt, completedCount: counts.completed, skippedCount: counts.skipped, conflictCount: counts.conflict, failedCount: counts.failed, obsoleteCount: counts.obsolete, exportRowCount }, false);
+  return { summary: await summarize(prisma, final ?? { ...run, status: "APPLIED", completedAt, completedCount: counts.completed, skippedCount: counts.skipped, conflictCount: counts.conflict, failedCount: counts.failed, obsoleteCount: counts.obsolete, exportRowCount }, false), won: true };
+}
+
+/**
+ * Ends a run that has been APPLYING for too long. The claim is one conditional update that stamps a fresh time, so only
+ * one caller can take it and a second late retry loses. Records with an outcome keep it; the rest are FAILED.
+ */
+async function recoverStuckRun(prisma: Db, run: RunRow, now: Date): Promise<BulkSummary | null> {
+  const cutoff = new Date(now.getTime() - APPLYING_STALE_MINUTES * 60_000);
+  const claim = await prisma.bulkActionRun.updateMany({ where: { id: run.id, status: "APPLYING", confirmedAt: { lt: cutoff } }, data: { confirmedAt: now } });
+  if (claim.count !== 1) return null;
+  const { summary } = await finishRun(prisma, run, run.actorUserId, paramsFromStored(run.action, run.params), {}, "INTERRUPTED");
+  return { ...summary, replayed: true };
 }
 
 async function replay(prisma: Db, run: RunRow, idempotencyKey: string, now: Date): Promise<BulkConfirmResult> {
@@ -624,23 +677,51 @@ async function replay(prisma: Db, run: RunRow, idempotencyKey: string, now: Date
     throw new BulkActionError("ALREADY_CONFIRMED", "This action was already confirmed. Its result is in Recent bulk actions. Preview again to run it again.", 409);
   }
   if (run.status === "APPLYING") {
-    const started = run.confirmedAt?.getTime() ?? 0;
-    if (now.getTime() - started < APPLYING_STALE_MINUTES * 60_000) {
-      throw new BulkActionError("IN_PROGRESS", "This action is still being applied. Check Recent bulk actions in a moment.", 409);
-    }
-    // Applying for too long: the process that was doing it is gone. End the run so it is never stuck. Records with no
-    // outcome are FAILED ("interrupted"), because it cannot be known whether the change was made.
-    const done = await prisma.bulkActionRecordOutcome.findMany({ where: { runId: run.id }, select: { registrationId: true, outcome: true, reason: true } });
-    const reached = new Set(done.map((row) => row.registrationId));
-    const outcomes: RecordOutcome[] = [
-      ...done.map((row) => ({ registrationId: row.registrationId, outcome: row.outcome as BulkActionOutcomeKey, reason: (row.reason ?? undefined) as BulkReasonCode | undefined })),
-      ...parseSnapshot(run.snapshot).filter((entry) => !reached.has(entry.id)).map((entry) => ({ registrationId: entry.id, outcome: "FAILED" as const, reason: "INTERRUPTED" as const })),
-    ];
-    const summary = await finishRun(prisma, run, run.actorUserId, paramsFromStored(run.action, run.params), outcomes, {});
-    return { summary: { ...summary, replayed: true }, file: null };
+    const recovered = await recoverStuckRun(prisma, run, now);
+    if (recovered) return { summary: recovered, file: null };
+    // Someone else ended it a moment ago, or it is still being applied.
+    const current = await loadRun(prisma, run.eventId, run.id);
+    if (current && current.status === "APPLIED") return { summary: await summarize(prisma, current, true), file: null };
+    throw new BulkActionError("IN_PROGRESS", "This action is still being applied. Check Recent bulk actions in a moment.", 409);
   }
   // No second change and no second file.
   return { summary: await summarize(prisma, run, true), file: null };
+}
+
+/* ---------- sweeps ---------- */
+
+/**
+ * Previews past their time are ended in bulk: EXPIRED, with the typed search text replaced. Previews are grouped by the
+ * replaced text, so each group is one conditional update.
+ */
+async function expireStalePreviews(prisma: Db, eventId: string, now: Date) {
+  const stale = await prisma.bulkActionRun.findMany({ where: { eventId, status: "PREVIEWED", expiresAt: { lte: now } }, select: { id: true, queryString: true }, take: 500 });
+  const groups = new Map<string, string[]>();
+  for (const row of stale) {
+    const redacted = auditQueryString(row.queryString);
+    groups.set(redacted, [...(groups.get(redacted) ?? []), row.id]);
+  }
+  for (const [queryString, ids] of groups) {
+    await prisma.bulkActionRun.updateMany({ where: { id: { in: ids }, eventId, status: "PREVIEWED", expiresAt: { lte: now } }, data: { status: "EXPIRED", queryString } });
+  }
+}
+
+/** Ends runs that have been APPLYING past the limit, with the same atomic recovery a retry uses. */
+async function endStuckRuns(prisma: Db, eventId: string, now: Date) {
+  const cutoff = new Date(now.getTime() - APPLYING_STALE_MINUTES * 60_000);
+  const stuck = await prisma.bulkActionRun.findMany({ where: { eventId, status: "APPLYING", confirmedAt: { lt: cutoff } }, take: 20 });
+  for (const run of stuck) await recoverStuckRun(prisma, run as RunRow, now);
+}
+
+async function sweep(eventId: string, now: Date) {
+  const prisma = getPrisma();
+  try {
+    await expireStalePreviews(prisma, eventId, now);
+    await endStuckRuns(prisma, eventId, now);
+  } catch (error) {
+    // Housekeeping never stops a page or a preview.
+    logError("Bulk action housekeeping failed", error, { eventId });
+  }
 }
 
 /* ---------- history ---------- */
@@ -657,7 +738,8 @@ export type RecentBulkAction = {
 };
 
 /** The last runs for the event: who, when, what, which scope and the counts. No names of registrants, no query text. */
-export async function listRecentBulkActions(eventId: string, take = 10): Promise<RecentBulkAction[]> {
+export async function listRecentBulkActions(eventId: string, take = 10, now: Date = new Date()): Promise<RecentBulkAction[]> {
+  await sweep(eventId, now);
   const rows = await getPrisma().bulkActionRun.findMany({
     where: { eventId },
     orderBy: { previewedAt: "desc" },

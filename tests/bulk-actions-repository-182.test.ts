@@ -65,6 +65,8 @@ let assigned: Set<string>;
 let matching: string[];
 let failFor: Set<string>;
 let selects: Array<Record<string, unknown>>;
+let createManyCalls = 0;
+let failCreateManyOn = 0;
 
 const NOW = new Date("2027-03-01T15:00:00.000Z");
 const TAG = { id: "tag-1", name: "Follow up" };
@@ -107,11 +109,22 @@ function pick(row: Record<string, unknown>, select: Record<string, any>) { // es
   return out;
 }
 
+function cond(value: unknown, test: unknown): boolean {
+  const num = (v: unknown) => (v instanceof Date ? v.getTime() : v);
+  if (test && typeof test === "object" && !(test instanceof Date)) {
+    const t = test as Record<string, unknown>;
+    if ("in" in t) return (t.in as unknown[]).includes(value);
+    if ("not" in t) return value !== t.not;
+    if ("gt" in t) return (num(value) as number) > (num(t.gt) as number);
+    if ("gte" in t) return (num(value) as number) >= (num(t.gte) as number);
+    if ("lt" in t) return value != null && (num(value) as number) < (num(t.lt) as number);
+    if ("lte" in t) return (num(value) as number) <= (num(t.lte) as number);
+  }
+  return value === test;
+}
+
 function runMatches(run: Run, where: Record<string, any>): boolean { // eslint-disable-line @typescript-eslint/no-explicit-any
-  return Object.entries(where).every(([key, value]) => {
-    if (key === "expiresAt" && value && typeof value === "object" && "gt" in value) return run.expiresAt.getTime() > value.gt.getTime();
-    return run[key] === value;
-  });
+  return Object.entries(where).every(([key, value]) => cond(run[key], value));
 }
 
 function installPrisma() {
@@ -124,8 +137,8 @@ function installPrisma() {
       const found = runs.find((run) => runMatches(run, where));
       return found ? { ...found } : null;
     }),
-    findMany: vi.fn(async ({ where, take }: { where: { eventId: string }; take: number }) =>
-      runs.filter((run) => run.eventId === where.eventId).sort((a, b) => b.previewedAt.getTime() - a.previewedAt.getTime()).slice(0, take).map((run) => ({ ...run, actor: { displayName: "Alex Sample" } }))),
+    findMany: vi.fn(async ({ where, take }: { where: Record<string, unknown>; take: number }) =>
+      runs.filter((run) => runMatches(run, where)).sort((a, b) => b.previewedAt.getTime() - a.previewedAt.getTime()).slice(0, take).map((run) => ({ ...run, actor: { displayName: "Alex Sample" } }))),
     updateMany: vi.fn(async ({ where, data }: { where: Record<string, unknown>; data: Run }) => {
       const hit = runs.filter((run) => runMatches(run, where));
       if (hit.length > 0 && data.idempotencyKey && runs.some((run) => run.eventId === (where.eventId ?? "event-1") && run.idempotencyKey === data.idempotencyKey && !hit.includes(run))) {
@@ -136,9 +149,15 @@ function installPrisma() {
     }),
   };
   const bulkActionRecordOutcome = {
-    createMany: vi.fn(async ({ data }: { data: Outcome[] }) => { outcomes.push(...data); return { count: data.length }; }),
-    findMany: vi.fn(async ({ where, take }: { where: { runId: string }; take: number }) =>
-      outcomes.filter((row) => row.runId === where.runId && row.outcome !== "COMPLETED").slice(0, take)
+    createMany: vi.fn(async ({ data }: { data: Outcome[] }) => {
+      createManyCalls += 1;
+      if (failCreateManyOn === createManyCalls) throw new Error("outcome write failed");
+      const fresh = data.filter((row) => !outcomes.some((have) => have.runId === row.runId && have.registrationId === row.registrationId));
+      outcomes.push(...fresh);
+      return { count: fresh.length };
+    }),
+    findMany: vi.fn(async ({ where, take }: { where: { runId: string; outcome?: { not: string } }; take?: number }) =>
+      outcomes.filter((row) => row.runId === where.runId && (!where.outcome || row.outcome !== where.outcome.not)).slice(0, take)
         .map((row) => ({ ...row, registration: { confirmationCode: regs.get(row.registrationId)?.confirmationCode ?? "GONE" } }))),
   };
   const registration = {
@@ -164,6 +183,8 @@ beforeEach(() => {
   assigned = new Set();
   failFor = new Set();
   selects = [];
+  createManyCalls = 0;
+  failCreateManyOn = 0;
   seed(3);
   installPrisma();
   mocks.listActiveTags.mockResolvedValue([TAG]);
@@ -590,6 +611,127 @@ describe("removing an inactive tag", () => {
   it("is refused for a deleted tag", async () => {
     mocks.listTags.mockResolvedValue([]);
     expect((await refusal(createBulkPreview(viewer(), tagInput({ action: "REMOVE_TAG" })))).code).toBe("TAG_UNAVAILABLE");
+  });
+});
+
+describe("recovering a stalled run", () => {
+  const appliedAudits = () => mocks.writeAuditLog.mock.calls.filter((call) => call[0].action === "BULK_ACTION_APPLIED").length;
+  const stall = (runId: string) => {
+    const run = runs.find((row) => row.id === runId)!;
+    run.status = "APPLYING";
+    run.idempotencyKey = KEY;
+    run.confirmedAt = new Date(NOW.getTime() - 20 * 60_000);
+  };
+
+  it("keeps the outcomes already saved and fails only the records with none, after a crash", async () => {
+    const runId = await previewed();
+    stall(runId);
+    outcomes.push({ runId, registrationId: "reg-1", outcome: "COMPLETED", reason: null });
+    const { summary } = await confirmBulkAction(viewer(), runId, KEY);
+    expect(summary.counts).toEqual({ completed: 1, skipped: 0, conflict: 0, failed: 2, obsolete: 0 });
+    expect(outcomes.find((row) => row.registrationId === "reg-1")?.outcome).toBe("COMPLETED");
+    expect(summary.notCompleted.map((row) => row.confirmationCode)).toEqual(["CODE0002", "CODE0003"]);
+    expect(appliedAudits()).toBe(1);
+  });
+
+  it("lets only one of two late retries take the recovery", async () => {
+    const runId = await previewed();
+    stall(runId);
+    const results = await Promise.allSettled([confirmBulkAction(viewer(), runId, KEY), confirmBulkAction(viewer(), runId, KEY)]);
+    expect(appliedAudits()).toBe(1);
+    expect(outcomes).toHaveLength(3);
+    for (const result of results) {
+      if (result.status === "rejected") expect((result.reason as BulkActionError).code).toBe("IN_PROGRESS");
+      else expect(result.value.summary.status).toBe("APPLIED");
+    }
+    expect(runs[0].status).toBe("APPLIED");
+  });
+
+  it("recovery while the original apply is still running keeps the real outcomes, audits once and stops the original", async () => {
+    seed(60);
+    const runId = await previewed();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let reached: () => void = () => {};
+    const atGate = new Promise<void>((resolve) => { reached = resolve; });
+    mocks.applyTag.mockImplementation(async (_event: string, registrationId: string, tagId: string) => {
+      if (registrationId === "reg-27") { reached(); await gate; }
+      assigned.add(`${registrationId}|${tagId}`);
+    });
+    const original = confirmBulkAction(viewer(), runId, KEY);
+    await atGate;
+    // Past the time limit, the same key is retried while the first request is still inside its apply.
+    const recovered = await confirmBulkAction(viewer(), runId, KEY, { now: new Date(NOW.getTime() + 11 * 60_000) });
+    expect(recovered.summary).toMatchObject({ status: "APPLIED", counts: { completed: 25, failed: 35 } });
+    release();
+    const late = await original;
+    // The original learns it no longer owns the run: no second audit row, no file, the stored summary, and it stops at its next check.
+    expect(late.file).toBeNull();
+    expect(late.summary.counts).toEqual(recovered.summary.counts);
+    expect(appliedAudits()).toBe(1);
+    expect(mocks.applyTag.mock.calls.length).toBeLessThanOrEqual(50);
+    expect(outcomes.filter((row) => row.outcome === "COMPLETED")).toHaveLength(25);
+    expect(runs[0]).toMatchObject({ status: "APPLIED", completedCount: 25, failedCount: 35 });
+  });
+
+  it("saves progress as it goes, so a crash leaves the done records COMPLETED", async () => {
+    seed(30);
+    const runId = await previewed();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let reached: () => void = () => {};
+    const atGate = new Promise<void>((resolve) => { reached = resolve; });
+    mocks.applyTag.mockImplementation(async (_event: string, registrationId: string, tagId: string) => {
+      if (registrationId === "reg-28") { reached(); await gate; }
+      assigned.add(`${registrationId}|${tagId}`);
+    });
+    const original = confirmBulkAction(viewer(), runId, KEY);
+    await atGate;
+    expect(outcomes.filter((row) => row.outcome === "COMPLETED")).toHaveLength(25);
+    release();
+    await original;
+  });
+
+  it("ends a stalled run when the page loads, with the same recovery", async () => {
+    const runId = await previewed();
+    stall(runId);
+    const recent = await listRecentBulkActions("event-1", 10, NOW);
+    expect(recent[0]).toMatchObject({ status: "APPLIED", counts: { failed: 3 } });
+    expect(appliedAudits()).toBe(1);
+    await listRecentBulkActions("event-1", 10, NOW);
+    expect(appliedAudits()).toBe(1);
+    expect(mocks.applyTag).not.toHaveBeenCalled();
+  });
+
+  it("uses a different reason when nothing was written because the apply failed first", async () => {
+    const runId = await previewed();
+    mocks.getPrisma().registration.findMany.mockRejectedValueOnce(new Error("version read failed"));
+    const { summary } = await confirmBulkAction(viewer(), runId, KEY);
+    expect(summary.counts).toMatchObject({ failed: 3, completed: 0 });
+    expect(summary.notCompleted.every((row) => row.reason === "Nothing was changed for this one.")).toBe(true);
+    expect(mocks.applyTag).not.toHaveBeenCalled();
+  });
+});
+
+describe("abandoned previews", () => {
+  it("expires them in bulk and replaces the typed text, on the page load and on a new preview", async () => {
+    await previewed(tagInput({ query: "q=Firstname&status=CONFIRMED" }));
+    await previewed(tagInput({ query: "q=Secondname&status=CONFIRMED" }));
+    vi.setSystemTime(new Date(NOW.getTime() + 31 * 60_000));
+    const fresh = await previewed(tagInput({ query: "q=Newtext" }));
+    // The new preview's own sweep already ended the two old ones.
+    expect(runs.slice(0, 2).map((run) => [run.status, run.queryString])).toEqual([["EXPIRED", "q=%5Btext%5D&status=CONFIRMED"], ["EXPIRED", "q=%5Btext%5D&status=CONFIRMED"]]);
+    expect(runs.find((run) => run.id === fresh)).toMatchObject({ status: "PREVIEWED", queryString: "q=Newtext" });
+    vi.setSystemTime(new Date(NOW.getTime() + 90 * 60_000));
+    const recent = await listRecentBulkActions("event-1");
+    expect(recent.every((run) => run.status === "EXPIRED")).toBe(true);
+    expect(JSON.stringify(runs)).not.toContain("Newtext");
+  });
+
+  it("leaves a preview that has not expired alone", async () => {
+    await previewed(tagInput({ query: "q=Keepme" }));
+    await listRecentBulkActions("event-1");
+    expect(runs[0]).toMatchObject({ status: "PREVIEWED", queryString: "q=Keepme" });
   });
 });
 

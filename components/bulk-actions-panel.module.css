@@ -45,7 +45,6 @@
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
 .countNumber { color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1.125rem); font-weight: 700; }
-.tableWrap { max-width: 100%; overflow-x: auto; }
 .empty { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 @media (max-width: 640px) {
   .card { padding: 12px; }
