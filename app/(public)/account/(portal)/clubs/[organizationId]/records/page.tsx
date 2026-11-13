@@ -198,6 +198,9 @@ export default async function ClubRecordsPage({
         notesPrefill={notesPrefill}
         prefill={prefill}
         readOnly={Boolean(report?.firstSubmittedAt) && locked}
+        returnedOnly={Boolean(report?.firstSubmittedAt) && reopenable && isLockedForClub(month, now)
+          ? areaReview.decisions.filter((decision) => decision.outcome === "RETURNED").map((decision) => decision.itemKey)
+          : undefined}
         showReturnedNotice
         reopenEndpoint={`${apiBase}/reports/${month}/reopen`}
       />

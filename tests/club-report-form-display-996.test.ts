@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
  * read-only view is a plain summary rather than disabled inputs. All data is synthetic.
  */
 vi.mock("server-only", () => ({}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 import { ClubReportForm } from "@/components/club-report-form";
 import { ON_TIME_POINTS, pickedTotal, pointItems, type PickedPoints } from "@/modules/club-reports/domain";
