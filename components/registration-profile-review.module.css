@@ -52,6 +52,7 @@
   border-radius: var(--radius-element);
   background: var(--card);
   cursor: pointer;
+  position: relative;
 }
 
 .row input {
@@ -73,6 +74,20 @@
 .fieldName {
   font-size: var(--type-public-label);
   font-weight: 700;
+  cursor: pointer;
+}
+
+/* The label's hit area covers the whole row, so the row is one 44px-high target. */
+.fieldName::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.valueList {
+  display: grid;
+  gap: 2px;
+  margin: 0;
 }
 
 .valueLine {

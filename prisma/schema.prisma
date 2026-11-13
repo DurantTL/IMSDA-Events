@@ -1209,18 +1209,6 @@ model PasswordResetToken {
   @@index([userId, expiresAt])
 }
 
-/**
- * A registrant's identity, separate from `User` by decision (ADR 0003).
- * The separation is the security property, not an accident of modelling: every
- * permission in this schema is granted by an `EventMembership` pointing at a
- * `User`, and an account in this table has no way to reach one. Widening the
- * staff table to hold attendees would put a far larger population through the
- * checks that guard roster export and sensitive data, where one careless query
- * is the difference between a registrant and staff access.
- * `email` is the whole claim. An account reaches every registration whose
- * contact address matches it and nothing else, so the address is stored already
- * normalised and is only load-bearing once `emailVerifiedAt` is set.
- */
 enum AttendeeProfileChangeSource {
   SELF_EDIT
   REGISTRATION_REVIEW
@@ -1230,7 +1218,8 @@ enum AttendeeProfileChangeSource {
 /// One field of an attendee's own saved profile that changed (#1512). Values are kept ONLY for `firstName`,
 /// `lastName`, `phone` and `shirtSize`. A row for any other field (mailing address, emergency contact) stores the field
 /// name alone with null values, and dietary and accessibility needs are never recorded here at all. The database
-/// enforces both rules. A staff correction always names the staff user and a reason.
+/// enforces both rules. A staff correction always names the staff user and a reason, so that user cannot be deleted
+/// while the change exists.
 model AttendeeProfileChange {
   id                     String                      @id @default(cuid())
   accountId              String
@@ -1247,12 +1236,24 @@ model AttendeeProfileChange {
   account              AttendeeAccount  @relation("AttendeeProfileChangeAccount", fields: [accountId], references: [id], onDelete: Cascade)
   registration         Registration?    @relation(fields: [registrationId], references: [id], onDelete: SetNull)
   actorAttendeeAccount AttendeeAccount? @relation("AttendeeProfileChangeActorAccount", fields: [actorAttendeeAccountId], references: [id], onDelete: SetNull)
-  actorUser            User?            @relation("AttendeeProfileChangeActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorUser            User?            @relation("AttendeeProfileChangeActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@index([accountId, createdAt])
   @@index([createdAt])
 }
 
+/**
+ * A registrant's identity, separate from `User` by decision (ADR 0003).
+ * The separation is the security property, not an accident of modelling: every
+ * permission in this schema is granted by an `EventMembership` pointing at a
+ * `User`, and an account in this table has no way to reach one. Widening the
+ * staff table to hold attendees would put a far larger population through the
+ * checks that guard roster export and sensitive data, where one careless query
+ * is the difference between a registrant and staff access.
+ * `email` is the whole claim. An account reaches every registration whose
+ * contact address matches it and nothing else, so the address is stored already
+ * normalised and is only load-bearing once `emailVerifiedAt` is set.
+ */
 model AttendeeAccount {
   id                 String                @id @default(cuid())
   healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]

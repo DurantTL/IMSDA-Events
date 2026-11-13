@@ -239,6 +239,12 @@ describe("profile change history (#1512)", () => {
     expect(JSON.stringify(attendeeProfileChange.createMany.mock.calls)).not.toMatch(/Vegan|Example Way|Casey/);
   });
 
+  it("does not record a name change when a first save only fills the name the form already showed", async () => {
+    attendeeAccount.findUniqueOrThrow.mockResolvedValue({ ...stored, firstName: null, lastName: null });
+    await updateAttendeeProfile("acct-1", input);
+    expect(attendeeProfileChange.createMany).not.toHaveBeenCalled();
+  });
+
   it("writes no history when nothing changed", async () => {
     await updateAttendeeProfile("acct-1", input);
     expect(attendeeProfileChange.createMany).not.toHaveBeenCalled();

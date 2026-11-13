@@ -77,10 +77,18 @@ describe("listProfileChangesForStaff", () => {
     expect(accounts).toEqual([{ accountId: "acct-1", accountName: "Avery Person", current: stored }]);
   });
 
-  it("never selects the address, emergency contact or health columns", async () => {
+  it("never selects the address, emergency contact or health columns, and lists only value-kept fields", async () => {
     attendeeProfileChange.findMany.mockResolvedValue([]);
-    await listProfileChangesForStaff("usr-admin");
-    expect(JSON.stringify(attendeeProfileChange.findMany.mock.calls[0]![0])).not.toMatch(/mailing|emergency|dietary|accessibility/i);
+    const result = await listProfileChangesForStaff("usr-admin");
+    const query = attendeeProfileChange.findMany.mock.calls[0]![0];
+    expect(query.where).toEqual({ field: { in: ["firstName", "lastName", "phone", "shirtSize"] } });
+    expect(JSON.stringify(query.select)).not.toMatch(/mailing|emergency|dietary|accessibility/i);
+    expect(result.capped).toBe(false);
+  });
+
+  it("says when the list is capped", async () => {
+    attendeeProfileChange.findMany.mockResolvedValue(Array.from({ length: 100 }, (_, index) => row({ id: `chg-${index}` })));
+    expect((await listProfileChangesForStaff("usr-admin")).capped).toBe(true);
   });
 });
 

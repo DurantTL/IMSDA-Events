@@ -18,14 +18,14 @@ export default async function ProfileUpdatesPage() {
   if (!user) redirect(await staffLoginRedirectPath());
   if (!isDisclosureAllowed("MATCH_CANDIDATE_EVIDENCE", staffIdentityAudience(user), "READ")) redirect("/no-access");
 
-  const { changes, accounts } = await listProfileChangesForStaff(user.id);
+  const { changes, accounts, capped } = await listProfileChangesForStaff(user.id);
   return (
     <section className="page-stack">
       <PageHeader
         title="Profile updates"
         description="Recent changes attendees made to their saved profile, and corrections staff made. Only name, phone and shirt size show their values."
       />
-      <ProfileUpdatesReview changes={changes} accounts={accounts} />
+      <ProfileUpdatesReview changes={changes} accounts={accounts} capped={capped} />
     </section>
   );
 }

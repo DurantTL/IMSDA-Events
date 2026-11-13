@@ -9,6 +9,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: dependencies.wr
 import { updateAttendeeProfile } from "@/modules/attendee-accounts/profile-service";
 
 const stored = {
+  displayName: "Avery Person",
   firstName: "Avery",
   lastName: "Person",
   phone: "555-0100",

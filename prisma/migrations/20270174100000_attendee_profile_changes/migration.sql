@@ -48,4 +48,4 @@ ALTER TABLE "AttendeeProfileChange" ADD CONSTRAINT "AttendeeProfileChange_regist
 ALTER TABLE "AttendeeProfileChange" ADD CONSTRAINT "AttendeeProfileChange_actorAttendeeAccountId_fkey" FOREIGN KEY ("actorAttendeeAccountId") REFERENCES "AttendeeAccount"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AttendeeProfileChange" ADD CONSTRAINT "AttendeeProfileChange_actorUserId_fkey" FOREIGN KEY ("actorUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "AttendeeProfileChange" ADD CONSTRAINT "AttendeeProfileChange_actorUserId_fkey" FOREIGN KEY ("actorUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

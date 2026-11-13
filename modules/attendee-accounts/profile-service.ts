@@ -91,15 +91,19 @@ function serializeProfile(profile: StoredProfile, fallback = { firstName: "", la
   };
 }
 
+/** The names the profile form shows for an account that never saved them separately. */
+function displayNameFallback(displayName: string) {
+  const parts = displayName.trim().split(/\s+/);
+  const firstName = parts.shift() ?? "";
+  return { firstName, lastName: parts.join(" ") };
+}
+
 export async function getAttendeeProfile(accountId: string) {
   const profile = await getPrisma().attendeeAccount.findUniqueOrThrow({
     where: { id: accountId },
     select: { ...profileSelect, displayName: true },
   });
-  const displayNameParts = profile.displayName.trim().split(/\s+/);
-  const fallbackFirstName = displayNameParts.shift() ?? "";
-  const fallbackLastName = displayNameParts.join(" ");
-  return serializeProfile(profile, { firstName: fallbackFirstName, lastName: fallbackLastName });
+  return serializeProfile(profile, displayNameFallback(profile.displayName));
 }
 
 export async function updateAttendeeProfile(
@@ -110,9 +114,12 @@ export async function updateAttendeeProfile(
   return getPrisma().$transaction(async (tx) => {
     // One change to this profile at a time (a registration review or a staff correction may be saving too).
     await tx.$queryRaw`SELECT "id" FROM "AttendeeAccount" WHERE "id" = ${accountId} FOR UPDATE`;
-    const before = serializeProfile(
-      await tx.attendeeAccount.findUniqueOrThrow({ where: { id: accountId }, select: profileSelect }),
-    );
+    // Read with the same name fallback the form shows, so a first save does not record a name change nobody saw.
+    const storedBefore = await tx.attendeeAccount.findUniqueOrThrow({
+      where: { id: accountId },
+      select: { ...profileSelect, displayName: true },
+    });
+    const before = serializeProfile(storedBefore, displayNameFallback(storedBefore.displayName));
     // Phones go through the shared check (#871) so what new registrations prefill from is clean. A changed phone
     // must pass and is stored normalised; the stored one, even an old unusable one, may stay as it is. The stored
     // value is read here, never taken from the request.

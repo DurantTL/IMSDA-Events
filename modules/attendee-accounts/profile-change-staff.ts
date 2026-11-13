@@ -52,7 +52,9 @@ export type StaffCorrectableAccount = {
 };
 
 export async function listProfileChangesForStaff(actorUserId: string) {
+  // Address and emergency contact changes are never listed for staff, so only the value-kept fields are read.
   const rows = await getPrisma().attendeeProfileChange.findMany({
+    where: { field: { in: [...valueKeptFields] } },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: PROFILE_CHANGE_LIST_LIMIT,
     select: {
@@ -75,6 +77,7 @@ export async function listProfileChangesForStaff(actorUserId: string) {
     resultIds: rows.map((row) => row.id),
   });
   const changes: StaffProfileChange[] = rows.map((row) => {
+    // Belt and braces: a value never leaves for a field outside the value-kept list.
     const keep = isValueKeptField(row.field);
     return {
       id: row.id,
@@ -103,7 +106,7 @@ export async function listProfileChangesForStaff(actorUserId: string) {
       },
     });
   }
-  return { changes, accounts: [...accounts.values()] };
+  return { changes, accounts: [...accounts.values()], capped: rows.length === PROFILE_CHANGE_LIST_LIMIT };
 }
 
 const text = (maximum: number) => z.string().trim().max(maximum);

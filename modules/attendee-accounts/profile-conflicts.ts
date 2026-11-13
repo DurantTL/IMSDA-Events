@@ -75,9 +75,11 @@ export const reviewFieldLabels: Record<ReviewableField, string> = {
   emergencyContactPhone: "Emergency contact phone",
 };
 
+const otherFieldLabels: Record<string, string> = { emergencyContactRelationship: "Emergency contact relationship" };
+
 /** The label of any history field name; an unknown one shows as written. */
 export function profileFieldLabel(field: string): string {
-  return (reviewFieldLabels as Record<string, string>)[field] ?? field;
+  return (reviewFieldLabels as Record<string, string>)[field] ?? otherFieldLabels[field] ?? field;
 }
 
 type FieldSource =

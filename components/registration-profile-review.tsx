@@ -13,7 +13,7 @@ type ReviewConflict = {
 
 type Review = { registrationId: string; version: string; conflicts: ReviewConflict[] };
 
-type Phase = "loading" | "hidden" | "review" | "done";
+type Phase = "loading" | "hidden" | "review" | "done" | "kept";
 
 /**
  * Offered on the registration confirmation to a signed-in attendee (#1512): where their saved profile differs from what
@@ -29,6 +29,11 @@ export function RegistrationProfileReview({ registrationId }: { registrationId: 
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const statusRef = useRef<HTMLParagraphElement>(null);
+
+  // One live region stays mounted through every state; after an action focus moves to it so the result is announced.
+  function focusStatus() {
+    window.requestAnimationFrame(() => statusRef.current?.focus());
+  }
 
   const load = useCallback(async (keepMessage = false) => {
     try {
@@ -97,6 +102,7 @@ export function RegistrationProfileReview({ registrationId }: { registrationId: 
       }
       setMessage("Your saved profile is updated.");
       setPhase("done");
+      focusStatus();
     } catch {
       setMessage("We could not update your profile. Check your connection and try again.");
     } finally {
@@ -104,12 +110,28 @@ export function RegistrationProfileReview({ registrationId }: { registrationId: 
     }
   }
 
-  if (phase === "done") {
-    return <p className={styles.statusDone} role="status">{message}</p>;
+  function keep() {
+    setMessage("Your profile was not changed.");
+    setPhase("kept");
+    focusStatus();
   }
-  if (phase !== "review" || !review) return null;
+
+  const reviewing = phase === "review" && review;
+  const status = (
+    <p
+      ref={statusRef}
+      className={message ? (reviewing ? styles.status : styles.statusDone) : "sr-only"}
+      role="status"
+      aria-live="polite"
+      tabIndex={-1}
+    >
+      {message}
+    </p>
+  );
+  if (!reviewing) return status;
 
   return (
+    <>
     <section className={styles.panel} aria-labelledby={headingId}>
       <h2 id={headingId} className={styles.heading}>Your saved profile is different</h2>
       <p className={styles.intro}>
@@ -122,26 +144,27 @@ export function RegistrationProfileReview({ registrationId }: { registrationId: 
           {review.conflicts.map((conflict) => {
             const id = `${headingId}-${conflict.field}`;
             return (
-              <li key={conflict.field}>
-                <label className={styles.row} htmlFor={id}>
-                  <input
-                    id={id}
-                    type="checkbox"
-                    checked={chosen.has(conflict.field)}
-                    onChange={(event) => toggle(conflict.field, event.target.checked)}
-                  />
-                  <span className={styles.values}>
-                    <span className={styles.fieldName}>{conflict.label}</span>
-                    <dl className={styles.valueLine}>
+              <li key={conflict.field} className={styles.row}>
+                <input
+                  id={id}
+                  type="checkbox"
+                  aria-describedby={`${id}-values`}
+                  checked={chosen.has(conflict.field)}
+                  onChange={(event) => toggle(conflict.field, event.target.checked)}
+                />
+                <div className={styles.values}>
+                  <label className={styles.fieldName} htmlFor={id}>{conflict.label}</label>
+                  <dl className={styles.valueList} id={`${id}-values`}>
+                    <div className={styles.valueLine}>
                       <dt>Saved profile</dt>
                       <dd translate="no">{conflict.savedValue || "Nothing saved"}</dd>
-                    </dl>
-                    <dl className={styles.valueLine}>
+                    </div>
+                    <div className={styles.valueLine}>
                       <dt>You entered</dt>
                       <dd translate="no">{conflict.enteredValue}</dd>
-                    </dl>
-                  </span>
-                </label>
+                    </div>
+                  </dl>
+                </div>
               </li>
             );
           })}
@@ -151,11 +174,12 @@ export function RegistrationProfileReview({ registrationId }: { registrationId: 
         <button type="button" className="primary-button" onClick={() => void apply()} disabled={busy}>
           {busy ? "Updating…" : "Update my profile"}
         </button>
-        <button type="button" className="secondary-button" onClick={() => setPhase("hidden")} disabled={busy}>
+        <button type="button" className="secondary-button" onClick={keep} disabled={busy}>
           Keep my profile as it is
         </button>
       </div>
-      <p ref={statusRef} className={styles.status} role="status" aria-live="polite">{message}</p>
     </section>
+    {status}
+    </>
   );
 }
