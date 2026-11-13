@@ -34,7 +34,7 @@ export function contentVisibility(templateKey: string, permissions: readonly Eve
 /** The subject shown in place of a withheld one. */
 export const WITHHELD_SUBJECT = "Health record message";
 
-export type TimelineRecipientRole = "Registrant" | "Staff notice" | "Billing contact" | "Club director";
+export type TimelineRecipientRole = "Registrant" | "Staff notice" | "Billing contact" | "Club director" | "Account email";
 
 /** Recipient kinds that never appear on a timeline: test sends and account email belong to no registration's history. */
 export const TIMELINE_EXCLUDED_RECIPIENT_KINDS = ["TEST", "ACCOUNT"] as const;
@@ -44,6 +44,7 @@ export function recipientRoleLabel(kind: string): TimelineRecipientRole {
     case "INTERNAL": return "Staff notice";
     case "BILLING_CONTACT": return "Billing contact";
     case "CLUB_DIRECTOR": return "Club director";
+    case "ACCOUNT": return "Account email";
     default: return "Registrant";
   }
 }

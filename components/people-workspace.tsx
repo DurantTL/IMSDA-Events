@@ -1,6 +1,7 @@
 "use client";
 
 import { choiceDisplayLabel } from "@/modules/forms/definition";
+import { dateTimeInZone } from "@/lib/format-date-time";
 import { ListPager } from "@/components/list-pager";
 import { ExactValue, Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
@@ -114,20 +115,7 @@ function answerValue(value: unknown) {
   return String(value);
 }
 
-function dateTime(value: string | null, timeZone: string) {
-  if (!value) return "Not recorded";
-  const date = new Date(value);
-  if (Number.isNaN(date.valueOf())) return value;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone,
-    timeZoneName: "short",
-  }).format(date);
-}
+const dateTime = dateTimeInZone;
 
 function submittedDateTime(value: string | null, timeZone: string) {
   return value ? dateTime(value, timeZone) : "Not yet";
@@ -1139,6 +1127,7 @@ export function PeopleWorkspace({
                   </div>
                 </section>
                 <RegistrationCommunicationsPanel
+                  key={selected.id}
                   eventId={eventId}
                   registrationId={selected.id}
                   timeZone={eventTimezone}

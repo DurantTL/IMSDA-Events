@@ -39,6 +39,7 @@ describe("communication timeline labels and order (#179)", () => {
     expect(recipientRoleLabel("INTERNAL")).toBe("Staff notice");
     expect(recipientRoleLabel("BILLING_CONTACT")).toBe("Billing contact");
     expect(recipientRoleLabel("CLUB_DIRECTOR")).toBe("Club director");
+    expect(recipientRoleLabel("ACCOUNT")).toBe("Account email");
   });
 
   it("makes a readable message type", () => {

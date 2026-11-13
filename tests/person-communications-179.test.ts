@@ -16,6 +16,7 @@ vi.mock("@/lib/prisma", () => ({
 
 import { loadPersonCommunications } from "@/modules/system-admin/person-communications";
 
+const admin = { userId: "usr_admin", scope: "full" as const, globalRole: "SYSTEM_ADMIN" as const };
 const target = { kind: "staff" as const, id: "usr_1", staffId: "usr_1", accountId: "acct_1" };
 
 function row(overrides: Record<string, unknown> = {}) {
@@ -54,9 +55,15 @@ describe("person communication history (#179)", () => {
     expect(mocks.auditCreate).not.toHaveBeenCalled();
   });
 
+  it("refuses a staff login that is not a system administrator even when the scope says full", async () => {
+    expect(await loadPersonCommunications({ userId: "usr_9", scope: "full", globalRole: null }, target)).toBeNull();
+    expect(mocks.findMany).not.toHaveBeenCalled();
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
+  });
+
   it("reads the person's own account mail and mail on registrations held by their account, never the body", async () => {
     mocks.findMany.mockResolvedValue([]);
-    await loadPersonCommunications({ userId: "usr_admin", scope: "full" }, target);
+    await loadPersonCommunications(admin, target);
     const args = mocks.findMany.mock.calls[0]![0];
     expect(args.where.OR).toEqual([
       { accountUserId: "usr_1" },
@@ -78,24 +85,24 @@ describe("person communication history (#179)", () => {
       row({ id: "msg_2", eventId: "evt_2", event: { name: "Other Event" }, recipientEmail: "other@example.test", subjectSnapshot: "Secret subject" }),
       row({ id: "msg_3", eventId: null, event: null, templateKey: "ACCOUNT_ACTIVATION", recipientKind: "ACCOUNT" }),
     ]);
-    const result = await loadPersonCommunications({ userId: "usr_admin", scope: "full" }, target);
+    const result = await loadPersonCommunications(admin, target);
     expect(result!.rows).toHaveLength(3);
-    expect(result!.rows[2]).toMatchObject({ eventName: "No event", recipientRole: "Registrant" });
+    expect(result!.rows[2]).toMatchObject({ eventName: "No event", recipientRole: "Account email" });
     expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
     const data = mocks.auditCreate.mock.calls[0]![0].data;
     expect(data).toMatchObject({
       actorUserId: "usr_admin",
-      action: "PERSON_COMMUNICATIONS_VIEWED",
-      entityType: "User",
+      action: "PERSON_CROSS_EVENT_READ",
+      entityType: "PersonIdentityRead",
       entityId: "usr_1",
-      metadata: { staffId: "usr_1", accountId: "acct_1", eventIds: ["evt_1", "evt_2"], rowCount: 3, truncated: false },
+      metadata: { surface: "PERSON_COMMUNICATIONS", kind: "staff", staffId: "usr_1", accountId: "acct_1", eventIds: ["evt_1", "evt_2"], resultCount: 3, resultIds: ["msg_1", "msg_2", "msg_3"], moreExist: 0, truncated: false },
     });
     expect(JSON.stringify(data)).not.toMatch(/example\.test|Secret subject|receipt/i);
   });
 
   it("withholds a health message's subject and carries no body text", async () => {
     mocks.findMany.mockResolvedValue([row({ templateKey: "HEALTH_RECORD_LINK", subjectSnapshot: "Allergy form for Sam", bodyTextSnapshot: "peanut" })]);
-    const result = await loadPersonCommunications({ userId: "usr_admin", scope: "full" }, target);
+    const result = await loadPersonCommunications(admin, target);
     expect(result!.rows[0]!.subject).toBe("Health record message");
     expect(JSON.stringify(result)).not.toMatch(/Allergy|peanut/);
     expect(result!.rows[0]).not.toHaveProperty("bodyText");
@@ -103,15 +110,15 @@ describe("person communication history (#179)", () => {
 
   it("caps at 100 and says when more exist", async () => {
     mocks.findMany.mockResolvedValue(Array.from({ length: 101 }, (_, index) => row({ id: `msg_${index}` })));
-    const result = await loadPersonCommunications({ userId: "usr_admin", scope: "full" }, { ...target, kind: "account", id: "acct_1" });
+    const result = await loadPersonCommunications(admin, { ...target, kind: "account", id: "acct_1" });
     expect(result).toMatchObject({ hasMore: true, limit: 100 });
     expect(result!.rows).toHaveLength(100);
-    expect(mocks.auditCreate.mock.calls[0]![0].data).toMatchObject({ entityType: "AttendeeAccount", metadata: { rowCount: 100, truncated: true } });
+    expect(mocks.auditCreate.mock.calls[0]![0].data).toMatchObject({ entityType: "PersonIdentityRead", metadata: { kind: "account", resultCount: 100, moreExist: 1 } });
   });
 
   it("does not return anything when the audit entry cannot be written", async () => {
     mocks.findMany.mockResolvedValue([row()]);
     mocks.auditCreate.mockRejectedValue(new Error("db down"));
-    await expect(loadPersonCommunications({ userId: "usr_admin", scope: "full" }, target)).rejects.toThrow("db down");
+    await expect(loadPersonCommunications(admin, target)).rejects.toThrow("db down");
   });
 });

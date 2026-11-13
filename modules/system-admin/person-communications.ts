@@ -1,7 +1,8 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/modules/audit/audit-service";
+import { auditCrossEventIdentityRead } from "@/modules/people/identity-read-audit";
+import { isDisclosureAllowed, staffIdentityAudience } from "@/modules/people/disclosure-matrix";
 import {
   PERSON_COMMUNICATIONS_LIMIT,
   WITHHELD_SUBJECT,
@@ -39,16 +40,21 @@ export type PersonCommunications = {
   hasMore: boolean;
 };
 
-export type PersonCommunicationsViewer = { userId: string; scope: "full" | "clubs" | null };
+export type PersonCommunicationsViewer = { userId: string; scope: "full" | "clubs" | null; globalRole?: "SYSTEM_ADMIN" | null };
 
 export type PersonCommunicationsTarget = { kind: "staff" | "account"; id: string; staffId: string | null; accountId: string | null };
 
-/** Only a system administrator ("full" scope) may open this; every other viewer gets `null` and nothing is read or audited. */
+/**
+ * Only a system administrator ("full" scope) may open this; every other viewer gets `null` and nothing is read or audited.
+ * The read goes through the identity disclosure matrix (reading a person's email is global reach, #128) and is audited
+ * as a cross-event identity read.
+ */
 export async function loadPersonCommunications(
   viewer: PersonCommunicationsViewer,
   target: PersonCommunicationsTarget,
 ): Promise<PersonCommunications | null> {
   if (viewer.scope !== "full") return null;
+  if (!isDisclosureAllowed("EMAIL", staffIdentityAudience({ globalRole: viewer.globalRole }), "READ")) return null;
   const prisma = getPrisma();
 
   const ownerClauses = [
@@ -123,18 +129,17 @@ export async function loadPersonCommunications(
 
   // Audit before anything is returned: if the entry cannot be written, nothing is shown. Ids and counts only.
   const eventIds = [...new Set(shown.flatMap((row) => (row.eventId ? [row.eventId] : [])))].sort();
-  await writeAuditLog({
+  await auditCrossEventIdentityRead({
     actorUserId: viewer.userId,
-    action: "PERSON_COMMUNICATIONS_VIEWED",
-    entityType: target.kind === "staff" ? "User" : "AttendeeAccount",
+    surface: "PERSON_COMMUNICATIONS",
     entityId: target.id,
-    summary: "Opened a person's communication history across events.",
-    metadata: {
-      staffId: target.staffId,
-      accountId: target.accountId,
+    resultIds: shown.map((row) => row.id),
+    extra: {
+      kind: target.kind,
+      ...(target.staffId ? { staffId: target.staffId } : {}),
+      ...(target.accountId ? { accountId: target.accountId } : {}),
       eventIds,
-      rowCount: rows.length,
-      truncated: found.length > PERSON_COMMUNICATIONS_LIMIT,
+      moreExist: found.length > PERSON_COMMUNICATIONS_LIMIT ? 1 : 0,
     },
   });
 

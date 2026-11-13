@@ -59,7 +59,7 @@ export default async function PersonAccessPage({
   const photo = full && person.staffId ? await getProfilePhotoState(person.staffId) : null;
   // Cross-event history (#179): a system administrator only, loaded (and audited) only when asked for with ?communications=1.
   const communications = full && query.communications === "1"
-    ? await loadPersonCommunications({ userId: viewer.user.id, scope: viewer.scope }, { kind, id, staffId: person.staffId, accountId: person.accountId })
+    ? await loadPersonCommunications({ userId: viewer.user.id, scope: viewer.scope, globalRole: viewer.user.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : null }, { kind, id, staffId: person.staffId, accountId: person.accountId })
     : null;
   const cleanHref = `/admin/people/${kind}/${encodeURIComponent(id)}${from ? `?from=${encodeURIComponent(from)}` : ""}`;
   return (

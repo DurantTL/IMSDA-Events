@@ -1,8 +1,9 @@
 import type { PersonCommunications } from "@/modules/system-admin/person-communications";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import styles from "@/components/person-communications.module.css";
 
 function shortDate(value: string | null) {
-  return value ? new Date(value).toLocaleString("en-US", { timeZone: "UTC", dateStyle: "medium", timeStyle: "short" }) + " UTC" : "Not recorded";
+  return value ? formatInConferenceTime(value, { dateStyle: "medium", timeStyle: "short" }) : "Not recorded";
 }
 
 /**

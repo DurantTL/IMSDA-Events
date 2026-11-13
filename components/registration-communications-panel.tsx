@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Mail, Send } from "lucide-react";
 import { messageDeliverySummary } from "@/modules/communications/timeline-domain";
 import type { RegistrationTimeline, RegistrationTimelineRow } from "@/modules/communications/timeline-repository";
+import { dateTimeInZone as dateTime } from "@/lib/format-date-time";
 import styles from "@/components/registration-communications-panel.module.css";
 
 const confirmationTemplateKeys = new Set([
@@ -18,13 +19,6 @@ export function canResendConfirmationMessage(record: Pick<RegistrationTimelineRo
     && record.retryOfMessageId === null
     && record.status !== "PENDING"
     && record.status !== "PROCESSING";
-}
-
-function dateTime(value: string | null, timeZone: string) {
-  if (!value) return "Not recorded";
-  const date = new Date(value);
-  if (Number.isNaN(date.valueOf())) return value;
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone, timeZoneName: "short" }).format(date);
 }
 
 /**
@@ -82,7 +76,7 @@ export function RegistrationCommunicationsPanel({
               <summary>
                 <span>
                   <strong>{message.subject}</strong>
-                  <small>{message.messageType} · To {message.recipientName ? `${message.recipientName} · ` : ""}{message.recipientEmail} ({message.recipientRole}) · {dateTime(delivery.date, timeZone)}</small>
+                  <small>{message.messageType} · To {message.recipientName ? `${message.recipientName} · ` : ""}<span translate="no">{message.recipientEmail}</span> ({message.recipientRole}) · {dateTime(delivery.date, timeZone)}</small>
                 </span>
                 <span className={`status-chip ${delivery.tone}`}>{delivery.label}</span>
               </summary>
@@ -93,7 +87,7 @@ export function RegistrationCommunicationsPanel({
                 <dl className={styles.facts}>
                   <div><dt>Message type</dt><dd>{message.messageType}</dd></div>
                   <div><dt>Template</dt><dd>{message.templateVersionLabel}</dd></div>
-                  <div><dt>Recipient</dt><dd>{message.recipientName ? `${message.recipientName}, ` : ""}{message.recipientEmail} ({message.recipientRole})</dd></div>
+                  <div><dt>Recipient</dt><dd>{message.recipientName ? `${message.recipientName}, ` : ""}<span translate="no">{message.recipientEmail}</span> ({message.recipientRole})</dd></div>
                   <div><dt>Sent as</dt><dd>{message.senderName}</dd></div>
                   <div><dt>Replies go to</dt><dd>{message.replyTo ?? "Not set"}</dd></div>
                   {message.batch && <div><dt>Scheduled email</dt><dd>{message.batch.name}</dd></div>}
