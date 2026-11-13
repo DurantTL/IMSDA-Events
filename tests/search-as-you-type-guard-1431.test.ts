@@ -167,8 +167,8 @@ describe("search boxes search as you type (#1431)", () => {
     expect(page).toMatch(/<SearchAsYouTypeForm[^>]*action="\/events"[\s\S]*<EventsSearchField[\s\S]*<\/SearchAsYouTypeForm>/);
   });
 
-  it("the gate name box on the check-in station is a proposed exception to S1, S2 and S4 (#1684)", () => {
-    // Proposed on purpose (docs/SITE-RULES.md S9, pending Caleb): it searches on Enter or the button, needs two letters, shows
+  it("the gate name box on the check-in station is an approved exception to S1, S2 and S4 (#1684)", () => {
+    // Approved on purpose (docs/SITE-RULES.md S9, Caleb, November 13, 2026): it searches on Enter or the button, needs two letters, shows
     // nothing when empty and caps results at ten, to show the least personal data and to log each lookup. It is not
     // a type="search" or name="q" box, so the scan above does not see it; this keeps a later change reviewed.
     const source = fs.readFileSync(path.join(root, "components/check-in-station-gate.tsx"), "utf8");
@@ -177,7 +177,7 @@ describe("search boxes search as you type (#1431)", () => {
     expect(source.match(/<input\b/g)).toHaveLength(1);
     expect(source).toContain("onSubmit={lookup}");
     expect(source).not.toMatch(/useDebouncedSearch|\.schedule\(/);
-    expect(fs.readFileSync(path.join(root, "docs/SITE-RULES.md"), "utf8")).toMatch(/\| S9 \| Proposed exception to S1, S2 and S4/);
+    expect(fs.readFileSync(path.join(root, "docs/SITE-RULES.md"), "utf8")).toMatch(/\| S9 \| Approved exception to S1, S2 and S4/);
   });
 
   it("converted boxes are not on the allowlist", () => {
