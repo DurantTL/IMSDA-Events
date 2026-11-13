@@ -133,7 +133,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       <LivePageRefresh />
       {event.archivedAt && (
         <div className="inline-notice" role="status">
-          <span>This event is archived: hidden from pickers and the public site, with registration closed. Its records, reports and exports still work. {permissions.includes("CONFIGURE_EVENT") ? <Link className="text-link" href={`/more/event-settings${query}`}>Unarchive it in Event settings.</Link> : null}</span>
+          <span>This event is archived and read-only: hidden from pickers and the public site, with registration closed. Its records, reports and exports still work. {permissions.includes("CONFIGURE_EVENT") ? <Link className="text-link" href={`/more/event-settings${query}`}>Unarchive it in Event settings.</Link> : null}</span>
         </div>
       )}
       <section className="event-hero">

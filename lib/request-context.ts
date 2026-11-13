@@ -4,6 +4,7 @@ import { runWithRequestScopedSet } from "@/lib/request-scoped-set";
 import { redactTokenPath } from "@/lib/token-path";
 import { withNoStore } from "@/lib/live-list-response";
 import { classifyPausableArea } from "@/modules/system-admin/area-pause-model";
+import { archivedWriteTarget } from "@/modules/events/archived-read-only";
 
 /**
  * One correlation ID per request, reachable from anywhere inside it.
@@ -75,12 +76,20 @@ export function withRequestContext<Arguments extends unknown[]>(
     };
 
     const response = await runWithRequestContext(context, async () => {
+      const path = rawPath(request.url);
       // A paused area refuses the change before the handler runs (#1518). Only a request that matches an area reads the switch.
       // Loaded on demand so every other route (and anything that imports this file) never pulls in the database client.
-      if (classifyPausableArea(request.method, rawPath(request.url))) {
+      if (classifyPausableArea(request.method, path)) {
         const { refuseIfAreaPaused } = await import("@/modules/system-admin/area-pause");
         const paused = await refuseIfAreaPaused(request);
         if (paused) return paused;
+      }
+      // A write to an archived event is refused before the handler runs (#159). Only event write paths load the guard.
+      const archivedTarget = archivedWriteTarget(request.method, path);
+      if (archivedTarget) {
+        const { refuseArchivedWriteFor } = await import("@/modules/events/archived-read-only-guard");
+        const archived = await refuseArchivedWriteFor(archivedTarget);
+        if (archived) return archived;
       }
       return handler(request, ...rest);
     });

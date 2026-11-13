@@ -38,7 +38,7 @@ export default async function ArchivedEventsPage({ searchParams }: { searchParam
         <ListPage
           header={{
             title: "Archived events",
-            description: "Archived events are hidden from pickers and the public site, and registration is closed. Their records, reports and exports are still here.",
+            description: "Archived events are read-only, hidden from pickers and the public site, and registration is closed. Their records, reports and exports are still here.",
             secondary: <Link className="secondary-button" href={backHref}>Back to events</Link>,
           }}
           footer={<SignOutButton className="secondary-button full-button" />}

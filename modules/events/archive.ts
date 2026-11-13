@@ -2,7 +2,8 @@
  * Archiving an event (#635): the pure rules, free of the database so they are
  * unit-tested on their own. `archive-repository.ts` performs the change.
  *
- * Archiving hides an event and closes registration for it. It deletes and
+ * Archiving hides an event and closes registration for it, and makes it
+ * read-only for staff writes (#159, `archived-read-only.ts`). It deletes and
  * changes nothing else, and unarchiving restores everything exactly.
  */
 
@@ -39,4 +40,4 @@ export type EventArchiveAuditMetadata = { eventId: string };
 
 /** Wording the dialog and the archived banner share. */
 export const EVENT_ARCHIVE_EFFECTS =
-  "It disappears from event pickers, the dashboard default, the public site and the public calendar, and registration closes. Nothing is deleted or changed: its registrations, payments, forms and records stay, and reports and exports still work from the Archived events list. Unarchiving restores it exactly.";
+  "It disappears from event pickers, the dashboard default, the public site and the public calendar, registration closes, and it becomes read-only until you unarchive it. Nothing is deleted or changed: its registrations, payments, forms and records stay, and reports and exports still work from the Archived events list. Unarchiving restores it exactly.";
