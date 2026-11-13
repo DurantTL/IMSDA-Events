@@ -379,7 +379,7 @@ const pages: PageSpec[] = [
   staff("attendee-listing", "/people/attendees"),
   staff("attendee-listing-meals", "/people/attendees?view=meals"),
   staff("duplicates", "/people/duplicates"),
-  // Bulk actions (#182): the scope, the action picker, and the recent runs table as cards on a phone.
+  // Bulk actions (#182): the scope and the action picker. The audit seeds no runs, so the recent-runs cards are not drawn here.
   { ...staff("people-bulk-actions", "/people/bulk-actions"), expectText: /Bulk actions/ },
   staff("event-staff", "/staff"),
   staff("finance", "/finance"),
