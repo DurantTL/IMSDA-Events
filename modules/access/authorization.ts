@@ -114,3 +114,23 @@ export async function requirePermission(
 
   return access;
 }
+
+/** Like `requirePermission`, for a page or download that is open to a holder of any one of several permissions. */
+export async function requireAnyPermission(
+  session: Session,
+  eventId: string,
+  permissions: readonly EventPermission[],
+  lookup: MembershipLookup,
+) {
+  const access = await requireEventMembership(session, eventId, lookup);
+  if (access.user.globalRole === "SYSTEM_ADMIN") return access;
+  const held = new Set(effectivePermissions(access.user, access.membership));
+  if (!permissions.some((permission) => held.has(permission))) {
+    throw new AccessDeniedError(
+      "Your event role doesn't include this. Ask your event administrator if you need access.",
+      403,
+      "PERMISSION_DENIED",
+    );
+  }
+  return access;
+}

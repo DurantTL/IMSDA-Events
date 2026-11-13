@@ -98,6 +98,15 @@ const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
     title: "Funds and matching",
     cards: [
       {
+        // Reads the same payment, refund, discount and invoice records as the pages below.
+        href: "/finance/money-report",
+        title: staffPageTitles.eventMoneyReport,
+        description: "What was charged, discounted, paid and refunded, what is still owed, and a CSV download. It only reads.",
+        gate: finance,
+        // A report of existing records with nothing to check, so a neutral chip like the Scholarship fund's.
+        status: () => ({ tone: "draft", text: "Read-only report" }),
+      },
+      {
         href: "/finance/scholarship-fund",
         title: staffPageTitles.scholarshipFund,
         description: "Money given for scholarships, what has been awarded, and what is left.",

@@ -42,9 +42,9 @@ function passing(entry: ReachedDestination): DestinationSearchContext {
 }
 
 describe("the registry", () => {
-  it("lists the 36 pages once each", () => {
-    expect(reachedDestinations).toHaveLength(36);
-    expect(reachedRoutes.size).toBe(36);
+  it("lists the 37 pages once each", () => {
+    expect(reachedDestinations).toHaveLength(37);
+    expect(reachedRoutes.size).toBe(37);
     expect(systemEntries).toHaveLength(6);
   });
 
@@ -176,7 +176,7 @@ describe("search finds each page for a viewer who may open it", () => {
 
   it("shows only the finance pages, the meal closeout and the item closeout to a finance-only viewer", () => {
     const routes = routesIn(as("MANAGE_FINANCE"));
-    expect(routes).toHaveLength(12);
+    expect(routes).toHaveLength(13);
     expect(routes.filter((route) => !route.startsWith("/finance/") && route !== "/more/ledger-health").sort()).toEqual(["/more/issued-assets/closeout", "/more/kitchen-report/closeout"]);
   });
 

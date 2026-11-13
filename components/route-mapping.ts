@@ -175,6 +175,7 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/finance/church-owed", "/finance", "components/finance-workspace.tsx"],
   ["/finance/invoices", "/finance", "components/finance-workspace.tsx"],
   ["/finance/invoices/statements", "/finance/invoices", "components/invoices.tsx"],
+  ["/finance/money-report", "/finance", "components/finance-workspace.tsx"],
   ["/finance/scholarship-fund", "/finance", "components/finance-workspace.tsx"],
   ["/finance/square-payments", "/finance", "components/finance-workspace.tsx"],
   ["/information-forms/responses", "/information-forms", "modules/information-forms/hub.ts"],
