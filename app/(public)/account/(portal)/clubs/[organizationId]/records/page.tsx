@@ -19,6 +19,8 @@ import {
   reportMonthLabel,
   yearToDate,
 } from "@/modules/club-reports/domain";
+import { getItemDecisionsForRecord, returnedReportMonths } from "@/modules/club-reports/area-review";
+import { mayChangeAfterReturn } from "@/modules/club-reports/area-review-domain";
 import { getClubReport, getClubReportYear, reportPrefill } from "@/modules/club-reports/repository";
 import {
   formatReportYearDueDate,
@@ -66,13 +68,15 @@ export default async function ClubRecordsPage({
 
   // The check-off lists roster names, so it needs the roster's own gate (MFA and an open unlock), not just the report role.
   const attendanceAvailable = (await getRosterAccessState(organizationId, now)).state === "OPEN";
-  const [notes, roster, report, rosterPrefill, notesPrefill, reportYear] = await Promise.all([
+  const [notes, roster, report, rosterPrefill, notesPrefill, reportYear, areaReview, returnedMonths] = await Promise.all([
     listClubMeetingNotes(organizationId, month),
     attendanceAvailable ? listAttendanceRoster(organizationId, clubYear) : Promise.resolve([]),
     getClubReport(organizationId, month),
     reportPrefill(organizationId, now),
     monthlyNotesSummary(organizationId, month),
     getClubReportYear(organizationId, clubYear),
+    getItemDecisionsForRecord(organizationId, month),
+    returnedReportMonths(organizationId, clubYear),
   ]);
   const reportsByMonth = new Map(reportYear.reports.map((entry) => [entry.reportMonth, entry]));
   // A club made this month is not behind on earlier ones (#1410). A month the club did file anyway stays listed.
@@ -83,7 +87,9 @@ export default async function ClubRecordsPage({
   // The export only serves the previous, current and next club year.
   const exportable = clubYearChoices(now).includes(clubYear);
   const due = reportDueDate(month);
-  const locked = isLockedForClub(month, now);
+  // The one exception to the due-date lock (#1701): the switch is on and the coordinator returned an item.
+  const reopenable = mayChangeAfterReturn(areaReview.switchOn, areaReview.decisions);
+  const locked = isLockedForClub(month, now) && !reopenable;
   // A brand new report prefills from meeting notes when there are any; a saved draft or
   // submitted report is never overwritten here; "Refresh from meeting notes" does that instead.
   const prefill = {
@@ -135,8 +141,10 @@ export default async function ClubRecordsPage({
             const submitted = filed?.status === "SUBMITTED";
             const candidateDue = formatDueDate(reportDueDate(candidate));
             const candidateLocked = isLockedForClub(candidate, now);
+            // A returned item (switch on, #1701) reopens the month for the club after the due date.
+            const returned = returnedMonths.has(candidate);
             // A draft never locks; only a submitted report closes.
-            const closed = candidateLocked && submitted;
+            const closed = candidateLocked && submitted && !returned;
             return (
               <li key={candidate}>
                 {submitted ? <CheckCircle2 size={17} aria-hidden="true" /> : <CircleAlert size={17} aria-hidden="true" />}
@@ -144,7 +152,7 @@ export default async function ClubRecordsPage({
                   <strong>{reportMonthLabel(candidate)}</strong>
                   <small>
                     {filed
-                      ? `${filed.status === "DRAFT" ? "Draft" : `${filed.totalPoints} points${filed.onTimePoints ? "" : " · late"}`}${closed ? " · closed" : candidateLocked ? ` · was due ${candidateDue}` : ` · editable until ${candidateDue}`}`
+                      ? `${filed.status === "DRAFT" ? "Draft" : `${filed.totalPoints} points${filed.onTimePoints ? "" : " · late"}`}${closed ? " · closed" : returned ? " · returned" : candidateLocked ? ` · was due ${candidateDue}` : ` · editable until ${candidateDue}`}`
                       : candidateLocked ? `Missing · was due ${candidateDue}` : `Due ${candidateDue}`}
                   </small>
                 </span>
@@ -184,11 +192,13 @@ export default async function ClubRecordsPage({
         endpoint={`${apiBase}/reports/${month}`}
         expectedOnTime={report?.firstSubmittedAt ? onTimePoints(month, new Date(report.firstSubmittedAt)) : locked ? 0 : ON_TIME_POINTS}
         initial={report}
+        itemDecisions={areaReview.switchOn ? areaReview.decisions : undefined}
         key={`${month}:${report?.updatedAt ?? "new"}`}
         monthLabel={reportMonthLabel(month)}
         notesPrefill={notesPrefill}
         prefill={prefill}
         readOnly={Boolean(report?.firstSubmittedAt) && locked}
+        showReturnedNotice
         reopenEndpoint={`${apiBase}/reports/${month}/reopen`}
       />
 
