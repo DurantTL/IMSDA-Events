@@ -332,6 +332,8 @@ const pages: PageSpec[] = [
   club("certificates-print", "/certificates/print"),
   // Optional roster charts and birthdays (#1704): switched on for the club by this script's seed.
   { ...club("charts", "/charts"), expectText: /Roster charts/ },
+  // Optional club calendar (#1700): switched on for the club, with one item, by this script's seed.
+  { ...club("calendar", "/calendar"), expectText: /Club calendar/ },
   // Area Coordinator.
   { ...area("overview", "/account/area-clubs/overview"), flow: "portal-navigation" },
   area("clubs", "/account/area-clubs/clubs"),
@@ -1629,6 +1631,8 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   await prisma.platformSettings.updateMany({ where: { id: "platform" }, data: { leaderDirectoryEnabled: false } }).catch((error: Error) => console.error(`Could not switch the synthetic leader directory off: ${error.message}`));
   const orgs = { organizationId: { in: [clubA, clubB] } };
   await prisma.masterGuideCandidate.deleteMany({ where: orgs });
+  await prisma.clubCalendarItem.deleteMany({ where: orgs });
+  await prisma.clubCalendarReminderSetting.deleteMany({ where: orgs });
   await prisma.clubOptionalFeature.deleteMany({ where: orgs });
   await prisma.clubStaffTrainingRecord.deleteMany({ where: orgs });
   await prisma.clubLetterTemplate.deleteMany({ where: orgs });
@@ -1907,6 +1911,17 @@ async function seedSynthetic(prisma: PrismaClient) {
     where: { organizationId_featureKey: { organizationId: clubA, featureKey: "roster-charts" } },
     update: {},
     create: { organizationId: clubA, featureKey: "roster-charts" },
+  });
+  // #1700: the club calendar is switched on for the audit club with one synthetic item (undone in cleanupSynthetic).
+  await prisma.clubOptionalFeature.upsert({
+    where: { organizationId_featureKey: { organizationId: clubA, featureKey: "club-calendar" } },
+    update: {},
+    create: { organizationId: clubA, featureKey: "club-calendar" },
+  });
+  await prisma.clubCalendarItem.upsert({
+    where: { id: `${P}_calendar_item` },
+    update: {},
+    create: { id: `${P}_calendar_item`, organizationId: clubA, kind: "MEETING", title: "Weekly meeting", date: new Date().toISOString().slice(0, 10), startTime: "18:30", endTime: "20:00", location: "Fellowship hall" },
   });
   for (const [id, kind, title, body] of [
     [clubLetterId, "LETTER", "Welcome letter", "Dear {first_name},\n\nWelcome to {club_name} for {club_year}. We are glad to have {full_name} with us.\n\n{date}"],

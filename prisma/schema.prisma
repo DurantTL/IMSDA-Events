@@ -720,6 +720,8 @@ enum MessageTemplateKey {
   CLUB_DRAFT_REMINDER
   /// The one email that hands a staff-started registration to its registrant (#1510): a private link, no answers. No event slice, like club form links.
   STAFF_REGISTRATION_DRAFT_LINK
+  /// The reminder (#1700) to a club's director and deputy that a club calendar item is coming up, when the club turned reminders on. Names the club, the kind, title, date, time and place and links to the sign-in-protected calendar page; never carries the item's notes. No event slice.
+  CLUB_CALENDAR_REMINDER
 }
 
 enum MessageTemplateStatus {
@@ -3093,6 +3095,8 @@ model Organization {
   clubEventPointAwards ClubEventPointAward[]
   baptismFollowUps BaptismFollowUp[]
   clubOptionalFeatures ClubOptionalFeature[]
+  clubCalendarItems ClubCalendarItem[]
+  clubCalendarReminderSetting ClubCalendarReminderSetting?
   masterGuideCandidates MasterGuideCandidate[]
   staffTrainingRecords ClubStaffTrainingRecord[]
   clubLetterTemplates  ClubLetterTemplate[]
@@ -6727,6 +6731,71 @@ model ClubOptionalFeature {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, featureKey])
+}
+
+/// What a club calendar item is (#1700, optional feature `club-calendar`).
+enum ClubCalendarItemKind {
+  MEETING
+  OUTING
+  DEADLINE
+}
+
+/// One meeting, outing or deadline on a club's own calendar (#1700). `date` is a calendar date (YYYY-MM-DD) and the two
+/// times are optional local conference times (HH:MM, America/Chicago), validated in code. `notes` is private to the
+/// club's leaders and is never written to an audit entry or an email. Exactly one creator column is set, the attendee
+/// account of a director or deputy or the staff user acting as the club's director (#442); the updater columns are the same.
+model ClubCalendarItem {
+  id                 String               @id @default(cuid())
+  organizationId     String
+  kind               ClubCalendarItemKind
+  title              String
+  date               String               @db.VarChar(10)
+  startTime          String?              @db.VarChar(5)
+  endTime            String?              @db.VarChar(5)
+  location           String?
+  notes              String?
+  createdByAccountId String?
+  createdByUserId    String?
+  updatedByAccountId String?
+  updatedByUserId    String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reminderLogs ClubCalendarReminderLog[]
+
+  @@index([organizationId, date])
+}
+
+/// A club's reminder choice for its calendar (#1700). No row means off, so a deploy never sends anything. `daysBefore` is
+/// 1 to 14, checked in code.
+model ClubCalendarReminderSetting {
+  id                 String   @id @default(cuid())
+  organizationId     String   @unique
+  enabled            Boolean  @default(false)
+  daysBefore         Int      @default(2)
+  updatedByAccountId String?
+  updatedByUserId    String?
+  updatedAt          DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+/// The claim that a reminder went out for one item on one date (#1700). Unique on (item, date), written in the same
+/// transaction that queues the emails, so a second or concurrent run queues nothing; moving the item to a new date makes
+/// a new claim. Holds a recipient count only, never an address.
+model ClubCalendarReminderLog {
+  id             String   @id @default(cuid())
+  itemId         String
+  itemDate       String   @db.VarChar(10)
+  organizationId String
+  recipients     Int
+  sentAt         DateTime
+
+  item ClubCalendarItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, itemDate])
+  @@index([organizationId])
 }
 
 /// One certification or workshop a club's director or deputy recorded for an adult on its roster (#1697, optional

@@ -15,6 +15,7 @@ import { sendDueClassChangeEmails } from "@/modules/honors/class-change-emails";
 import { sendDueHonorWatchSummaries } from "@/modules/honors/watch-emails";
 import { sendDueMonthlyRecordReminders } from "@/modules/club-reports/monthly-reminders";
 import { sendDueClubDraftReminders } from "@/modules/club-registrations/draft-reminders";
+import { sendDueClubCalendarReminders } from "@/modules/club-calendar/reminders";
 import { runHealthSnapshotSweep, sealedCopiesEnabled } from "@/modules/health-records/snapshot-hooks";
 import { expireStalePendingTeams } from "@/modules/general-link-registrations/repository";
 import { endVisitingClubAccess } from "@/modules/visiting-clubs/access-end";
@@ -36,6 +37,7 @@ import {
   MESSAGE_FILE_CLEANUP_JOB,
   MONTHLY_RECORD_REMINDERS_JOB,
   CLUB_DRAFT_REMINDERS_JOB,
+  CLUB_CALENDAR_REMINDERS_JOB,
   PAY_ON_SQUARE_LINK_SWEEP_JOB,
   RETENTION_CLEANUP_JOB,
 } from "@/modules/operations/sweep-heartbeat";
@@ -304,6 +306,29 @@ async function postHandler(request: Request) {
           }
         : undefined,
     );
+    // Club calendar reminders (#1700): only clubs that switched the calendar on and then turned reminders on (both off until
+    // then) have their role holders emailed, once per item and date, from 8 a.m. Central, within the club's chosen days before
+    // the item. A unique log row is claimed with the emails, so running it on every sweep is safe. Its failure must not make a
+    // successful sweep look failed.
+    const clubCalendarReminders = await sendDueClubCalendarReminders().catch((error) => {
+      logError("The club calendar reminder step failed after a successful outbox sweep", error);
+      return null;
+    });
+    await recordStep(
+      CLUB_CALENDAR_REMINDERS_JOB,
+      "club calendar reminder",
+      clubCalendarReminders !== null && clubCalendarReminders.failed === 0,
+      clubCalendarReminders
+        ? {
+            status: clubCalendarReminders.status,
+            clubs: clubCalendarReminders.clubs,
+            reminded: clubCalendarReminders.reminded,
+            noRecipient: clubCalendarReminders.noRecipient,
+            failed: clubCalendarReminders.failed,
+            delivered: clubCalendarReminders.delivered,
+          }
+        : undefined,
+    );
     // Sealed health copies (#924): the event-start copies that are due, and the daily deletion of copies whose
     // keep-until date has passed (never one under a legal hold). A no-op with HEALTH_RECORDS_ENABLED off, safe on
     // every sweep, and it reports counts only. Its failure must not make a successful sweep look failed.
@@ -411,6 +436,7 @@ async function postHandler(request: Request) {
       honorWatchSummaries,
       monthlyRecordReminders,
       clubDraftReminders,
+      clubCalendarReminders,
       healthSnapshots,
       generalLinkRetention,
       messageFiles,

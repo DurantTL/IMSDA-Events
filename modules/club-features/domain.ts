@@ -9,7 +9,7 @@
 
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
-export const CLUB_OPTIONAL_FEATURE_KEYS = ["roster-health-flags", "staff-training-records", "master-guide-tracking", "fill-in-letters", "completion-certificates", "roster-charts"] as const;
+export const CLUB_OPTIONAL_FEATURE_KEYS = ["roster-health-flags", "staff-training-records", "master-guide-tracking", "fill-in-letters", "completion-certificates", "roster-charts", "club-calendar"] as const;
 export type ClubOptionalFeatureKey = (typeof CLUB_OPTIONAL_FEATURE_KEYS)[number];
 
 export const clubOptionalFeatureDefinitions: Record<ClubOptionalFeatureKey, { title: string; description: string }> = {
@@ -32,6 +32,10 @@ export const clubOptionalFeatureDefinitions: Record<ClubOptionalFeatureKey, { ti
   "roster-charts": {
     title: "Roster charts and birthdays",
     description: "Adds a Charts page to your club with counts of your active roster by class, school grade and member type, and meeting attendance over the year. Your director and deputy also see age groups and a list of this month's birthdays (month and day only, never the year). Your registrar sees the counts but never ages or birthdays. Nothing is stored or sent.",
+  },
+  "club-calendar": {
+    title: "Club calendar",
+    description: "Adds a Calendar page to your club where your director and deputy add meetings, outings and deadlines, shown next to the conference's events. Everyone with a role in your club can see it. Reminder emails are off until your director or deputy turns them on there.",
   },
   "staff-training-records": {
     title: "Staff training records",
