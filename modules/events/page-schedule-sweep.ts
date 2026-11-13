@@ -40,7 +40,9 @@ export async function publishDueEventPageSections({ now = new Date() }: { now?: 
         if (dueSections.length === 0) return 0;
         const updated = await tx.eventContentSection.updateMany({
           where: { id: { in: dueSections.map((section) => section.id) }, isPublished: false, scheduledPublishAt: { lte: now } },
-          data: { isPublished: true, scheduledPublishAt: null },
+          // The time stays on the published row until the next save rewrites it: it is how a save from an editor opened
+          // before this run is recognised as this section (see replaceEventContent), not as a new past time.
+          data: { isPublished: true },
         });
         if (updated.count === 0) return 0;
         await recordPageVersionIfChanged(tx, eventId, { source: "SCHEDULED_PUBLISH", actorUserId: null });

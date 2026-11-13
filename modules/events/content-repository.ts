@@ -187,7 +187,7 @@ export async function replaceEventContent(
       ? customHtmlAssetIds(body)
       : blockAssetIds(section.kind, data);
     // Set below, inside the transaction, for a schedule that has already come due (#1514).
-    return { section, body, data, blockAssets, publishNow: false };
+    return { section, body, data, blockAssets, publishNow: false, publishedBySweep: false };
   });
   const saveTime = new Date();
 
@@ -202,6 +202,33 @@ export async function replaceEventContent(
   const assetsToCheck = [...new Set([...linkedAssetIds, ...imageAssetIds])];
   try {
     await prisma.$transaction(async (tx) => {
+      // A publish time must be in the future when it is newly entered. The editor sends back the time already stored, and
+      // between that time and the next sweep it is in the past: that section is due, so this save publishes it (#1514).
+      // An editor left open while the sweep published the section sends it back as a draft with its old time; the sweep
+      // keeps that time on the row it published, so only that exact row (same kind, title and time) keeps it published.
+      // Matched before the custom HTML check, which then compares such a block as the published block it now is.
+      const pastSchedules = prepared.filter((entry) => {
+        const at = effectiveScheduledPublishAt(entry.section);
+        return at !== null && at.getTime() <= saveTime.getTime();
+      });
+      if (pastSchedules.length > 0) {
+        const candidates = await tx.eventContentSection.findMany({
+          where: { eventId, scheduledPublishAt: { not: null } },
+          select: { kind: true, title: true, isPublished: true, scheduledPublishAt: true },
+        });
+        for (const entry of pastSchedules) {
+          const at = effectiveScheduledPublishAt(entry.section)!.getTime();
+          const match = candidates.findIndex((row) => (
+            row.kind === entry.section.kind && row.title === entry.section.title && row.scheduledPublishAt?.getTime() === at
+          ));
+          if (match < 0) throw new EventContentError("SCHEDULE_NOT_FUTURE", SCHEDULE_NOT_FUTURE_MESSAGE);
+          entry.publishNow = true;
+          entry.publishedBySweep = candidates[match]!.isPublished;
+          // One stored row answers for one submitted section.
+          candidates.splice(match, 1);
+        }
+      }
+
       // Custom HTML is system-administrator content. An event administrator's
       // save may carry the existing HTML blocks back unchanged (the editor
       // shows them read-only, publish state included) but may not add one,
@@ -220,7 +247,9 @@ export async function replaceEventContent(
         const expected = stored.map((row) => fingerprint(row.title, row.body, row.isPublished, row.isPublished ? null : row.scheduledPublishAt)).sort();
         const submitted = prepared
           .filter((entry) => entry.section.kind === "CUSTOM_HTML")
-          .map((entry) => fingerprint(entry.section.title, entry.body, entry.section.isPublished, effectiveScheduledPublishAt(entry.section)))
+          .map((entry) => (entry.publishedBySweep
+            ? fingerprint(entry.section.title, entry.body, true, null)
+            : fingerprint(entry.section.title, entry.body, entry.section.isPublished, effectiveScheduledPublishAt(entry.section))))
           .sort();
         if (expected.length !== submitted.length || expected.some((value, index) => value !== submitted[index])) {
           throw new EventContentError(
@@ -278,31 +307,6 @@ export async function replaceEventContent(
             "ASSET_NOT_AN_IMAGE",
             "A block can only show an uploaded PNG, JPEG, or WebP image, not a PDF.",
           );
-        }
-      }
-
-      // A publish time must be in the future when it is newly entered. The editor sends back the time already stored, and
-      // between that time and the next sweep it is in the past: that section is due, so this save publishes it (#1514).
-      const pastSchedules = prepared.filter((entry) => {
-        const at = effectiveScheduledPublishAt(entry.section);
-        return at !== null && at.getTime() <= saveTime.getTime();
-      });
-      if (pastSchedules.length > 0) {
-        // Either still scheduled and now due, or already published by the sweep since the editor loaded (its schedule is
-        // cleared): an editor left open sends such a section back as a draft with its old time, and it stays published.
-        const candidates = await tx.eventContentSection.findMany({
-          where: { eventId, OR: [{ isPublished: false, scheduledPublishAt: { not: null } }, { isPublished: true }] },
-          select: { kind: true, title: true, isPublished: true, scheduledPublishAt: true },
-        });
-        for (const entry of pastSchedules) {
-          const at = effectiveScheduledPublishAt(entry.section)!.getTime();
-          const sameSection = (row: (typeof candidates)[number]) => row.kind === entry.section.kind && row.title === entry.section.title;
-          let at_index = candidates.findIndex((row) => !row.isPublished && sameSection(row) && row.scheduledPublishAt?.getTime() === at);
-          if (at_index < 0) at_index = candidates.findIndex((row) => row.isPublished && sameSection(row));
-          if (at_index < 0) throw new EventContentError("SCHEDULE_NOT_FUTURE", SCHEDULE_NOT_FUTURE_MESSAGE);
-          // One stored row answers for one submitted section.
-          candidates.splice(at_index, 1);
-          entry.publishNow = true;
         }
       }
 

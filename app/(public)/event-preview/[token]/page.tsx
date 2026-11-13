@@ -42,7 +42,7 @@ export default async function EventPreviewPage({ params }: PreviewPageProps) {
       preview
       banner={(
         <p className={styles.banner} role="status">
-          <strong>Preview</strong> — includes changes that are not published yet; this link expires {expiryLabel(link.expiresAt)}
+          <strong>Preview</strong> — includes changes that are not published yet; this link expires {expiryLabel(link.expiresAt)}.
           {draftTitles.length > 0 && <> Not published yet: {draftTitles.join(", ")}.</>}
         </p>
       )}

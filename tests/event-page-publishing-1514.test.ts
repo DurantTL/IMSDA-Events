@@ -33,6 +33,7 @@ function matches(section: Section, where: Record<string, any> = {}) { // eslint-
   if (where.isPublished !== undefined && section.isPublished !== where.isPublished) return false;
   if (where.id?.in && !where.id.in.includes(section.id)) return false;
   if (where.scheduledPublishAt?.lte && !(section.scheduledPublishAt && section.scheduledPublishAt <= where.scheduledPublishAt.lte)) return false;
+  if (where.scheduledPublishAt && "not" in where.scheduledPublishAt && where.scheduledPublishAt.not === null && section.scheduledPublishAt === null) return false;
   return true;
 }
 
@@ -165,6 +166,33 @@ describe("scheduledPublishAt on a section", () => {
     expect(db.sections.find((section) => section.title === "Hours")).toMatchObject({ isPublished: true, scheduledPublishAt: null });
   });
 
+  it("lets an event administrator's stale editor save custom HTML the sweep already published", async () => {
+    const html = { kind: "CUSTOM_HTML", title: "Banner", body: "<p>Hi</p>", isPublished: false, scheduledPublishAt: "2027-03-12T15:00:00.000Z" };
+    await save([html], { isSystemAdmin: true });
+    await publishDueEventPageSections({ now: new Date("2027-03-12T15:05:00.000Z") });
+    vi.setSystemTime(new Date("2027-03-12T15:10:00.000Z"));
+    await expect(save([html])).resolves.toBeTruthy();
+    expect(db.sections[0]).toMatchObject({ isPublished: true, scheduledPublishAt: null });
+  });
+
+  it("refuses unpublishing a live section with a past time instead of quietly keeping it live", async () => {
+    await save([text("Hours")]);
+    vi.setSystemTime(new Date("2027-03-12T15:10:00.000Z"));
+    await expect(save([text("Hours", { isPublished: false, scheduledPublishAt: "2026-03-12T15:00:00.000Z" })]))
+      .rejects.toMatchObject({ code: "SCHEDULE_NOT_FUTURE" });
+    expect(db.sections[0]).toMatchObject({ isPublished: true });
+  });
+
+  it("does not publish a stale draft through an unrelated live section with the same heading", async () => {
+    await save([text("Schedule"), text("Schedule", { body: "Draft plan", isPublished: false, scheduledPublishAt: "2027-03-12T15:00:00.000Z" })]);
+    // Another editor deletes the scheduled draft before it comes due.
+    await save([text("Schedule")]);
+    vi.setSystemTime(new Date("2027-03-12T15:10:00.000Z"));
+    await expect(save([text("Schedule"), text("Schedule", { body: "Draft plan", isPublished: false, scheduledPublishAt: "2027-03-12T15:00:00.000Z" })]))
+      .rejects.toMatchObject({ code: "SCHEDULE_NOT_FUTURE" });
+    expect(db.sections).toHaveLength(1);
+  });
+
   it("lets one stored row answer for only one submitted section", async () => {
     await save([text("Hours", { isPublished: false, scheduledPublishAt: "2027-03-12T15:00:00.000Z" })]);
     vi.setSystemTime(new Date("2027-03-12T15:02:00.000Z"));
@@ -255,7 +283,8 @@ describe("the scheduled publish sweep", () => {
 
     const first = await publishDueEventPageSections({ now: at });
     expect(first).toEqual({ events: 1, published: 1, failed: 0 });
-    expect(db.sections.find((section) => section.title === "Due")).toMatchObject({ isPublished: true, scheduledPublishAt: null });
+    // The time stays on the row the sweep published, so an editor opened before this run is recognised on its next save.
+    expect(db.sections.find((section) => section.title === "Due")).toMatchObject({ isPublished: true, scheduledPublishAt: new Date("2027-03-12T15:00:00.000Z") });
     expect(db.sections.find((section) => section.title === "Later")).toMatchObject({ isPublished: false });
     expect(db.versions).toHaveLength(versionsBefore + 1);
     expect(db.versions.at(-1)?.source).toBe("SCHEDULED_PUBLISH");
@@ -385,10 +414,13 @@ describe("the preview link", () => {
   });
 
   it("takes the event row lock before it revokes or inserts", async () => {
-    const order: string[] = [];
-    db.onLock = () => order.push(`lock:${db.links.length}`);
     await createPreviewLink("event-1", "user-1", NOW);
-    expect(order).toEqual(["lock:0"]);
+    const order: string[] = [];
+    // Recorded as the number of links still active when the lock is taken: the old one must not be revoked yet.
+    db.onLock = () => order.push(`lock:${db.links.filter((link) => link.revokedAt === null).length}`);
+    await createPreviewLink("event-1", "user-1", NOW);
+    expect(order).toEqual(["lock:1"]);
+    expect(db.links.filter((link) => link.revokedAt === null)).toHaveLength(1);
     db.onLock = null;
   });
 

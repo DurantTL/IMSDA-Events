@@ -78,7 +78,7 @@ export function EventPageVersionsPanel({
         <h2 id="event-content-versions-title">Published versions</h2>
         <p>
           Each time what visitors see changes, the page is kept here. Restoring a version puts those published sections back.
-          Sections that are not published stay as they are.
+          Sections that are not published stay as drafts, unless their scheduled time has already come.
         </p>
       </div>
       {loadError && <p className="form-error" role="alert">{loadError}</p>}
@@ -118,7 +118,7 @@ export function EventPageVersionsPanel({
         title={pending ? `Restore version ${pending.versionNumber}?` : "Restore version?"}
       >
         <p>
-          Visitors see this version straight away. Your sections that are not published stay as drafts.
+          Visitors see this version straight away. Your sections that are not published stay as drafts, unless their scheduled time has already come.
           {dirty ? " You have unsaved edits in the editor; restoring replaces them." : ""}
         </p>
       </ConfirmDialog>

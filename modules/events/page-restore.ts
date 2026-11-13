@@ -20,8 +20,8 @@ export class PageVersionRestoreError extends Error {
 /**
  * Puts an earlier published version of the page back (#1514).
  *
- * The version's sections come back published; the event's current unpublished sections stay as drafts, with their
- * schedule when it is still in the future. The result goes through the ordinary page save, so the custom HTML rule,
+ * The version's sections come back published; the event's current unpublished sections stay as drafts with their
+ * schedule, except that a draft whose scheduled time has already come is published by the save, as the sweep would. The result goes through the ordinary page save, so the custom HTML rule,
  * the contact check and the file ownership checks all apply as they do for any save. The save records the new state as
  * its own version, marked as a rollback.
  */
