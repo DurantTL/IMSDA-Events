@@ -4,6 +4,7 @@ import { evaluateEventRegistrationPhase, type EventLifecycleSource } from "@/mod
 import { neutralizePlaceholders } from "@/modules/invoices/delivery-domain";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { clubRegistrationPath } from "@/modules/club-registrations/roster-return";
+import { localClockTime } from "@/modules/events/event-times";
 
 /**
  * Reminders for an unsubmitted club registration (#164): the pure rules. When a reminder is due, whether it may go out
@@ -81,8 +82,7 @@ export function policyFromRow(row: PolicyRow): ClubDraftReminderPolicyValues {
 export const QUIET_HOURS = { sendFromHour: 9, sendUntilHour: 19 } as const;
 
 function localHour(instant: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone, hour: "2-digit", hourCycle: "h23" }).formatToParts(instant);
-  return Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+  return Number(localClockTime(instant, timeZone).slice(0, 2));
 }
 
 /** Whether it is a reasonable hour to email, in the event's own time zone: 9:00 up to (not including) 19:00. */
