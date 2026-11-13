@@ -948,6 +948,8 @@ model User {
   eventPagePreviewLinksCreated EventPagePreviewLink[]    @relation("EventPagePreviewLinkCreatedBy")
   eventPagePreviewLinksRevoked EventPagePreviewLink[]    @relation("EventPagePreviewLinkRevokedBy")
   eventPageVersionsCreated     EventPageVersion[]        @relation("EventPageVersionCreatedBy")
+  registrationThemesCreated    RegistrationThemeVersion[] @relation("RegistrationThemeVersionCreatedBy")
+  registrationThemesPublished  RegistrationThemeVersion[] @relation("RegistrationThemeVersionPublishedBy")
   createdEventImageLibraryImages EventImageLibraryImage[] @relation("EventImageLibraryCreatedBy")
   retiredEventImageLibraryImages EventImageLibraryImage[] @relation("EventImageLibraryRetiredBy")
   uploadedMessageFiles      MessageFile[]             @relation("MessageFileUploadedBy")
@@ -1716,6 +1718,38 @@ model EventPageVersion {
   @@unique([eventId, versionNumber])
 }
 
+/// Where a registration look is in its life (#283): one draft being edited, one published look the public sees, and the
+/// earlier published looks kept as history.
+enum RegistrationThemeStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+/// One version of an event's registration look (#283): a constrained set of tokens (colors, system fonts, layout choices)
+/// validated by `modules/registration-themes/tokens.ts`. An event has at most one DRAFT and one PUBLISHED version (partial
+/// unique indexes in the migration). A database trigger keeps a non-draft version immutable: it can only move from
+/// PUBLISHED to ARCHIVED, and it is deleted only with its event.
+model RegistrationThemeVersion {
+  id                String                  @id @default(cuid())
+  eventId           String
+  versionNumber     Int
+  status            RegistrationThemeStatus @default(DRAFT)
+  tokens            Json
+  createdByUserId   String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  publishedAt       DateTime?
+  publishedByUserId String?
+  archivedAt        DateTime?
+
+  event       Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy   User? @relation("RegistrationThemeVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  publishedBy User? @relation("RegistrationThemeVersionPublishedBy", fields: [publishedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, versionNumber])
+}
+
 /// An uploaded image a block's `data` points at (#816), derived from `data` on
 /// every save. It is what lets the public asset route serve a published
 /// block's image, and what makes deleting a file that a block still shows fail
@@ -2101,6 +2135,7 @@ model Event {
   contentSections                     EventContentSection[]
   pagePreviewLinks                    EventPagePreviewLink[]
   pageVersions                        EventPageVersion[]
+  registrationThemeVersions           RegistrationThemeVersion[]
   emergencyPlan                       EmergencyPlan?
   assets                              EventAsset[]
   imageLibraryImages                  EventImageLibraryImage[] @relation("EventImageLibrarySource")

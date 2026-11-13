@@ -24,6 +24,8 @@ import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { PageHeader } from "@/components/page-header";
 import { EventClubOptionsGroup } from "@/components/event-club-options-group";
+import { RegistrationThemePanel } from "@/components/registration-theme-panel";
+import { getRegistrationThemeEditorState } from "@/modules/registration-themes/repository";
 
 export const metadata: Metadata = { title: staffPageTitles.eventSettings };
 
@@ -45,6 +47,7 @@ export default async function EventSettingsPage({
   const { user } = await getCurrentSession();
   const [settings, archiveFacts, locations, coordinators, teamSettings, generalLink, linkNotice, platform, emailSettings, mapSiteOptions] = await Promise.all([getEventSettings(event.id), findEventArchiveFacts(event.id), listEventLocations(event.id), listActiveAreaCoordinators(), getTeamSettings(event.id), getGeneralLinkSettings(event.id), getCalendarLinkNotice(event.id), getPlatformSettings(), loadEventEmailSettings(getPrisma(), event.id), listMapSiteOptions()]);
   if (!settings) notFound();
+  const registrationTheme = await getRegistrationThemeEditorState(event.id);
   return (
     <>
       {(calendarDates === "updated" || calendarDates === "kept") && <CalendarDatesConfirmation outcome={calendarDates} />}
@@ -56,6 +59,7 @@ export default async function EventSettingsPage({
         // Where each value comes from (#1258): the defaults a new event is seeded from, and the event's sender against the central one. Names and addresses only.
         platformDefaults={{ defaultTimezone: platform.defaultTimezone, defaultAttendeeEditPolicy: platform.defaultAttendeeEditPolicy }}
         emailSender={emailSettings ? { senderName: emailSettings.senderName, replyToOverride: emailSettings.replyToOverride, central: { name: emailSettings.central.name, replyTo: emailSettings.central.replyTo } } : undefined} />
+      <RegistrationThemePanel key={`registration-look-${event.id}`} eventId={event.id} initialState={registrationTheme} />
       {settings.audience === "CLUB" && (
         <EventClubOptionsGroup>
           <EventTeamSettingsPanel key={`teams-${event.id}`} eventId={event.id} initialSettings={teamSettings} />

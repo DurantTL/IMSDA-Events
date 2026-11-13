@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/modules/attendee-accounts/passkey-offer-eligibility", () => ({ passkeyOfferForPage: vi.fn().mockResolvedValue(false) }));
+vi.mock("@/modules/registration-themes/repository", () => ({ getPublishedThemeRowBySlug: vi.fn().mockResolvedValue(null) }));
 // The header's session links read cookies and the database (#1009); they have their own tests.
 vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
 vi.mock("@/lib/prisma", () => ({

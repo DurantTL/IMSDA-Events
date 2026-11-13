@@ -7,6 +7,9 @@ import { passkeyOfferForPage } from "@/modules/attendee-accounts/passkey-offer-e
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { PublicRegistrationForm } from "@/components/public-registration-form";
 import { getPublicRegistrationExperience } from "@/modules/forms/public-repository";
+import { RegistrationThemeScope } from "@/components/registration-theme-scope";
+import { getPublishedThemeRowBySlug } from "@/modules/registration-themes/repository";
+import { registrationThemeStyle, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
 
 export const dynamic = "force-dynamic";
 
@@ -30,11 +33,14 @@ export default async function EmbeddedRegistrationPage({
   const experience = await getPublicRegistrationExperience(eventSlug, formSlug);
   if (!experience) notFound();
 
+  const themeStyle = registrationThemeStyle(resolveRegistrationTheme(await getPublishedThemeRowBySlug(eventSlug)));
+
   if (
     experience.lifecycle.phase !== "OPEN"
     || experience.lifecycle.capacityDecision === "FULL"
   ) {
     return (
+      <RegistrationThemeScope style={themeStyle}>
       <main className="public-registration-embed-state">
         <BrandLink target="_top" />
         <p className="public-registration-eyebrow">IMAdventist</p>
@@ -48,12 +54,14 @@ export default async function EmbeddedRegistrationPage({
           View event registration
         </Link>
       </main>
+      </RegistrationThemeScope>
     );
   }
 
   const { account } = await getCurrentAttendee();
 
   return (
+    <RegistrationThemeScope style={themeStyle}>
     <div className="public-registration-embed">
       <PublicRegistrationForm
         event={{
@@ -72,5 +80,6 @@ export default async function EmbeddedRegistrationPage({
         securityCheck={await securityCheckConfigForPage()}
       />
     </div>
+    </RegistrationThemeScope>
   );
 }

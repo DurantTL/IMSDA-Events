@@ -132,6 +132,8 @@ export type BuilderWorkspaceProps = {
   eventAudience?: string;
   eventBillingMode?: string;
   initialForms: FormView[];
+  /** The event's published registration look (#283) as CSS custom properties, so the preview matches the public form. Presentation only; undefined for the platform look. */
+  registrationThemeStyle?: import("react").CSSProperties;
   /** The event's Meals ticket plan prices in cents, keyed "LUNCH:ADULT" (#1139). A meal ticket field with a price here shows it read-only. */
   mealPlanPrices?: Record<string, number>;
   templates: TemplateView[];
