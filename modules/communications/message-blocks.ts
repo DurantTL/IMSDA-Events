@@ -449,7 +449,13 @@ export function buildCheckinBlock(input: CheckinBlockInput) {
 export type SeminarAttendee = {
   name: string;
   /** Every seminar field the form has, with this attendee's choices in ranked order. */
-  fields: ReadonlyArray<{ label: string; choices: readonly string[]; assigned: readonly string[] }>;
+  fields: ReadonlyArray<{
+    label: string;
+    choices: readonly string[];
+    assigned: readonly string[];
+    /** The attendee chose "Not attending" for this field (#893); shown as its own line, never as a ranked choice. */
+    notAttending?: boolean;
+  }>;
 };
 
 function ordinal(position: number) {
@@ -469,12 +475,13 @@ export function buildSeminarPreferencesBlock(attendees: readonly SeminarAttendee
   return attendees
     .map((attendee, index) => {
       // Fields with nothing to say are left out, and so are attendees with none.
-      const fields = attendee.fields.filter((field) => field.choices.length > 0 || field.assigned.length > 0);
+      const fields = attendee.fields.filter((field) => field.choices.length > 0 || field.assigned.length > 0 || field.notAttending === true);
       if (fields.length === 0) return null;
       const lines = [`**${escapeMarkdown(clean(attendee.name) ?? `Attendee ${index + 1}`)}**`];
       const labelled = fields.length > 1;
       for (const field of fields) {
         const prefix = labelled ? `${escapeMarkdown(field.label)} — ` : "";
+        if (field.notAttending) lines.push(`- ${prefix}Not attending`);
         field.assigned.forEach((value) => lines.push(`- ${prefix}Assigned: ${escapeMarkdown(value)}`));
         field.choices.forEach((choice, rank) => (
           lines.push(`- ${prefix}${ordinal(rank + 1)} choice: ${escapeMarkdown(choice)}`)

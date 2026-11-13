@@ -716,6 +716,8 @@ enum MessageTemplateKey {
   MONTHLY_RECORD_REMINDER
   /// The counts-only summary of those reminders to Area Coordinators (#1895). Numbers only. No event.
   MONTHLY_RECORD_REMINDER_SUMMARY
+  /// The reminder (#164) to a club's director and deputy that a club registration for an event is started but not submitted. Names the club and the event and links to the sign-in-protected registration page; never carries an answer. Event-scoped.
+  CLUB_DRAFT_REMINDER
 }
 
 enum MessageTemplateStatus {
@@ -919,6 +921,7 @@ model User {
   auditLogs                 AuditLog[]
   startedCheckInStations    CheckInStation[]      @relation("CheckInStationStartedBy")
   revokedCheckInStations    CheckInStation[]      @relation("CheckInStationRevokedBy")
+  checkInGateArrivals       CheckInGateArrival[]
   archivedEvents            Event[]               @relation("EventArchivedBy")
   emergencyPlanVersions     EmergencyPlanVersion[] @relation("EmergencyPlanVersionPublisher")
   moduleRequests            ModuleRequest[] @relation("ModuleRequestRequester")
@@ -1004,6 +1007,7 @@ model User {
   createdStaffInvitations            StaffInvitation[]            @relation("StaffInvitationCreatedBy")
   decidedStaffInvitations            StaffInvitation[]            @relation("StaffInvitationDecidedBy")
   updatedClubRegistrationDrafts      ClubRegistrationDraft[]      @relation("ClubRegistrationDraftUpdatedByUser")
+  updatedClubDraftReminderPolicies   ClubDraftReminderPolicy[]    @relation("ClubDraftReminderPolicyUpdatedBy")
   updatedClubSupplyStock             ClubSupplyStock[]            @relation("ClubSupplyStockUpdatedByUser")
   createdClubOrderBatches            ClubSupplyOrderBatch[]       @relation("ClubSupplyOrderBatchCreatedByUser")
   receivedClubOrderBatches           ClubSupplyOrderBatch[]       @relation("ClubSupplyOrderBatchReceivedByUser")
@@ -1216,6 +1220,7 @@ model PasswordResetToken {
 model AttendeeAccount {
   id                 String                @id @default(cuid())
   healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]
+  monthlyRecordItemReviews ClubMonthlyReportItemReview[]
   leaderDirectoryPreference LeaderDirectoryPreference?
   teamPermissionDecisions ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedByAccount")
   /// The staff `User` linked to this account (#554), if any. See `User.attendeeAccountId`.
@@ -1905,6 +1910,9 @@ model Event {
   /// Volunteers background check on file. Registration is never blocked; check-in holds a not-current
   /// adult or staff member unless staff type an audited override (#874).
   checksAdultBackgrounds Boolean          @default(false)
+  /// Lets a check-in station look up people arriving at the gate (#1684). Off by default; turning it off hides gate
+  /// mode and keeps the arrivals already logged. Not copied when an event is cloned.
+  checkInGateModeEnabled Boolean          @default(false)
   /// Offers "Pay on Square" (Square's hosted checkout page) next to the embedded card form (#327).
   /// Off by default; staff turn it on for attendee-paid events.
   hostedPaymentLinkEnabled Boolean        @default(false)
@@ -2009,6 +2017,7 @@ model Event {
   unsubscribeTokens                   EmailUnsubscribeToken[]
   auditLogs                           AuditLog[]
   checkInStations                     CheckInStation[]
+  checkInGateArrivals                 CheckInGateArrival[]
   importRuns                          ImportRun[]
   awardItems                          EventAwardItem[]
   registrationForms                   RegistrationForm[]
@@ -2070,6 +2079,8 @@ model Event {
   invoicePayments                     InvoicePayment[]
   messageAttachments                  MessageAttachment[]
   clubRegistrationDrafts              ClubRegistrationDraft[]
+  clubDraftReminderPolicy             ClubDraftReminderPolicy?
+  clubDraftReminderLogs               ClubDraftReminderLog[]
   clubAssignments                     ClubEventAssignment[]
   honorEnrollments                    HonorEnrollment[]
   honorClassChanges                   HonorClassChange[]
@@ -3076,6 +3087,7 @@ model Organization {
   generalLinkSubmissionsAsClub GeneralLinkSubmission[] @relation("GeneralLinkSubmissionClub")
   generalLinkSubmissionsSuggested GeneralLinkSubmission[] @relation("GeneralLinkSubmissionSuggestedClub")
   registrationDrafts ClubRegistrationDraft[]
+  clubDraftReminderLogs ClubDraftReminderLog[]
   eventAssignments   ClubEventAssignment[]
   honorEnrollments   HonorEnrollment[]
   honorClassWaitlist HonorClassWaitlistEntry[]
@@ -3443,10 +3455,46 @@ model ClubMonthlyReport {
   updatedAt            DateTime         @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  itemReviews  ClubMonthlyReportItemReview[]
 
   @@unique([organizationId, reportMonth])
   @@index([clubYear, reportMonth])
   @@index([clubYear, status])
+}
+
+enum MonthlyRecordItemOutcome {
+  OK
+  RETURNED
+}
+
+/// The conference switch for Area Coordinator item-by-item review of Monthly Records (#1701), per club year. No row
+/// means off. Turned on or off by a Clubs Administrator or system administrator; audited.
+model MonthlyRecordAreaReviewSetting {
+  clubYear        String   @id
+  enabled         Boolean  @default(false)
+  updatedByUserId String?
+  updatedAt       DateTime @updatedAt
+}
+
+/// An Area Coordinator's decision on one item of a submitted Monthly Record (#1701). `itemKey` is one of the twelve
+/// point items (never on-time points). A change writes a new row and sets `supersededAt` on the old one; any save of the
+/// record as SUBMITTED supersedes the current rows. At most one current row (supersededAt null) per report and item:
+/// a partial unique index in the migration SQL, which Prisma cannot express.
+model ClubMonthlyReportItemReview {
+  id                  String                   @id @default(cuid())
+  reportId            String
+  itemKey             String
+  outcome             MonthlyRecordItemOutcome
+  /// Required (1 to 500 characters) for RETURNED, optional for OK.
+  note                String                   @default("")
+  reviewedByAccountId String?
+  reviewedAt          DateTime                 @default(now())
+  supersededAt        DateTime?
+
+  report            ClubMonthlyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reviewedByAccount AttendeeAccount?  @relation(fields: [reviewedByAccountId], references: [id], onDelete: SetNull)
+
+  @@index([reportId, supersededAt])
 }
 
 /// One club's Pathfinder Year-End Report (#607) for one Pathfinder year
@@ -4015,6 +4063,7 @@ model RegistrationAttendee {
   attendeeTypeDefinition EventAttendeeType?                @relation(fields: [attendeeTypeDefinitionId], references: [id], onDelete: Restrict)
   classifications        RegistrationAttendeeClassification[]
   checkIns               CheckIn[]
+  gateArrivals           CheckInGateArrival[]
   attendanceCorrections  AttendanceCorrection[]
   capacityReservations   RegistrationCapacityReservation[]
   substitutionOperations RegistrationOperation[]
@@ -7587,6 +7636,47 @@ model BackgroundCheckReminder {
 
   @@index([personId, organizationId, sentAt])
   @@index([batchId])
+}
+
+/// Whether an event reminds directors about an unsubmitted club registration (#164), and when. One row per event; no row
+/// means off, so nothing is sent until staff turn it on. Allowed ranges are enforced by the application: first reminder
+/// 1 to 14 days after the draft was last edited, repeat every 1 to 14 days, 1 to 3 reminders, expiry 7 to 90 days.
+model ClubDraftReminderPolicy {
+  id              String   @id @default(cuid())
+  eventId         String   @unique
+  enabled         Boolean  @default(false)
+  firstAfterDays  Int      @default(2)
+  repeatEveryDays Int      @default(3)
+  maxReminders    Int      @default(2)
+  /// A draft not edited for this many days counts as expired and is never reminded.
+  staleAfterDays  Int      @default(30)
+  updatedByUserId String?
+  updatedAt       DateTime @updatedAt
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  updatedBy User? @relation("ClubDraftReminderPolicyUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+}
+
+/// One club-registration reminder (#164): the claim and the send log. One row per draft and attempt number, written in
+/// the same transaction that queues the emails; the unique key is what makes an attempt go once however often the sweep
+/// runs. `draftId` is a plain string, not a foreign key: submitting the registration deletes the draft and the log stays.
+/// Holds a count of recipients and no address, name or answer.
+model ClubDraftReminderLog {
+  id             String   @id @default(cuid())
+  eventId        String
+  organizationId String
+  draftId        String
+  draftKey       String   @default("")
+  attempt        Int
+  recipients     Int
+  sentAt         DateTime @default(now())
+  correlationId  String
+
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([draftId, attempt])
+  @@index([eventId, sentAt])
 }
 
 /// One automatic Monthly Record reminder (#1895): one row per club per report month, claimed in the same transaction
@@ -11653,10 +11743,34 @@ model CheckInStation {
   event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   startedBy User  @relation("CheckInStationStartedBy", fields: [startedByUserId], references: [id], onDelete: Cascade)
   revokedBy User? @relation("CheckInStationRevokedBy", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+  gateArrivals CheckInGateArrival[]
 
   @@index([eventId, revokedAt])
   @@index([startedByUserId])
   @@index([revokedByUserId])
+}
+
+/// "Arrived at gate" noted from a check-in station's gate mode (#1684). Separate from check-in: it never creates a
+/// `CheckIn` and changes nothing about who is checked in. Kept when gate mode is switched off.
+model CheckInGateArrival {
+  id               String   @id @default(cuid())
+  eventId          String
+  attendeeId       String
+  stationId        String?
+  recordedByUserId String?
+  arrivedAt        DateTime @default(now())
+  /// One per tap of the button; a retry after a lost response gets the saved arrival back.
+  idempotencyKey   String   @unique
+
+  event      Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  attendee   RegistrationAttendee @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+  station    CheckInStation?      @relation(fields: [stationId], references: [id], onDelete: SetNull)
+  recordedBy User?                @relation(fields: [recordedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, attendeeId])
+  @@index([attendeeId])
+  @@index([stationId])
+  @@index([recordedByUserId])
 }
 
 /// Event emergency plan (#114): the procedural reference staff carry before

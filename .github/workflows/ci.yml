@@ -490,6 +490,12 @@ jobs:
       # once, plus check-in racing undo and double undo. One record and one audit
       # entry each, "already checked in by <name>" for the others, never an error.
       - run: npm run test:check-in-concurrency
+      # Gate mode on the check-in station (#1684), real name search: off by default and refused when off
+      # on lookup and arrival; a youth is green with no Sterling answer; an adult is green with a current
+      # check and yellow without one (none at an event that does not check); another event's person and a
+      # cancelled registration are not found; minimal fields only; every lookup audited without the typed
+      # text or names; a repeated arrival key is one row, never a check-in; arrivals kept when switched off.
+      - run: npm run test:check-in-gate
       # Real-database check of the eAdventist organizations import and church map
       # locations (#649, #724). It creates, migrates and drops its own scratch
       # database on this same Postgres service (the CI role may create databases),

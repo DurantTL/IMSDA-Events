@@ -2,7 +2,7 @@
 
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { CircleAlert, FileText, RefreshCw, Save, Send, X } from "lucide-react";
 import {
   MAX_HONORS,
@@ -20,6 +20,8 @@ import { clubClassLevelLabels, type ClubClassLevel } from "@/modules/club-roster
 import { savedMessage } from "@/components/form-message";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { clubMemberNounPlural } from "@/modules/organizations/club-kind";
+import { AreaItemReviewControls, ItemDecisionView, ReturnedItemsNotice } from "@/components/monthly-record-item-review";
+import { decisionsByItem, returnedNotice, type ItemDecision } from "@/modules/club-reports/area-review-domain";
 
 type Prefill = {
   meetingPlace: string;
@@ -82,7 +84,16 @@ export function ClubReportForm({
   variant = "account",
   asDialog = false,
   clubKind,
+  itemDecisions,
+  areaReviewTarget,
+  showReturnedNotice = false,
 }: {
+  /** The club's own page only: tells the director how many items were returned (#1701). */
+  showReturnedNotice?: boolean;
+  /** The Area Coordinator's current item decisions (#1701); only passed while the conference switch is on. */
+  itemDecisions?: readonly ItemDecision[];
+  /** Set only for a real Area Coordinator on a record in their ministries while the switch is on: shows the OK / Return controls. */
+  areaReviewTarget?: { organizationId: string; month: string; version: string };
   /** Pathfinder or Adventurer: the member wording (#1517). Pathfinder when omitted. */
   clubKind?: string | null;
   endpoint: string;
@@ -265,6 +276,8 @@ export function ClubReportForm({
   );
 
   const { confirm: askConfirm, confirmDialog } = useConfirm();
+  const decisions = decisionsByItem(itemDecisions ?? []);
+  const returnedText = showReturnedNotice ? returnedNotice(itemDecisions ?? []) : null;
 
   // A closed report (an Area Coordinator's view, or a club after the due date) is read, not edited: the answers as plain text, no disabled inputs (#996).
   const answerText = (value: number | undefined) => (value === undefined ? "Not answered" : `${value}`);
@@ -272,6 +285,7 @@ export function ClubReportForm({
   const readOnlyBody = (
     <>
       {renderSummary(asDialog)}
+      {returnedText && <ReturnedItemsNotice text={returnedText} />}
       <div className="inline-notice" role="status">
         {readOnlyNote ?? (
           <>
@@ -297,7 +311,15 @@ export function ClubReportForm({
         <dl>
           <div><dt>{`Report submitted by ${dueLabel}`}</dt><dd>{onTime}</dd></div>
           {pointItems.map((item) => (
-            <div key={item.key}><dt>{item.label}</dt><dd>{answerText(points[item.key])}</dd></div>
+            <div key={item.key}>
+              <dt>{item.label}</dt>
+              <dd>
+                {answerText(points[item.key])}
+                {areaReviewTarget
+                  ? <AreaItemReviewControls decision={decisions[item.key]} itemKey={item.key} month={areaReviewTarget.month} organizationId={areaReviewTarget.organizationId} version={areaReviewTarget.version} />
+                  : decisions[item.key] && <ItemDecisionView decision={decisions[item.key]!} />}
+              </dd>
+            </div>
           ))}
           <div><dt>Class levels worked on</dt><dd>{classLevels.length > 0 ? classLevels.map((level) => clubClassLevelLabels[level]).join(", ") : "None"}</dd></div>
           <div>
@@ -319,6 +341,7 @@ export function ClubReportForm({
   const formBody = readOnly ? readOnlyBody : (
     <>
       {renderSummary(asDialog)}
+      {returnedText && <ReturnedItemsNotice text={returnedText} />}
 
       {allowDraft && !isDraft && report && reopenEndpoint && (
         <div className="inline-notice" role="status">
@@ -358,7 +381,8 @@ export function ClubReportForm({
         {pointItems.map((item) => {
           const problem = problemFor(item.key);
           return (
-            <div className={`club-report-item${problem ? " has-problem" : ""}`} key={item.key}>
+            <Fragment key={item.key}>
+            <div className={`club-report-item${problem ? " has-problem" : ""}`}>
               <label htmlFor={`points-${item.key}`}>
                 <strong>{item.label}</strong>
                 {item.help && <small>{item.help}</small>}
@@ -378,6 +402,8 @@ export function ClubReportForm({
                 {item.values.map((value) => <option key={value} value={value}>{value}</option>)}
               </select>
             </div>
+            {decisions[item.key] && <ItemDecisionView decision={decisions[item.key]!} />}
+            </Fragment>
           );
         })}
 

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
   const prisma: any = {
     clubDirectorGrant: { findMany: vi.fn(), updateMany: vi.fn() },
     clubInvite: { findMany: vi.fn(), updateMany: vi.fn() },
+    organization: { findMany: vi.fn(), updateMany: vi.fn() },
     $transaction: vi.fn(),
   };
   return { prisma, writeAuditLog: vi.fn() };
@@ -35,6 +36,8 @@ beforeEach(() => {
   mocks.prisma.clubDirectorGrant.updateMany.mockResolvedValue({ count: 1 });
   mocks.prisma.clubInvite.findMany.mockResolvedValue([]);
   mocks.prisma.clubInvite.updateMany.mockResolvedValue({ count: 1 });
+  mocks.prisma.organization.findMany.mockResolvedValue([]);
+  mocks.prisma.organization.updateMany.mockResolvedValue({ count: 1 });
 });
 afterEach(() => vi.useRealTimers());
 
@@ -57,14 +60,14 @@ describe("the visiting club access window", () => {
 
 describe("endVisitingClubAccess", () => {
   it("does nothing and writes nothing when no role is due", async () => {
-    await expect(endVisitingClubAccess()).resolves.toEqual({ ended: 0, clubs: 0, invitesCancelled: 0 });
+    await expect(endVisitingClubAccess()).resolves.toEqual({ ended: 0, clubs: 0, invitesCancelled: 0, clubsDeactivated: 0 });
     expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
   it("ends every due role at now, counts roles and clubs, and audits each with ids only", async () => {
     mocks.prisma.clubDirectorGrant.findMany.mockResolvedValue([grant("g1"), grant("g2", "REGISTRAR"), grant("g3", "DIRECTOR", "guest-2")]);
-    await expect(endVisitingClubAccess()).resolves.toEqual({ ended: 3, clubs: 2, invitesCancelled: 0 });
+    await expect(endVisitingClubAccess()).resolves.toEqual({ ended: 3, clubs: 2, invitesCancelled: 0, clubsDeactivated: 0 });
     for (const call of mocks.prisma.clubDirectorGrant.updateMany.mock.calls) {
       expect(call[0].data).toEqual({ effectiveTo: NOW });
       expect(call[0].where.revokedAt).toBeNull();
@@ -83,7 +86,7 @@ describe("endVisitingClubAccess", () => {
   it("skips a role another run already ended, with no count and no audit entry", async () => {
     mocks.prisma.clubDirectorGrant.findMany.mockResolvedValue([grant("g1"), grant("g2")]);
     mocks.prisma.clubDirectorGrant.updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
-    await expect(endVisitingClubAccess()).resolves.toEqual({ ended: 1, clubs: 1, invitesCancelled: 0 });
+    await expect(endVisitingClubAccess()).resolves.toEqual({ ended: 1, clubs: 1, invitesCancelled: 0, clubsDeactivated: 0 });
     expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
     expect(mocks.writeAuditLog.mock.calls[0][0].entityId).toBe("g2");
   });
@@ -94,11 +97,26 @@ describe("endVisitingClubAccess", () => {
       { id: "i2", organizationId: "guest-1", organization: { guestEventId: "event-1" } },
     ]);
     mocks.prisma.clubInvite.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
-    await expect(endVisitingClubAccess()).resolves.toEqual({ ended: 0, clubs: 0, invitesCancelled: 1 });
+    await expect(endVisitingClubAccess()).resolves.toEqual({ ended: 0, clubs: 0, invitesCancelled: 1, clubsDeactivated: 0 });
     expect(mocks.prisma.clubInvite.findMany.mock.calls[0][0].where.organization.guestEvent).toEqual({ endsAt: { lt: new Date(NOW.getTime() - 30 * DAY) } });
     expect(mocks.prisma.clubInvite.updateMany.mock.calls[0][0]).toEqual({ where: { id: "i1", status: { in: ["PENDING", "SENT"] } }, data: { status: "CANCELLED", cancelledAt: NOW } });
     expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
     expect(mocks.writeAuditLog.mock.calls[0][0]).toMatchObject({ action: "VISITING_CLUB_INVITE_CANCELLED", entityId: "i1", metadata: { inviteId: "i1", organizationId: "guest-1" } });
+  });
+
+  it("marks each due visiting club inactive, skips one another run already did, and audits ids only", async () => {
+    mocks.prisma.organization.findMany.mockResolvedValue([{ id: "guest-1", guestEventId: "event-1" }, { id: "guest-2", guestEventId: "event-2" }]);
+    mocks.prisma.organization.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+    await expect(endVisitingClubAccess()).resolves.toEqual({ ended: 0, clubs: 0, invitesCancelled: 0, clubsDeactivated: 1 });
+    const cutoff = { guestEventId: { not: null }, guestEvent: { endsAt: { lt: new Date(NOW.getTime() - 30 * DAY) } } };
+    expect(mocks.prisma.organization.findMany.mock.calls[0][0].where).toEqual({ type: "CLUB", isActive: true, ...cutoff });
+    expect(mocks.prisma.organization.updateMany.mock.calls[0][0]).toEqual({ where: { id: "guest-1", type: "CLUB", isActive: true, ...cutoff }, data: { isActive: false } });
+    expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
+    expect(mocks.writeAuditLog.mock.calls[0][0]).toMatchObject({
+      action: "ORGANIZATION_MARKED_INACTIVE", entityType: "Organization", entityId: "guest-1", eventId: "event-1",
+      metadata: { type: "CLUB", isActive: false, guestEventId: "event-1" },
+    });
+    expect(JSON.stringify(mocks.writeAuditLog.mock.calls)).not.toMatch(/@|name/i);
   });
 
   it("runs without a strict isolation level, because each update is guarded", async () => {
@@ -107,9 +125,9 @@ describe("endVisitingClubAccess", () => {
     expect(mocks.prisma.$transaction.mock.calls[0]).toHaveLength(1);
   });
 
-  it("leaves the club itself active", async () => {
-    mocks.prisma.clubDirectorGrant.findMany.mockResolvedValue([grant("g1")]);
+  it("only ever changes the club's active flag, so its registrations and billing still point at it", async () => {
+    mocks.prisma.organization.findMany.mockResolvedValue([{ id: "guest-1", guestEventId: "event-1" }]);
     await endVisitingClubAccess();
-    expect(mocks.prisma.organization).toBeUndefined();
+    expect(mocks.prisma.organization.updateMany.mock.calls[0][0].data).toEqual({ isActive: false });
   });
 });

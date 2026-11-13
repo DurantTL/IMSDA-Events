@@ -9,7 +9,8 @@ import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { AddressFieldGroup } from "@/components/address-field-group";
 import { SearchableSelect } from "@/components/searchable-select";
 import { inlineFieldProblem, inputAttributesFor, isUnchangedEmail, isUnchangedFromStored, isUnchangedPhone, valueTypeForFieldType } from "@/lib/field-validation";
-import { dateFieldProblem } from "@/modules/forms/definition";
+import { SeminarNotAttendingChoice } from "@/components/seminar-not-attending-choice";
+import { dateFieldProblem, isNotAttendingAnswer, SEMINAR_NOT_ATTENDING } from "@/modules/forms/definition";
 import type { EditableAttendeeField } from "@/modules/attendee-accounts/registration-answer-policy";
 import { formatAddressDisplay, isPlainAddressObject, type AddressValue } from "@/modules/forms/address";
 import { evaluateVisibilityRule, fieldVisibilityRule, type RuleCondition } from "@/modules/forms/visibility-rule";
@@ -256,7 +257,8 @@ export function AttendeeRegistrationAnswersForm({
                 );
               }
               if (field.type === "RANKED_CHOICE") {
-                const selected = Array.isArray(value) ? value.map(String) : [];
+                const notAttending = isNotAttendingAnswer(value);
+                const selected = (Array.isArray(value) ? value.map(String) : []).filter((entry) => entry !== SEMINAR_NOT_ATTENDING);
                 const slots = field.maxSelections ?? 2;
                 return (
                   <fieldset className="attendee-answer-ranking" disabled={locked} key={field.id}>
@@ -269,7 +271,7 @@ export function AttendeeRegistrationAnswersForm({
                           className={`field-select${selected[rank] ? "" : " is-empty"}`}
                           title={selected[rank] || undefined}
                           value={selected[rank] ?? ""}
-                          required={field.required || rank < (field.minSelections ?? 0)}
+                          required={!notAttending && (field.required || rank < (field.minSelections ?? 0))}
                           onChange={(event) => {
                             const next = [...selected];
                             if (event.target.value) next[rank] = event.target.value;
@@ -293,6 +295,14 @@ export function AttendeeRegistrationAnswersForm({
                         )}
                       </label>
                     ))}
+                    {field.seminarPreference && (
+                      <SeminarNotAttendingChoice
+                        id={`${attendee.attendeeId}_${field.id}_not_attending`}
+                        selected={notAttending}
+                        disabled={locked}
+                        onChange={(chosen) => updateAnswer(attendee.attendeeId, field.key, chosen ? [SEMINAR_NOT_ATTENDING] : [])}
+                      />
+                    )}
                     {field.helpText && <small>{field.helpText}</small>}
                     {locked && <small>Contact the event team to change these preferences.</small>}
                   </fieldset>

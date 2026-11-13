@@ -99,7 +99,7 @@ export function stationApiError(error: unknown) {
         ? 410
         : error.code === "BALANCE_REASON_REQUIRED"
           ? 422
-          : error.code === "PERMISSION_DENIED"
+          : error.code === "PERMISSION_DENIED" || error.code === "GATE_MODE_OFF"
             ? 403
             : 409;
     return stationJson({ error: error.code, message: error.message }, { status });

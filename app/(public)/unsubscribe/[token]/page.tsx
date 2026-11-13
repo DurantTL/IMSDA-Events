@@ -12,14 +12,14 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Email preferences",
-  description: "Choose which IMAdventist announcements you receive.",
+  description: "Choose which IMAdventist announcements and reminders you receive.",
   robots: { index: false, follow: false, nocache: true },
 };
 
 const doneMessages: Record<string, string> = {
-  event: "You will not get more announcements for this event.",
-  all: "You will not get announcements for any IMSDA event.",
-  resubscribed: "You will get announcements again.",
+  event: "You will not get more announcements or reminders for this event.",
+  all: "You will not get announcements or reminders for any IMSDA event.",
+  resubscribed: "You will get announcements and reminders again.",
 };
 
 /**
@@ -52,39 +52,39 @@ export default async function UnsubscribePage({
         <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <p className="eyebrow">Email preferences</p>
-          <h1>Event announcements</h1>
+          <h1>Event announcements and reminders</h1>
           <p>
-            Settings for <strong>{maskEmailAddress(subject.email)}</strong>, for announcements from {event.name}.
+            Settings for <strong>{maskEmailAddress(subject.email)}</strong>, for announcements and reminders from {event.name}.
           </p>
         </div>
         {done && <p className="inline-notice success" role="status">{done}</p>}
         <p role="status">
           {state.all
-            ? "You are not getting announcements for any IMSDA event."
+            ? "You are not getting announcements or reminders for any IMSDA event."
             : state.event
-              ? "You are not getting announcements for this event."
-              : "You are getting announcements for this event."}
+              ? "You are not getting announcements or reminders for this event."
+              : "You are getting announcements and reminders for this event."}
         </p>
         {!state.event && !state.all && (
           <form method="post" action={action}>
             <input type="hidden" name="action" value="event" />
-            <button className="primary-button" type="submit">Stop announcements for this event</button>
+            <button className="primary-button" type="submit">Stop announcements and reminders for this event</button>
           </form>
         )}
         {!state.all && (
           <form method="post" action={action}>
             <input type="hidden" name="action" value="all" />
-            <button className="secondary-button" type="submit">Stop all IMAdventist announcements</button>
+            <button className="secondary-button" type="submit">Stop all IMAdventist announcements and reminders</button>
           </form>
         )}
         {optedOut && (
           <form method="post" action={action}>
             <input type="hidden" name="action" value="resubscribe" />
-            <button className="secondary-button" type="submit">Start getting announcements again</button>
+            <button className="secondary-button" type="submit">Start getting announcements and reminders again</button>
           </form>
         )}
         <p className="quiet-copy">
-          This only covers announcements. You will still get messages about your registration: confirmations, receipts,
+          This only covers announcements and reminders from the event team, such as a reminder to finish a club registration. You will still get messages about your registration: confirmations, receipts,
           balance reminders, waitlist and transfer notices, and safety or schedule changes.
         </p>
       </section>

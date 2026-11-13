@@ -157,6 +157,7 @@ describe("ranked program assignment", () => {
       fieldLabel: "Friday seminar",
       appliedAt: "2026-06-10T10:00:00.000Z",
       appliedByName: "Admin",
+      notAttending: 0,
       assignments: preview.assignments,
     });
 

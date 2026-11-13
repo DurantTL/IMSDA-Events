@@ -21,9 +21,14 @@ import {
   isPlainAddressObject,
   type AddressValue,
 } from "@/modules/forms/address";
+import { SeminarNotAttendingChoice } from "@/components/seminar-not-attending-choice";
 import {
   isFieldVisible,
+  choiceDisplayLabel,
+  isNotAttendingAnswer,
+  isSeminarPreferenceField,
   numberFieldBounds,
+  SEMINAR_NOT_ATTENDING,
   registrationFormDefinitionSchema,
   type RegistrationFormField,
 } from "@/modules/forms/definition";
@@ -177,7 +182,7 @@ function AmendmentField({
         <small>{field.label}</small>
         <strong>
           {Array.isArray(value)
-            ? value.join(", ") || "Not provided"
+            ? value.map((entry) => choiceDisplayLabel(String(entry))).join(", ") || "Not provided"
             : typeof value === "boolean"
               ? value ? "Yes" : "No"
               : isPlainAddressObject(value)
@@ -235,7 +240,9 @@ function AmendmentField({
   }
 
   if (field.type === "MULTISELECT" || field.type === "RANKED_CHOICE") {
-    const selected = selectedValues(value);
+    // "Not attending" (#893) is a marker, not one of the field's choices.
+    const notAttending = isNotAttendingAnswer(value);
+    const selected = selectedValues(value).filter((choice) => choice !== SEMINAR_NOT_ATTENDING);
     const maximum = field.maxSelections ?? (
       field.type === "RANKED_CHOICE" ? 2 : field.options.length
     );
@@ -255,10 +262,12 @@ function AmendmentField({
                 className={rank >= 0 ? "is-selected" : ""}
                 type="button"
                 aria-pressed={rank >= 0}
-                disabled={rank < 0 && selected.length >= maximum}
+                disabled={rank < 0 && !notAttending && selected.length >= maximum}
                 key={option}
                 onClick={() => onChange(
-                  rank >= 0
+                  notAttending
+                    ? [option]
+                    : rank >= 0
                     ? selected.filter((choice) => choice !== option)
                     : [...selected, option],
                 )}
@@ -269,6 +278,13 @@ function AmendmentField({
             );
           })}
         </div>
+        {isSeminarPreferenceField(field) && (
+          <SeminarNotAttendingChoice
+            id={`${id}_not_attending`}
+            selected={notAttending}
+            onChange={(chosen) => onChange(chosen ? [SEMINAR_NOT_ATTENDING] : [])}
+          />
+        )}
       </fieldset>
     );
   }

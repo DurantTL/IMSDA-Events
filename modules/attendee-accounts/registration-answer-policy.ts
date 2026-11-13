@@ -5,6 +5,7 @@ import {
   getAvailabilityMode,
   isBirthDateField,
   isFieldVisible,
+  isSeminarPreferenceField,
   validateTestResponses,
   type RegistrationFormDefinition,
   type RegistrationFormField,
@@ -55,6 +56,8 @@ export type EditableAttendeeField = {
   helpText: string;
   type: "SELECT" | "RADIO" | "MULTISELECT" | "RANKED_CHOICE" | "CHECKBOX" | "NUMBER" | "ADDRESS" | "PHONE" | "EMAIL" | "DATE";
   required: boolean;
+  /** A seminar field (#893): offers the explicit "Not attending" choice. */
+  seminarPreference?: boolean;
   options: string[];
   minSelections: number | null;
   maxSelections: number | null;
@@ -122,11 +125,7 @@ export function isTieredAttendeeFieldEditable(field: RegistrationFormField) {
   return true;
 }
 
-export function isSeminarPreferenceField(field: RegistrationFormField) {
-  return field.scope === "ATTENDEE"
-    && field.type === "RANKED_CHOICE"
-    && getAvailabilityMode(field) === "RANKED_INTEREST";
-}
+export { isSeminarPreferenceField };
 
 function tieredEditableFieldDefinitions(
   definition: RegistrationFormDefinition,
@@ -160,6 +159,7 @@ export function editableAttendeeFields(
       helpText: field.helpText,
       type: field.type as EditableAttendeeField["type"],
       required: field.required,
+      seminarPreference: isSeminarPreferenceField(field),
       options: field.options,
       minSelections: field.minSelections ?? null,
       maxSelections: field.maxSelections ?? null,

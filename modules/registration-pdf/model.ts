@@ -22,6 +22,9 @@ import {
   isFieldVisible,
   type RegistrationFormDefinition,
   type RegistrationFormField,
+  SEMINAR_NOT_ATTENDING,
+  choiceDisplayLabel,
+  isNotAttendingAnswer,
 } from "@/modules/forms/definition";
 import { formatAddressDisplay } from "@/modules/forms/address";
 import { resolveFieldFlags } from "@/modules/forms/field-flags";
@@ -174,7 +177,7 @@ function isBlank(value: unknown) {
 
 function choiceLabel(field: RegistrationFormField, value: unknown) {
   const text = String(value);
-  return field.optionLabels?.[text] ?? text;
+  return field.optionLabels?.[text] ?? choiceDisplayLabel(text);
 }
 
 /** One answer as a reader sees it, or an empty string when there is nothing to show. */
@@ -188,6 +191,7 @@ export function displayAnswer(field: RegistrationFormField, value: unknown): str
     case "MULTISELECT":
       return Array.isArray(value) ? value.map((entry) => choiceLabel(field, entry)).join(", ") : choiceLabel(field, value);
     case "RANKED_CHOICE":
+      if (isNotAttendingAnswer(value)) return choiceLabel(field, SEMINAR_NOT_ATTENDING);
       return Array.isArray(value) ? value.map((entry, index) => `${index + 1}. ${choiceLabel(field, entry)}`).join("  ") : choiceLabel(field, value);
     case "SELECT":
     case "RADIO":

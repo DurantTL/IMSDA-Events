@@ -2,6 +2,7 @@ import { isProtectedAnswerField } from "@/modules/attendee-accounts/registration
 import { YOUTH_GUEST_ROLE_LABEL } from "@/modules/reporting/club-event-reports";
 import { isHealthTypeField } from "@/modules/forms/field-flags";
 import {
+  isNotAttendingAnswer,
   registrationFormDefinitionSchema,
   type RegistrationFormDefinition,
   type RegistrationFormField,
@@ -101,6 +102,8 @@ export type OperationalSeminarField = {
     totalInterest: number;
   }>;
   totalInterest: number;
+  /** People who chose "Not attending" (#893): counted here, never as a seminar rank or a seat. */
+  notAttending: number;
 };
 
 export type OperationalReport = {
@@ -146,6 +149,7 @@ type MutableSeminarField = {
   id: string;
   label: string;
   scope: OperationalReportScope;
+  notAttending: number;
   choices: Map<string, {
     firstChoice: number;
     secondChoice: number;
@@ -376,6 +380,7 @@ function ensureSeminarField(
       id: `seminars-${field.scope.toLocaleLowerCase("en-US")}-${identifier(field.label)}`,
       label: field.label,
       scope: field.scope,
+      notAttending: 0,
       choices: new Map(),
     };
     collection.set(key, aggregate);
@@ -398,6 +403,10 @@ function addSeminarRanks(
   value: unknown,
 ) {
   if (!Array.isArray(value)) return;
+  if (isNotAttendingAnswer(value)) {
+    aggregate.notAttending += 1;
+    return;
+  }
   const configuredOptions = new Set(field.options);
   value.forEach((selection, index) => {
     if (typeof selection !== "string" || !configuredOptions.has(selection)) return;
@@ -522,6 +531,7 @@ function finishSeminarFields(collection: Map<string, MutableSeminarField>) {
         scope: field.scope,
         choices,
         totalInterest: choices.reduce((total, choice) => total + choice.totalInterest, 0),
+        notAttending: field.notAttending,
       };
     })
     .sort((left, right) => left.label.localeCompare(right.label));
@@ -862,6 +872,7 @@ export function operationalReportCsv(
       "First choice",
       "Second choice",
       "Total interest",
+      "People not attending",
     ]];
     for (const field of report.seminars) {
       for (const choice of field.choices) {
@@ -872,8 +883,11 @@ export function operationalReportCsv(
           choice.firstChoice,
           choice.secondChoice,
           choice.totalInterest,
+          "",
         ]);
       }
+      // Its own row, so people who are not attending never read as interest in a seminar (#893).
+      rows.push([field.label, scopeLabel(field.scope), "Not attending (no seat)", "", "", "", field.notAttending]);
     }
     return toCsv(rows);
   }
