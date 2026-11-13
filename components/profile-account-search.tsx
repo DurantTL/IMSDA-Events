@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ProfileCorrectionForm } from "@/components/profile-correction-form";
 import { ProfilePersonalCorrectionForm } from "@/components/profile-personal-correction-form";
 import styles from "@/components/profile-account-search.module.css";
+import { confirmLeave } from "@/components/unsaved-changes-registry";
 
 /** Kept in step with `modules/attendee-accounts/account-search-staff.ts` (a test compares them). */
 export const ACCOUNT_SEARCH_MIN = 3;
@@ -87,7 +88,7 @@ export function ProfileAccountSearch() {
   async function open(accountId: string, reload = false) {
     if (openingId !== null) return;
     if (!reload && (dirty.current.correction || dirty.current.personal)
-      && !window.confirm("You have unsaved corrections for the account that is open. Open another account and discard them?")) return;
+      && !(await confirmLeave("You have unsaved corrections for the account that is open. Open another account and discard them?"))) return;
     setOpeningId(accountId);
     say("");
     try {
