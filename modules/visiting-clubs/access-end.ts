@@ -17,12 +17,14 @@ const BATCH = 500;
  *
  * Safe to run on every sweep and from two places at once without a strict isolation level: each update only touches a row that
  * is still open, so a grant or invite another run already ended is not counted or audited twice. One audit entry per ended
- * role and per cancelled invite, ids only.
+ * role, per cancelled invite and per club marked inactive, ids only.
  */
 export async function endVisitingClubAccess(now = new Date()): Promise<{ ended: number; clubs: number; invitesCancelled: number; clubsDeactivated: number }> {
   const prisma = getPrisma();
   const open = [{ effectiveTo: null }, { effectiveTo: { gt: now } }];
   const pastWindow = { guestEventId: { not: null }, guestEvent: { endsAt: { lt: visitingClubAccessCutoff(now) } } };
+  // A visiting club still active after its window (the guest check is spelled out, as the club-filter guard expects).
+  const activePastWindowClub = { type: "CLUB" as const, isActive: true, guestEventId: { not: null }, guestEvent: pastWindow.guestEvent };
   const due = await prisma.clubDirectorGrant.findMany({
     where: { revokedAt: null, OR: open, organization: pastWindow },
     select: { id: true, organizationId: true, role: true, organization: { select: { guestEventId: true } } },
@@ -36,7 +38,7 @@ export async function endVisitingClubAccess(now = new Date()): Promise<{ ended: 
     take: BATCH,
   });
   const dueClubs = await prisma.organization.findMany({
-    where: { type: "CLUB", isActive: true, ...pastWindow },
+    where: activePastWindowClub,
     select: { id: true, guestEventId: true },
     orderBy: { id: "asc" },
     take: BATCH,
@@ -83,7 +85,7 @@ export async function endVisitingClubAccess(now = new Date()): Promise<{ ended: 
     }
     for (const club of dueClubs) {
       const done = await tx.organization.updateMany({
-        where: { id: club.id, type: "CLUB", isActive: true, ...pastWindow },
+        where: { id: club.id, ...activePastWindowClub },
         data: { isActive: false },
       });
       if (done.count === 0) continue;

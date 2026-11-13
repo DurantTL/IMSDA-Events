@@ -700,7 +700,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("open-without-form", "Open events have a form", "Every event that is open for registration has a published registration form.", "/registration-builder", "Open the form builder"),
     m("registrations-received", "Registrations received", "Public registration submissions in the last 24 hours for open events. A count only.", "/people", "Open registrations"),
     m("general-link-expiry", "Pending-team expiry", "The last sweep's expiry of general-link teams still waiting 30 days after their event ended.", "/admin/events", "Open events"),
-    m("visiting-club-access-end", "Visiting club access end", "The last sweep's ending of visiting club roles 30 days after their event ended.", "/admin/events", "Open events"),
+    m("visiting-club-access-end", "Visiting club access end", "The last sweep's ending of visiting club roles, and marking the clubs inactive, 30 days after their event ended.", "/admin/events", "Open events"),
   ], async (ctx) => {
     let pricing: Awaited<ReturnType<Reader>>[number];
     try {
