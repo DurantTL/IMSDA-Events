@@ -42,7 +42,7 @@ export function PersonCommunicationsSection({
               ))}
             </ul>
           )}
-          {communications.hasMore ? <p className={styles.note}>Showing the newest {communications.limit} messages. Older ones are not listed.</p> : null}
+          {communications.hasMore ? <p className={styles.note}>Only the newest {communications.limit} messages are listed. Older ones are not shown.</p> : null}
           <a className={styles.open} href={closeHref}>Hide communication history</a>
         </>
       )}

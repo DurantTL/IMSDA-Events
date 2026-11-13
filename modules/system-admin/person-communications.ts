@@ -139,6 +139,7 @@ export async function loadPersonCommunications(
       ...(target.staffId ? { staffId: target.staffId } : {}),
       ...(target.accountId ? { accountId: target.accountId } : {}),
       eventIds,
+      // At most the shown ids are passed, so the helper's `truncated` stays false; `moreExist` says whether older messages exist.
       moreExist: found.length > PERSON_COMMUNICATIONS_LIMIT ? 1 : 0,
     },
   });

@@ -123,7 +123,7 @@ export function RegistrationCommunicationsPanel({
           );
         })}
         {state.status === "ready" && rows.length === 0 && <p className="quiet-copy">No emails are linked to this registration yet.</p>}
-        {state.status === "ready" && state.data.hasMore && <p className="quiet-copy">Showing the newest {state.data.limit} messages. Older ones are not listed here.</p>}
+        {state.status === "ready" && state.data.hasMore && <p className="quiet-copy">Only the newest {state.data.limit} messages are listed here. Older ones are not shown.</p>}
       </div>
     </section>
   );

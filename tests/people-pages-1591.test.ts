@@ -35,6 +35,7 @@ vi.mock("@/modules/system-admin/people-directory", () => ({
   listClubOptions: mocks.listClubOptions,
   getPersonDetail: mocks.getPersonDetail,
 }));
+vi.mock("@/modules/system-admin/person-communications", () => ({ loadPersonCommunications: async () => null }));
 vi.mock("@/modules/system-admin/pending-invites", () => ({
   listPendingInvitesPage: mocks.listPendingInvitesPage,
   listPendingInvites: mocks.listPendingInvites,
