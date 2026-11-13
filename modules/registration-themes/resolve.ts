@@ -40,7 +40,12 @@ export function resolveRegistrationTheme(row: StoredThemeRow | null | undefined)
  */
 export function registrationThemeStyle(tokens: RegistrationThemeTokens): CSSProperties | undefined {
   const safe = registrationThemeTokensSchema.parse(normalizeThemeTokens(tokens));
-  if (isPlatformDefaultTheme(safe)) return undefined;
+  return isPlatformDefaultTheme(safe) ? undefined : themeCssVariables(safe);
+}
+
+/** The same custom properties for any valid theme, the platform default included (the staff editor's sample always needs them). */
+export function themeCssVariables(tokens: RegistrationThemeTokens): CSSProperties {
+  const safe = registrationThemeTokensSchema.parse(normalizeThemeTokens(tokens));
   const tints = deriveThemeTints(safe);
   const vars: Record<`--${string}`, string> = {
     "--imsda-navy": safe.primary,

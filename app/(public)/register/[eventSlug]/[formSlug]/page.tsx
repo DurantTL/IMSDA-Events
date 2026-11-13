@@ -21,6 +21,9 @@ import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-se
 import { getAutoEventInfoCards } from "@/modules/event-info-cards/repository";
 import { getPublicRegistrationExperience } from "@/modules/forms/public-repository";
 import { clubEventEntryRedirect } from "@/modules/general-link-registrations/repository";
+import { RegistrationThemeScope } from "@/components/registration-theme-scope";
+import { getPublishedThemeRowBySlug } from "@/modules/registration-themes/repository";
+import { registrationThemeStyle, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
 
 export const dynamic = "force-dynamic";
 
@@ -111,8 +114,10 @@ export default async function PublicRegistrationPage({
   const editableCards = await listPublishedRegistrationInfoCards(eventSlug);
   const formsHelpContact = await getFormsHelpContact();
 
+  const themeStyle = registrationThemeStyle(resolveRegistrationTheme(await getPublishedThemeRowBySlug(eventSlug)));
+
   return (
-    <>
+    <RegistrationThemeScope style={themeStyle}>
     <PublicMetricsBeacon hits={[{ metric: "REGISTRATION_START", dimension: eventSlug }]} />
     <PublicRegistrationForm
       formsHelpContact={formsHelpContact}
@@ -148,6 +153,6 @@ export default async function PublicRegistrationPage({
         ) : undefined
       }
     />
-    </>
+    </RegistrationThemeScope>
   );
 }

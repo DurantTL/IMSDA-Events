@@ -11,6 +11,9 @@ import { passkeyOfferForPage } from "@/modules/attendee-accounts/passkey-offer-e
 import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 import { getFormsHelpContact } from "@/modules/system-admin/platform-settings";
 import { clubEventEntryRedirect } from "@/modules/general-link-registrations/repository";
+import { RegistrationThemeScope } from "@/components/registration-theme-scope";
+import { getPublishedThemeRowBySlug } from "@/modules/registration-themes/repository";
+import { registrationThemeStyle, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
 import { prefillFromStaffDraft, resolveStaffDraftLink } from "@/modules/staff-registration-drafts/repository";
 
 export const dynamic = "force-dynamic";
@@ -67,7 +70,9 @@ export default async function FinishStaffRegistrationPage({ params }: { params: 
   // The sanitizer keeps plain strings, booleans, string lists and string maps only, which is what the form's answers hold.
   const initialResponses = prefillFromStaffDraft(experience.form.definition, link.responses) as FormResponses;
   const editableCards = await listPublishedRegistrationInfoCards(link.eventSlug);
+  const themeStyle = registrationThemeStyle(resolveRegistrationTheme(await getPublishedThemeRowBySlug(link.eventSlug)));
   return (
+    <RegistrationThemeScope style={themeStyle}>
     <PublicRegistrationForm
       formsHelpContact={await getFormsHelpContact()}
       event={{
@@ -99,5 +104,6 @@ export default async function FinishStaffRegistrationPage({ params }: { params: 
         </>
       ) : undefined}
     />
+    </RegistrationThemeScope>
   );
 }

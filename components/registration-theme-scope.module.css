@@ -1,0 +1,96 @@
+/*
+ * An event's registration look (#283). The wrapper sets custom properties from modules/registration-themes/resolve.ts: it
+ * overrides the colors the registration CSS already reads (--imsda-navy, --imsda-purple, --ink, --muted, --card, --paper and
+ * the soft tints) and adds --reg-theme-* and --radius-theme-* values consumed below. The wrapper exists only for a themed
+ * event, so every rule here may assume the variables are set. Old rules in globals.css are left as they are.
+ */
+.themed {
+  font-family: var(--reg-theme-font-body);
+}
+
+.themed :global(.public-registration-page) {
+  background: var(--reg-theme-page-bg);
+  font-family: var(--reg-theme-font-body);
+}
+
+.themed :global(.public-registration-page h1),
+.themed :global(.public-registration-page h2),
+.themed :global(.public-registration-page h3) {
+  font-family: var(--reg-theme-font-heading);
+}
+
+/* Content width: the hero, the form layout and the header share one cap. */
+.themed :global(.public-registration-hero),
+.themed :global(.public-registration-layout),
+.themed :global(.public-registration-header-inner) {
+  max-width: var(--reg-theme-max-width);
+}
+
+/* The hero band was a navy gradient with white text: it follows the main color, and the text stays white (checked in the
+   contrast list as "White button text on the main color"). */
+.themed :global(.public-registration-hero) {
+  background: linear-gradient(120deg, var(--imsda-navy-deep), var(--imsda-navy));
+  border-radius: var(--radius-theme-card);
+}
+
+.themed :global(.public-registration-hero .public-registration-eyebrow),
+.themed :global(.public-registration-hero > div:first-child > p:last-child) {
+  color: var(--reg-theme-on-primary);
+}
+
+/* Cards: corner radius and shadow. */
+.themed :global(.public-registration-page .panel),
+.themed :global(.public-registration-intro),
+.themed :global(.public-registration-progress) {
+  border-radius: var(--radius-theme-card);
+  box-shadow: var(--reg-theme-shadow);
+}
+
+/* Density: the space between the form's blocks and between its fields. */
+.themed :global(.public-registration-form-column) {
+  gap: var(--reg-theme-gap);
+}
+
+.themed :global(.public-registration-page .form-stack) {
+  gap: var(--reg-theme-field-gap);
+}
+
+/* Buttons: shape and the themed main color. */
+.themed :global(.public-registration-page .primary-button) {
+  border-radius: var(--radius-theme-button);
+  background: var(--imsda-navy);
+  border-color: var(--imsda-navy);
+  color: var(--reg-theme-on-primary);
+}
+
+.themed :global(.public-registration-page .primary-button:hover:not(:disabled)) {
+  background: var(--imsda-navy-deep);
+  border-color: var(--imsda-navy-deep);
+}
+
+.themed :global(.public-registration-page .secondary-button) {
+  border-radius: var(--radius-theme-button);
+}
+
+/* Keyboard focus follows the accent (3:1 on cards and the page background is checked). */
+.themed :global(.public-registration-page :focus-visible) {
+  outline-color: var(--focus-ring);
+}
+
+/* The form builder's preview shows the same look inside its device frame. */
+.themedPreview {
+  background: var(--reg-theme-page-bg);
+  color: var(--ink);
+  font-family: var(--reg-theme-font-body);
+}
+
+.themedPreview :is(h3, h4) {
+  font-family: var(--reg-theme-font-heading);
+}
+
+.themedPreview :global(.primary-button) {
+  border-radius: var(--radius-theme-button);
+  background: var(--imsda-navy);
+  border-color: var(--imsda-navy);
+  color: var(--reg-theme-on-primary);
+}

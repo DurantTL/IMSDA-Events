@@ -5,7 +5,7 @@ import type { RegistrationThemeTokens } from "./tokens";
 export const ON_PRIMARY = "#ffffff";
 
 /** How much of a color goes into its soft tint over the surface. One table feeds both the check and the rendered variables. */
-export const TINT_PERCENT = { primary: 10, accent: 10, success: 12, warning: 14, error: 10 } as const;
+export const TINT_PERCENT = { primary: 10, accent: 9, success: 10, warning: 8, error: 6 } as const;
 
 export type ThemeTints = Record<keyof typeof TINT_PERCENT, string>;
 

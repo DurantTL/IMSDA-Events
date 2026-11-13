@@ -7,6 +7,9 @@ import { passkeyOfferForPage } from "@/modules/attendee-accounts/passkey-offer-e
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { PublicRegistrationForm } from "@/components/public-registration-form";
 import { getPublicRegistrationExperience } from "@/modules/forms/public-repository";
+import { RegistrationThemeScope } from "@/components/registration-theme-scope";
+import { getPublishedThemeRowBySlug } from "@/modules/registration-themes/repository";
+import { registrationThemeStyle, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
 
 export const dynamic = "force-dynamic";
 
@@ -52,8 +55,10 @@ export default async function EmbeddedRegistrationPage({
   }
 
   const { account } = await getCurrentAttendee();
+  const themeStyle = registrationThemeStyle(resolveRegistrationTheme(await getPublishedThemeRowBySlug(eventSlug)));
 
   return (
+    <RegistrationThemeScope style={themeStyle}>
     <div className="public-registration-embed">
       <PublicRegistrationForm
         event={{
@@ -72,5 +77,6 @@ export default async function EmbeddedRegistrationPage({
         securityCheck={await securityCheckConfigForPage()}
       />
     </div>
+    </RegistrationThemeScope>
   );
 }
