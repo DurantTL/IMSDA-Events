@@ -27,6 +27,14 @@ vi.mock("@/modules/communications/messaging-repository", () => ({ getMessagingWo
 vi.mock("@/modules/communications/email-preferences-repository", () => ({ listEventAnnouncementOptOuts: async () => [] }));
 vi.mock("@/modules/communications/repository", () => ({ listAnnouncements: async () => [] }));
 vi.mock("@/modules/communications/scheduled-email-repository", () => ({ listScheduledEmails: async () => [] }));
+vi.mock("@/modules/club-registrations/draft-reminders", () => ({
+  getClubDraftReminderOverview: async () => ({
+    policy: { enabled: false, firstAfterDays: 2, repeatEveryDays: 3, maxReminders: 2, staleAfterDays: 30 },
+    emailOn: true, registrationOpen: true, drafts: 0, dueNow: 0, upcoming: [],
+    counts: { queued: 0, sent: 0, failed: 0, suppressed: 0, cancelled: 0 },
+    limits: { firstAfterDays: [1, 14], repeatEveryDays: [1, 14], maxReminders: [1, 3], staleAfterDays: [7, 90] },
+  }),
+}));
 vi.mock("@/modules/community/repository", () => ({
   getStaffCommunity: async () => ({
     eventId: "evt_1",
@@ -83,6 +91,15 @@ describe("each page has one titled header and is registered (#1585)", () => {
     expect(count(markup, /primary-button/g)).toBe(1);
     expect(markup).toMatch(/primary-button[^>]*>[\s\S]*?New schedule/);
     expect(markup).toMatch(/<button class="secondary-button"[^>]*>Schedule an email<\/button>/);
+  });
+
+  it("adds the unfinished club registration reminders section below the schedules, off until turned on (#164)", async () => {
+    const markup = await render(ScheduledEmailsPage as never);
+    expect(markup).toContain("Reminders for unfinished club registrations</h2>");
+    expect(markup).toContain("Reminders are off for this event.");
+    expect(markup).toContain("Nothing is sent until it is turned on");
+    expect(markup).toContain("0 club registrations would get a reminder on the next run.");
+    expect(count(markup, /<h1\b/g)).toBe(1);
   });
 
   it("draws one h1 on /community, with Attendee preview outlined and no Messages button", async () => {
