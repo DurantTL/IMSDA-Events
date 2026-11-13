@@ -1,13 +1,13 @@
 /**
  * The optional club calendar (#1700), pure. A club's director and deputy add meetings, outings and deadlines; every
  * active club role can see them next to the conference's published calendar. Reminders are off until the director or
- * deputy turns them on, and go to the club's active role holders, at most once for an item on a date.
+ * deputy turns them on, and go to the club's director and deputy, at most once for an item on a date.
  *
  * Dates are calendar dates (YYYY-MM-DD) and times are local conference time (`CONFERENCE_TIME_ZONE`), as text, so no
  * time zone arithmetic can move an item to another day.
  */
 
-import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/conference-format";
+import { CONFERENCE_TIME_ZONE, formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { addDays, calendarDateIn, isCalendarDate, type CalendarItem } from "@/modules/calendar/domain";
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
@@ -82,8 +82,8 @@ export function timeRangeLabel(startTime: string | null, endTime: string | null)
 
 /** The conference-local hour (0 to 23) of an instant. */
 export function conferenceHour(now: Date): number {
-  const hour = new Intl.DateTimeFormat("en-US", { timeZone: CONFERENCE_TIME_ZONE, hour: "numeric", hourCycle: "h23" }).format(now);
-  return Number(hour) % 24;
+  // A bare hour number for a comparison, never shown to anyone, so it carries no zone label.
+  return Number(formatInConferenceTime(now, { hour: "numeric", hourCycle: "h23", zoneLabel: false })) % 24;
 }
 
 export function conferenceToday(now: Date) {

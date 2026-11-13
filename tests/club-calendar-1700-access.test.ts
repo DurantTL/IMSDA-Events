@@ -255,6 +255,15 @@ describe("writes (POST, PATCH, DELETE, PUT) are checked on the server", () => {
     nothingWritten();
   });
 
+  it("answers a registrar and a reporter the same 404 as everyone while the feature is off", async () => {
+    mocks.prisma.clubOptionalFeature.findUnique.mockResolvedValue(null);
+    for (const role of ["REGISTRAR", "REPORTER"] as const) {
+      signedInAs(role);
+      for (const [, attempt] of attempts) expect((await attempt()).status).toBe(404);
+    }
+    nothingWritten();
+  });
+
   it("refuses an item that is not this club's: the change is scoped by club in the write itself", async () => {
     signedInAs("DIRECTOR");
     mocks.prisma.clubCalendarItem.updateMany.mockResolvedValue({ count: 0 });

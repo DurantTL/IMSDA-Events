@@ -9,6 +9,7 @@ import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
   CLUB_CALENDAR_KINDS,
   CLUB_CALENDAR_LOCATION_MAX,
@@ -59,9 +60,12 @@ function ItemForm({ organizationId, entry, defaultDate, onDone }: { organization
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState("");
   const [saved, setSaved] = useState("");
+  const [dirty, setDirty] = useState(false);
   const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
+  useUnsavedChangesGuard(dirty, entry ? "You have unsaved changes to this calendar item. Leave this page and discard them?" : "You have an unsaved calendar item. Leave this page and discard it?");
 
   function set(key: FieldKey, value: string) {
+    setDirty(true);
     setValues((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: undefined }));
     clearSummaryField(fieldId(key));
@@ -89,6 +93,7 @@ function ItemForm({ organizationId, entry, defaultDate, onDone }: { organization
     try {
       const url = `/api/attendee/clubs/${encodeURIComponent(organizationId)}/calendar${entry?.itemId ? `/${encodeURIComponent(entry.itemId)}` : ""}`;
       await request(url, { method: entry ? "PATCH" : "POST", body: JSON.stringify(values) });
+      setDirty(false);
       if (!entry) setValues(emptyValues(defaultDate));
       setSaved(savedMessage());
       router.refresh();
@@ -223,6 +228,8 @@ function ReminderSettings({ organizationId, initial }: { organizationId: string;
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState("");
   const [saved, setSaved] = useState("");
+  const [dirty, setDirty] = useState(false);
+  useUnsavedChangesGuard(dirty, "You have unsaved reminder settings. Leave this page and discard them?");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -236,6 +243,7 @@ function ReminderSettings({ organizationId, initial }: { organizationId: string;
     setBusy(true);
     try {
       await request(`/api/attendee/clubs/${encodeURIComponent(organizationId)}/calendar/reminders`, { method: "PUT", body: JSON.stringify({ enabled, daysBefore }) });
+      setDirty(false);
       setSaved(savedMessage());
       router.refresh();
     } catch (caught) {
@@ -249,17 +257,17 @@ function ReminderSettings({ organizationId, initial }: { organizationId: string;
     <form aria-labelledby="club-calendar-reminders-heading" className={styles.panel} noValidate onSubmit={(event) => void submit(event)}>
       <h3 className={styles.panelHeading} id="club-calendar-reminders-heading">Reminder emails</h3>
       <p className={styles.meta}>
-        Off until you turn them on. When on, your club&apos;s director, deputy, registrar and reporter each get one email for an item,
+        Off until you turn them on. When on, your club&apos;s director and deputy each get one email for an item,
         from 8 a.m. Central time, within the number of days you choose before it. The email names the item, date, time and place. It never includes notes.
         A person who opted out of IMAdventist announcements is skipped.
       </p>
       <label className={styles.check}>
-        <input checked={enabled} onChange={(event) => { setEnabled(event.target.checked); setSaved(""); }} type="checkbox" />
+        <input checked={enabled} onChange={(event) => { setEnabled(event.target.checked); setDirty(true); setSaved(""); }} type="checkbox" />
         Send reminder emails
       </label>
       <div className={styles.field}>
         <label htmlFor="club-calendar-days">Days before</label>
-        <input id="club-calendar-days" inputMode="numeric" max={REMINDER_DAYS_MAX} min={REMINDER_DAYS_MIN} onChange={(event) => { setDays(event.target.value); setSaved(""); }} type="number" value={days} />
+        <input id="club-calendar-days" inputMode="numeric" max={REMINDER_DAYS_MAX} min={REMINDER_DAYS_MIN} onChange={(event) => { setDays(event.target.value); setDirty(true); setSaved(""); }} type="number" value={days} />
         <small>{`From ${REMINDER_DAYS_MIN} to ${REMINDER_DAYS_MAX}.`}</small>
       </div>
       <div>

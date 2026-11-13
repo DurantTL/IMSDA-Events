@@ -1,6 +1,6 @@
 import "server-only";
 
-import { actorAttribution, requireClubCapability, RosterAccessError } from "@/modules/club-rosters/access";
+import { actorAttribution, getClubRoleAccess, requireClubCapability, RosterAccessError } from "@/modules/club-rosters/access";
 import { clubCalendarAvailable, type ClubCalendarActor } from "@/modules/club-calendar/repository";
 
 /**
@@ -10,10 +10,13 @@ import { clubCalendarAvailable, type ClubCalendarActor } from "@/modules/club-ca
  * route never says whether the feature exists. Returns who is acting, for attribution.
  */
 export async function requireClubCalendarWriteAccess(organizationId: string, now = new Date()) {
-  const access = await requireClubCapability(organizationId, "editProfile", now);
-  if (!(await clubCalendarAvailable(organizationId))) {
+  // The role gate first for who is a member of this club at all (others get its 404/401), then the feature before the
+  // capability, so a registrar on a club with the calendar off gets the same "not found" as everyone.
+  const role = await getClubRoleAccess(organizationId, now);
+  if (role.state === "OK" && !(await clubCalendarAvailable(organizationId))) {
     throw new RosterAccessError("NOT_FOUND", 404, "That page could not be found.");
   }
+  const access = await requireClubCapability(organizationId, "editProfile", now);
   const attribution = actorAttribution(access.actor);
   const actor: ClubCalendarActor = access.actor.kind === "STAFF_ACTING" && access.actor.viaClubsAdministrator
     ? { ...(attribution as { userId: string; actAsId: string }), viaClubsAdministrator: true }

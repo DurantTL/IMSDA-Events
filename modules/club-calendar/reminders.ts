@@ -29,7 +29,7 @@ import {
 
 /**
  * The club calendar reminder (#1700), run by the scheduled outbox sweep. A club that switched the calendar on AND turned
- * reminders on (both off until then, so a deploy sends nothing) has its active role holders emailed once for an item
+ * reminders on (both off until then, so a deploy sends nothing) has its director and deputy emailed once for an item
  * when today, in conference time, is within the club's chosen days before the item, from 8 a.m. on.
  *
  * Why it cannot send twice: the claim is a row in `ClubCalendarReminderLog`, unique on (item, item date), written in the
@@ -61,14 +61,14 @@ type Client = Pick<ReturnType<typeof getPrisma>, "clubDirectorGrant" | "organiza
 
 type Recipient = { email: string; name: string };
 
-/** All four roles: the club's active role holders with an active, enabled account, read now. */
+/** The club's active director and deputy (the people who can turn reminders off) with an active, enabled account, read now. */
 async function loadRecipients(client: Pick<Client, "clubDirectorGrant">, organizationIds: readonly string[], now: Date) {
   const byClub = new Map<string, Recipient[]>();
   if (organizationIds.length === 0) return byClub;
   const grants = await client.clubDirectorGrant.findMany({
     where: {
       organizationId: { in: [...organizationIds] },
-      role: { in: ["DIRECTOR", "DEPUTY", "REGISTRAR", "REPORTER"] },
+      role: { in: ["DIRECTOR", "DEPUTY"] },
       revokedAt: null,
       effectiveFrom: { lte: now },
       OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
@@ -118,24 +118,26 @@ export async function sendDueClubCalendarReminders(options: { now?: Date } = {})
   if (due.length === 0) return result;
   const logged = await prisma.clubCalendarReminderLog.findMany({ where: { itemId: { in: due.map((item) => item.id) } }, select: { itemId: true, itemDate: true } });
   const alreadyReminded = new Set(logged.map((row) => `${row.itemId}|${row.itemDate}`));
-  const wanted = due.filter((item) => !alreadyReminded.has(`${item.id}|${item.date}`)).slice(0, REMINDER_RUN_CAP);
-  if (wanted.length === 0) return result;
+  const unreminded = due.filter((item) => !alreadyReminded.has(`${item.id}|${item.date}`));
+  if (unreminded.length === 0) return result;
 
-  const clubIds = [...new Set(wanted.map((item) => item.organizationId))];
+  const clubIds = [...new Set(unreminded.map((item) => item.organizationId))];
   const recipientsByClub = await loadRecipients(prisma, clubIds, now);
   // Opted out of ALL IMAdventist announcements: skipped here, and again at delivery. An event-less message has no event
   // id, so only the global opt-out can match.
   const everyone = [...recipientsByClub.values()].flat().map((person) => person.email);
   const optOuts = await loadAnnouncementOptOuts(prisma, everyone, "");
 
+  // The cap counts items that can be claimed: one with nobody to email is set aside first, so it cannot starve the rest.
+  const recipientsFor = (organizationId: string) => (recipientsByClub.get(organizationId) ?? []).filter((person) => announcementOptOutFor(optOuts, person.email, "") === null);
+  const claimable = unreminded.filter((item) => recipientsFor(item.organizationId).length > 0);
+  result.noRecipient = unreminded.length - claimable.length;
+  const wanted = claimable.slice(0, REMINDER_RUN_CAP);
+
   const messageIds: string[] = [];
   for (const item of wanted) {
     const setting = settingByClub.get(item.organizationId)!;
-    const recipients = (recipientsByClub.get(item.organizationId) ?? []).filter((person) => announcementOptOutFor(optOuts, person.email, "") === null);
-    if (recipients.length === 0) {
-      result.noRecipient += 1;
-      continue;
-    }
+    const recipients = recipientsFor(item.organizationId);
     try {
       const ids = await prisma.$transaction(async (tx) => {
         // Re-read inside the transaction: the switches may have been turned off, or the item changed or deleted, since the reads above.

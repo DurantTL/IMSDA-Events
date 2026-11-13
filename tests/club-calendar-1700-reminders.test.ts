@@ -78,9 +78,10 @@ vi.mock("@/lib/prisma", () => {
     },
     clubDirectorGrant: { findMany: async ({ where }: { where: { organizationId: { in: string[] }; role: { in: string[] }; attendeeAccount?: unknown } }) => {
       // The query must ask for all four roles and active accounts only; the stand-in then applies exactly that filter.
-      expect([...where.role.in].sort()).toEqual(["DEPUTY", "DIRECTOR", "REGISTRAR", "REPORTER"]);
+      expect([...where.role.in].sort()).toEqual(["DEPUTY", "DIRECTOR"]);
+      const allowed = where.role.in;
       expect(where.attendeeAccount).toEqual({ disabledAt: null, status: "ACTIVE" });
-      return state.grants.filter((grant) => where.organizationId.in.includes(grant.organizationId as string) && activeAccount(grant.attendeeAccount));
+      return state.grants.filter((grant) => where.organizationId.in.includes(grant.organizationId as string) && allowed.includes(grant.role as string) && activeAccount(grant.attendeeAccount));
     } },
     messageOutbox: {
       create: async ({ data }: { data: Row }) => {
@@ -136,10 +137,10 @@ beforeEach(() => {
 const run = (now = NOW) => sendDueClubCalendarReminders({ now });
 
 describe("what is sent", () => {
-  it("queues one email per active role holder, all four roles, with the item's details and no notes", async () => {
+  it("queues one email each to the director and deputy only, never the registrar or reporter, with the item's details and no notes", async () => {
     const result = await run();
-    expect(result).toMatchObject({ status: "RAN", clubs: 1, reminded: 1, noRecipient: 0, failed: 0, delivered: 4 });
-    expect(state.outbox.map((row) => row.recipientEmail).sort()).toEqual(["deputy@example.test", "director@example.test", "registrar@example.test", "reporter@example.test"]);
+    expect(result).toMatchObject({ status: "RAN", clubs: 1, reminded: 1, noRecipient: 0, failed: 0, delivered: 2 });
+    expect(state.outbox.map((row) => row.recipientEmail).sort()).toEqual(["deputy@example.test", "director@example.test"]);
     const message = state.outbox[0]!;
     expect(message).toMatchObject({ eventId: null, templateKey: "CLUB_CALENDAR_REMINDER", recipientKind: "ACCOUNT", status: "PENDING" });
     expect(message.metadata).toMatchObject({ organizationId: "club-1", itemId: "item-1", itemDate: "2026-11-12" });
@@ -149,8 +150,8 @@ describe("what is sent", () => {
     expect(text).toContain("Synthetic Lake");
     expect(text).toContain("https://events.example.test/account/clubs/club-1/calendar?month=2026-11");
     expect(text).not.toContain("Private note");
-    expect(state.logs).toEqual([expect.objectContaining({ itemId: "item-1", itemDate: "2026-11-12", organizationId: "club-1", recipients: 4 })]);
-    expect(state.audit).toEqual([expect.objectContaining({ action: "CLUB_CALENDAR_REMINDER_SENT", metadata: { organizationId: "club-1", itemId: "item-1", kind: "OUTING", recipients: 4 } })]);
+    expect(state.logs).toEqual([expect.objectContaining({ itemId: "item-1", itemDate: "2026-11-12", organizationId: "club-1", recipients: 2 })]);
+    expect(state.audit).toEqual([expect.objectContaining({ action: "CLUB_CALENDAR_REMINDER_SENT", metadata: { organizationId: "club-1", itemId: "item-1", kind: "OUTING", recipients: 2 } })]);
     expect(JSON.stringify(state.audit)).not.toMatch(/example\.test|Canoe|Private/);
   });
 });
@@ -205,6 +206,15 @@ describe("which items are due", () => {
     state.items = [{ ...state.items[0]!, date: "2026-11-10" }];
     expect(await run()).toMatchObject({ reminded: 1 });
   });
+  it("counts the cap after setting aside items with nobody to email, so they cannot starve it", async () => {
+    state.clubs.push({ id: "club-3", name: "No Leaders", type: "CLUB", isActive: true });
+    state.features.push({ organizationId: "club-3", featureKey: "club-calendar" });
+    state.settings.push({ organizationId: "club-3", enabled: true, daysBefore: 2 });
+    const stuck = Array.from({ length: 100 }, (_, index) => ({ ...state.items[0]!, id: `a-stuck-${String(index).padStart(3, "0")}`, organizationId: "club-3", date: "2026-11-11" }));
+    state.items = [...stuck, { ...state.items[0]!, id: "z-real", date: "2026-11-12" }];
+    expect(await run()).toMatchObject({ reminded: 1, noRecipient: 100 });
+    expect(state.outbox.every((row) => (row.metadata as Row).itemId === "z-real")).toBe(true);
+  });
   it("caps one run at 100 items", async () => {
     state.items = Array.from({ length: 120 }, (_, index) => ({ ...state.items[0]!, id: `item-${String(index).padStart(3, "0")}` }));
     expect(await run()).toMatchObject({ reminded: 100 });
@@ -232,10 +242,10 @@ describe("it cannot send twice", () => {
     expect(await run()).toMatchObject({ reminded: 1 });
     const keys = state.outbox.map((row) => row.idempotencyKey as string);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys.filter((key) => !firstKeys.includes(key))).toHaveLength(4);
+    expect(keys.filter((key) => !firstKeys.includes(key))).toHaveLength(2);
   });
   it("rolls the claim back when queueing fails, so the next sweep retries", async () => {
-    state.failOutboxFor = "reporter@example.test";
+    state.failOutboxFor = "deputy@example.test";
     expect(await run()).toMatchObject({ reminded: 0, failed: 1 });
     expect(state.logs).toEqual([]);
     expect(state.outbox).toEqual([]);
@@ -256,26 +266,25 @@ describe("it cannot send twice", () => {
 
 describe("who is emailed", () => {
   it("skips an address that opted out of ALL IMAdventist announcements, and emails the rest", async () => {
-    state.optOuts = [{ normalizedEmail: "registrar@example.test", scope: "ALL", eventId: null }];
+    state.optOuts = [{ normalizedEmail: "deputy@example.test", scope: "ALL", eventId: null }];
     await run();
-    expect(state.outbox.map((row) => row.recipientEmail)).not.toContain("registrar@example.test");
-    expect(state.outbox).toHaveLength(3);
-    expect(state.logs[0]).toMatchObject({ recipients: 3 });
+    expect(state.outbox.map((row) => row.recipientEmail)).toEqual(["director@example.test"]);
+    expect(state.logs[0]).toMatchObject({ recipients: 1 });
   });
-  it("does not email an ended, revoked, scheduled, disabled or unverified role holder", async () => {
+  it("does not email an ended, revoked, scheduled, disabled or unverified director or deputy", async () => {
     state.grants = [
       grant("club-1", "DIRECTOR", "ended@example.test", { effectiveTo: new Date("2026-11-01T00:00:00.000Z") }),
       grant("club-1", "DEPUTY", "revoked@example.test", { revokedAt: new Date("2026-11-01T00:00:00.000Z") }),
-      grant("club-1", "REGISTRAR", "later@example.test", { effectiveFrom: new Date("2026-12-01T00:00:00.000Z") }),
-      grant("club-1", "REPORTER", "disabled@example.test", {}, { disabledAt: new Date("2026-10-01T00:00:00.000Z") }),
-      grant("club-1", "REPORTER", "pending@example.test", {}, { status: "PENDING" }),
+      grant("club-1", "DEPUTY", "later@example.test", { effectiveFrom: new Date("2026-12-01T00:00:00.000Z") }),
+      grant("club-1", "DEPUTY", "disabled@example.test", {}, { disabledAt: new Date("2026-10-01T00:00:00.000Z") }),
+      grant("club-1", "DEPUTY", "pending@example.test", {}, { status: "PENDING" }),
       grant("club-1", "DIRECTOR", "current@example.test"),
     ];
     await run();
     expect(state.outbox.map((row) => row.recipientEmail)).toEqual(["current@example.test"]);
   });
   it("emails a person who holds two roles once", async () => {
-    state.grants = [grant("club-1", "DIRECTOR", "same@example.test"), grant("club-1", "REPORTER", "Same@Example.test")];
+    state.grants = [grant("club-1", "DIRECTOR", "same@example.test"), grant("club-1", "DEPUTY", "Same@Example.test")];
     await run();
     expect(state.outbox).toHaveLength(1);
   });
@@ -307,6 +316,7 @@ describe("the re-check at delivery", () => {
     ["reminders were turned off", () => { state.settings[0]!.enabled = false; }],
     ["the calendar was turned off", () => { state.features = []; }],
     ["the club is no longer active", () => { state.clubs[0]!.isActive = false; }],
+    ["the recipient is only a registrar now", () => { state.grants[0]!.role = "REGISTRAR"; }],
     ["the recipient lost their role", () => { state.grants = state.grants.filter((row) => (row.attendeeAccount as { email: string }).email !== "director@example.test"); }],
     ["the recipient's grant ended", () => { state.grants[0]!.effectiveTo = new Date("2026-11-09T00:00:00.000Z"); }],
     ["the recipient's account was disabled", () => { (state.grants[0]!.attendeeAccount as Row).disabledAt = new Date("2026-11-09T00:00:00.000Z"); }],
