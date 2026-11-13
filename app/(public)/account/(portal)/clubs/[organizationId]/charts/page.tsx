@@ -4,8 +4,8 @@ import { BackLink } from "@/components/back-link";
 import { clubAccessClosed } from "@/components/club-access-closed";
 import { ClubRosterCharts } from "@/components/club-roster-charts";
 import { loadRosterCharts } from "@/modules/club-roster-charts/repository";
-import { monthOf, parseBirthdayMonth } from "@/modules/club-roster-charts/domain";
-import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
+import { conferenceMonthOf, parseBirthdayMonth } from "@/modules/club-roster-charts/domain";
+import { actorAttribution, getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { yearLabel } from "@/modules/club-rosters/home-view";
 
 export const metadata: Metadata = { title: "Roster charts" };
@@ -27,7 +27,7 @@ export default async function ClubRosterChartsPage({
   const [{ organizationId }, { month: monthParam }] = await Promise.all([params, searchParams]);
   const access = await getRosterAccessStateForPage(organizationId);
   if (access.state !== "OPEN") return clubAccessClosed(access);
-  const view = await loadRosterCharts(organizationId, access.capabilities, { month: parseBirthdayMonth(monthParam, monthOf(new Date())) });
+  const view = await loadRosterCharts(organizationId, access.capabilities, { month: parseBirthdayMonth(monthParam, conferenceMonthOf(new Date())), actor: actorAttribution(access.actor) });
   if (!view) notFound();
   const base = `/account/clubs/${organizationId}`;
   return (
@@ -40,7 +40,8 @@ export default async function ClubRosterChartsPage({
         </div>
         <p className="quiet-copy">
           Counts of the active people on your roster this club year. Each chart has a table you can open under it. Nothing is
-          stored or sent. You can turn this off in <a href={`${base}/club-info#club-optional-features`}>Club settings</a>.
+          stored or sent.
+          {access.capabilities.editProfile && <> You can turn this off in <a href={`${base}/club-info#club-optional-features`}>Club settings</a>.</>}
         </p>
         <ClubRosterCharts action={`${base}/charts`} view={view} />
       </section>

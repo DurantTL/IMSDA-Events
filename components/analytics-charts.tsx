@@ -109,7 +109,7 @@ function LegendSwatch({ index }: { index: number }) {
   );
 }
 
-export function TrendChart({ title, series, points, summary, startLabel, endLabel }: {
+export function TrendChart({ title, series, points, summary, startLabel, endLabel, pointLabel = "Date", tableNote = "counts for each date or week" }: {
   title: string;
   series: readonly TrendSeries[];
   points: readonly TrendPoint[];
@@ -117,6 +117,10 @@ export function TrendChart({ title, series, points, summary, startLabel, endLabe
   summary: string;
   startLabel: string;
   endLabel: string;
+  /** The first table column heading. */
+  pointLabel?: string;
+  /** The words after the title in the table caption. */
+  tableNote?: string;
 }) {
   const base = safe(useId());
   const titleId = `${base}-title`;
@@ -145,9 +149,9 @@ export function TrendChart({ title, series, points, summary, startLabel, endLabe
       </svg>
       <p className={styles.axis}><span>{startLabel}</span><span>{`Vertical scale: 0 to ${number(max)}`}</span><span>{endLabel}</span></p>
       <DataTable
-        head={["Date", ...series.map((entry) => entry.label)]}
+        head={[pointLabel, ...series.map((entry) => entry.label)]}
         rows={points.map((point) => [point.label, ...series.map((_, index) => number(point.values[index] ?? 0))])}
-        title={`${title}: counts for each date or week`}
+        title={`${title}: ${tableNote}`}
       />
     </figure>
   );
@@ -184,7 +188,7 @@ export function FunnelBars({ title, steps, summary }: { title: string; steps: re
 export type BarRow = { key: string; label: string; value: number };
 
 /** Ranked horizontal bars (a top-N list). `empty` shows when there are no rows. */
-export function HorizontalBars({ title, valueLabel, rows, summary, empty, nameLabel = "Event" }: { title: string; valueLabel: string; rows: readonly BarRow[]; summary: string; empty: string; /** The first table column heading. */ nameLabel?: string }) {
+export function HorizontalBars({ title, valueLabel, rows, summary, empty, nameLabel = "Event", order = ", most first" }: { title: string; valueLabel: string; rows: readonly BarRow[]; summary: string; empty: string; /** The first table column heading. */ nameLabel?: string; /** The words after the title in the table caption, with their own leading comma or space. */ order?: string }) {
   const base = safe(useId());
   const titleId = `${base}-title`;
   const descId = `${base}-desc`;
@@ -204,7 +208,7 @@ export function HorizontalBars({ title, valueLabel, rows, summary, empty, nameLa
               </li>
             ))}
           </ol>
-          <DataTable head={[nameLabel, valueLabel]} rows={rows.map((row) => [row.label, number(row.value)])} title={`${title}, most first`} />
+          <DataTable head={[nameLabel, valueLabel]} rows={rows.map((row) => [row.label, number(row.value)])} title={`${title}${order}`} />
         </>
       )}
     </figure>

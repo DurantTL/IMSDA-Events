@@ -7,6 +7,7 @@
  * age beside it, and the age groups are counts of people.
  */
 
+import { calendarDateIn } from "@/modules/calendar/domain";
 import { ageOn, clubClassLevelLabels, clubRosterAttendeeTypeLabels, clubSchoolGradeLabels, type ClubClassLevel, type ClubSchoolGrade } from "@/modules/club-rosters/domain";
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
@@ -103,9 +104,14 @@ export function parseBirthdayMonth(value: string | string[] | undefined, fallbac
   return month >= 1 && month <= 12 ? month : fallback;
 }
 
-/** The month (1 to 12) of a calendar date, in UTC like the roster's other dates. */
-export function monthOf(date: Date): number {
-  return date.getUTCMonth() + 1;
+/** The calendar date today in the conference (Central) time zone, as YYYY-MM-DD. */
+export function conferenceToday(now: Date): string {
+  return calendarDateIn(now);
+}
+
+/** The month (1 to 12) it is now in the conference (Central) time zone. */
+export function conferenceMonthOf(now: Date): number {
+  return Number(conferenceToday(now).slice(5, 7));
 }
 
 export type BirthdayInput = { name: string; birthDate: string };
@@ -161,12 +167,6 @@ export function attendanceByMonth(meetings: readonly MeetingAttendance[]): Atten
       present: entry.present,
       averagePresent: Math.round(entry.present / entry.meetings),
     }));
-}
-
-/** The first and last calendar dates of a club year such as "2026-27" (September 1 to August 31). */
-export function clubYearDateRange(clubYear: string): { from: string; to: string } {
-  const start = Number(clubYear.slice(0, 4));
-  return { from: `${start}-09-01`, to: `${start + 1}-08-31` };
 }
 
 /* ------------------------------------------------------------------ Text summaries */

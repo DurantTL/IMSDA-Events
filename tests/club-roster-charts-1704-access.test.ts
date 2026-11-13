@@ -122,6 +122,44 @@ describe("the optional feature switch", () => {
   });
 });
 
+describe("auditing birthday views", () => {
+  it("writes one entry for a director view, with counts and ids only", async () => {
+    signedInAs("DIRECTOR");
+    await html();
+    expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
+    const entry = mocks.writeAuditLog.mock.calls[0]![0];
+    expect(entry).toMatchObject({
+      action: "CLUB_ROSTER_BIRTHDAYS_VIEWED",
+      entityType: "Organization",
+      entityId: "club-1",
+      metadata: { organizationId: "club-1", clubYear: "2026-27", month: 11, count: 2, actorAttendeeAccountId: "account-1" },
+    });
+    expect(JSON.stringify(entry)).not.toMatch(/Ann|Cy|Bo|Example|Sample|\d{4}-\d{2}-\d{2}/);
+  });
+
+  it("writes none for a registrar", async () => {
+    signedInAs("REGISTRAR");
+    await html();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("records the staff user and act-as for staff acting as the director", async () => {
+    actingAsDirector();
+    await html();
+    expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
+    expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({ actorUserId: "staff-1", metadata: { actAsId: "act-1" } });
+  });
+
+  it("writes none for a reporter, another club or a feature that is off", async () => {
+    signedInAs("REPORTER");
+    await ClubRosterChartsPage(params);
+    signedInAs("DIRECTOR");
+    mocks.prisma.clubOptionalFeature.findUnique.mockResolvedValue(null);
+    await expect(ClubRosterChartsPage(params)).rejects.toThrow();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+});
+
 describe("the charts page", () => {
   it("is named Roster charts", () => {
     expect(metadata.title).toBe("Roster charts");
@@ -175,6 +213,23 @@ describe("the charts page", () => {
     expect(askedForBirthDates).toBe(false);
   });
 
+  it("offers the Club settings link only to roles that can open it", async () => {
+    signedInAs("DIRECTOR");
+    expect(await html()).toContain("Club settings");
+    signedInAs("REGISTRAR");
+    expect(await html()).not.toContain("Club settings");
+  });
+
+  it("captions each chart table in its own words", async () => {
+    signedInAs("DIRECTOR");
+    const page = await html();
+    expect(page).toContain("Members by class, in class order");
+    expect(page).toContain("Members by school grade, in grade order");
+    expect(page).toContain("Members by age group, in age order");
+    expect(page).toContain("counts for each month");
+    expect(page).not.toContain("most first");
+  });
+
   it("shows the page to staff acting as this club's director, birthdays included", async () => {
     actingAsDirector();
     mocks.prisma.clubOptionalFeature.findUnique.mockResolvedValue({ id: "feature-1" });
@@ -185,7 +240,6 @@ describe("the charts page", () => {
   it("is not found when the club has not switched it on", async () => {
     signedInAs("DIRECTOR");
     mocks.prisma.clubOptionalFeature.findUnique.mockResolvedValue(null);
-    expect(mocks.prisma.clubOptionalFeature.findUnique).not.toHaveBeenCalled();
     await expect(ClubRosterChartsPage(params)).rejects.toThrow("NEXT_NOT_FOUND");
     expect(mocks.prisma.clubOptionalFeature.findUnique).toHaveBeenCalledWith({ where: { organizationId_featureKey: { organizationId: "club-1", featureKey: "roster-charts" } }, select: { id: true } });
     expect(mocks.prisma.clubRosterMember.findMany).not.toHaveBeenCalled();

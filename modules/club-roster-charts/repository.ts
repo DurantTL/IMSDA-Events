@@ -9,17 +9,19 @@ import {
   birthdaysInMonth,
   canSeeRosterBirthdays,
   canSeeRosterCharts,
-  clubYearDateRange,
   countByAgeBand,
   countByClassLevel,
   countByMemberType,
   countBySchoolGrade,
-  monthOf,
+  conferenceMonthOf,
+  conferenceToday,
   type AttendanceMonth,
   type Birthday,
   type CountRow,
 } from "@/modules/club-roster-charts/domain";
-import { calendarDateOf, clubYearFor } from "@/modules/club-rosters/domain";
+import { clubYearFor } from "@/modules/club-rosters/domain";
+import { writeAuditLog } from "@/modules/audit/audit-service";
+import { clubYearDateBounds } from "@/modules/club-meeting-notes/domain";
 import { openBirthDate } from "@/modules/club-rosters/birth-dates";
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
@@ -29,6 +31,28 @@ import type { ClubCapabilities } from "@/modules/organizations/director-grants-d
  * are opened only here, only for a viewer whose club role already sees birth dates, and only to count age groups and to
  * list month and day. Nothing here writes, and no birth date or age leaves this file.
  */
+
+/** Who is looking: an attendee account, or staff acting as the club's director (#442). */
+export type RosterChartsActor = { accountId: string } | { userId: string; actAsId?: string };
+
+async function auditBirthdaysViewed(organizationId: string, clubYear: string, month: number, shown: number, actor: RosterChartsActor) {
+  await writeAuditLog({
+    ...("userId" in actor ? { actorUserId: actor.userId } : {}),
+    action: "CLUB_ROSTER_BIRTHDAYS_VIEWED",
+    entityType: "Organization",
+    entityId: organizationId,
+    summary: "Showed the birthdays page on a club's roster charts.",
+    metadata: {
+      organizationId,
+      clubYear,
+      month,
+      count: shown,
+      ...("accountId" in actor
+        ? { actorAttendeeAccountId: actor.accountId }
+        : actor.actAsId ? { actAsId: actor.actAsId } : { viewedAsStaff: true }),
+    },
+  });
+}
 
 export type RosterChartsView = {
   clubYear: string;
@@ -50,13 +74,13 @@ export async function rosterChartsAvailable(organizationId: string, capabilities
 export async function loadRosterCharts(
   organizationId: string,
   capabilities: Pick<ClubCapabilities, "roster" | "seeBirthDates">,
-  options: { month?: number } = {},
+  options: { month?: number; actor?: RosterChartsActor } = {},
   now = new Date(),
 ): Promise<RosterChartsView | null> {
   if (!(await rosterChartsAvailable(organizationId, capabilities))) return null;
   const prisma = getPrisma();
   const clubYear = clubYearFor(now);
-  const range = clubYearDateRange(clubYear);
+  const range = clubYearDateBounds(clubYear);
   const [members, attendanceRows] = await Promise.all([
     prisma.clubRosterMember.findMany({
       where: { organizationId, clubYear, status: "ACTIVE" },
@@ -80,7 +104,7 @@ export async function loadRosterCharts(
 
   let birthdayView: RosterChartsView["birthdayView"] = null;
   if (canSeeRosterBirthdays(capabilities)) {
-    const month = options.month ?? monthOf(now);
+    const month = options.month ?? conferenceMonthOf(now);
     const withDates = await prisma.clubRosterMember.findMany({
       where: { organizationId, clubYear, status: "ACTIVE" },
       select: { sealedBirthDate: true, person: { select: { firstName: true, lastName: true } } },
@@ -91,12 +115,15 @@ export async function loadRosterCharts(
     }));
     birthdayView = {
       month,
-      ageBands: countByAgeBand(opened.map((person) => person.birthDate), calendarDateOf(now)),
+      ageBands: countByAgeBand(opened.map((person) => person.birthDate), conferenceToday(now)),
       birthdays: birthdaysInMonth(
         opened.flatMap((person) => (person.birthDate && person.name ? [{ name: person.name, birthDate: person.birthDate }] : [])),
         month,
       ),
     };
+    // Age groups and month/day together can rebuild a full birth date, so each view that shows birthdays is audited
+    // (ADR 0005 Addendum A). The entry holds counts and ids only: no name and no date.
+    if (options.actor) await auditBirthdaysViewed(organizationId, clubYear, month, birthdayView.birthdays.length, options.actor);
   }
 
   return {

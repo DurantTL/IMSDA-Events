@@ -4,7 +4,8 @@ import {
   birthdaysInMonth,
   canSeeRosterBirthdays,
   canSeeRosterCharts,
-  clubYearDateRange,
+  conferenceMonthOf,
+  conferenceToday,
   countByAgeBand,
   countByClassLevel,
   countByMemberType,
@@ -13,7 +14,7 @@ import {
   summarizeAttendance,
   summarizeCounts,
 } from "@/modules/club-roster-charts/domain";
-import { calendarDateOf } from "@/modules/club-rosters/domain";
+import { clubYearDateBounds } from "@/modules/club-meeting-notes/domain";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
 
 /** Roster charts and birthdays (#1704), pure. Synthetic data only. */
@@ -86,7 +87,7 @@ describe("counts", () => {
 
 describe("age groups (pinned clock)", () => {
   it("groups people by age today, counting a missing birth date apart", () => {
-    const today = calendarDateOf(new Date());
+    const today = conferenceToday(new Date());
     expect(today).toBe("2026-11-12");
     const rows = countByAgeBand(["2019-01-01", "2015-11-12", "2015-11-13", "2012-05-05", "2009-11-12", "1985-03-03", null], today);
     expect(rows).toEqual([
@@ -151,6 +152,19 @@ describe("birthdays", () => {
   });
 });
 
+describe("conference time zone", () => {
+  it("uses the Central date and month at 7 pm on the last day of a month, not UTC", () => {
+    const evening = new Date("2026-12-01T01:00:00.000Z"); // 7 pm Central on November 30
+    expect(conferenceToday(evening)).toBe("2026-11-30");
+    expect(conferenceMonthOf(evening)).toBe(11);
+    expect(evening.getUTCMonth() + 1).toBe(12);
+    // A person turning 12 on December 1 is still 11 that evening.
+    expect(countByAgeBand(["2014-12-01"], conferenceToday(evening))[0]!.key).toBe("10_12");
+    expect(countByAgeBand(["2014-11-30"], conferenceToday(evening))[0]!.key).toBe("10_12");
+    expect(countByAgeBand(["2016-12-01"], conferenceToday(evening))[0]!.key).toBe("UNDER_10");
+  });
+});
+
 describe("attendance by month", () => {
   it("groups meetings by month, oldest first, with the average present", () => {
     const rows = attendanceByMonth([
@@ -172,6 +186,6 @@ describe("attendance by month", () => {
   });
 
   it("covers a club year from September to August", () => {
-    expect(clubYearDateRange("2026-27")).toEqual({ from: "2026-09-01", to: "2027-08-31" });
+    expect(clubYearDateBounds("2026-27")).toEqual({ from: "2026-09-01", to: "2027-08-31" });
   });
 });
