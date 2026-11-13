@@ -482,4 +482,21 @@ describe("tiered attendee answer updates", () => {
     expect(tx.registrationCapacityReservation.upsert.mock.calls.map(([call]) => [call.create.optionValue, call.create.rank]))
       .toEqual([["Service", 0], ["Prayer", 1]]);
   });
+
+  it("only releases a waitlisted registration's rows, as a first submission on the waitlist writes none (#893)", async () => {
+    const { registration, tx } = fixture();
+    Object.assign(registration, { status: "WAITLISTED" });
+    await updateTieredRegistrationAnswersWithClient(tx as never, {
+      notifyApprovers: false,
+      registrationId: registration.id,
+      clientRequestId: "3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
+      expectedUpdatedAt: registration.updatedAt.toISOString(),
+      attendees: [{ attendeeId: "attendee-1", responses: { session_preferences: ["Service", "Prayer"] } }],
+      now: new Date("2026-07-30T11:00:00.000Z"),
+      audit: { action: "PRIVATE_LINK_ANSWERS_UPDATED", summary: () => "Changed.", metadata: {} },
+    });
+
+    expect(tx.registrationCapacityReservation.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.registrationCapacityReservation.upsert).not.toHaveBeenCalled();
+  });
 });

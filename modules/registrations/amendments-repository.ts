@@ -676,7 +676,8 @@ async function upsertChoiceSelections(
 /**
  * Re-syncs only the named attendees' selection rows for the named choice fields (#893): their old rows for those fields are
  * released, then the answers now stored are written. Other people's rows and other fields are left alone. "Not attending"
- * writes no row, so moving to it only releases.
+ * writes no row, so moving to it only releases. A waitlisted registration only releases, as a first submission on the
+ * waitlist writes no rows (`writeSelections: false`).
  */
 export async function syncAttendeeChoiceSelections(
   tx: Prisma.TransactionClient,
@@ -690,6 +691,7 @@ export async function syncAttendeeChoiceSelections(
     attendees: Array<{ attendeeId: string; responses: Record<string, unknown> }>;
     fieldKeys: string[];
     now: Date;
+    writeSelections?: boolean;
   },
 ) {
   if (input.attendees.length === 0 || input.fieldKeys.length === 0) return;
@@ -702,6 +704,7 @@ export async function syncAttendeeChoiceSelections(
     },
     data: { releasedAt: input.now },
   });
+  if (input.writeSelections === false) return;
   const keys = new Set(input.fieldKeys);
   const selections = selectedCapacityChoices(input.definition, input.registrationResponses, input.attendees)
     .filter((selection) => selection.registrationAttendeeId !== null && keys.has(selection.fieldKey));

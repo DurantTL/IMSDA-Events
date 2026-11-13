@@ -62,6 +62,7 @@ export async function updateTieredRegistrationAnswersWithClient(
     },
     select: {
       id: true,
+      status: true,
       eventId: true,
       confirmationCode: true,
       updatedAt: true,
@@ -297,6 +298,7 @@ export async function updateTieredRegistrationAnswersWithClient(
         .map((update) => ({ attendeeId: update.attendee.id, responses: update.responses })),
       fieldKeys: changedFields,
       now: input.now,
+      writeSelections: registration.status !== "WAITLISTED",
     });
     // A team registration keeps its event's team rules whoever edits it (#809); nothing is saved if they break.
     let teamMessageIds: string[] = [];
