@@ -877,6 +877,7 @@ enum ProgramUnassignedReason {
 
 model User {
   id            String            @id @default(cuid())
+  registrationSavedViews RegistrationSavedView[] @relation("RegistrationSavedViewOwner")
   personMergesActed            PersonMerge[]                 @relation("PersonMergeActor")
   personMergesReversed         PersonMerge[]                 @relation("PersonMergeReversedBy")
   personAnonymizationsApproved PersonAnonymization[]         @relation("PersonAnonymizationApprovedBy")
@@ -1845,6 +1846,7 @@ model AdminAlertFeedReceipt {
 }
 
 model Event {
+  registrationSavedViews RegistrationSavedView[]
   baptismFollowUpSetting BaptismFollowUpSetting?
   id                   String             @id @default(cuid())
   clubTeacherRule      ClubTeacherRule?
@@ -6633,6 +6635,29 @@ model ClubReportColumnLayout {
   updatedAt          DateTime @updatedAt
 
   @@unique([scopeKey, audience, name])
+}
+
+/// A named set of Registrations list filters, saved by one staff member for one event (#1511). It stores only filter
+/// keys and the stored values they name (the canonical operations search query without its page), never registration
+/// data, counts or rows: whoever opens a view runs it again under their own permissions. A shared view is visible to
+/// the event's staff who can read the list; `sharedByUserId` is a plain reference to who shared it.
+model RegistrationSavedView {
+  id             String    @id @default(cuid())
+  eventId        String
+  ownerUserId    String
+  name           String
+  query          String
+  shared         Boolean   @default(false)
+  sharedAt       DateTime?
+  sharedByUserId String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  owner User  @relation("RegistrationSavedViewOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, ownerUserId, name])
+  @@index([eventId, shared])
 }
 
 /// A director confirming that a club started its next club year's roster by

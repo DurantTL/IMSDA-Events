@@ -6,6 +6,9 @@ import { resolveLocationFilter } from "@/modules/event-locations/filter";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listRegistrations } from "@/modules/registrations/repository";
 import { OperationsSearchBar } from "@/components/operations-search-bar";
+import { SavedViewsPanel } from "@/components/saved-views-panel";
+import { hasSavableContent } from "@/modules/registrations/saved-views-domain";
+import { canShareSavedViews, listSavedViews } from "@/modules/registrations/saved-views-repository";
 import {
   activeFilterKeys,
   conflictIssue,
@@ -59,6 +62,10 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   const searchParseIssues = parsedSearch.issues.filter((issue) => issue.filter !== "location");
   const searchViewer = { eventId: event.id, permissions };
   const { catalog: searchCatalog, filters: searchFilters } = await describeOperationsSearch(searchViewer);
+  // Saved views (#1511): the current filters in canonical form (no page), and the views this person can open, each
+  // checked against the catalog already loaded above.
+  const currentViewQuery = serializeOperationsSearchQuery({ ...searchQuery, page: 1 });
+  const savedViews = user ? await listSavedViews({ eventId: event.id, userId: user.id, permissions }, searchCatalog) : [];
   const serverSearch = activeFilterKeys(searchQuery).some((key) => key !== "location") || picked.has("sort") || picked.has("page") || searchParseIssues.length > 0;
   // The retired single-answer parameters cannot ride along with a server search: say so instead of ignoring them.
   const retiredAnswerParams = serverSearch && Boolean(answerQuestion || answerValue) ? [conflictIssue(CHOICE_FILTER_QUESTION_PARAM)] : [];
@@ -138,6 +145,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
       query={searchQuery}
       summary={searchResult ? { total: searchResult.total, page: searchResult.page, pageCount: searchResult.pageCount, issues: searchResult.issues } : null}
     />
+    {user ? <SavedViewsPanel eventId={event.id} views={savedViews} currentQuery={currentViewQuery} canSave={hasSavableContent({ ...searchQuery, page: 1 })} canShare={canShareSavedViews(permissions)} /> : null}
     <LocationFilter basePath="/people" locations={locations} params={searchResult ? searchParamsForLinks : { event: event.id, filter, [CHOICE_FILTER_QUESTION_PARAM]: choice?.question.id, [CHOICE_FILTER_VALUE_PARAM]: choice?.value ?? undefined }} selectedId={locationId} />
     <ChoiceAnswerFilter eventId={event.id} view={choiceView} carry={{ filter, location: locationId ?? undefined }} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canExport={permissions.includes("VIEW_REPORTS") && permissions.includes("VIEW_SENSITIVE_DATA")} />
     </>} key={`${event.id}:${choice?.question.id ?? ""}:${choice?.value ?? ""}:${searchResult?.queryString ?? ""}`} eventId={event.id} eventSlug={event.slug} eventTimezone={event.timezone} waitlistEnabled={event.waitlistEnabled} initialRegistrations={registrations} canEdit={permissions.includes("MANAGE_REGISTRATION")} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} initialFilter={filter} initialRegistrationId={registration} backgroundFlaggedAttendeeIds={[...flagged]} announcementOptOuts={announcementOptOuts} emailSuppressions={suppressionMarks} responsibleAdults={responsibleAdults} matchingPersonFilter={Boolean(choice?.value)} locationId={locationId} pageScoped={Boolean(searchResult)} serverFiltered={Boolean(searchResult) || Boolean(locationId) || Boolean(choice?.value)} serverQuery={searchQuery.text} openOnlyRegistration={openOnlyRegistration} resultOrderText={searchResult ? describeSearchOrder(searchResult) : undefined} pendingTeamCount={pendingTeamCount} />
