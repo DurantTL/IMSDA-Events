@@ -23,6 +23,7 @@ import {
   checkoutFromRegistration,
   loadCheckoutRegistration,
   runSerializable,
+  assertCardPaymentsOpen,
   SquarePaymentOperationError,
   type PaymentAccess,
   type PaymentAuthorization,
@@ -126,7 +127,9 @@ async function prepareHostedLink(
       "This private registration link is invalid or no longer active.",
     );
   }
-  const checkout = checkoutFromRegistration(registration, configuration, { kind: input.kind });
+  // A Closed event hands out no Pay on Square link, new or replayed: checked in this transaction, before Square is called.
+  await assertCardPaymentsOpen(tx, registration.eventId);
+    const checkout = checkoutFromRegistration(registration, configuration, { kind: input.kind });
 
   const existing = await tx.paymentAttempt.findUnique({
     where: { clientIdempotencyKey: input.idempotencyKey },

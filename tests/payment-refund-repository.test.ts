@@ -107,7 +107,8 @@ describe("manual refund safety", () => {
 
     await recordRefund("event_1", "payment_manual", "user_1", input);
 
-    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    // One read of the event's state, one lock on the payment.
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
     expect(tx.refund.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ idempotencyKey: "key-operation-1", amount: 10 }),
     });

@@ -10,6 +10,7 @@ import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/mes
 import { findPaymentReplay } from "@/modules/payments/payment-replay";
 import { stationSummarySuffix } from "@/modules/checkin-stations/domain";
 import { logError } from "@/lib/logger";
+import { assertEventOpenForMoney } from "@/modules/events/money-lock";
 import {
   flushHostedDeletionsAfterResponse,
   invalidateHostedCheckoutsInTransaction,
@@ -104,6 +105,8 @@ export async function recordManualPayment(
   // the balance and the deposit rules and the audit is written once, by the attempt that commits. Nothing writes to
   // the Registration row itself: the lock is a lock only, so it does not make amendment reviews stale.
   await runSerializableTransaction(async (tx) => {
+    // A Closed event takes no new payments; checked in this transaction, before anything is written.
+    await assertEventOpenForMoney(tx, eventId, "staff");
     await tx.$queryRaw`
       SELECT "id" FROM "Registration"
       WHERE "id" = ${registrationId} AND "eventId" = ${eventId}
@@ -215,6 +218,8 @@ export async function recordRefund(
   let result: { pendingMessageIds: string[] };
   try {
   result = await prisma.$transaction(async (tx) => {
+    // A Closed event takes no new refunds; checked in this transaction, before anything is written.
+    await assertEventOpenForMoney(tx, eventId, "staff");
     // Serializes refunds on this payment, so a retry that races the original
     // waits and then finds its key below, and two distinct refunds cannot
     // both pass the balance check.

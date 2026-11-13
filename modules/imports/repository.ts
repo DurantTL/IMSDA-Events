@@ -6,6 +6,7 @@ import { recordRegistrationClassChanges, withClassChangeKick } from "@/modules/h
 import { createHash, randomUUID } from "node:crypto";
 import { ImportRecordStatus, ImportRunStatus, Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { assertEventOpenForMoney, EventClosedError } from "@/modules/events/money-lock";
 import { logError } from "@/lib/logger";
 import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/background-checks/refresh-after-write";
 import { createImportSnapshotIdentity, CsvImportError, parseImportCsv, type NormalizedImportData, type ParsedImportRow } from "@/modules/imports/csv-parser";
@@ -398,6 +399,9 @@ async function syncImportedDetails(
     },
   });
   if (!registration) throw new ImportOperationError("IMPORT_CONFLICT", `Registration ${data.confirmationCode} no longer exists.`);
+  // A row that carries a payment or a refund is refused for a Closed event, so the whole commit rolls back; checked in this
+  // transaction, before anything is written.
+  if (data.payment || (data.refunds?.length ?? 0) > 0) await assertEventOpenForMoney(tx, eventId, "staff");
 
   const contactSnapshot = {
     ...jsonObject(registration.contactSnapshot),
@@ -836,7 +840,8 @@ async function commitImportRunInner(eventId: string, importRunId: string, actorU
   } catch (error) {
     // The transaction rolled the run back to PENDING. Record the failure so it shows on the System report and
     // operational health (#1379); only a run still PENDING is touched, and a failure here never hides the real error.
-    if (!lostClaim) {
+    // A commit refused because the event is Closed leaves the run as it was, so it can be committed after a reopen.
+    if (!lostClaim && !(error instanceof EventClosedError)) {
       try {
         await getPrisma().importRun.updateMany({ where: { id: importRunId, eventId, status: ImportRunStatus.PENDING }, data: { status: ImportRunStatus.FAILED } });
       } catch (markError) {

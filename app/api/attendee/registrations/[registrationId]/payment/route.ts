@@ -62,7 +62,9 @@ function failure(error: unknown) {
           : error.code === "PAYMENT_RESULT_UNCERTAIN"
             || error.code === "PAYMENT_OPERATION_CONFLICT"
             ? 503
-            : 422,
+            : error.code === "EVENT_CLOSED"
+              ? 409
+              : 422,
       },
     );
   }

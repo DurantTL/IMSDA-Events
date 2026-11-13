@@ -3,6 +3,7 @@ import { AccessDeniedError, requirePermission } from "@/modules/access/authoriza
 import { getCurrentSession } from "@/modules/access/current-session";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { findActiveMembership } from "@/modules/events/repository";
+import { EventClosedError } from "@/modules/events/money-lock";
 import {
   attachSquarePaymentToRegistration,
   listUnmatchedSquarePayments,
@@ -40,6 +41,12 @@ function failure(error: unknown, fallback: string) {
     );
   }
   if (error instanceof AccessDeniedError) {
+    return Response.json(
+      { error: error.code, message: error.message },
+      { status: error.status, headers: noStoreHeaders },
+    );
+  }
+  if (error instanceof EventClosedError) {
     return Response.json(
       { error: error.code, message: error.message },
       { status: error.status, headers: noStoreHeaders },

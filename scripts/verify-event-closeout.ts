@@ -133,7 +133,7 @@ async function main() {
     assert(signoff.signedByNameSnapshot === "Ivy Invoices" && signoff.signedByUserId === invoicer.userId && signoff.warningsAcknowledged && signoff.note === "Reviewed the open items.", "the sign-off records the name, acknowledgement and note");
     const snapshotText = JSON.stringify(signoff.checklistSnapshot);
     const stored = signoff.checklistSnapshot as { checkedAt?: string; checks?: unknown[] };
-    assert(typeof stored.checkedAt === "string" && !Number.isNaN(Date.parse(stored.checkedAt)) && Array.isArray(stored.checks) && stored.checks.length === 11, "the snapshot holds a checkedAt time and all eleven checks");
+    assert(typeof stored.checkedAt === "string" && !Number.isNaN(Date.parse(stored.checkedAt)) && Array.isArray(stored.checks) && stored.checks.length === 12, "the snapshot holds a checkedAt time and all twelve checks");
     assert(!/Sample|Registrant|@|ECO-/.test(snapshotText), "the snapshot holds no name, email or code");
     for (const row of stored.checks as Array<Record<string, unknown>>) assert(Object.keys(row).sort().join() === "cents,count,id,state", "each snapshot row is id, state, count, cents");
     const closing = await prisma.eventLifecycleTransition.findUniqueOrThrow({ where: { id: signoff.transitionId! } });

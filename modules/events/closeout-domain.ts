@@ -21,6 +21,7 @@ export const closeoutCheckIds = [
   "pending-refunds",
   "failed-refunds",
   "draft-invoices",
+  "closed-event-money",
   "outstanding-balances",
   "overpaid-credit",
   "failed-payments",
@@ -31,7 +32,7 @@ export const closeoutCheckIds = [
 export type CloseoutCheckId = (typeof closeoutCheckIds)[number];
 
 /** Who the link is for: the money report is open to report viewers; the other pages need finance access. */
-export type CloseoutLinkAccess = "report" | "finance" | "event";
+export type CloseoutLinkAccess = "report" | "finance" | "event" | "page";
 
 export type CloseoutCheck = {
   id: CloseoutCheckId;
@@ -60,6 +61,8 @@ export type CloseoutFacts = {
   /** Registrations still WAITING on the waitlist; null when unreadable. */
   waitlistWaiting: number | null;
   square: UnmatchedSquareSummary;
+  /** Square payments and refunds recorded while the event was Closed that nobody has marked reviewed; null when unreadable. */
+  closedMoneyFlags: { count: number; cents: number } | null;
 };
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
@@ -138,6 +141,15 @@ export function buildCloseoutChecklist(facts: CloseoutFacts): CloseoutCheck[] {
       open: (count) => `${plural(count, "church invoice is", "church invoices are")} still in draft. Finalize or discard each one first.`,
       clear: "Every church invoice is finalized.",
     }));
+
+  checks.push(countCheck({ id: "closed-event-money", label: "Money recorded while closed", href: `${path("/finance/closeout", eventId)}#closeout-closed-money`, linkLabel: "Review the money", linkAccess: "page" }, {
+    count: facts.closedMoneyFlags?.count ?? null,
+    cents: facts.closedMoneyFlags?.cents ?? null,
+    whenOpen: "blocking",
+    what: "Money recorded while the event was closed",
+    open: (count) => `${plural(count, "Square payment or refund", "Square payments and refunds")} (${dollars(facts.closedMoneyFlags!.cents)}) arrived after the event was closed. ${count === 1 ? "It is" : "They are"} recorded, but a finance admin must mark ${count === 1 ? "it" : "each"} reviewed before the event can be signed off again.`,
+    clear: "No money arrived after the event was closed, or every item was reviewed.",
+  }));
 
   // Warnings.
   const owingCount = report?.owing.length ?? null;
@@ -268,6 +280,7 @@ export const checkLabels: Record<CloseoutCheckId, string> = {
   "pending-refunds": "Pending refunds",
   "failed-refunds": "Failed refunds",
   "draft-invoices": "Church invoices in draft",
+  "closed-event-money": "Money recorded while closed",
   "outstanding-balances": "Balances still owed",
   "overpaid-credit": "Overpaid credit",
   "failed-payments": "Failed payments",
@@ -277,6 +290,8 @@ export const checkLabels: Record<CloseoutCheckId, string> = {
 };
 
 export const CLOSEOUT_NOTE_MAX_LENGTH = 500;
+/** The note a finance admin writes when marking money recorded while closed as reviewed. */
+export const CLOSED_MONEY_CLEAR_NOTE_MAX_LENGTH = 500;
 
 export const closeoutStateWords: Record<CloseoutState, string> = {
   ready: "Ready",

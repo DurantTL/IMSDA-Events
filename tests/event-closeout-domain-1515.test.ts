@@ -30,6 +30,7 @@ const cleanFacts = (overrides: Partial<CloseoutFacts> = {}): CloseoutFacts => ({
   failedMessages: 0,
   waitlistWaiting: 0,
   square: { state: "ok", count: 0, cents: 0 },
+  closedMoneyFlags: { count: 0, cents: 0 },
   ...overrides,
 });
 const withReport = (change: Partial<NonNullable<CloseoutFacts["report"]>>) => cleanFacts({ report: { ...cleanFacts().report!, ...change } });
@@ -45,7 +46,7 @@ describe("the closeout checklist (#1515)", () => {
       expect(check.label, check.id).toBe(checkLabels[check.id]);
     }
     expect(checks.every((check) => check.state === "ready")).toBe(true);
-    expect(summarizeCloseout(checks)).toEqual({ blocking: 0, warning: 0, ready: 11, canSignOff: true });
+    expect(summarizeCloseout(checks)).toEqual({ blocking: 0, warning: 0, ready: 12, canSignOff: true });
   });
 
   it("blocks when the money report does not add up", () => {
@@ -101,10 +102,10 @@ describe("the closeout checklist (#1515)", () => {
   });
 
   it("never turns an unreadable value into ready: a blocking check stays blocking, a warning check stays a warning", () => {
-    const blind = buildCloseoutChecklist(cleanFacts({ report: null, draftInvoices: null, failedMessages: null, waitlistWaiting: null, churchBilled: true }));
+    const blind = buildCloseoutChecklist(cleanFacts({ report: null, draftInvoices: null, failedMessages: null, waitlistWaiting: null, closedMoneyFlags: null, churchBilled: true }));
     const states = Object.fromEntries(blind.map((check) => [check.id, check.state]));
     expect(states).toMatchObject({
-      "money-reconciliation": "blocking", "pending-payments": "blocking", "pending-refunds": "blocking", "failed-refunds": "blocking", "draft-invoices": "blocking",
+      "money-reconciliation": "blocking", "pending-payments": "blocking", "pending-refunds": "blocking", "failed-refunds": "blocking", "draft-invoices": "blocking", "closed-event-money": "blocking",
       "outstanding-balances": "warning", "overpaid-credit": "warning", "failed-payments": "warning", "failed-messages": "warning", waitlist: "warning",
     });
     for (const check of blind.filter((entry) => entry.id !== "unmatched-square")) {
@@ -112,6 +113,15 @@ describe("the closeout checklist (#1515)", () => {
       expect(check.sentence, check.id).toMatch(/could not be checked/);
     }
     expect(summarizeCloseout(blind).canSignOff).toBe(false);
+  });
+
+  it("blocks while money Square recorded after the close is not marked reviewed, and links to the list on the Closeout page", () => {
+    const open = stateOf(cleanFacts({ closedMoneyFlags: { count: 2, cents: 7500 } }), "closed-event-money");
+    expect(open).toMatchObject({ state: "blocking", count: 2, cents: 7500, label: "Money recorded while closed", linkAccess: "page" });
+    expect(open.href).toBe("/finance/closeout?event=evt_1#closeout-closed-money");
+    expect(open.sentence).toContain("$75.00");
+    expect(stateOf(cleanFacts({ closedMoneyFlags: { count: 0, cents: 0 } }), "closed-event-money").state).toBe("ready");
+    expect(summarizeCloseout(buildCloseoutChecklist(cleanFacts({ closedMoneyFlags: { count: 1, cents: 100 } }))).canSignOff).toBe(false);
   });
 
   it("an unreadable draft-invoice count on an event with no church billing is not an error, a church-billed one is", () => {
@@ -140,7 +150,7 @@ describe("the sign-off decision", () => {
 describe("the stored snapshot", () => {
   it("keeps ids, states, counts and cents only", () => {
     const snapshot = closeoutSnapshot(buildCloseoutChecklist(cleanFacts({ waitlistWaiting: 3 })));
-    expect(snapshot).toHaveLength(11);
+    expect(snapshot).toHaveLength(12);
     for (const row of snapshot) expect(Object.keys(row).sort()).toEqual(["cents", "count", "id", "state"]);
     expect(JSON.stringify(snapshot)).not.toMatch(/evt_1|\/finance|waiting on/);
   });

@@ -56,6 +56,8 @@ import {
 } from "@/modules/communications/transactional-messages";
 import { authorizeRegistrationAccessToken } from "@/modules/public-access/repository";
 import { logError } from "@/lib/logger";
+import { assertEventOpenForMoney, EventClosedError } from "@/modules/events/money-lock";
+import { flagIfEventClosed } from "@/modules/events/closed-event-money-flags";
 
 export type PaymentClient = Prisma.TransactionClient | PrismaClient;
 export type PaymentAccess = {
@@ -80,7 +82,8 @@ export type SquarePaymentOperationErrorCode =
   | "PAYMENT_DECLINED"
   | "PAYMENT_RESULT_UNCERTAIN"
   | "PAYMENT_REQUIRES_REVIEW"
-  | "PAYMENT_OPERATION_CONFLICT";
+  | "PAYMENT_OPERATION_CONFLICT"
+  | "EVENT_CLOSED";
 
 export class SquarePaymentOperationError extends Error {
   constructor(
@@ -91,6 +94,19 @@ export class SquarePaymentOperationError extends Error {
   ) {
     super(message);
     this.name = "SquarePaymentOperationError";
+  }
+}
+
+/**
+ * A card attempt or hosted link on a Closed event is refused with the attendee message, in the transaction that would
+ * start it and before Square is called. The code is EVENT_CLOSED (409 in the routes).
+ */
+export async function assertCardPaymentsOpen(tx: Prisma.TransactionClient, eventId: string) {
+  try {
+    await assertEventOpenForMoney(tx, eventId, "attendee");
+  } catch (error) {
+    if (error instanceof EventClosedError) throw new SquarePaymentOperationError("EVENT_CLOSED", error.message);
+    throw error;
   }
 }
 
@@ -579,6 +595,8 @@ async function preparePaymentAttempt(
     if (existing.status !== "PROCESSING") {
       return { operation: "RETURN_EXISTING", attempt: existing };
     }
+    // Calling Square again for a Closed event is refused; a payment Square already took arrives by webhook and is flagged.
+    await assertCardPaymentsOpen(tx, access.eventId);
     const retried = await tx.paymentAttempt.update({
       where: { id: existing.id },
       data: {
@@ -600,6 +618,8 @@ async function preparePaymentAttempt(
       "This private registration link is invalid or no longer active."
     );
   }
+  // A Closed event starts no new card payment: checked in this transaction, before a Square call or an attempt row.
+  await assertCardPaymentsOpen(tx, registration.eventId);
   const checkout = checkoutFromRegistration(registration, configuration, { kind: input.kind });
   if (checkout.state !== "READY") operationErrorForCheckout(checkout);
   // A deposit asked for must be one the server priced; it never silently charges the whole balance instead.
@@ -872,6 +892,8 @@ async function recordDuplicateCharge(
       },
     },
   });
+  // Square took this money whatever the event's state: it is recorded above, and flagged here when the event is Closed.
+  await flagIfEventClosed(tx, { eventId: attempt.eventId, kind: "PAYMENT", paymentId: payment.id, amountCents: provider.amountCents, source: "SQUARE_DUPLICATE" });
   return {
     attempt: updated,
     pendingMessageIds: [],
@@ -1068,6 +1090,10 @@ async function applyProviderPayment(
     });
   }
 
+  // Money Square took is never refused: when the event is Closed it stays recorded and is flagged in this transaction.
+  if (becameSuccessful) {
+    await flagIfEventClosed(tx, { eventId: attempt.eventId, kind: "PAYMENT", paymentId: payment.id, amountCents: attempt.amountCents, source: source === "CREATE_PAYMENT" ? "SQUARE_CARD" : "SQUARE_WEBHOOK" });
+  }
   const receipt = becameSuccessful
     ? await enqueuePaymentReceiptMessage(tx, {
         eventId: attempt.eventId,
@@ -1522,6 +1548,7 @@ async function applyExternalSquarePayment(
       },
     },
   });
+  await flagIfEventClosed(tx, { eventId: registration.eventId, kind: "PAYMENT", paymentId: created.id, amountCents: balanceCents, source: "SQUARE_EXTERNAL" });
   const receipt = await enqueuePaymentReceiptMessage(tx, {
     eventId: registration.eventId,
     registrationId: registration.id,
@@ -2030,6 +2057,11 @@ async function applyRefundWebhook(
         },
       });
     }
+  }
+
+  // A refund Square made is never refused. When it is new (or has just settled) and the event is Closed, it is flagged here.
+  if ((!existing || existing.status !== effectiveStatus) && effectiveStatus !== "FAILED") {
+    await flagIfEventClosed(tx, { eventId: payment.eventId, kind: "REFUND", refundId: refund.id, amountCents, source: "SQUARE_REFUND" });
   }
 
   if (!existing || existing.status !== effectiveStatus) {

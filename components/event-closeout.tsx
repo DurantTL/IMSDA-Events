@@ -1,7 +1,8 @@
 import { ClipboardCheck, WalletCards } from "lucide-react";
+import { ClosedMoneyReview } from "@/components/closed-money-review";
 import { EventCloseoutActions } from "@/components/event-closeout-actions";
 import { withCurrentEvent } from "@/components/staff-navigation";
-import { CLOSEOUT_NOTE_MAX_LENGTH, checkLabels, closeoutStateWords, type CloseoutCheck } from "@/modules/events/closeout-domain";
+import { CLOSED_MONEY_CLEAR_NOTE_MAX_LENGTH, CLOSEOUT_NOTE_MAX_LENGTH, checkLabels, closeoutStateWords, type CloseoutCheck } from "@/modules/events/closeout-domain";
 import type { CloseoutView } from "@/modules/events/closeout-repository";
 import { LIFECYCLE_REASON_MAX_LENGTH } from "@/modules/events/lifecycle-state";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
@@ -66,6 +67,12 @@ export function EventCloseoutView({ data, canSignOff, canManageFinance, canOpenM
         {data.stateLabel}. {summaryText}
       </p>
 
+      {closed && data.closedMoney.length > 0 ? (
+        <p className={`${styles.summary} ${styles.summaryBlocking}`} role="alert" data-testid="closeout-closed-money-notice">
+          Money arrived after this event was closed. It is recorded, but a finance admin must review it. Reopen the event to deal with it, then sign off again.
+        </p>
+      ) : null}
+
       <section className={styles.panel} aria-labelledby="closeout-checks">
         <h3 className={styles.panelHeading} id="closeout-checks">Checklist</h3>
         <p className={styles.note}>Blocking checks stop the sign-off. Warnings can be signed off once you have reviewed them. A check that could not be read is never shown as ready.</p>
@@ -85,6 +92,14 @@ export function EventCloseoutView({ data, canSignOff, canManageFinance, canOpenM
           })}
         </ul>
       </section>
+
+      {data.closedMoney.length > 0 ? (
+        <section className={styles.panel} aria-labelledby="closeout-closed-money-heading" id="closeout-closed-money">
+          <h3 className={styles.panelHeading} id="closeout-closed-money-heading">Money recorded while closed ({data.closedMoney.length})</h3>
+          <p className={styles.note}>Square payments and refunds that arrived after the event was closed. Each is recorded and counted in the money report. A finance admin marks each one reviewed, with a note.</p>
+          <ClosedMoneyReview eventId={data.eventId} items={data.closedMoney} canReview={canSignOff} noteMaxLength={CLOSED_MONEY_CLEAR_NOTE_MAX_LENGTH} />
+        </section>
+      ) : null}
 
       <section className={styles.panel} aria-labelledby="closeout-signoff">
         <h3 className={styles.panelHeading} id="closeout-signoff"><ClipboardCheck aria-hidden="true" size={18} /> Sign-off</h3>

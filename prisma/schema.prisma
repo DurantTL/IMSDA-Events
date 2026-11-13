@@ -1981,6 +1981,7 @@ model Event {
 
   lifecycleTransitions                EventLifecycleTransition[]
   closeoutSignoffs                    EventCloseoutSignoff[]
+  closedEventMoneyFlags               ClosedEventMoneyFlag[]
   closeoutReopenings                  EventCloseoutReopening[]
   /// The calendar items this event was set up from or linked to (#445). Several items can share one registration
   /// event (#1086): different dates or sites of one event, or a snow date.
@@ -4158,6 +4159,7 @@ model Payment {
   registration   Registration    @relation(fields: [registrationId], references: [id], onDelete: Cascade)
   refunds        Refund[]
   paymentAttempt PaymentAttempt?
+  closedEventMoneyFlag ClosedEventMoneyFlag?
 
   @@index([eventId, status])
   @@index([registrationId])
@@ -4537,6 +4539,7 @@ model Refund {
 
   event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
   payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  closedEventMoneyFlag ClosedEventMoneyFlag?
 
   @@unique([paymentId, externalReference])
   @@unique([paymentId, idempotencyKey])
@@ -12217,4 +12220,32 @@ model VisitingClubRequest {
   @@index([status, createdAt])
   @@index([eventId, status])
   @@index([submittedByAccountId])
+}
+
+/// Square money that arrived on an event that was already Closed (#1515 follow-up). The payment or refund is recorded as
+/// usual (the money moved); this row only asks the finance office to look at it. One row per payment and per refund, so a
+/// replayed webhook never raises it twice. Cleared, never deleted: `clearedAt`, the name as it was, and a required note.
+/// Ids and cents only. The user is a plain id with no foreign key, like the sign-off.
+model ClosedEventMoneyFlag {
+  id                    String    @id @default(cuid())
+  eventId               String
+  /// PAYMENT or REFUND.
+  kind                  String
+  paymentId             String?   @unique
+  refundId              String?   @unique
+  amountCents           Int
+  /// Where it came from: SQUARE_CARD (a card attempt that finished after close), SQUARE_WEBHOOK, SQUARE_EXTERNAL,
+  /// SQUARE_REFUND or SQUARE_DUPLICATE.
+  source                String
+  createdAt             DateTime  @default(now())
+  clearedAt             DateTime?
+  clearedByUserId       String?
+  clearedByNameSnapshot String?
+  clearNote             String?
+
+  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  refund  Refund?  @relation(fields: [refundId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, clearedAt])
 }
