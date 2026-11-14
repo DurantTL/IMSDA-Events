@@ -12,8 +12,9 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { formatDateRange } from "@/modules/calendar/domain";
 import { conferenceToday } from "@/modules/calendar/repository";
+import type { MinimumCounted } from "@/modules/public-metrics/domain";
 import { FunnelBars, HorizontalBars, InlineFunnelBar, InlineFunnelKey, StatTiles, TrendChart, type StatTile } from "@/components/analytics-charts";
-import { analyticsPeriods, bucketSeries, changeVersusPrevious, describeChange, funnelRate, parseAnalyticsPeriod, rateChangeVersusPrevious, topEventsByCompleted, type AnalyticsPeriod, type Change, type RateChange } from "@/modules/public-metrics/domain";
+import { analyticsPeriods, bucketSeries, changeVersusPrevious, describeChange, funnelRate, minimumShownCount, parseAnalyticsPeriod, rateChangeVersusPrevious, topEventsByCompleted, type AnalyticsPeriod, type Change, type RateChange } from "@/modules/public-metrics/domain";
 import { getAnalyticsSummary, type MetricRow } from "@/modules/public-metrics/repository";
 import styles from "./analytics.module.css";
 
@@ -94,6 +95,11 @@ function Table({ caption, head, rows, empty = "Nothing counted yet.", sortBy, se
 
 const rowsOf = (items: MetricRow[], label = (dimension: string) => dimension || "(none)"): TableRow[] => items.map((row) => ({ cells: [label(row.dimension), String(row.count)], values: [label(row.dimension), row.count] }));
 
+/** The words for the values left out because each was below the minimum: a count only, never a name. */
+function otherLine(kind: string, rest: MinimumCounted<MetricRow>) {
+  return rest.hiddenCount === 0 ? null : `Other ${kind}, each fewer than ${minimumShownCount} times: ${number(rest.hiddenTotal)} in total.`;
+}
+
 /** Aggregate public-site counts for the last 30 days, 90 days or 12 months (#111, #1560). System administrators only. Counts only: nobody's activity is shown. */
 export default async function PublicAnalyticsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { user } = await getCurrentSession();
@@ -150,7 +156,7 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
           <div className="section-heading"><div><p className="eyebrow">{formatDateRange(summary.from, summary.to)}</p><h2 id="analytics-intro">What is counted</h2></div></div>
           <StaffViewStrip choice label="Time period" views={analyticsPeriods.map((period) => ({ key: String(period), label: periodLabels[period], href: periodHref(search, period), current: period === days }))} />
           <p className={`field-help ${styles.help}`}>
-            Daily counts only. Nothing here identifies a person, a device, a search or a private event.
+            Daily counts only. Nothing here identifies a person, a device or a private event. The only text kept is the referring site&apos;s name, campaign tags and searches that found nothing, each shown only once it reaches {minimumShownCount} uses.
             Visitors who send a Global Privacy Control or Do Not Track signal are not counted, and the staff workspace is never measured. Rows older than 400 days are deleted.
           </p>
         </section>
@@ -210,6 +216,29 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
             Events are counted only while they are public.
           </p>
           <Table caption="How the events list was searched or filtered (which filter, never what was typed)" head={["Used", "Count"]} rows={rowsOf(summary.directory, (dimension) => dimension || "search")} search={search} sortBy="used" />
+        </section>
+
+        <section aria-labelledby="analytics-sources" className="panel">
+          <div className="section-heading"><div><h2 id="analytics-sources">Where visitors come from</h2></div></div>
+          <HorizontalBars empty="No visits from other sites were counted in this period." nameLabel="Site" order=", most first" rows={summary.referrers.shown.slice(0, 10).map((row) => ({ key: row.dimension, label: row.dimension, value: row.count }))} summary={summary.referrers.shown.length === 0 ? "No referring site reached the minimum count in this period." : `Bar chart of the top referring sites: ${summary.referrers.shown.slice(0, 10).map((row) => `${row.dimension}, ${number(row.count)}`).join("; ")}. The same numbers are in the table.`} title="Top referring sites" valueLabel="Visits" />
+          <Table caption="Referring sites (the site's name only, never the page)" head={["Site", "Visits"]} empty="No visits from other sites were counted in this period." rows={rowsOf(summary.referrers.shown)} search={search} sortBy="sites" />
+          {otherLine("sites", summary.referrers) && <p className={`field-help ${styles.help}`}>{otherLine("sites", summary.referrers)}</p>}
+          <Table caption="Campaign tags (source / medium / campaign)" head={["Tags", "Visits"]} empty="No campaign links were counted in this period." rows={rowsOf(summary.campaigns.shown)} search={search} sortBy="tags" />
+          {otherLine("tags", summary.campaigns) && <p className={`field-help ${styles.help}`}>{otherLine("tags", summary.campaigns)}</p>}
+          <p className={`field-help ${styles.help}`}>
+            Counted once when a visit starts, from the site that linked here and from the utm_source, utm_medium and utm_campaign tags in the link; nothing else from the address.
+            A site or tag set is shown only after {minimumShownCount} visits in the period, and one seen fewer than {minimumShownCount} times is deleted after 30 days.
+          </p>
+        </section>
+
+        <section aria-labelledby="analytics-searches" className="panel">
+          <div className="section-heading"><div><h2 id="analytics-searches">Searches with no results</h2></div></div>
+          <Table caption="Searches on the events list that showed no events" head={["Search", "Times"]} empty="No searches without results were counted in this period." rows={rowsOf(summary.noResultSearches.shown)} search={search} sortBy="searches" />
+          {otherLine("searches", summary.noResultSearches) && <p className={`field-help ${styles.help}`}>{otherLine("searches", summary.noResultSearches)}</p>}
+          <p className={`field-help ${styles.help}`}>
+            The words are cleaned first (lower case, letters and numbers only). Anything with an @ sign or a long number is never kept.
+            A search is shown only after {minimumShownCount} times in the period, and one seen fewer than {minimumShownCount} times is deleted after 30 days.
+          </p>
         </section>
 
         <section aria-labelledby="analytics-signin" className="panel">
