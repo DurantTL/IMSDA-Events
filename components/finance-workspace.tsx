@@ -40,7 +40,7 @@ import { EmptyState, NoMatchesState } from "@/components/empty-state";
 
 type PaymentRecord = RegistrationRecord["payments"][number];
 type AdjustmentRecord = RegistrationRecord["adjustments"][number];
-type AdjustmentKind = "SCHOLARSHIP" | "DISCOUNT" | "PROMO_CODE" | "CORRECTION" | "MEAL" | "ASSET";
+type AdjustmentKind = "SCHOLARSHIP" | "DISCOUNT" | "PROMO_CODE" | "CORRECTION" | "MEAL" | "ASSET" | "PRICE_OVERRIDE";
 
 const adjustmentKindLabels: Record<AdjustmentKind, string> = {
   SCHOLARSHIP: "Scholarship",
@@ -49,6 +49,7 @@ const adjustmentKindLabels: Record<AdjustmentKind, string> = {
   CORRECTION: "Correction",
   MEAL: "Meals",
   ASSET: "Keys and items",
+  PRICE_OVERRIDE: "Price override",
 };
 
 export function FinanceWorkspace({
@@ -86,6 +87,8 @@ export function FinanceWorkspace({
   function setModal(next: typeof modal) { setModalState(next); setFormEdited(false); }
   const trackForm = (event: FormEvent<HTMLFormElement>) => setFormEdited(formHasEdits(event.currentTarget, { ignore: ["adjustKind", "useFund", "fundOrganizationId", "fundSponsorName", "fundPledged"] }));
   const [adjustKind, setAdjustKind] = useState<AdjustmentKind>("SCHOLARSHIP");
+  /** The person chosen for a price override (#1509), so their current price shows beside the new one. */
+  const [overrideAttendeeId, setOverrideAttendeeId] = useState("");
   // The fund fields and the adjustment Type are controlled, so they are counted from their own state, not from the form.
   useUnsavedChangesGuard(formEdited || (modal === "adjust" && (adjustKind !== "SCHOLARSHIP" || fundEdited)));
   const [selectedAdjustment, setSelectedAdjustment] = useState<AdjustmentRecord | null>(null);
@@ -210,6 +213,8 @@ export function FinanceWorkspace({
     const attendeeId = String(form.get("attendeeId") ?? "") || undefined;
     const body = adjustKind === "PROMO_CODE"
       ? { kind: adjustKind, code: String(form.get("code") ?? ""), reason, attendeeId }
+      : adjustKind === "PRICE_OVERRIDE"
+        ? { kind: adjustKind, attendeeId, priceCents: Math.round(Number(form.get("price") ?? 0) * 100), reason }
       : adjustKind === "CORRECTION"
         ? { kind: adjustKind, amountCents: form.get("direction") === "RAISE" ? amountCents : -amountCents, reason, attendeeId }
         : adjustKind === "SCHOLARSHIP" && form.get("useFund") === "on"
@@ -369,14 +374,33 @@ export function FinanceWorkspace({
               <form className="form-stack" onChange={trackForm} onSubmit={saveAdjustment}>
                 <div className="inline-notice">{selected.isDeferredOrganizationBilling ? `Current estimated ${selected.isGroup ? "amount" : "church amount"} ${formatCents(selected.totalAmountCents)}. ${selected.isGroup ? groupBillingFinalNote : churchBillingFinalNote}` : `Current total ${formatCents(selected.totalAmountCents)} · paid ${formatCents(selected.paidCents)} · balance ${formatCents(selected.balanceCents)}`}</div>
                 <label>Type
-                  <select name="adjustKind" value={adjustKind} onChange={(event) => { setAdjustKind(event.target.value as AdjustmentKind); setError(""); }}>
+                  <select name="adjustKind" value={adjustKind} onChange={(event) => { setAdjustKind(event.target.value as AdjustmentKind); setOverrideAttendeeId(""); setError(""); }}>
                     <option value="SCHOLARSHIP">{`Scholarship — ${wording.lowers}`}</option>
                     <option value="DISCOUNT">{`Discount — ${wording.lowers}`}</option>
                     <option value="PROMO_CODE">Promo code — apply an event code now</option>
                     <option value="CORRECTION">Correction — fix a wrong amount either way</option>
+                    <option value="PRICE_OVERRIDE">Set this person&apos;s price — charge one person a different price</option>
                   </select>
                 </label>
-                {selected.attendees.length > 1 && (
+                {adjustKind === "PRICE_OVERRIDE" && (
+                  <>
+                    <label>Person
+                      <select name="attendeeId" required value={overrideAttendeeId} onChange={(event) => { setOverrideAttendeeId(event.target.value); setError(""); }}>
+                        <option value="">Choose a person</option>
+                        {selected.attendees.map((attendee) => <option key={attendee.id} value={attendee.id}>{attendee.firstName} {attendee.lastName}{typeof attendee.currentPriceCents !== "number" ? " (no per-person price on file)" : ""}</option>)}
+                      </select>
+                    </label>
+                    {(() => {
+                      const person = selected.attendees.find((attendee) => attendee.id === overrideAttendeeId);
+                      if (!person) return null;
+                      return typeof person.currentPriceCents !== "number"
+                        ? <p className="quiet-copy">There is no per-person price on file for {person.firstName} {person.lastName}. Use a discount or a correction instead.</p>
+                        : <p className="quiet-copy">Current price for {person.firstName} {person.lastName}: <strong>{formatCents(person.currentPriceCents)}</strong>, with adjustments. The total changes by the difference.</p>;
+                    })()}
+                    <label>New price<input name="price" type="number" min="0" step="0.01" required /></label>
+                  </>
+                )}
+                {adjustKind !== "PRICE_OVERRIDE" && selected.attendees.length > 1 && (
                   <label>For
                     <select name="attendeeId" defaultValue="">
                       <option value="">{adjustKind === "PROMO_CODE" ? "Whole registration" : "Whole registration (not one person)"}</option>
@@ -385,7 +409,7 @@ export function FinanceWorkspace({
                     {adjustKind === "PROMO_CODE" && <small className="quiet-copy">Codes are per person: pick someone to price the code on their share only. Each person can have one code.</small>}
                   </label>
                 )}
-                {adjustKind === "PROMO_CODE" ? (
+                {adjustKind === "PRICE_OVERRIDE" ? null : adjustKind === "PROMO_CODE" ? (
                   <label>Promo code<input name="code" maxLength={40} required autoComplete="off" placeholder="EARLYBIRD" />
                     <small className="quiet-copy">Checked against the price and the date they registered, and counts as one use of the code.</small>
                   </label>

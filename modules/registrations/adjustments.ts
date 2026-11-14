@@ -11,6 +11,9 @@ import { getRegistrationById } from "@/modules/registrations/repository";
 import { fundAwardSchema } from "@/modules/scholarship-funds/domain";
 import { recordFundAward } from "@/modules/scholarship-funds/repository";
 import { formatPersonName } from "@/lib/person-name";
+import { attendeePriceCents, attendeeShareCentsFrom } from "@/modules/registrations/person-price";
+import { appendLedgerEntry, staffLedgerActor } from "@/modules/ledger/entries";
+import type { LedgerEntryKind } from "@/modules/ledger/domain";
 
 /**
  * Staff adjustments to what a registration owes (#396): scholarships,
@@ -52,6 +55,14 @@ export const createAdjustmentSchema = z.discriminatedUnion("kind", [
     /** One person in the registration (#397): the code prices that person's share only. */
     attendeeId: z.string().trim().min(1).max(64).optional(),
   }).strict(),
+  z.object({
+    kind: z.literal("PRICE_OVERRIDE"),
+    /** The one person whose price is set (#1509); required. */
+    attendeeId: z.string().trim().min(1, "Choose a person.").max(64),
+    /** The person's new price, in cents: what they owe in total for themselves, adjustments included. */
+    priceCents: z.number().int("Enter a price.").min(0, "The price can't be less than $0.").max(10_000_000),
+    reason: z.string().trim().min(3, "Enter a reason.").max(500),
+  }).strict(),
 ]);
 
 export const reverseAdjustmentSchema = z.object({
@@ -73,6 +84,7 @@ export type AdjustmentErrorCode =
   | "PROMO_INVALID"
   | "ATTENDEE_NOT_FOUND"
   | "ATTENDEE_PRICE_UNKNOWN"
+  | "PRICE_OVERRIDE_UNCHANGED"
   | "FUND_AWARD_NOT_ALLOWED";
 
 export class AdjustmentError extends Error {
@@ -93,21 +105,53 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 /**
- * One person's share of the priced registration, from the latest pricing
- * snapshot (an amendment's, else the submission's): the line items carrying
- * their attendee index. Null when the registration has no per-person pricing
- * (entered by staff, or a single-person form).
+ * One person's current share of what the registration owes: their priced lines plus every adjustment line (and
+ * reversal) that names them. Null when the registration has no per-person pricing for them.
  */
-function attendeePriceCents(
-  registration: { publicFormSubmission: { pricingSnapshot: unknown } | null; operations: Array<{ afterSnapshot: unknown }> },
+async function attendeeShareCents(
+  tx: Client,
+  registration: Parameters<typeof attendeePriceCents>[0] & { id: string },
+  attendee: { id: string },
   attendeeIndex: number,
 ) {
-  const amended = record(record(registration.operations[0]?.afterSnapshot).pricingSnapshot);
-  const snapshot = Object.keys(amended).length > 0 ? amended : record(registration.publicFormSubmission?.pricingSnapshot);
-  const lines = Array.isArray(snapshot.lineItems) ? snapshot.lineItems.map(record) : [];
-  const own = lines.filter((line) => line.attendeeIndex === attendeeIndex && typeof line.amountCents === "number");
-  if (own.length === 0) return null;
-  return own.reduce((total, line) => total + (line.amountCents as number), 0);
+  const adjusted = await tx.registrationAdjustment.aggregate({
+    where: { registrationId: registration.id, registrationAttendeeId: attendee.id },
+    _sum: { amountCents: true },
+  });
+  return attendeeShareCentsFrom(registration, attendeeIndex, adjusted._sum.amountCents ?? 0);
+}
+
+/**
+ * Records a price-override line in the ledger (#1509), in the caller's transaction: a CHARGE when the person's price went
+ * up, a DISCOUNT when it came down. Money only (an attendee position, never a name).
+ */
+async function appendPriceOverrideLedgerEntry(
+  tx: Client,
+  input: {
+    eventId: string; registrationId: string; actorUserId: string; adjustmentId: string; reason: string;
+    attendeeIndex: number; previousPriceCents: number; newPriceCents: number;
+  },
+) {
+  const changeCents = input.newPriceCents - input.previousPriceCents;
+  const kind: LedgerEntryKind = changeCents > 0 ? "CHARGE" : "DISCOUNT";
+  await appendLedgerEntry(tx, {
+    eventId: input.eventId,
+    registrationId: input.registrationId,
+    kind,
+    amountCents: changeCents,
+    currency: "USD",
+    pricingSnapshot: {
+      attendeeIndex: input.attendeeIndex,
+      previousPriceCents: input.previousPriceCents,
+      newPriceCents: input.newPriceCents,
+      changeCents,
+    },
+    sourceType: "STAFF_PRICE_OVERRIDE",
+    sourceId: input.adjustmentId,
+    origin: "LIVE",
+    actor: await staffLedgerActor(tx, input.actorUserId),
+    reason: input.reason,
+  });
 }
 
 function attendeeName(attendee: { profileSnapshot: unknown; person: { firstName: string; lastName: string } }) {
@@ -223,6 +267,7 @@ export async function createRegistrationAdjustment(
     let kind: RegistrationAdjustmentKind = input.kind;
     let changeCents: number;
     let promo: { id: string; code: string } | null = null;
+    let priceOverride: { previousPriceCents: number; newPriceCents: number } | null = null;
     if (input.kind === "SCHOLARSHIP" && input.fundAward && registration.event?.billingMode === "DEFERRED_ORGANIZATION_INVOICE") {
       // A church-billed registration adjusts an estimate that is invoiced later, not an amount a fund award can cover.
       throw new AdjustmentError(
@@ -304,6 +349,20 @@ export async function createRegistrationAdjustment(
         }
         throw error;
       }
+    } else if (input.kind === "PRICE_OVERRIDE") {
+      if (!attendee) throw new AdjustmentError("ATTENDEE_NOT_FOUND", "That person isn't on this registration.");
+      const share = await attendeeShareCents(tx, registration, attendee, attendeeIndex);
+      if (share === null) {
+        throw new AdjustmentError(
+          "ATTENDEE_PRICE_UNKNOWN",
+          `There's no per-person price on file for ${attendeeName(attendee)}. Use a discount or a correction for the amount.`,
+        );
+      }
+      if (input.priceCents === share) {
+        throw new AdjustmentError("PRICE_OVERRIDE_UNCHANGED", `${attendeeName(attendee)} already pays ${formatCents(share)}. Enter a different price.`);
+      }
+      priceOverride = { previousPriceCents: share, newPriceCents: input.priceCents };
+      changeCents = input.priceCents - share;
     } else if (input.kind === "CORRECTION") {
       changeCents = input.amountCents;
     } else {
@@ -358,6 +417,29 @@ export async function createRegistrationAdjustment(
         registrationAttendeeId: attendee?.id ?? null,
       },
     }, tx);
+    if (priceOverride && attendee) {
+      await appendPriceOverrideLedgerEntry(tx, {
+        eventId, registrationId, actorUserId, adjustmentId: adjustment.id, reason: input.reason,
+        attendeeIndex, ...priceOverride,
+      });
+      await writeAuditLog({
+        eventId,
+        actorUserId,
+        action: "REGISTRATION_PRICE_OVERRIDDEN",
+        entityType: "RegistrationAdjustment",
+        entityId: adjustment.id,
+        summary: `Set one person's price on registration ${registration.confirmationCode}.`,
+        metadata: {
+          registrationId,
+          adjustmentId: adjustment.id,
+          registrationAttendeeId: attendee.id,
+          personPriceBeforeCents: priceOverride.previousPriceCents,
+          personPriceAfterCents: priceOverride.newPriceCents,
+          totalBeforeCents: registration.totalCents,
+          totalAfterCents: nextTotal,
+        },
+      }, tx);
+    }
   });
   return getRegistrationById(eventId, registrationId);
 }
@@ -475,6 +557,13 @@ export async function reverseRegistrationAdjustment(
     }
     const changeCents = -original.amountCents;
     const nextTotal = checkNewTotal(registration.totalCents, changeCents, registration.paidCents);
+    // The person's share before the reversal, for the ledger entry a price override's reversal writes (#1509).
+    const overrideAttendeeIndex = original.kind === "PRICE_OVERRIDE" && original.registrationAttendeeId
+      ? registration.attendees.findIndex((candidate) => candidate.id === original.registrationAttendeeId)
+      : -1;
+    const shareBeforeReversal = overrideAttendeeIndex >= 0
+      ? await attendeeShareCents(tx, registration, { id: original.registrationAttendeeId! }, overrideAttendeeIndex)
+      : null;
     const reversal = await tx.registrationAdjustment.create({
       data: {
         eventId,
@@ -501,6 +590,14 @@ export async function reverseRegistrationAdjustment(
       where: { id: registrationId },
       data: { totalAmount: nextTotal / 100 },
     });
+    if (original.kind === "PRICE_OVERRIDE") {
+      // Without a per-person price on file (an override can only be written with one) the share is the line alone.
+      const previousPriceCents = shareBeforeReversal ?? original.amountCents;
+      await appendPriceOverrideLedgerEntry(tx, {
+        eventId, registrationId, actorUserId, adjustmentId: reversal.id, reason,
+        attendeeIndex: overrideAttendeeIndex, previousPriceCents, newPriceCents: previousPriceCents + changeCents,
+      });
+    }
     await writeAuditLog({
       eventId,
       actorUserId,

@@ -13,7 +13,7 @@ and a health view proves the two agree. Later slices (payments, allocations, ref
 | `amountCents` | Integer cents, **signed**: `CHARGE >= 0`, `DISCOUNT <= 0`, `CREDIT <= 0` (a database `CHECK`). A registration's total is the plain sum of its entries. |
 | `currency` | `USD` unless the form says otherwise. |
 | `pricingSnapshot` | Required JSON: the **money-only** pricing facts behind the entry (line key, amount, pricing label and attendee position, never the free-text line label, which names the attendee; totals; the promo rule; before and after totals for an amendment). Built by `moneyOnlyPricingSnapshot` on both the live and backfill paths. Names, attendee labels and contact details never reach a row, because a row can never be erased (`stripPersonalKeys` is a backstop at the write). |
-| `sourceType`, `sourceId` | `REGISTRATION_SUBMISSION` (the registration id), `AMENDMENT` (the `RegistrationOperation` id) or `PROMO_REDEMPTION` (the `PromoCodeRedemption` id). |
+| `sourceType`, `sourceId` | `REGISTRATION_SUBMISSION` (the registration id), `AMENDMENT` (the `RegistrationOperation` id), `PROMO_REDEMPTION` (the `PromoCodeRedemption` id) or `STAFF_PRICE_OVERRIDE` (the price-override `RegistrationAdjustment` id, or the id of its reversal; #1509). |
 | `origin` | `LIVE` (written with the change) or `BACKFILL` (reconstructed by the script). |
 | `actorType`, `actorId`, `actorNameSnapshot` | An immutable snapshot of who made the change. **No foreign keys**: `SET NULL` would be an UPDATE, and removing a user must not rewrite history. Only a staff member's name is kept; a director or group contact is an id only. |
 | `reason`, `createdAt` | Optional short reason (not used for amendments: their free-text reason stays on the operation) and the time. |
