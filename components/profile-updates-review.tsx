@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/empty-state";
+import { ProfileAccountSearch } from "@/components/profile-account-search";
 import { ProfileCorrectionForm } from "@/components/profile-correction-form";
 import styles from "@/components/profile-updates-review.module.css";
 import { ProfilePersonalCorrectionForm } from "@/components/profile-personal-correction-form";
@@ -20,16 +21,19 @@ export function ProfileUpdatesReview({ changes, accounts, slice }: { changes: St
   const pageHref = (target: number) => (target <= 1 ? "/people/profile-updates" : `/people/profile-updates?page=${target}`);
   if (changes.length === 0) {
     return (
-      <EmptyState
-        action={{ label: "Back to people", href: "/people" }}
-        actionClass="secondary-button"
-        canCreate
-        className="empty-state panel"
-        headingLevel={2}
-        title="No profile changes yet"
-      >
-        Changes appear here when an attendee edits their saved profile or updates it from a registration. Nothing needs your attention now.
-      </EmptyState>
+      <div className={styles.stack}>
+        <EmptyState
+          action={{ label: "Back to people", href: "/people" }}
+          actionClass="secondary-button"
+          canCreate
+          className="empty-state panel"
+          headingLevel={2}
+          title="No profile changes yet"
+        >
+          Changes appear here when an attendee edits their saved profile or updates it from a registration. Nothing needs your attention now.
+        </EmptyState>
+        <ProfileAccountSearch />
+      </div>
     );
   }
   return (
@@ -64,6 +68,7 @@ export function ProfileUpdatesReview({ changes, accounts, slice }: { changes: St
           ))}
         </ul>
       </section>
+      <ProfileAccountSearch />
     </div>
   );
 }

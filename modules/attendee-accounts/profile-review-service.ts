@@ -111,7 +111,7 @@ async function currentAnswers(client: AnswerClient, registrationId: string, veri
         take: 1,
         select: { afterSnapshot: true },
       },
-      attendees: { orderBy: [{ position: "asc" }, { id: "asc" }], select: { formResponses: true } },
+      attendees: { orderBy: [{ position: "asc" }, { id: "asc" }], select: { formResponses: true, attendeeTypeDefinition: { select: { minimumAge: true, maximumAge: true } } } },
     },
   });
   const submission = registration?.publicFormSubmission;
@@ -125,7 +125,11 @@ async function currentAnswers(client: AnswerClient, registrationId: string, veri
     Object.fromEntries(Object.entries(source).filter(([key]) => allowed.has(key)));
   const registrationAnswers = keep(answers, registrationKeys);
   const attendeeAnswers = registration.attendees.map((attendee) => keep(record(attendee.formResponses), attendeeKeys));
-  const holderIndex = accountHolderAttendeeIndex({ verifiedEmail, registrationAnswers, attendeeAnswers, today: todayDateValue() });
+  const attendees = registration.attendees.map((attendee, index) => ({
+    answers: attendeeAnswers[index]!,
+    type: attendee.attendeeTypeDefinition ?? null,
+  }));
+  const holderIndex = accountHolderAttendeeIndex({ verifiedEmail, registrationAnswers, attendees, today: todayDateValue() });
   return { registration: registrationAnswers, holder: holderIndex === null ? {} : attendeeAnswers[holderIndex]! };
 }
 

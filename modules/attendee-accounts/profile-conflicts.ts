@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { ageOn, parseCalendarDate } from "@/modules/club-rosters/domain";
+import { classifyAttendeeType } from "@/modules/attendee-types/domain";
 import { BIRTH_DATE_FIELD_KEYS, todayDateValue } from "@/modules/forms/definition";
 
 /**
@@ -272,28 +273,43 @@ function firstClean(responses: Record<string, unknown>, keys: readonly string[])
 }
 
 /**
- * True when the attendee's own birth-date answer is a real calendar date showing 18 or over on `today` (a YYYY-MM-DD
- * calendar date in America/Chicago). No birth date, an unreadable one or one in the future is not an adult: nothing
- * else (an age number, the attendee type, a "minor" flag) is evidence.
+ * Whether an attendee is an adult, as far as the registration can prove it. A birth-date answer that is present
+ * decides, and only a real calendar date on or before `today` showing 18 or over is an adult: an unreadable or future
+ * birth date is unclear, so not an adult, and never falls through to the type. Only a fully absent birth date lets the
+ * linked attendee type decide, through the shared `classifyAttendeeType` (adult means a minimum age of 18 or more and no
+ * maximum under 18). No type, no age range, a younger range or an open-ended one is not an adult. Free-text labels, age
+ * numbers and "minor" flags are never evidence.
  */
-function isAdultByBirthDate(attendee: Record<string, unknown>, today: string): boolean {
-  const raw = firstClean(attendee, BIRTH_DATE_FIELD_KEYS);
-  if (!raw || !parseCalendarDate(raw)) return false;
-  const age = ageOn(raw, today);
-  return age !== null && age >= ADULT_AGE;
+function isAdultAttendee(attendee: AccountHolderAttendee, today: string): boolean {
+  const raw = firstClean(attendee.answers, BIRTH_DATE_FIELD_KEYS);
+  if (raw) {
+    if (!parseCalendarDate(raw)) return false;
+    const age = ageOn(raw, today);
+    return age !== null && age >= ADULT_AGE;
+  }
+  return attendee.type ? classifyAttendeeType(attendee.type) === "ADULT" : false;
 }
+
+/** One attendee on the registration: the attendee-scope answers and the age range of the linked attendee type. */
+export type AccountHolderAttendee = {
+  answers: Record<string, unknown>;
+  /** The attendee's `EventAttendeeType` age range; null when there is no linked type. */
+  type: { minimumAge: number | null; maximumAge: number | null } | null;
+};
 
 /**
  * The index of the one attendee who is the signed-in account holder, else null.
  *
  * An attendee counts when (a) an attendee-scope email answer equals the account's verified email, or (b) their first
- * and last name answers match the registration's primary contact name; and, in both cases, their birth-date answer
- * shows an adult today. A child is never the holder. If more than one attendee counts, nobody does.
+ * and last name answers match the registration's primary contact name; and, in both cases, they are an adult: a
+ * birth-date answer showing 18 or over, or, when there is no usable birth date, an adult attendee type (minimum age 18
+ * or more). A birth date always wins over the type. A child is never the holder. If more than one attendee counts,
+ * nobody does.
  */
 export function accountHolderAttendeeIndex(input: {
   verifiedEmail: string;
   registrationAnswers: Record<string, unknown>;
-  attendeeAnswers: ReadonlyArray<Record<string, unknown>>;
+  attendees: ReadonlyArray<AccountHolderAttendee>;
   /** Today's calendar date in America/Chicago; defaults to now. */
   today?: string;
 }): number | null {
@@ -302,12 +318,13 @@ export function accountHolderAttendeeIndex(input: {
   const contactFirst = firstClean(input.registrationAnswers, contactFirstNameKeys).toLowerCase();
   const contactLast = firstClean(input.registrationAnswers, contactLastNameKeys).toLowerCase();
   const holders: number[] = [];
-  input.attendeeAnswers.forEach((attendee, index) => {
-    if (!isAdultByBirthDate(attendee, today)) return;
-    const emailMatch = email !== "" && attendeeEmailKeys.some((key) => clean(attendee[key]).toLowerCase() === email);
+  input.attendees.forEach((attendee, index) => {
+    if (!isAdultAttendee(attendee, today)) return;
+    const answers = attendee.answers;
+    const emailMatch = email !== "" && attendeeEmailKeys.some((key) => clean(answers[key]).toLowerCase() === email);
     const nameMatch = contactFirst !== "" && contactLast !== ""
-      && clean(attendee.first_name).toLowerCase() === contactFirst
-      && clean(attendee.last_name).toLowerCase() === contactLast;
+      && clean(answers.first_name).toLowerCase() === contactFirst
+      && clean(answers.last_name).toLowerCase() === contactLast;
     if (emailMatch || nameMatch) holders.push(index);
   });
   return holders.length === 1 ? holders[0]! : null;
