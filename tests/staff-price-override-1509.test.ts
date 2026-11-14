@@ -93,7 +93,7 @@ describe("setting one person's price", () => {
     expect(mocks.registrationUpdate).toHaveBeenCalledWith({ where: { id: "reg-1" }, data: { totalAmount: 245 } });
     expect(mocks.ledgerCreate).toHaveBeenCalledTimes(1);
     expect(mocks.ledgerCreate.mock.calls[0]![0].data).toMatchObject({
-      kind: "DISCOUNT", amountCents: -2500, sourceType: "STAFF_PRICE_OVERRIDE", sourceId: "adj-1", origin: "LIVE", actorType: "STAFF", actorId: "user-1", reason: "Approved by the committee",
+      kind: "DISCOUNT", amountCents: -2500, sourceType: "STAFF_PRICE_OVERRIDE", sourceId: "adj-1", origin: "LIVE", actorType: "STAFF", actorId: "user-1", reason: null,
       pricingSnapshot: { attendeeIndex: 1, previousPriceCents: 12500, newPriceCents: 10000, changeCents: -2500 },
     });
     const audit = mocks.writeAuditLog.mock.calls.find(([entry]) => entry.action === "REGISTRATION_PRICE_OVERRIDDEN")![0];
@@ -102,6 +102,17 @@ describe("setting one person's price", () => {
       metadata: { registrationId: "reg-1", adjustmentId: "adj-1", registrationAttendeeId: "att-2", personPriceBeforeCents: 12500, personPriceAfterCents: 10000, totalBeforeCents: 27000, totalAfterCents: 24500 },
     });
     expect(JSON.stringify(audit)).not.toMatch(/Sara|Lee/);
+  });
+
+  it("keeps no free text in the ledger row; the reason stays on the adjustment line", async () => {
+    await createRegistrationAdjustment("event-1", "reg-1", "user-1", override(10000));
+    expect(mocks.ledgerCreate.mock.calls[0]![0].data.reason).toBeNull();
+    expect(mocks.adjustmentCreate.mock.calls[0]![0].data.reason).toBe("Approved by the committee");
+  });
+
+  it("leaves meal and item lines out of the person's current price", async () => {
+    await createRegistrationAdjustment("event-1", "reg-1", "user-1", override(10000));
+    expect(mocks.adjustmentAggregate).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ registrationAttendeeId: "att-2", kind: { notIn: ["MEAL", "ASSET"] } }) }));
   });
 
   it("raises the person's price: a positive line and a CHARGE ledger entry", async () => {
@@ -175,7 +186,7 @@ describe("reversing a price override", () => {
     expect(mocks.registrationUpdate).toHaveBeenCalledWith({ where: { id: "reg-1" }, data: { totalAmount: 270 } });
     expect(mocks.ledgerCreate).toHaveBeenCalledTimes(1);
     expect(mocks.ledgerCreate.mock.calls[0]![0].data).toMatchObject({
-      kind: "CHARGE", amountCents: 2500, sourceType: "STAFF_PRICE_OVERRIDE", sourceId: "adj-2", reason: "Committee changed its mind",
+      kind: "CHARGE", amountCents: 2500, sourceType: "STAFF_PRICE_OVERRIDE", sourceId: "adj-2", reason: null,
       pricingSnapshot: { attendeeIndex: 1, previousPriceCents: 10000, newPriceCents: 12500, changeCents: 2500 },
     });
   });

@@ -17,14 +17,6 @@
   text-transform: none;
 }
 
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-}
-
 .typeRow {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));

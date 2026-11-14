@@ -309,7 +309,7 @@ function serializeRegistration(registration: RegistrationWithRelations, director
         currentPriceCents: attendeeShareCentsFrom(
           registration,
           attendeeIndex,
-          registration.adjustments.filter((adjustment) => adjustment.registrationAttendeeId === attendee.id).reduce((total, adjustment) => total + adjustment.amountCents, 0),
+          registration.adjustments.filter((adjustment) => adjustment.registrationAttendeeId === attendee.id && adjustment.kind !== "MEAL" && adjustment.kind !== "ASSET").reduce((total, adjustment) => total + adjustment.amountCents, 0),
         ),
         position: attendee.position,
         source: profile.source === "PUBLIC_REGISTRATION" ? "PUBLIC_REGISTRATION" as const : "STAFF" as const,

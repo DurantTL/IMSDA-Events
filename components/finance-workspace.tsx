@@ -1,6 +1,7 @@
 "use client";
 
 import { Money } from "@/components/exact-value";
+import { formatPersonName } from "@/lib/person-name";
 import { formatCents } from "@/modules/payments/format-cents";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { RegistrationMealsHistory } from "@/components/registration-meals-history";
@@ -387,15 +388,15 @@ export function FinanceWorkspace({
                     <label>Person
                       <select name="attendeeId" required value={overrideAttendeeId} onChange={(event) => { setOverrideAttendeeId(event.target.value); setError(""); }}>
                         <option value="">Choose a person</option>
-                        {selected.attendees.map((attendee) => <option key={attendee.id} value={attendee.id}>{attendee.firstName} {attendee.lastName}{typeof attendee.currentPriceCents !== "number" ? " (no per-person price on file)" : ""}</option>)}
+                        {selected.attendees.map((attendee) => <option key={attendee.id} value={attendee.id}>{formatPersonName(attendee)}{typeof attendee.currentPriceCents !== "number" ? " (no per-person price on file)" : ""}</option>)}
                       </select>
                     </label>
                     {(() => {
                       const person = selected.attendees.find((attendee) => attendee.id === overrideAttendeeId);
                       if (!person) return null;
                       return typeof person.currentPriceCents !== "number"
-                        ? <p className="quiet-copy">There is no per-person price on file for {person.firstName} {person.lastName}. Use a discount or a correction instead.</p>
-                        : <p className="quiet-copy">Current price for {person.firstName} {person.lastName}: <strong>{formatCents(person.currentPriceCents)}</strong>, with adjustments. The total changes by the difference.</p>;
+                        ? <p className="quiet-copy">There is no per-person price on file for {formatPersonName(person)}. Use a discount or a correction instead.</p>
+                        : <p className="quiet-copy">Current price for {formatPersonName(person)}: <strong><Money cents={person.currentPriceCents} /></strong>, with their discounts and corrections (not meals or items). The total changes by the difference.</p>;
                     })()}
                     <label>New price<input name="price" type="number" min="0" step="0.01" required /></label>
                   </>

@@ -90,7 +90,7 @@ These still change `Registration.totalAmount` without writing an entry:
 - staff adjustments, including a promo code applied after submission (`registrations/adjustments.ts`, #396);
 - card surcharge increments and decrements (`payments/square-repository.ts`);
 - payment-choice repricing (`payments/payment-choice-repository.ts`);
-- club member transfers (`club-transfers/repository.ts`);
+- club member transfers (`club-transfers/repository.ts`); a transfer moves a price-override adjustment line with the person but not its ledger entry;
 - staff direct total edit (`registrations/repository.ts`, `updateRegistration`);
 - an import that updates an existing registration (`imports/repository.ts`).
 

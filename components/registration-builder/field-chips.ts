@@ -1,7 +1,7 @@
 // The compact chips on a canvas question card (#1139). Derived only from the
 // question's own definition data, so they can never disagree with what the form
 // does. Pure, so the rules are testable without a browser.
-import type { RegistrationFormField } from "@/modules/forms/definition";
+import { hasAttendeeTypePrices, type RegistrationFormField } from "@/modules/forms/definition";
 import { resolveFieldFlags } from "@/modules/forms/field-flags";
 import { builderFieldModules } from "@/modules/forms/builder-modules";
 import { isMealTicketField } from "./module-owned-settings";
@@ -48,7 +48,7 @@ export function deriveFieldChips(field: RegistrationFormField, sectionTitle = ""
   const chips: FieldChip[] = [{ kind: "scope", label: field.scope === "ATTENDEE" ? "Asked of each person" : "Asked once" }];
   if (field.required || field.optionSource === "ATTENDEE_TYPES") chips.push({ kind: "required", label: "Required" });
   if (hasVisibilityRule(field)) chips.push({ kind: "logic", label: "Has logic" });
-  if (affectsPrice(field)) chips.push({ kind: "price", label: "Has price" });
+  if (affectsPrice(field)) chips.push({ kind: "price", label: hasAttendeeTypePrices(field) ? "Prices by attendee type" : "Has price" });
   if (hasCapacity(field)) chips.push({ kind: "capacity", label: "Has capacity" });
   if (resolveFieldFlags(field, { sectionTitle }).sensitive) chips.push({ kind: "sensitive", label: "Sensitive" });
   const source = sourceModuleName(field);

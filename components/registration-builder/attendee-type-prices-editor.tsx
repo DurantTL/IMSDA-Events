@@ -23,7 +23,10 @@ export function AttendeeTypePricesEditor({ field, sectionIndex, fieldIndex }: Ed
   if (!canPriceByAttendeeType(field) || (!selector && !on)) return null;
 
   const windows = fieldPriceWindows(field);
-  const configured = selector?.options ?? [];
+  // Right after "Source attendee types" is ticked the options are still the old choice labels, not type codes; prices
+  // can only be keyed by the codes the saved form hydrates.
+  const hydrated = Boolean(selector) && selector!.options.length > 0 && selector!.options.every((option) => /^[A-Z][A-Z0-9_]*$/.test(option) && selector!.optionLabels?.[option] !== undefined);
+  const configured = hydrated ? selector!.options : [];
   const stored = new Set([field.attendeeTypePricesCents, ...windows.map((window) => window.attendeeTypePricesCents)].flatMap((map) => Object.keys(map ?? {})));
   const retired = [...stored].filter((code) => !configured.includes(code));
 
@@ -32,22 +35,23 @@ export function AttendeeTypePricesEditor({ field, sectionIndex, fieldIndex }: Ed
 
   return (
     <div className={`field-full ${styles.editor}`} role="group" aria-label={`Prices by attendee type for ${field.label}`}>
-      <label className={styles.toggle}>
+      <label className="required-toggle">
         <input
-          disabled={!canEdit || !selector}
+          disabled={!canEdit || !selector || (!hydrated && !on)}
           type="checkbox"
           checked={on}
           onChange={(event) => updateField(sectionIndex, fieldIndex, event.target.checked ? { attendeeTypePricesCents: {} } : clearAttendeeTypePricesPatch(field))}
         />
         Charge a different price for each type of attendee
       </label>
+      {selector && !hydrated && <small className={styles.help}>Save the form first to set prices by type.</small>}
       {!selector && <small className={styles.help}>This form needs an attendee-type question first.</small>}
       {on && (
         <>
           <p className={styles.help}>
             Leave a box blank to charge the usual price. A price for a type carries into later price windows until a window sets a new one for that type.
           </p>
-          {configured.length === 0 && <small className={styles.help}>No active attendee types are set up for this event yet.</small>}
+          {hydrated && configured.length === 0 && <small className={styles.help}>No active attendee types are set up for this event yet.</small>}
           {[...configured, ...retired].map((code) => {
             const name = selector?.optionLabels?.[code] ?? code;
             const isRetired = !configured.includes(code);
@@ -57,14 +61,14 @@ export function AttendeeTypePricesEditor({ field, sectionIndex, fieldIndex }: Ed
                 <label>
                   {field.basePricingLabel || "Standard price"}
                   <span className="money-input"><b>$</b>
-                    <input aria-label={`${name} price for ${field.label}`} disabled={!canEdit} type="number" min={0} max={100000} step="0.01" placeholder="Usual price" value={money(field.attendeeTypePricesCents?.[code])} onChange={(event) => set(null, code, event.target.value)} />
+                    <input aria-label={`${name} price for ${field.label}`} disabled={!canEdit || !hydrated} type="number" min={0} max={100000} step="0.01" placeholder="Usual price" value={money(field.attendeeTypePricesCents?.[code])} onChange={(event) => set(null, code, event.target.value)} />
                   </span>
                 </label>
                 {windows.map((window, index) => (
                   <label key={index}>
                     {window.label}
                     <span className="money-input"><b>$</b>
-                      <input aria-label={`${name} price in price window ${index + 1} for ${field.label}`} disabled={!canEdit} type="number" min={0} max={100000} step="0.01" placeholder="Usual price" value={money(window.attendeeTypePricesCents?.[code])} onChange={(event) => set(index, code, event.target.value)} />
+                      <input aria-label={`${name} price in price window ${index + 1} for ${field.label}`} disabled={!canEdit || (!hydrated && !isRetired)} type="number" min={0} max={100000} step="0.01" placeholder="Usual price" value={money(window.attendeeTypePricesCents?.[code])} onChange={(event) => set(index, code, event.target.value)} />
                     </span>
                   </label>
                 ))}

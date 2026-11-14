@@ -115,7 +115,8 @@ async function attendeeShareCents(
   attendeeIndex: number,
 ) {
   const adjusted = await tx.registrationAdjustment.aggregate({
-    where: { registrationId: registration.id, registrationAttendeeId: attendee.id },
+    // Meal and item charges are not part of the person's price, so an override never cancels them.
+    where: { registrationId: registration.id, registrationAttendeeId: attendee.id, kind: { notIn: ["MEAL", "ASSET"] } },
     _sum: { amountCents: true },
   });
   return attendeeShareCentsFrom(registration, attendeeIndex, adjusted._sum.amountCents ?? 0);
@@ -141,7 +142,7 @@ async function appendPriceOverrideLedgerEntry(
     amountCents: changeCents,
     currency: "USD",
     pricingSnapshot: {
-      attendeeIndex: input.attendeeIndex,
+      ...(input.attendeeIndex >= 0 ? { attendeeIndex: input.attendeeIndex } : {}),
       previousPriceCents: input.previousPriceCents,
       newPriceCents: input.newPriceCents,
       changeCents,
@@ -149,8 +150,9 @@ async function appendPriceOverrideLedgerEntry(
     sourceType: "STAFF_PRICE_OVERRIDE",
     sourceId: input.adjustmentId,
     origin: "LIVE",
+    // A ledger row is permanent and keeps no free text; the reason stays on the adjustment line.
     actor: await staffLedgerActor(tx, input.actorUserId),
-    reason: input.reason,
+    reason: null,
   });
 }
 

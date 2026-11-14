@@ -6,6 +6,7 @@ import {
   resolveFieldPrices,
   type RegistrationFormDefinition,
 } from "@/modules/forms/definition";
+import { deriveFieldChips } from "@/components/registration-builder/field-chips";
 import { buildFeesCard } from "@/modules/event-info-cards/domain";
 import { churchInvoiceTerms } from "@/modules/club-registrations/church-invoice-terms";
 import { hiddenPricePatchForType, pricingPatchForTypeChange } from "@/modules/forms/choice-type-pricing";
@@ -76,6 +77,14 @@ describe("prices by attendee type: schema", () => {
   it("refuses the map on the selector itself", () => {
     const withMap = { ...form(null), sections: [{ ...form(null).sections[0], fields: [{ ...selector, attendeeTypePricesCents: { CHILD: 1 } }] }] };
     expect(registrationFormDefinitionSchema.safeParse(withMap).success).toBe(false);
+  });
+
+  it("says in plain words when a key is not a type code", () => {
+    const result = parse({ priceCents: 5000, attendeeTypePricesCents: { Adult: 2500 } });
+    expect(result.success).toBe(false);
+    const message = JSON.stringify(result.error?.issues);
+    expect(message).toContain("Save the form after choosing the attendee types");
+    expect(message).not.toContain("Invalid key in record");
   });
 
   it("needs an attendee-type question on the form", () => {
@@ -155,6 +164,14 @@ describe("prices by attendee type: other readers", () => {
   it("states no single church-invoice rate for a type-priced fee", () => {
     const definition = definitionOf({ priceCents: 5000, attendeeTypePricesCents: { CHILD: 2500 } });
     expect(churchInvoiceTerms(definition, { pricingDate: "2026-10-01" })).toBeNull();
+  });
+});
+
+describe("prices by attendee type: chip", () => {
+  it("names the option on the question card", () => {
+    const field = definitionOf(typed).sections[0]!.fields[1]!;
+    expect(deriveFieldChips(field).find((chip) => chip.kind === "price")?.label).toBe("Prices by attendee type");
+    expect(deriveFieldChips(definitionOf({ priceCents: 100 }).sections[0]!.fields[1]!).find((chip) => chip.kind === "price")?.label).toBe("Has price");
   });
 });
 

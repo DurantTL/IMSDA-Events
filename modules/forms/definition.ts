@@ -27,7 +27,11 @@ const attendeeNameKeys = ["full_name", "name", "attendee_name", "guest_name"] as
 
 const priceCentsSchema = z.number().int().min(0).max(10000000);
 /** A price for each attendee type, keyed by the type's code (#1509); see `resolveFieldPrices`. */
-const attendeeTypePricesSchema = z.record(z.string().regex(/^[A-Z][A-Z0-9_]*$/, "Attendee type codes use uppercase letters, numbers, and underscores."), priceCentsSchema);
+const attendeeTypePricesSchema = z.record(z.string(), priceCentsSchema).superRefine((prices, context) => {
+  for (const code of Object.keys(prices)) {
+    if (!/^[A-Z][A-Z0-9_]*$/.test(code)) context.addIssue({ code: "custom", path: [code], message: "Prices by attendee type need an attendee type from your event setup. Save the form after choosing the attendee types, then set the prices." });
+  }
+});
 // A credit is entered as a negative price per unit on a REGISTRATION-scope
 // NUMBER field (e.g. Camporee's per-person meal sponsorship, #409): each unit
 // in the answer subtracts this amount, optionally capped at the
