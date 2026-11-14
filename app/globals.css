@@ -4198,7 +4198,7 @@ body:has(.auth-page) { padding-bottom: 0; }
 .public-registration-confirmation { border-radius: 26px; padding: 34px; text-align: center; }
 .public-registration-confirmation-icon { display: grid; width: 66px; height: 66px; margin: 0 auto 17px; place-items: center; border-radius: 20px; background: var(--green-soft); color: var(--green); }
 .public-registration-confirmation-icon.is-waitlist { background: var(--imsda-purple-soft); color: var(--imsda-purple); }
-.public-registration-confirmation h1 { margin: 4px 0 9px; color: var(--ink); font-size: clamp(1.8rem, 5vw, 2.6rem); letter-spacing: -0.03em; }
+.public-registration-confirmation h1, .public-registration-confirmation > h2 { margin: 4px 0 9px; color: var(--ink); font-size: clamp(1.8rem, 5vw, 2.6rem); letter-spacing: -0.03em; }
 .public-registration-confirmation-message { max-width: 590px; margin: 0 auto; color: var(--muted); font-size: 0.9rem; line-height: 1.65; }
 .public-registration-code { display: grid; max-width: 390px; gap: 3px; margin: 24px auto; border: 1px dashed #9db9c5; border-radius: 14px; background: #f7fafb; padding: 14px; }
 .public-registration-code small { color: var(--muted); font-size: var(--text-badge); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -12921,7 +12921,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 
 /* Small confirmations (#1211): a short check-mark pop once, decoration only; none under reduced motion. */
 .confirm-check-icon { display: inline-flex; }
-.public-registration-confirmation h1:focus:not(:focus-visible) { outline: none; }
+.public-registration-confirmation h1:focus:not(:focus-visible), .public-registration-confirmation > h2:focus:not(:focus-visible) { outline: none; }
 .add-to-calendar-link.is-added { border-color: var(--green); color: var(--green); }
 .add-to-calendar-link:focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: 2px; }
 @media (prefers-reduced-motion: no-preference) {
