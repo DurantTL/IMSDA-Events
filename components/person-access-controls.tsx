@@ -236,6 +236,7 @@ export type EventMembershipView = {
   active: boolean;
   healthInformation: boolean;
   finalizeInvoices: boolean;
+  registrationOverride: boolean;
 };
 
 /** One event membership: role and access (removal keeps the row as inactive), plus the two extras. */
@@ -260,7 +261,7 @@ export function EventMembershipControls({ membership, targetIsSystemAdministrato
     }, "The staff assignment could not be updated.");
   }
 
-  async function extra(path: "health-access" | "invoice-finalization-access", granted: boolean, label: string) {
+  async function extra(path: "health-access" | "invoice-finalization-access" | "registration-override-access", granted: boolean, label: string) {
     await run(async () => {
       await callJson(`${base}/${path}`, { method: "PUT", json: { granted } }, `${label} could not be changed.`);
       return `${label} ${granted ? "given to" : "removed from"} ${name} for ${membership.eventName}.`;
@@ -308,6 +309,17 @@ export function EventMembershipControls({ membership, targetIsSystemAdministrato
               type="button"
             >
               {membership.finalizeInvoices ? "Remove finalize invoices" : "Give finalize invoices"}
+            </button>
+          ) : null}
+          {membership.active ? (
+            <button
+              aria-pressed={membership.registrationOverride}
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => void extra("registration-override-access", !membership.registrationOverride, "Permission for registration overrides")}
+              type="button"
+            >
+              {membership.registrationOverride ? "Remove registration overrides" : "Give registration overrides"}
             </button>
           ) : null}
         </div>

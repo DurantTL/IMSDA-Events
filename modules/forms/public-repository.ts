@@ -298,7 +298,7 @@ export type StaffSubmitContext = {
  * not archived or in a closed-out state (complete, financial reconciliation, closed). A date that has not arrived or has
  * passed, or registration closed by hand, can be; an ended or closed-out event never.
  */
-function staffOverridableClosedState(event: Parameters<typeof evaluateEventRegistrationPhase>[0], now: Date) {
+export function staffOverridableClosedState(event: Parameters<typeof evaluateEventRegistrationPhase>[0], now: Date) {
   if (event.archivedAt || hasEventEnded(event, now)) return false;
   const state = effectiveLifecycleState(event);
   return state !== "COMPLETE" && state !== "FINANCIAL_RECONCILIATION" && state !== "CLOSED" && state !== "ARCHIVED";
@@ -1876,7 +1876,7 @@ async function createPublicRegistrationTransaction(
     }
     await tx.staffRegistrationDraft.update({
       where: { id: staffDraftId },
-      data: { status: "SUBMITTED", registrationId: registration.id, submittedAt: now, responses: {}, handOffExpiresAt: null, updatedByUserId: staff.actorUserId },
+      data: { status: "SUBMITTED", registrationId: registration.id, submittedAt: now, responses: {}, handOffExpiresAt: null, updatedByUserId: staff.actorUserId, submittedByUserId: staff.actorUserId },
     });
     // Counts, ids and states only: never an answer value.
     await tx.auditLog.create({

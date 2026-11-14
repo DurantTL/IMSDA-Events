@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AmendmentField } from "@/components/registration-amendment-editor";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -16,7 +17,7 @@ import {
   STAFF_DRAFT_ROSTER_NOTE,
   STAFF_DRAFT_SOURCES,
   STAFF_DRAFT_SOURCE_LABELS,
-  STAFF_DRAFT_STATUS_LABELS,
+  staffDraftStatusLabel,
   type StaffDraftCheckLines,
   type StaffDraftPlanSection,
   type StaffDraftSource,
@@ -29,6 +30,8 @@ export type StaffDraftRow = {
   formName: string;
   source: StaffDraftSource;
   status: StaffDraftStatus;
+  /** The staff member who sent it themselves, or null when the registrant submitted it. */
+  submittedByStaffName?: string | null;
   registrantName: string | null;
   registrantEmail: string | null;
   updatedByName: string;
@@ -46,7 +49,7 @@ type Detail = {
 type CheckResult =
   | { ok: true; registrantFills: string[]; check: { registrationStatus: "SUBMITTED" | "WAITLISTED"; waitlistPosition: number | null; totalCents?: number; discountAmountCents?: number; promoCode: string | null; lineItems: Array<{ key: string; label: string; amountCents: number; pricingLabel?: string }>; pricingDate: string } }
   | { ok: false; kind: "NEEDS_ANSWERS"; message: string; lines: StaffDraftCheckLines; rosterPending: boolean }
-  | { ok: false; kind: "UNAVAILABLE"; message: string };
+  | { ok: false; kind: "UNAVAILABLE"; message: string; code?: string; overridable?: boolean };
 
 type Responses = Record<string, unknown>;
 
@@ -284,7 +287,7 @@ export function StaffRegistrationDrafts({
                   <span className={styles.rowTitle}>{row.registrantName ?? "Name not entered yet"}</span>
                   <p className={styles.rowMeta}>{row.registrantEmail ?? "Email not entered yet"}</p>
                   <p className={styles.rowMeta}>
-                    {STAFF_DRAFT_SOURCE_LABELS[row.source]} · {row.formName} · {STAFF_DRAFT_STATUS_LABELS[row.status]} · updated {updatedAtLabel(row.updatedAt)} by {row.updatedByName}
+                    {STAFF_DRAFT_SOURCE_LABELS[row.source]} · {row.formName} · {staffDraftStatusLabel(row.status, row.submittedByStaffName)} · updated {updatedAtLabel(row.updatedAt)} by {row.updatedByName}
                   </p>
                 </div>
                 <button className={`secondary-button ${styles.rowOpen}`} type="button" disabled={busy !== ""} onClick={() => guarded(() => open(row.id))}>
@@ -301,7 +304,7 @@ export function StaffRegistrationDrafts({
 
       {detail && (
         <section className={styles.panel} aria-labelledby="staff-draft-edit">
-          <h2 id="staff-draft-edit" ref={headingRef} tabIndex={-1}>{detail.draft.registrantName ?? "New registration"} <span className={styles.chip}>{STAFF_DRAFT_STATUS_LABELS[detail.draft.status]}</span></h2>
+          <h2 id="staff-draft-edit" ref={headingRef} tabIndex={-1}>{detail.draft.registrantName ?? "New registration"} <span className={styles.chip}>{staffDraftStatusLabel(detail.draft.status, detail.draft.submittedByStaffName)}</span></h2>
           <p className={styles.note}>
             {STAFF_DRAFT_SOURCE_LABELS[detail.draft.source]} · {detail.draft.formName}. Answers marked &ldquo;{STAFF_DRAFT_REGISTRANT_FILLS_IN}&rdquo; are never kept in a draft.
           </p>
@@ -310,7 +313,13 @@ export function StaffRegistrationDrafts({
           {detail.draft.status === "HANDED_OFF" && (
             <p className={styles.note}>The registrant has a private link{detail.draft.handOffExpiresAt ? ` that works until ${new Date(detail.draft.handOffExpiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}` : ""}. Changing the answers withdraws it.</p>
           )}
-          {detail.draft.status === "SUBMITTED" && <p className={styles.note}>The registrant has submitted this registration. It is a normal registration now.</p>}
+          {detail.draft.status === "SUBMITTED" && (
+            <p className={styles.note}>
+              {detail.draft.submittedByStaffName
+                ? `${detail.draft.submittedByStaffName} sent this registration for the registrant. It is a normal registration now.`
+                : "The registrant has submitted this registration. It is a normal registration now."}
+            </p>
+          )}
 
           {sections.map((section) => (
             <fieldset key={section.id} className={styles.panel}>
@@ -345,6 +354,15 @@ export function StaffRegistrationDrafts({
               </button>
               <button className="secondary-button" type="button" disabled={busy !== ""} onClick={() => { setConfirmError(""); setConfirm("discard"); }}>Discard</button>
             </div>
+          )}
+          {editable && (
+            <p className={styles.note}>
+              <Link className={`secondary-button ${styles.finishLink}`} href={`/people/staff-drafts/${encodeURIComponent(detail.draft.id)}/finish?event=${encodeURIComponent(eventId)}`}>
+                Finish for them
+              </Link>{" "}
+              Enter the rest yourself, such as the people attending and any acknowledgments, and send the registration now.
+              {detail.draft.status === "HANDED_OFF" ? " Finishing it stops the registrant's link." : ""}
+            </p>
           )}
 
           {check && <CheckView result={check} />}
@@ -404,7 +422,13 @@ export function StaffRegistrationDrafts({
 
 function CheckView({ result }: { result: CheckResult }) {
   if (!result.ok && result.kind === "UNAVAILABLE") {
-    return <div className={styles.result} role="status"><h3>Can&rsquo;t be registered right now</h3><p className={styles.note}>{result.message}</p></div>;
+    return (
+      <div className={styles.result} role="status">
+        <h3>Can&rsquo;t be registered right now</h3>
+        <p className={styles.note}>{result.message}</p>
+        {result.overridable && <p className={styles.note}>Someone with Registration overrides can send this past the rule.</p>}
+      </div>
+    );
   }
   if (!result.ok) {
     const { staffNeeds, registrantFills } = result.lines;

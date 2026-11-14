@@ -19,7 +19,7 @@ import { hashOpaqueToken } from "../modules/access/tokens";
 import { registrationFormDefinitionSchema } from "../modules/forms/definition";
 import { submitPublicRegistration, type StaffSubmitContext } from "../modules/forms/public-repository";
 import { STAFF_DRAFT_LINK_TEMPLATE_KEY } from "../modules/staff-registration-drafts/link-email";
-import { checkStaffDraft, createStaffDraft, submitStaffDraft } from "../modules/staff-registration-drafts/repository";
+import { checkStaffDraft, createStaffDraft, getStaffFinishView, submitStaffDraft } from "../modules/staff-registration-drafts/repository";
 
 loadEnvConfig(process.cwd());
 
@@ -182,6 +182,7 @@ async function staffSubmitChecks() {
   assert(await prisma.payment.count({ where: { registrationId: paperRegistration.id } }) === 0 && await prisma.paymentAttempt.count({ where: { registrationId: paperRegistration.id } }) === 0, "no payment rows are made");
   const linkedDraft = await prisma.staffRegistrationDraft.findUniqueOrThrow({ where: { id: paperDraft } });
   assert(linkedDraft.status === "SUBMITTED" && linkedDraft.registrationId === paperRegistration.id && linkedDraft.source === "PAPER" && JSON.stringify(linkedDraft.responses) === "{}", "the draft links to the registration with its paper source");
+  assert(linkedDraft.submittedByUserId === staffUserId, "a staff submit records the staff user who sent it");
   assert((await prisma.messageOutbox.findUniqueOrThrow({ where: { id: pending.id } })).status === "CANCELLED", "the pending hand-off email is cancelled");
   const byStaff = await prisma.auditLog.findMany({ where: { entityId: paperDraft, action: "STAFF_REGISTRATION_DRAFT_SUBMITTED_BY_STAFF" } });
   const byStaffMetadata = byStaff[0]?.metadata as Record<string, unknown> | undefined;
@@ -240,6 +241,20 @@ async function staffSubmitChecks() {
   assert(!closedAudits[0]!.summary.includes(reason) && /registration closed/.test(closedAudits[0]!.summary), "its summary names the rule, not the reason");
   assert(closedSent.totalCents === openTotal, "an override never changes the price");
 
+  // The finish page: the form for an open event, a message for someone who cannot override, the form with the rule for someone who can.
+  const finishOpen = await getStaffFinishView(open.id, await staffDraft(open, "PHONE", "Finish"), false);
+  assert(finishOpen.kind === "READY" && finishOpen.overrideRule === null, "an open event shows the form with no rule");
+  const finishClosedDraft = await staffDraft(closed, "PHONE", "FinishClosed");
+  const finishDenied = await getStaffFinishView(closed.id, finishClosedDraft, false);
+  assert(finishDenied.kind === "MESSAGE" && /closed for this event\. Someone with Registration overrides can send it\./.test(finishDenied.message), "closed without the permission is a message only");
+  const finishAllowed = await getStaffFinishView(closed.id, finishClosedDraft, true);
+  assert(finishAllowed.kind === "READY" && finishAllowed.overrideRule === "Registration is closed for this event.", "closed with the permission shows the form and names the rule");
+  assert(finishAllowed.kind === "READY" && !finishAllowed.experience.form.definition.sections.some((section) => section.fields.some((candidate) => candidate.options.includes("Credit / debit card"))), "the finish form leaves off the card choice");
+  const closedSentDraft = await getStaffFinishView(closed.id, closedDraft, true);
+  assert(closedSentDraft.kind === "MESSAGE" && /already sent/.test(closedSentDraft.message), "a draft already sent is a message only");
+  const sentRow = await prisma.staffRegistrationDraft.findUniqueOrThrow({ where: { id: closedDraft } });
+  assert(sentRow.submittedByUserId === staffUserId, "the override submit records who sent it");
+
   // --- Not open yet.
   const upcoming = await makeEvent("upcoming", { registrationOpensOn: dateOffset(3) });
   const upcomingDraft = await staffDraft(upcoming, "PHONE", "Upcoming");
@@ -278,6 +293,8 @@ async function staffSubmitChecks() {
   const ended = await makeEvent("ended", { startsAt: new Date(Date.now() - 5 * 86_400_000), endsAt: new Date(Date.now() - 3 * 86_400_000) });
   const endedDraft = await staffDraft(ended, "PHONE", "Ended");
   const endedRefusal = await rejection(staffSubmit(ended, endedDraft, "Ended", { override: { reason }, overrideAllowed: true }));
+  const finishEnded = await getStaffFinishView(ended.id, endedDraft, true);
+  assert(finishEnded.kind === "MESSAGE" && /ended or been closed out/.test(finishEnded.message), "an ended event is a message only, even with the permission");
   assert(endedRefusal?.code === "REGISTRATION_CLOSED" && (endedRefusal as { overridable?: boolean }).overridable === false, "an ended event is never overridable");
   assert(await prisma.registration.count({ where: { eventId: ended.id } }) === 0, "nothing was written for an ended event");
 
@@ -343,6 +360,7 @@ async function main() {
   const registration = await prisma.registration.findFirstOrThrow({ where: { eventId, confirmationCode: sent.confirmationCode } });
   assert(linked.status === "SUBMITTED" && linked.registrationId === registration.id && linked.submittedAt !== null, "the submit links the draft and marks it submitted");
   assert(JSON.stringify(linked.responses) === "{}", "the draft's answers are cleared");
+  assert(linked.submittedByUserId === null, "a registrant's own submit leaves submittedByUserId empty");
   assert(await prisma.payment.count({ where: { registrationId: registration.id } }) === 0 && await prisma.paymentAttempt.count({ where: { registrationId: registration.id } }) === 0, "no payment rows were made");
 
   const registrationsNow = await prisma.registration.count({ where: { eventId } });

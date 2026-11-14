@@ -9,10 +9,11 @@ import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { AccountEmailNotConfiguredError, getAccountEmailSender } from "@/modules/communications/account-email";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
 import { evaluateEventRegistrationPhase } from "@/modules/events/lifecycle";
+import { definitionWithoutCardOption } from "@/modules/payments/online-card-fee";
 import { isFieldVisible, registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { publicRegistrationInputSchema } from "@/modules/forms/public-domain";
-import { checkPublicRegistration, PublicRegistrationError, submitPublicRegistration, type PublicRegistrationCheck } from "@/modules/forms/public-repository";
+import { checkPublicRegistration, getPublicRegistrationExperience, PublicRegistrationError, staffOverridableClosedState, submitPublicRegistration, type PublicRegistrationCheck } from "@/modules/forms/public-repository";
 import { StaffDraftError } from "@/modules/staff-registration-drafts/errors";
 import {
   sanitizeStaffDraftResponses,
@@ -46,6 +47,7 @@ const draftSelect = {
   handOffMessageId: true,
   registrationId: true,
   submittedAt: true,
+  submittedBy: { select: { displayName: true } },
   createdAt: true,
   updatedAt: true,
   createdBy: { select: { displayName: true } },
@@ -83,6 +85,8 @@ function toSummary(row: DraftRow) {
     handOffExpiresAt: row.handOffExpiresAt?.toISOString() ?? null,
     handedOffAt: row.handedOffAt?.toISOString() ?? null,
     registrationId: row.registrationId,
+    /** The staff member who sent it themselves; null when the registrant submitted it (#1510). */
+    submittedByStaffName: row.submittedBy?.displayName ?? null,
     submittedAt: row.submittedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -498,4 +502,64 @@ export async function submitStaffDraft(
     override: body.override,
     overrideAllowed: actor.canOverride,
   });
+}
+
+export type StaffFinishView =
+  | { kind: "MESSAGE"; message: string }
+  | {
+    kind: "READY";
+    draft: { id: string; source: StaffDraftSource; status: StaffDraftStatus; formName: string };
+    experience: NonNullable<Awaited<ReturnType<typeof getPublicRegistrationExperience>>>;
+    /** The saved answers, kept only for questions the form asks now. Never the people: staff add those in the form. */
+    responses: Record<string, unknown>;
+    /** The rule the event is past right now, in plain words, or null when nothing needs overriding. */
+    overrideRule: string | null;
+    canOverride: boolean;
+  };
+
+/**
+ * What the staff finish page shows (#1510): the form to fill in, or a plain message. A closed, not-yet-open or full-without-waitlist
+ * event shows the form only to someone who can override (with the rule named); anyone else reads who can send it. An ended,
+ * archived or closed-out event, and a draft already sent or discarded, are a message only.
+ */
+export async function getStaffFinishView(eventId: string, draftId: string, canOverride: boolean, now = new Date()): Promise<StaffFinishView> {
+  const prisma = getPrisma();
+  const row = await prisma.staffRegistrationDraft.findFirst({
+    where: { id: draftId, eventId },
+    select: { id: true, formId: true, status: true, source: true, responses: true, form: { select: { slug: true, name: true } }, event: { select: { slug: true } } },
+  });
+  if (!row) return { kind: "MESSAGE", message: "That draft could not be found." };
+  if (row.status === "SUBMITTED") return { kind: "MESSAGE", message: "This registration was already sent." };
+  if (row.status !== "OPEN" && row.status !== "HANDED_OFF") return { kind: "MESSAGE", message: "This registration was discarded, so it can't be finished." };
+  try {
+    await publishedFormForEvent(prisma, eventId, row.formId);
+  } catch (error) {
+    if (error instanceof StaffDraftError) return { kind: "MESSAGE", message: error.message };
+    throw error;
+  }
+  const event = await prisma.event.findUniqueOrThrow({ where: { id: eventId } });
+  const phase = evaluateEventRegistrationPhase(event, now);
+  if (phase !== "OPEN" && !staffOverridableClosedState(event, now)) {
+    return { kind: "MESSAGE", message: "This event has ended or been closed out, so a registration can't be sent for it." };
+  }
+  const experience = await getPublicRegistrationExperience(row.event.slug, row.form.slug);
+  if (!experience) return { kind: "MESSAGE", message: "This form isn't available right now." };
+  const overrideRule = phase === "UPCOMING"
+    ? "Registration isn't open yet for this event."
+    : phase === "CLOSED"
+      ? "Registration is closed for this event."
+      : experience.lifecycle.capacityDecision === "FULL"
+        ? "This event is full and has no waitlist."
+        : null;
+  if (overrideRule && !canOverride) return { kind: "MESSAGE", message: `${overrideRule} Someone with Registration overrides can send it.` };
+  // Staff never choose card payment for the registrant: the online choices are left off, as the server also refuses them.
+  const definition = definitionWithoutCardOption(experience.form.definition);
+  return {
+    kind: "READY",
+    draft: { id: row.id, source: row.source as StaffDraftSource, status: row.status as StaffDraftStatus, formName: row.form.name },
+    experience: { ...experience, form: { ...experience.form, definition } },
+    responses: prefillFromStaffDraft(definition, responsesFromJson(row.responses)),
+    overrideRule,
+    canOverride,
+  };
 }

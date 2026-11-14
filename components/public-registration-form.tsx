@@ -159,6 +159,7 @@ import { labelledFieldMessage } from "@/lib/field-validation";
 import { FormErrorSummary, type ErrorSummaryItem } from "@/components/form-error-summary";
 import { InformationBlock } from "@/components/information-block";
 import { RegistrationProfileReview } from "@/components/registration-profile-review";
+import { OVERRIDE_NEEDS_PERMISSION, StaffSubmitPanel, staffSubmitExtras, staffSubmitFieldErrors, type StaffSubmitConfig } from "@/components/staff-submit-panel";
 import { summarizeRosterAttendees } from "@/modules/forms/roster-summary";
 import {
   draftsAllowed,
@@ -323,6 +324,12 @@ export type PublicRegistrationFormProps = {
   initialAttendeeResponses?: FormResponses;
   /** The private link's token when staff started this registration for the registrant (#1510); sent with the submit so it is linked back. */
   staffDraftToken?: string;
+  /**
+   * Staff sending a registration they started for the registrant (#1510), on the staff finish page. Submits to the staff
+   * endpoint with the paper location and any override; no security check, browser draft, account, passkey or profile offer;
+   * typed signatures are not shown; acknowledgments are recorded as entered by staff.
+   */
+  staffSubmit?: StaffSubmitConfig;
   embedded?: boolean;
   /** Published info cards for the top of the form (#652); rendered by the server page. */
   topContent?: React.ReactNode;
@@ -542,6 +549,7 @@ export function PublicRegistrationForm({
   initialResponses = {},
   initialAttendeeResponses = {},
   staffDraftToken,
+  staffSubmit,
   embedded = false,
   topContent,
   disableDrafts = false,
@@ -553,6 +561,12 @@ export function PublicRegistrationForm({
   formsHelpContact,
 }: PublicRegistrationFormProps) {
   const securityCheckRef = useRef<SecurityCheckHandle>(null);
+  // Staff sending for the registrant (#1510): the paper location, the override reason, and a rule the server named at submit.
+  const [staffPaperLocation, setStaffPaperLocation] = useState("");
+  const [staffOverrideReason, setStaffOverrideReason] = useState("");
+  const [staffServerRule, setStaffServerRule] = useState<string | null>(null);
+  const [staffFieldError, setStaffFieldError] = useState<{ paperLocation?: string; reason?: string }>({});
+  const staffOverrideRule = staffSubmit?.canOverride ? staffSubmit.overrideRule ?? staffServerRule : null;
   // Same action the route expects: the general link's team flow and the individual form share "registration".
   const securityCheckAction = group && !group.teamFlow ? "group-registration" : "registration";
   const { definition } = form;
@@ -778,7 +792,7 @@ export function PublicRegistrationForm({
   const [accountChoice, setAccountChoice] = useState<"without" | "create">("without");
   // The optional-account offer (#854): never for someone already signed in, and
   // never on a club's own registration.
-  const showAccountPrompt = accountPromptVisible({ signedIn: disableDrafts, clubRegistration: Boolean(club) });
+  const showAccountPrompt = accountPromptVisible({ signedIn: disableDrafts || Boolean(staffSubmit), clubRegistration: Boolean(club) });
   const lockedAttendeeFieldKeys = useMemo(
     () => new Set(club?.lockedAttendeeFieldKeys ?? []),
     [club?.lockedAttendeeFieldKeys],
@@ -797,7 +811,7 @@ export function PublicRegistrationForm({
   // Saved only after a real edit (draftDirty), never because of prefill alone.
   // Restored after mount so server and first client render match; saving
   // waits until the restore attempt has run.
-  const draftsEnabled = !club && draftsAllowed({
+  const draftsEnabled = !club && !staffSubmit && draftsAllowed({
     signedIn: disableDrafts,
     prefill: [initialResponses, initialAttendeeResponses],
   });
@@ -1170,7 +1184,10 @@ export function PublicRegistrationForm({
           { ignoredFieldKeys },
         ).issues;
     // Staff acting as a director cannot give the director's acknowledgments, so they are never required of them.
-    const actingAsDirectorKeys = new Set(club?.staffActingAsDirector ? [...acknowledgmentFields(definition), ...signatureFields(definition)].map((candidate) => candidate.key) : []);
+    // Staff sending for the registrant (#1510) cannot sign for them: typed signatures are not shown or required.
+    const actingAsDirectorKeys = new Set(club?.staffActingAsDirector
+      ? [...acknowledgmentFields(definition), ...signatureFields(definition)].map((candidate) => candidate.key)
+      : staffSubmit ? signatureFields(definition).map((candidate) => candidate.key) : []);
     const validationIssues = actingAsDirectorKeys.size === 0
       ? allValidationIssues
       : allValidationIssues.filter((issue) => !actingAsDirectorKeys.has(issue.key));
@@ -2220,6 +2237,11 @@ export function PublicRegistrationForm({
               <span>I acknowledge this.</span>
             </label>
           )}
+          {staffSubmit && (
+            <p className="field-help public-registration-acknowledgment-note" role="note">
+              Tick an acknowledgment only if the person agreed. It&apos;s recorded as entered by staff (or from the paper form), not as their own online agreement.
+            </p>
+          )}
           {fieldSupport(field, context)}
         </fieldset>
       );
@@ -2314,6 +2336,8 @@ export function PublicRegistrationForm({
         />
       );
     }
+
+    if (field.type === "SIGNATURE" && staffSubmit) return null;
 
     if (field.type === "SIGNATURE") {
       // The statement is shown in full, then signed by typing a name (#1265). What is recorded is exactly this statement, the
@@ -3302,7 +3326,17 @@ export function PublicRegistrationForm({
       return;
     }
 
-    if (!club && !securityCheckRef.current?.require(group?.submitLabel ?? (joiningWaitlist ? "Join waitlist" : "Submit registration"))) return;
+    // The staff endpoint is signed-in and has no security check (#1510), like a club's own endpoint.
+    if (!club && !staffSubmit && !securityCheckRef.current?.require(group?.submitLabel ?? (joiningWaitlist ? "Join waitlist" : "Submit registration"))) return;
+    if (staffSubmit) {
+      const fieldError = staffSubmitFieldErrors(staffSubmit, staffPaperLocation, staffOverrideRule, staffOverrideReason);
+      setStaffFieldError(fieldError);
+      if (fieldError.paperLocation || fieldError.reason) {
+        setError(fieldError.paperLocation ?? fieldError.reason ?? "");
+        window.requestAnimationFrame(() => errorSummaryRef.current?.focus());
+        return;
+      }
+    }
     setSubmitting(true);
     submitInFlight.current = true;
     setIssues([]);
@@ -3316,7 +3350,7 @@ export function PublicRegistrationForm({
         : {};
       // The key rides in the body and the server dedupes on it (#1263), so a quiet retry after a
       // lost connection is safe; "Try again" reuses the same key because the state keeps it.
-      const submission = await submitJson(club?.submitUrl ?? group?.submitUrl ?? `/api/public/events/${encodeURIComponent(event.slug)}/forms/${encodeURIComponent(form.slug)}/registrations`,
+      const submission = await submitJson(staffSubmit?.submitUrl ?? club?.submitUrl ?? group?.submitUrl ?? `/api/public/events/${encodeURIComponent(event.slug)}/forms/${encodeURIComponent(form.slug)}/registrations`,
         {
           versionId: form.versionId,
           idempotencyKey: submissionKey,
@@ -3330,7 +3364,8 @@ export function PublicRegistrationForm({
           ...(responsibleAdultMinors.length > 0 ? { responsibleAdults: responsibleAdultValues } : {}),
           ...(lodgingSubmission ? { lodging: lodgingSubmission } : {}),
           ...(merchandiseSubmission.length > 0 ? { merchandise: merchandiseSubmission } : {}),
-          ...(staffDraftToken && !club && !group ? { staffDraftToken } : {}),
+          ...(staffDraftToken && !club && !group && !staffSubmit ? { staffDraftToken } : {}),
+          ...(staffSubmit ? staffSubmitExtras(staffSubmit, staffPaperLocation, staffOverrideRule, staffOverrideReason) : {}),
           ...(club?.locationId ? { locationId: club.locationId } : {}),
           ...(club?.teamName ? { teamName: club.teamName } : {}),
           ...(club?.draftKey ? { draftKey: club.draftKey } : {}),
@@ -3339,16 +3374,16 @@ export function PublicRegistrationForm({
           ...(group?.locationId ? { locationId: group.locationId } : {}),
           ...(group?.teamName ? { teamName: group.teamName } : {}),
           ...(Object.keys(groupPicks).length > 0 ? { honorSelections: groupPicks } : {}),
-          website,
+          ...(staffSubmit ? {} : { website }),
         },
         {
           idempotent: true,
           fallbackMessage: "We could not complete the registration.",
-          ...(club ? {} : { init: { headers: securityCheckRef.current?.headers() } }),
+          ...(club || staffSubmit ? {} : { init: { headers: securityCheckRef.current?.headers() } }),
         },
       );
       if (submission.unavailable) {
-        if (!club) securityCheckRef.current?.settle();
+        if (!club && !staffSubmit) securityCheckRef.current?.settle();
         // The site is restarting: keep every answer, the key and the draft; offer Try again.
         setSiteUpdating(unavailableMessage(submission));
         // The notice sits at the top of the form: bring the host page there too (a cross-origin iframe
@@ -3357,7 +3392,7 @@ export function PublicRegistrationForm({
         return;
       }
       const response = submission;
-      if (!club) {
+      if (!club && !staffSubmit) {
         // The token is single-use: reset the box after every attempt that stays on the page.
         securityCheckRef.current?.settle(submission.body);
         if (!response.ok && securityCheckRef.current?.isRejection(submission.body)) {
@@ -3371,6 +3406,7 @@ export function PublicRegistrationForm({
         issues?: FormIssue[];
         message?: string;
         error?: string;
+        overridable?: boolean;
       };
       if (!response.ok || !result.confirmation) {
         // A busy-queue conflict wrote nothing; keep the key so submitting again replays safely (#920).
@@ -3391,23 +3427,30 @@ export function PublicRegistrationForm({
         });
         if (priceChanges.length > 0) setMerchandisePriceUpdates((current) => ({ ...current, ...Object.fromEntries(priceChanges) }));
         setServerIssues(nextIssues);
+        // A rule changed while the page was open (#1510): someone with the override permission is offered the reason box; anyone
+        // else is told who can send it.
+        let failureMessage = result.message ?? "We could not complete the registration. Review the form and try again.";
+        if (staffSubmit && result.overridable === true) {
+          if (staffSubmit.canOverride) setStaffServerRule(result.message ?? "A registration rule stopped this.");
+          else failureMessage = `${failureMessage} ${OVERRIDE_NEEDS_PERMISSION}`;
+        }
         showIssues(
           nextIssues,
-          result.message ?? "We could not complete the registration. Review the form and try again.",
+          failureMessage,
           stepForIssue(nextIssues[0]) ?? currentStep,
         );
         return;
       }
       setSheetOpen(false);
       setConfirmation(result.confirmation);
-      if (!club) clearPublicDraft(getBrowserDraftStorage(), draftIdentity);
+      if (!club && !staffSubmit) clearPublicDraft(getBrowserDraftStorage(), draftIdentity);
       club?.onSubmitted?.({ honors: result.honors });
       group?.onSubmitted?.({ honors: result.honors });
       setGroupHonorsNote(result.honors?.error ?? null);
       window.imsdaEmbedScrollTop?.();
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
-      if (!club) securityCheckRef.current?.settle();
+      if (!club && !staffSubmit) securityCheckRef.current?.settle();
       setError("We could not reach the registration service. Your answers are still here; please try again.");
       window.imsdaEmbedScrollTop?.();
       window.requestAnimationFrame(() => errorSummaryRef.current?.focus());
@@ -3478,22 +3521,25 @@ export function PublicRegistrationForm({
 
   if (confirmation) {
     const waitlisted = confirmation.registrationStatus === "WAITLISTED";
+    const ConfirmationShell = staffSubmit ? "div" : "main";
     // A team registered through the general link (#931): free, so no pricing date or fee band; the team and club are named.
     const teamConfirmation = isTeamConfirmation(group);
     const enteredClub = resolveResponsibleOrganization(rosterEnabled ? registrationResponses : responses) ?? "";
     return (
-      <main className="public-registration-page">
+      <ConfirmationShell className="public-registration-page">
+        {!staffSubmit && (
         <header className="public-registration-header">
           <div className="public-registration-header-inner">
             <BrandLink className="public-registration-brand public-event-brand-link" target={embedded ? "_top" : undefined} wordmark />
             <span className="public-registration-secure">{waitlisted ? <Clock3 size={16} aria-hidden="true" /> : <LockKeyhole size={16} aria-hidden="true" />} {waitlisted ? "Waitlist request received" : "Registration received"}</span>
           </div>
         </header>
+        )}
         <section className="public-registration-confirmation-wrap">
           <article className="public-registration-confirmation">
             <span className={`public-registration-confirmation-icon${waitlisted ? " is-waitlist" : ""}`}>{waitlisted ? <Clock3 size={34} aria-hidden="true" /> : <CheckCircle2 size={34} aria-hidden="true" />}</span>
             <p className="public-registration-eyebrow">{waitlisted ? "Waitlist request received" : "Registration received"}</p>
-            <h1 ref={focusConfirmationHeading} tabIndex={-1}>{waitlisted ? "You’re on the waitlist" : "Thank you for registering"}</h1>
+            <h1 ref={focusConfirmationHeading} tabIndex={-1}>{staffSubmit ? (waitlisted ? "Added to the waitlist" : "Registration sent") : waitlisted ? "You’re on the waitlist" : "Thank you for registering"}</h1>
             <p className="public-registration-confirmation-message">{confirmation.message}</p>
             <div className="public-registration-code">
               <small>{waitlisted ? "Waitlist reference" : "Confirmation code"}</small>
@@ -3516,7 +3562,7 @@ export function PublicRegistrationForm({
                 </small>
               </span>
             </div>
-            {attendeeSignedIn && confirmation.registrationId && <RegistrationProfileReview registrationId={confirmation.registrationId} />}
+            {attendeeSignedIn && !staffSubmit && confirmation.registrationId && <RegistrationProfileReview registrationId={confirmation.registrationId} />}
             <dl className={`public-registration-confirmation-details${teamConfirmation ? " is-compact" : ""}`}>
               {confirmationDetailRows({
                 team: teamConfirmation ? { teamName: group?.teamName ?? "", club: enteredClub, location: group?.locationName ?? null } : null,
@@ -3571,7 +3617,7 @@ export function PublicRegistrationForm({
                 <p>{merchandiseNotChargedNotice}</p>
               </section>
             )}
-            {confirmation.managePath && (
+            {confirmation.managePath && !staffSubmit && (
               <div className="public-registration-manage-link">
                 <a {...eventsSiteNavigation} href={confirmation.managePath}>
                   {(confirmation.cardSelected || confirmation.depositSelected) && !confirmation.paymentCollected && !waitlisted
@@ -3592,7 +3638,7 @@ export function PublicRegistrationForm({
                 )}
               </div>
             )}
-            {showAccountPrompt && (
+            {showAccountPrompt && !staffSubmit && (
               <RegistrationAccountPrompt
                 email={confirmation.email}
                 embedded={embedded}
@@ -3601,14 +3647,20 @@ export function PublicRegistrationForm({
                 brief={teamConfirmation}
               />
             )}
-            <RegistrationPasskeyOffer eligible={passkeyOffer} embedded={embedded} />
+            {!staffSubmit && <RegistrationPasskeyOffer eligible={passkeyOffer} embedded={embedded} />}
             <div className="public-registration-confirmation-actions">
-              <a {...eventsSiteNavigation} className="public-registration-secondary-button" href={`/events/${event.slug}`}><ArrowLeft size={16} aria-hidden="true" /> Back to event</a>
-              <button className="public-registration-secondary-button" type="button" onClick={startAnotherRegistration}>{waitlisted ? "Add another waitlist request" : "Start another registration"}</button>
+              {staffSubmit ? (
+                <a className="public-registration-secondary-button" href={staffSubmit.returnHref}><ArrowLeft size={16} aria-hidden="true" /> {staffSubmit.returnLabel}</a>
+              ) : (
+                <>
+                  <a {...eventsSiteNavigation} className="public-registration-secondary-button" href={`/events/${event.slug}`}><ArrowLeft size={16} aria-hidden="true" /> Back to event</a>
+                  <button className="public-registration-secondary-button" type="button" onClick={startAnotherRegistration}>{waitlisted ? "Add another waitlist request" : "Start another registration"}</button>
+                </>
+              )}
             </div>
           </article>
         </section>
-      </main>
+      </ConfirmationShell>
     );
   }
 
@@ -3621,11 +3673,11 @@ export function PublicRegistrationForm({
     })
     : [];
   const stepItems = clickableSteps(registrationSteps, visitedStepIds, currentStepIndex, errorStepIds);
-  const Shell = club ? "div" : "main";
+  const Shell = club || staffSubmit ? "div" : "main";
   return (
     <Shell className={club ? "public-registration-page club-registration-form" : "public-registration-page"}>
       {confirmDialog}
-      {!club && (<>
+      {!club && !staffSubmit && (<>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
           <BrandLink className="public-registration-brand public-event-brand-link" target={embedded ? "_top" : undefined} wordmark />
@@ -3650,6 +3702,17 @@ export function PublicRegistrationForm({
       <form className="public-registration-layout" noValidate onSubmit={submit}>
         <div className="public-registration-form-column">
           {formsHelpContact && !club && <FormsHelpRow align="end" contact={formsHelpContact} />}
+          {staffSubmit && (
+            <StaffSubmitPanel
+              config={staffSubmit}
+              paperLocation={staffPaperLocation}
+              onPaperLocation={setStaffPaperLocation}
+              overrideReason={staffOverrideReason}
+              onOverrideReason={setStaffOverrideReason}
+              overrideRule={staffOverrideRule}
+              fieldError={staffFieldError}
+            />
+          )}
           {topContent}
           {joiningWaitlist && (
             <section className="public-registration-waitlist-banner" role="status">
@@ -3858,7 +3921,7 @@ export function PublicRegistrationForm({
             <section className="public-registration-submit-card">
               <div><ShieldCheck size={21} aria-hidden="true" /><span><strong>Server-verified registration</strong><small>Pricing and remaining capacity are checked again when you submit.</small></span></div>
               {cardSelected && !joiningWaitlist && !deferredOrganizationBilling && <p>Submitting saves the registration first. Your private registration page will then offer secure Square checkout when online payments are configured.</p>}
-              {!club && <SecurityCheck config={securityCheck} action={securityCheckAction} handleRef={securityCheckRef} />}
+              {!club && !staffSubmit && <SecurityCheck config={securityCheck} action={securityCheckAction} handleRef={securityCheckRef} />}
               <SubmitButton
                 className="public-registration-submit-button"
                 icon={<ClipboardCheck size={19} aria-hidden="true" />}

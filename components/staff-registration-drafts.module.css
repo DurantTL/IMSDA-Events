@@ -93,3 +93,4 @@
 .lines li span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .total { font-weight: 700; }
 .status { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.finishLink { display: inline-flex; align-items: center; min-height: var(--touch-target); text-decoration: none; }

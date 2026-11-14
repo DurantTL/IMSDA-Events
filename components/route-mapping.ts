@@ -268,6 +268,7 @@ export const unmappedDynamicPages: Readonly<Record<string, string>> = {
   "/finance/invoices/[invoiceId]/send": "Send one invoice, from the invoice.",
   "/finance/invoices/statements/[partyId]": "One party's statement, from Statements.",
   "/more/club-forms/[submissionId]": "One club form submission, from Club forms.",
+  "/people/staff-drafts/[draftId]/finish": "Finish one phone, paper or walk-in registration for the registrant, from Phone and paper registrations.",
   "/more/clubs/[organizationId]": "One club's roster, from This event's clubs.",
   "/more/clubs/reports/[organizationId]/[month]": "One Monthly Record, from the event's club reports.",
   "/help/[guideId]": "One Help & learning guide, opened from the Help hub and from search; only for a viewer who may see it.",

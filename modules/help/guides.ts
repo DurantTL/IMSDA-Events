@@ -174,7 +174,7 @@ const writtenHelpGuides: readonly HelpGuide[] = [
       "Open Event setup, then the Staff card. On Team, scroll to Role boundaries. Each role lists what it can do.",
       ...roleLines,
       "Pick the smallest role that covers the work. Read-only staff can look at the event workspace and change nothing.",
-      `Some access is not a role. ${eventExtraText.VIEW_HEALTH_INFORMATION.name} and ${eventExtraText.FINALIZE_INVOICES.name} are given one person at a time by a ${systemRoleText.SYSTEM_ADMIN.name.toLowerCase()}, and no role carries them.`,
+      `Some access is not a role. ${eventExtraText.VIEW_HEALTH_INFORMATION.name}, ${eventExtraText.FINALIZE_INVOICES.name} and ${eventExtraText.OVERRIDE_REGISTRATION_RULES.name} are given one person at a time by a ${systemRoleText.SYSTEM_ADMIN.name.toLowerCase()}, and no role carries them.`,
       `${systemRoleText.CLUBS_ADMIN.name} and ${systemRoleText.SYSTEM_ADMIN.name.toLowerCase()} are not event roles. You never need either one to follow this guide.`,
       "To change a role, choose the person's row on Team.",
       "Under Event role, choose the new role.",
