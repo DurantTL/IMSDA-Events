@@ -6,7 +6,7 @@ import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
 import { BrandLink } from "@/components/brand-link";
 import { PublicExploreNav } from "@/components/public-explore-nav";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
-import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
+import { NoResultSearchBeacon, PublicMetricsBeacon } from "@/components/public-metrics-beacon";
 import { HubLink, SiteNoticesView } from "@/components/site-notices-view";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { addDays, calendarCountLabel, calendarItemStatusLine, formatDateRange, type CalendarItem } from "@/modules/calendar/domain";
@@ -104,9 +104,11 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
   // Staff can reorder and hide category choices (#111); hiding only removes the choice, the events stay listed.
   const categories = applyCategoryPreferences(allCategories, hubContent.calendarCategories, filters.category);
   const { items, pinned } = pinFeatured(applyEventDirectoryFilters(openItems, filters), featuredRows);
-  // A search that showed no event card at all (#1560): the cleaned term is counted, never the raw text.
-  const noResultTerm = filters.q && items.length === 0 ? normalizeSearchTerm(filters.q) : null;
-  const noResultHits = noResultTerm ? [{ metric: "SEARCH_NO_RESULTS" as const, dimension: noResultTerm }] : [];
+  // "No results" means the search words alone match none of the open events (#1560): not a list emptied by a filter, and not
+  // an empty calendar. The cleaned term, never the raw text, goes to the beacon.
+  const noResultTerm = filters.q && openItems.length > 0 && applyEventDirectoryFilters(openItems, { q: filters.q, from: "", to: "", category: "", location: "", audience: "all" }).length === 0
+    ? normalizeSearchTerm(filters.q)
+    : null;
   const clearHref = eventDirectoryHref({ audience: filter });
   const verse = hubContent.footer.verse ? splitVerse(hubContent.footer.verse) : null;
 
@@ -122,9 +124,9 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
 
       <PublicMetricsBeacon hits={[
         ...(used.search ? [{ metric: "DIRECTORY_SEARCH" as const }] : []),
-        ...noResultHits,
         ...used.filters.map((name) => ({ metric: "DIRECTORY_FILTER" as const, dimension: name })),
       ]} />
+      <NoResultSearchBeacon term={noResultTerm} />
       <SiteNoticesView notices={activeNotices(hubContent, today)} />
 
       <section className="public-registration-hero calendar-hero public-home-banner">

@@ -121,7 +121,12 @@ describe("pruning", () => {
     expect(await prunePublicMetrics(new Date("2026-11-12T15:00:00Z"))).toBe(5);
     expect(mocks.deleteMany).toHaveBeenCalledWith({ where: { day: { lt: new Date("2025-10-08T00:00:00Z") } } });
     const query = mocks.executeRaw.mock.calls[0][0];
-    expect((query.strings as string[]).join("?")).toContain("< ?::date");
+    const text = (query.strings as string[]).join("?");
+    expect(text).toContain("WITH totals AS");
+    expect(text).toContain("GROUP BY 1, 2");
+    expect(text).toContain("DELETE FROM \"PublicMetricDaily\" AS d USING totals AS t");
+    expect(text).toContain("t.total < ?");
+    expect(text).toContain("d.\"day\" < ?::date");
     expect(query.values).toContain(3);
     expect(query.values).toContainEqual(new Date("2026-10-13T00:00:00Z"));
     expect(query.values).toEqual(expect.arrayContaining(["REFERRER_SITE", "CAMPAIGN_VISIT", "SEARCH_NO_RESULTS"]));

@@ -124,3 +124,58 @@ export function PublicWebVitals() {
   useReportWebVitals(reportVital);
   return null;
 }
+
+/* ------------------------------------------------------------------ Search with no results (#1560) */
+
+/** The term the document loaded with (undefined until the first mount), the latest term waiting to be sent, and what was sent. All in memory. */
+let loadedTerm: string | null | undefined;
+let pendingTerm: string | null = null;
+const sentTerms = new Set<string>();
+let noResultListeners = false;
+let noResultMounted = 0;
+
+/** Sends the final term once per document. Skipped for a reload or back/forward while the term is still the one the page loaded with. */
+function flushNoResultTerm() {
+  const term = pendingTerm;
+  if (!term || sentTerms.has(term)) return;
+  const navigation = typeof performance !== "undefined" ? (performance.getEntriesByType?.("navigation")[0] as PerformanceNavigationTiming | undefined) : undefined;
+  if ((navigation?.type === "reload" || navigation?.type === "back_forward") && term === loadedTerm) return;
+  sentTerms.add(term);
+  sendHit({ metric: "SEARCH_NO_RESULTS", dimension: term });
+}
+
+/** Test hook: forget everything this document remembered about no-result searches. */
+export function resetNoResultForTests() {
+  loadedTerm = undefined;
+  pendingTerm = null;
+  sentTerms.clear();
+  noResultMounted = 0;
+}
+
+/**
+ * A search on the events list that showed no events (#1560). The page gives the cleaned term, or null when the visitor
+ * saw results. Typing changes the term as it goes, so only the latest one is kept, and it is sent once, when the page
+ * is hidden or closed or the visitor leaves the events list: a term replaced by a later one is never sent.
+ */
+export function NoResultSearchBeacon({ term }: { term: string | null }) {
+  useEffect(() => {
+    if (loadedTerm === undefined) loadedTerm = term;
+    pendingTerm = term;
+  }, [term]);
+
+  useEffect(() => {
+    noResultMounted += 1;
+    if (!noResultListeners) {
+      noResultListeners = true;
+      window.addEventListener("pagehide", flushNoResultTerm);
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushNoResultTerm(); });
+    }
+    return () => {
+      noResultMounted -= 1;
+      // Leaving the events list sends its last term. Checked on the next tick so a development double mount never counts as leaving.
+      setTimeout(() => { if (noResultMounted === 0) flushNoResultTerm(); }, 0);
+    };
+  }, []);
+
+  return null;
+}

@@ -61,11 +61,14 @@ export async function prunePublicMetrics(now = new Date()): Promise<number> {
   const cutoff = new Date(`${addDays(today, -retentionDays)}T00:00:00Z`);
   const result = await getPrisma().publicMetricDaily.deleteMany({ where: { day: { lt: cutoff } } });
   const rareCutoff = new Date(`${addDays(today, -rareFreeTextRetentionDays)}T00:00:00Z`);
+  const metricList = Prisma.join(freeTextMetrics.map((metric) => Prisma.sql`${metric}::"PublicMetric"`));
+  // One pass over the three metrics adds up each value across every stored day; then one delete.
   const rare = await getPrisma().$executeRaw(Prisma.sql`
-    DELETE FROM "PublicMetricDaily" AS p
-    WHERE p."metric" IN (${Prisma.join(freeTextMetrics.map((metric) => Prisma.sql`${metric}::"PublicMetric"`))})
-      AND p."day" < ${rareCutoff}::date
-      AND (SELECT COALESCE(SUM(t."count"), 0) FROM "PublicMetricDaily" AS t WHERE t."metric" = p."metric" AND t."dimension" = p."dimension") < ${minimumShownCount}`);
+    WITH totals AS (
+      SELECT "metric", "dimension", SUM("count") AS total FROM "PublicMetricDaily" WHERE "metric" IN (${metricList}) GROUP BY 1, 2
+    )
+    DELETE FROM "PublicMetricDaily" AS d USING totals AS t
+    WHERE d."metric" = t."metric" AND d."dimension" = t."dimension" AND t.total < ${minimumShownCount} AND d."day" < ${rareCutoff}::date`);
   return result.count + rare;
 }
 
