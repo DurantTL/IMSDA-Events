@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logWarn } from "@/lib/logger";
 import { calendarDateIn, addDays } from "@/modules/calendar/domain";
-import { buildEventFunnel, decideDimension, defaultAnalyticsPeriod, fillDailySeries, previousPeriodAvailable, previousPeriodRange, retentionDays, type AnalyticsPeriod, type DailyFunnelPoint, type DateRange, type EventFunnelRow, type FunnelCounts, type PublicMetricName } from "@/modules/public-metrics/domain";
+import { applyMinimumCount, buildEventFunnel, decideDimension, defaultAnalyticsPeriod, fillDailySeries, freeTextDailyCap, freeTextMetrics, isFreeTextMetric, minimumShownCount, rareFreeTextRetentionDays, type MinimumCounted, previousPeriodAvailable, previousPeriodRange, retentionDays, type AnalyticsPeriod, type DailyFunnelPoint, type DateRange, type EventFunnelRow, type FunnelCounts, type PublicMetricName } from "@/modules/public-metrics/domain";
 
 /**
  * Counts one public event (#111). Aggregate only: one row per day, metric and allowlisted dimension, incremented
@@ -29,6 +29,18 @@ export async function recordPublicMetric(metric: PublicMetricName, dimension: un
       stored = decision.dimension;
     }
     const day = new Date(`${calendarDateIn(now)}T00:00:00Z`);
+    if (isFreeTextMetric(metric)) {
+      // Abuse cap, in the same statement: a value already stored today still counts up; a new one is added only while
+      // fewer than 200 different values exist for that day and metric. Two requests at the same instant can both pass
+      // the check, so the number of values can briefly pass 200 by a few; that is acceptable.
+      const written = await getPrisma().$executeRaw(Prisma.sql`
+        INSERT INTO "PublicMetricDaily" ("day", "metric", "dimension", "count")
+        SELECT ${day}::date, ${metric}::"PublicMetric", ${stored}::text, 1
+        WHERE EXISTS (SELECT 1 FROM "PublicMetricDaily" WHERE "day" = ${day}::date AND "metric" = ${metric}::"PublicMetric" AND "dimension" = ${stored}::text)
+          OR (SELECT count(*) FROM "PublicMetricDaily" WHERE "day" = ${day}::date AND "metric" = ${metric}::"PublicMetric") < ${freeTextDailyCap}
+        ON CONFLICT ("day", "metric", "dimension") DO UPDATE SET "count" = "PublicMetricDaily"."count" + 1`);
+      return written > 0;
+    }
     await getPrisma().$executeRaw(Prisma.sql`
       INSERT INTO "PublicMetricDaily" ("day", "metric", "dimension", "count")
       VALUES (${day}::date, ${metric}::"PublicMetric", ${stored}, 1)
@@ -40,11 +52,21 @@ export async function recordPublicMetric(metric: PublicMetricName, dimension: un
   }
 }
 
-/** Deletes daily rows older than the retention window (400 days). Returns how many went. */
+/**
+ * Deletes daily rows older than the retention window (400 days), and rows of the three free-text metrics that are older
+ * than 30 days and whose value, added up over every stored day, was seen fewer than 3 times. Returns how many went.
+ */
 export async function prunePublicMetrics(now = new Date()): Promise<number> {
-  const cutoff = new Date(`${addDays(calendarDateIn(now), -retentionDays)}T00:00:00Z`);
+  const today = calendarDateIn(now);
+  const cutoff = new Date(`${addDays(today, -retentionDays)}T00:00:00Z`);
   const result = await getPrisma().publicMetricDaily.deleteMany({ where: { day: { lt: cutoff } } });
-  return result.count;
+  const rareCutoff = new Date(`${addDays(today, -rareFreeTextRetentionDays)}T00:00:00Z`);
+  const rare = await getPrisma().$executeRaw(Prisma.sql`
+    DELETE FROM "PublicMetricDaily" AS p
+    WHERE p."metric" IN (${Prisma.join(freeTextMetrics.map((metric) => Prisma.sql`${metric}::"PublicMetric"`))})
+      AND p."day" < ${rareCutoff}::date
+      AND (SELECT COALESCE(SUM(t."count"), 0) FROM "PublicMetricDaily" AS t WHERE t."metric" = p."metric" AND t."dimension" = p."dimension") < ${minimumShownCount}`);
+  return result.count + rare;
 }
 
 export type MetricRow = { dimension: string; count: number };
@@ -60,6 +82,11 @@ export type AnalyticsSummary = {
   imageErrors: MetricRow[];
   vitals: Array<{ name: string; good: number; needsImprovement: number; poor: number }>;
   directory: MetricRow[];
+  /** Referring sites and campaign tags (#1560): only values seen at least 3 times in the period; the rest are a count only. */
+  referrers: MinimumCounted<MetricRow>;
+  campaigns: MinimumCounted<MetricRow>;
+  /** Searches on the events list that showed nothing (#1560), same rule. */
+  noResultSearches: MinimumCounted<MetricRow>;
   /** The same-length period just before this one (#1961); `totals` is null when it is no longer fully stored (past the 400-day retention). */
   previous: (DateRange & { totals: FunnelCounts | null });
   /** One point per day of the period for views, starts and completions; days with no counts are 0. */
@@ -95,7 +122,7 @@ export async function getAnalyticsSummary(today: string, days: AnalyticsPeriod =
   const by = (metric: PublicMetricName): MetricRow[] =>
     rows.filter((row) => row.metric === metric).map((row) => ({ dimension: row.dimension, count: row._sum.count ?? 0 })).sort((a, b) => b.count - a.count || a.dimension.localeCompare(b.dimension));
   const total = (metric: PublicMetricName) => by(metric).reduce((sum, row) => sum + row.count, 0);
-  const metricNames = ["EVENT_PAGE_VIEW", "DIRECTORY_SEARCH", "DIRECTORY_FILTER", "REGISTRATION_START", "REGISTRATION_COMPLETE", "LOGIN_SUCCESS", "LOGIN_FAILURE", "NOT_FOUND", "IMAGE_ERROR", "WEB_VITAL"] as const;
+  const metricNames = ["EVENT_PAGE_VIEW", "DIRECTORY_SEARCH", "DIRECTORY_FILTER", "REGISTRATION_START", "REGISTRATION_COMPLETE", "LOGIN_SUCCESS", "LOGIN_FAILURE", "NOT_FOUND", "IMAGE_ERROR", "WEB_VITAL", "REFERRER_SITE", "CAMPAIGN_VISIT", "SEARCH_NO_RESULTS"] as const;
   const totals = Object.fromEntries(metricNames.map((metric) => [metric, total(metric)])) as Record<PublicMetricName, number>;
   const counts = (metric: PublicMetricName) => new Map(by(metric).map((row) => [row.dimension, row.count]));
   const funnelRows = buildEventFunnel(counts("EVENT_PAGE_VIEW"), counts("REGISTRATION_START"), counts("REGISTRATION_COMPLETE"));
@@ -123,6 +150,10 @@ export async function getAnalyticsSummary(today: string, days: AnalyticsPeriod =
       poor: vitalCounts.get(`${name}:poor`) ?? 0,
     })),
     directory: [...by("DIRECTORY_SEARCH"), ...by("DIRECTORY_FILTER")],
+    // Below-minimum values are rolled up here, on the server: their text never leaves this function.
+    referrers: applyMinimumCount(by("REFERRER_SITE")),
+    campaigns: applyMinimumCount(by("CAMPAIGN_VISIT")),
+    noResultSearches: applyMinimumCount(by("SEARCH_NO_RESULTS")),
     previous: { ...previousRange, totals: previousTotals },
     daily: !trends ? [] : fillDailySeries(from, today, dayRows.map((row) => ({ day: row.day.toISOString().slice(0, 10), metric: row.metric, count: row._sum.count ?? 0 }))),
   };

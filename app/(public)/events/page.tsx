@@ -28,7 +28,7 @@ import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/rep
 import { pinFeatured } from "@/modules/events/featured-domain";
 import { listFeaturedEventRows } from "@/modules/events/featured";
 import { getPublishedHubContent } from "@/modules/site-content/hub-content";
-import { directoryFiltersInUse } from "@/modules/public-metrics/domain";
+import { directoryFiltersInUse, normalizeSearchTerm } from "@/modules/public-metrics/domain";
 import { activeNotices, applyCategoryPreferences, splitVerse } from "@/modules/site-content/hub-content-domain";
 import { clubRegistrationEntryPath } from "@/modules/club-registrations/entry-path";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
@@ -104,6 +104,9 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
   // Staff can reorder and hide category choices (#111); hiding only removes the choice, the events stay listed.
   const categories = applyCategoryPreferences(allCategories, hubContent.calendarCategories, filters.category);
   const { items, pinned } = pinFeatured(applyEventDirectoryFilters(openItems, filters), featuredRows);
+  // A search that showed no event card at all (#1560): the cleaned term is counted, never the raw text.
+  const noResultTerm = filters.q && items.length === 0 ? normalizeSearchTerm(filters.q) : null;
+  const noResultHits = noResultTerm ? [{ metric: "SEARCH_NO_RESULTS" as const, dimension: noResultTerm }] : [];
   const clearHref = eventDirectoryHref({ audience: filter });
   const verse = hubContent.footer.verse ? splitVerse(hubContent.footer.verse) : null;
 
@@ -119,6 +122,7 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
 
       <PublicMetricsBeacon hits={[
         ...(used.search ? [{ metric: "DIRECTORY_SEARCH" as const }] : []),
+        ...noResultHits,
         ...used.filters.map((name) => ({ metric: "DIRECTORY_FILTER" as const, dimension: name })),
       ]} />
       <SiteNoticesView notices={activeNotices(hubContent, today)} />

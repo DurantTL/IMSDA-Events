@@ -3589,10 +3589,15 @@ enum PublicMetric {
   NOT_FOUND
   IMAGE_ERROR
   WEB_VITAL
+  REFERRER_SITE
+  CAMPAIGN_VISIT
+  SEARCH_NO_RESULTS
 }
 
-/// Privacy-safe public analytics (#111): a count per day, metric and allowlisted dimension, and nothing else. No
-/// person, session, address, device, search text, URL or referrer is ever stored here (docs/PUBLIC-ANALYTICS.md).
+/// Privacy-safe public analytics (#111): a count per day, metric and dimension, and nothing else. No person, session,
+/// address, device, URL or query string is ever stored here. Three metrics (#1560) hold short normalized text: a
+/// referring site's host, utm campaign tags, and a search that found nothing. Each is capped per day, shown only from
+/// 3 uses and deleted after 30 days when rarer (docs/PUBLIC-ANALYTICS.md).
 model PublicMetricDaily {
   day       DateTime     @db.Date
   metric    PublicMetric

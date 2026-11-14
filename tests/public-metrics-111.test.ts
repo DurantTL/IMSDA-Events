@@ -70,7 +70,7 @@ beforeEach(() => {
 });
 
 describe("the allowlists", () => {
-  it("accepts only listed dimensions and never free text", () => {
+  it("accepts only listed dimensions, and free text only for the three normalized metrics (#1560)", () => {
     expect(decideDimension("DIRECTORY_SEARCH", "camp for kids")).toEqual({ kind: "ok", dimension: "" });
     expect(decideDimension("DIRECTORY_FILTER", "location")).toEqual({ kind: "ok", dimension: "location" });
     expect(decideDimension("DIRECTORY_FILTER", "Lake Site")).toEqual({ kind: "drop" });
@@ -139,6 +139,7 @@ describe("recording a count", () => {
 
   it("deletes only rows past 400 days", async () => {
     mocks.deleteMany.mockResolvedValue({ count: 3 });
+    mocks.executeRaw.mockResolvedValue(0);
     expect(await prunePublicMetrics(new Date("2026-10-28T15:00:00Z"))).toBe(3);
     expect(mocks.deleteMany).toHaveBeenCalledWith({ where: { day: { lt: new Date("2025-09-23T00:00:00Z") } } });
   });
