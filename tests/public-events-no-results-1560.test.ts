@@ -53,6 +53,13 @@ describe("search with no results (#1560)", () => {
     await render({ q: "camp", from: "2030-01-01" });
     expect(term()).toBeNull();
   });
+  it("checks the words against every open event, not only the chosen audience tab", async () => {
+    mocks.items.mockResolvedValue([camp, { ...camp, key: "event-camporee", title: "Fictitious Club Camporee", href: "/events/camporee", clubEvent: true }]);
+    await render({ q: "camporee", for: "everyone" });
+    expect(term()).toBeNull();
+    await render({ q: "zebra rodeo", for: "everyone" });
+    expect(term()).toBe("zebra rodeo");
+  });
   it("passes nothing when there are no open events at all", async () => {
     mocks.items.mockResolvedValue([]);
     await render({ q: "zebra rodeo" });

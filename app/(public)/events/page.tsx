@@ -105,8 +105,10 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
   const categories = applyCategoryPreferences(allCategories, hubContent.calendarCategories, filters.category);
   const { items, pinned } = pinFeatured(applyEventDirectoryFilters(openItems, filters), featuredRows);
   // "No results" means the search words alone match none of the open events (#1560): not a list emptied by a filter, and not
-  // an empty calendar. The cleaned term, never the raw text, goes to the beacon.
-  const noResultTerm = filters.q && openItems.length > 0 && applyEventDirectoryFilters(openItems, { q: filters.q, from: "", to: "", category: "", location: "", audience: "all" }).length === 0
+  // an empty calendar. It is checked against every open event, whatever audience tab is chosen. The cleaned term, never the
+  // raw text, goes to the beacon.
+  const allOpenItems = filter === "all" ? openItems : selectOpenRegistrationItems(calendarItems, "all");
+  const noResultTerm = filters.q && allOpenItems.length > 0 && applyEventDirectoryFilters(allOpenItems, { q: filters.q, from: "", to: "", category: "", location: "", audience: "all" }).length === 0
     ? normalizeSearchTerm(filters.q)
     : null;
   const clearHref = eventDirectoryHref({ audience: filter });
