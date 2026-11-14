@@ -517,8 +517,9 @@ export function buildMerchandiseReceiptBlock(input: MerchandiseReceiptBlockInput
   for (const line of input.lines) {
     lines.push(`- ${line.quantity} × ${escapeMarkdown(line.productName)} (${escapeMarkdown(line.variantLabel)}): ${formatMessageMoney(line.lineTotalCents)}`);
   }
-  if (input.feeCents > 0) lines.push(`- Processing fee: ${formatMessageMoney(input.feeCents)}`);
-  if (input.taxCents > 0) lines.push(`- Tax: ${formatMessageMoney(input.taxCents)}`);
+  // A comp charges nothing, so it lists no fee or tax lines that could read as a charge.
+  if (!input.comped && input.feeCents > 0) lines.push(`- Processing fee: ${formatMessageMoney(input.feeCents)}`);
+  if (!input.comped && input.taxCents > 0) lines.push(`- Tax: ${formatMessageMoney(input.taxCents)}`);
   lines.push(input.comped
     ? `- **Total:** $0.00 (comped; items valued at ${formatMessageMoney(input.totalCents)})`
     : `- **Total:** ${formatMessageMoney(input.totalCents)}`, "", "### Receipt", "");

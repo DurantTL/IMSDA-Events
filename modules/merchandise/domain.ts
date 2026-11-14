@@ -12,7 +12,7 @@ export const merchandiseOrderStatusWords = {
   PAID: "Confirmed",
   CANCELLED: "Cancelled",
   REFUNDED: "Refunded",
-  // Rule B12: no new word. A comped order is confirmed; the staff panel adds a visible "Comped" tag.
+  // Rule B12: no new word. A comped order is confirmed; the staff panel adds "No charge".
   COMPED: "Confirmed",
 } as const satisfies Record<MerchandiseOrderStatusValue, StatusWord>;
 

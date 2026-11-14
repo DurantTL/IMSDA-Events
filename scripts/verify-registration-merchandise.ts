@@ -214,7 +214,10 @@ async function main() {
   const compedOrder = await staffOrder(main.eventId, "d", main.variants.cap);
   await act(main.eventId, compedOrder.id, { action: "COMP", reason: "Speaker gift" });
   assert((await listMerchandiseOrders(main.eventId)).totals.some((row) => row.variantLabel === "One size" && row.quantity >= 1), "a comped order counts for pickup");
-  await act(main.eventId, compedOrder.id, { action: "CANCEL", reason: "Gift withdrawn" });
+  const noFinance = await caught(act(main.eventId, compedOrder.id, { action: "CANCEL", reason: "Gift withdrawn" }));
+  assert(noFinance instanceof MerchandiseOrderActionError && noFinance.code === "FINANCE_REQUIRED", "cancelling a comped order needs finance access");
+  assert(await prisma.merchandiseOrder.findUniqueOrThrow({ where: { id: compedOrder.id } }).then((row) => row.status) === "COMPED", "the refused cancel leaves the order comped");
+  await applyMerchandiseOrderAction(main.eventId, compedOrder.id, userId, merchandiseOrderActionSchema.parse({ clientRequestId: randomUUID(), action: "CANCEL", reason: "Gift withdrawn" }), new Date(), true);
   assert(await prisma.merchandiseOrder.findUniqueOrThrow({ where: { id: compedOrder.id } }).then((row) => row.status) === "CANCELLED", "a comped order can be cancelled");
 
   const wrongEvent = await caught(act(waitEvent.eventId, racerA.id, { action: "CANCEL", reason: "Wrong event" }));

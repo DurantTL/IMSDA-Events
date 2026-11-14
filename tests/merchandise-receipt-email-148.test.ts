@@ -62,6 +62,8 @@ describe("merchandise receipt template (#148)", () => {
       expect(text).toContain("comped; items valued at $52.00");
     }
     expect(comped.body).not.toContain("Total:** $52.00");
+    const compedWithFee = render("Comped — no charge", { comped: true, feeCents: 150, taxCents: 100 });
+    expect(compedWithFee.body).not.toMatch(/Processing fee|Tax:/);
   });
 
   it("shows fee and tax only when nonzero", () => {
