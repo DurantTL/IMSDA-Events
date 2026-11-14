@@ -350,6 +350,8 @@ const pages: PageSpec[] = [
   { ...staff("recognitions", `/more/recognitions?event=${clubEventId}`, "system-admin"), expectText: /Recognitions/ },
   // The optional Event staffing sheet (#1678): the coordinator's switch, the activities, the gaps and the people (switched on in seedEventStaffing).
   { ...area("event-staffing", `/account/area-clubs/events/${clubEventId}/staffing`), expectText: /Event staffing/ },
+  // The optional Baptism follow-up (#1680) for an Area Coordinator: the switch, the lead addresses and the names with their followed-up forms.
+  { ...area("baptism-follow-up", `/account/area-clubs/events/${clubEventId}/baptism-follow-up`), expectText: /Baptism follow-up/ },
   // The optional Inspections tool (#1896): the switch, the phone score entry and the CSV import (switched on in seedInspections).
   { ...area("inspections", `/account/area-clubs/events/${clubEventId}/inspections`), expectText: /Inspections/ },
   area("team-permissions", "/account/area-clubs/team-permissions"),
@@ -1321,6 +1323,12 @@ async function seedBaptismFollowUp(prisma: PrismaClient): Promise<void> {
   await prisma.baptismFollowUpSetting.upsert({
     where: { eventId: clubEventId },
     create: { eventId: clubEventId, leadEmails: ["lead@example.test"] },
+    update: {},
+  });
+  // One synthetic name on a synthetic club, so the names list shows the followed-up status and its note form.
+  await prisma.baptismFollowUp.upsert({
+    where: { eventId_organizationId_normalizedName: { eventId: clubEventId, organizationId: clubB, normalizedName: "ava sample" } },
+    create: { eventId: clubEventId, organizationId: clubB, normalizedName: "ava sample", displayName: "Ava Sample", leadNotified: true },
     update: {},
   });
 }

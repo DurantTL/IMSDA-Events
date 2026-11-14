@@ -79,8 +79,8 @@ describe("club teachers module (#1681)", () => {
     expect(eventModuleDefinition("club-teachers").alwaysOn).toBe(false);
   });
 
-  it("is one of the only modules the scoped (Area Coordinator) path may switch (Camporee scoring #1676 and Attendance points #1677 are the others)", () => {
-    expect(scopedToggleModuleKeys).toEqual(["club-teachers", "event-scoring", "inspection-scoring", "attendance-points", "debrief", "event-budget", "event-staffing", "recognitions"]);
+  it("is one of the modules the scoped (Area Coordinator) path may switch (Camporee scoring, Attendance points, Baptism follow-up and others)", () => {
+    expect(scopedToggleModuleKeys).toEqual(["club-teachers", "event-scoring", "inspection-scoring", "attendance-points", "debrief", "event-budget", "event-staffing", "recognitions", "baptism-follow-up"]);
   });
 });
 

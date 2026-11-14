@@ -4,16 +4,26 @@ import { getPrisma } from "@/lib/prisma";
 import type { MembershipLookup, Session } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { BAPTISM_FOLLOW_UP_MODULE_KEY, parseLeadEmails, usablePastorEmail } from "@/modules/baptism-follow-up/domain";
-import { requireStaffToggleAccess } from "@/modules/event-modules/scoped-toggle";
+import {
+  ScopedToggleError,
+  assertScopedToggleAllowed,
+  loadScopedToolEvent,
+  requireStaffToggleAccess,
+  scopedActorAudit,
+  scopedModuleIsOn,
+  writeScopedModuleSwitch,
+  type ScopedToggleActor,
+} from "@/modules/event-modules/scoped-toggle";
 
 /**
- * Who the baptism notices of an event go to, and what the Baptism follow-up page shows (#1680). Staff only: a system
- * administrator, an Event Admin of the event or the Clubs Administrator (who is an Event Admin on club events), the same people
- * the page admits. The module itself is turned on by a system administrator on the event features page.
+ * Who the baptism notices of an event go to, and what the Baptism follow-up page shows (#1680). Two kinds of actor, the shared
+ * scoped-switch kinds (`scoped-toggle.ts`): staff (a system administrator, an Event Admin of the event or the Clubs
+ * Administrator, who is an Event Admin on club events) and an active Area Coordinator on a published club event, after the
+ * second sign-in step. Either may switch the module on or off; off hides the tool and keeps every name, status and note.
  */
 
 export class BaptismFollowUpError extends Error {
-  constructor(public readonly code: "EVENT_NOT_FOUND" | "MODULE_OFF" | "INVALID_ADDRESSES", message: string) {
+  constructor(public readonly code: "EVENT_NOT_FOUND" | "MODULE_OFF" | "INVALID_ADDRESSES" | "INVALID_NOTE" | "FOLLOW_UP_NOT_FOUND" | "CONFLICT", message: string) {
     super(message);
     this.name = "BaptismFollowUpError";
   }
@@ -24,21 +34,36 @@ export async function requireBaptismFollowUpStaff(session: Session, eventId: str
   return requireStaffToggleAccess(session, eventId, lookup);
 }
 
-async function loadClubEvent(eventId: string) {
-  const event = await getPrisma().event.findFirst({ where: { id: eventId, archivedAt: null, audience: "CLUB" }, select: { id: true, name: true } });
-  if (!event) throw new BaptismFollowUpError("EVENT_NOT_FOUND", "This is not a club event, or it is archived.");
-  return event;
+/** The club event, as this kind of actor may see it: staff also see an unpublished one, a coordinator only a published one. */
+export async function loadClubEvent(eventId: string, scope: ScopedToggleActor["kind"] = "staff") {
+  try {
+    return await loadScopedToolEvent(eventId, scope, "This is not a club event, or it is archived.");
+  } catch (error) {
+    if (error instanceof ScopedToggleError && error.code === "EVENT_NOT_FOUND") throw new BaptismFollowUpError("EVENT_NOT_FOUND", error.message);
+    throw error;
+  }
 }
 
 export async function baptismFollowUpIsOn(eventId: string): Promise<boolean> {
-  const row = await getPrisma().eventModule.findUnique({ where: { eventId_moduleKey: { eventId, moduleKey: BAPTISM_FOLLOW_UP_MODULE_KEY } }, select: { id: true } });
-  return row !== null;
+  return scopedModuleIsOn(eventId, BAPTISM_FOLLOW_UP_MODULE_KEY);
+}
+
+/** Switches Baptism follow-up on or off, audited for a real change (the shared scoped switch). Off keeps every name, status and note. */
+export async function applyBaptismFollowUpSwitch(actor: ScopedToggleActor, eventId: string, enabled: boolean) {
+  await assertScopedToggleAllowed(BAPTISM_FOLLOW_UP_MODULE_KEY, actor);
+  await loadClubEvent(eventId, actor.kind);
+  await getPrisma().$transaction(async (tx) => {
+    await writeScopedModuleSwitch(tx, { actor, eventId, moduleKey: BAPTISM_FOLLOW_UP_MODULE_KEY, enabled });
+  });
+  return { enabled: await baptismFollowUpIsOn(eventId) };
 }
 
 /** Saves the event lead addresses (empty clears them, which stops notices). Audited with the counts and the addresses added and removed. */
-export async function saveBaptismLeadEmails(actor: { userId: string }, eventId: string, raw: string | readonly string[]) {
-  await loadClubEvent(eventId);
-  if (!(await baptismFollowUpIsOn(eventId))) throw new BaptismFollowUpError("MODULE_OFF", "Baptism follow-up is off for this event. Ask a system administrator to turn it on.");
+export async function saveBaptismLeadEmails(actor: ScopedToggleActor, eventId: string, raw: string | readonly string[]) {
+  await assertScopedToggleAllowed(BAPTISM_FOLLOW_UP_MODULE_KEY, actor);
+  await loadClubEvent(eventId, actor.kind);
+  if (!(await baptismFollowUpIsOn(eventId))) throw new BaptismFollowUpError("MODULE_OFF", "Baptism follow-up is off for this event. Turn it on first.");
+  const who = scopedActorAudit(actor);
   return getPrisma().$transaction(async (tx) => {
     const stored = await tx.baptismFollowUpSetting.findUnique({ where: { eventId }, select: { leadEmails: true } });
     const parsed = parseLeadEmails(raw, stored?.leadEmails ?? []);
@@ -53,7 +78,7 @@ export async function saveBaptismLeadEmails(actor: { userId: string }, eventId: 
       });
       await writeAuditLog({
         eventId,
-        actorUserId: actor.userId,
+        ...(who.actorUserId ? { actorUserId: who.actorUserId } : {}),
         action: "BAPTISM_FOLLOW_UP_LEADS_CHANGED",
         entityType: "BaptismFollowUpSetting",
         entityId: eventId,
@@ -61,6 +86,7 @@ export async function saveBaptismLeadEmails(actor: { userId: string }, eventId: 
         // The event lead addresses are staff contacts, not attendee data, so who was added and removed is recorded with the counts.
         // No attendee name is ever put in an audit entry.
         metadata: {
+          ...who.metadata,
           eventId,
           previousCount: before.length,
           newCount: parsed.emails.length,
@@ -82,14 +108,14 @@ export type BaptismClubRow = {
   pastorOnFile: boolean;
   /** The sponsoring church, for the office's pastor page; null when the club has none. */
   churchId: string | null;
-  names: Array<{ displayName: string; notifiedAt: string; recipients: BaptismRecipients }>;
+  names: Array<{ id: string; displayName: string; notifiedAt: string; recipients: BaptismRecipients; followedUpAt: string | null; note: string | null }>;
 };
 
-export type BaptismFollowUpPage = { enabled: boolean; leadEmails: string[]; clubs: BaptismClubRow[] };
+export type BaptismFollowUpPage = { enabled: boolean; eventName: string; leadEmails: string[]; clubs: BaptismClubRow[] };
 
 /** What the page shows: the switch, the lead addresses, and the notified names by club. Registered clubs with no pastor on file are listed too. */
-export async function loadBaptismFollowUpPage(eventId: string): Promise<BaptismFollowUpPage> {
-  await loadClubEvent(eventId);
+export async function loadBaptismFollowUpPage(eventId: string, scope: ScopedToggleActor["kind"] = "staff"): Promise<BaptismFollowUpPage> {
+  const event = await loadClubEvent(eventId, scope);
   const prisma = getPrisma();
   const [enabled, setting, rows, registered] = await Promise.all([
     baptismFollowUpIsOn(eventId),
@@ -97,7 +123,7 @@ export async function loadBaptismFollowUpPage(eventId: string): Promise<BaptismF
     prisma.baptismFollowUp.findMany({
       where: { eventId },
       orderBy: [{ notifiedAt: "asc" }, { displayName: "asc" }],
-      select: { organizationId: true, displayName: true, notifiedAt: true, pastorNotified: true },
+      select: { id: true, organizationId: true, displayName: true, notifiedAt: true, pastorNotified: true, followedUpAt: true, followUpNote: true },
     }),
     prisma.clubEventRegistration.findMany({
       where: { eventId, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } },
@@ -125,8 +151,15 @@ export async function loadBaptismFollowUpPage(eventId: string): Promise<BaptismF
       pastorOnFile: club.parentOrganizationId !== null && churchesWithPastor.has(club.parentOrganizationId),
       names: rows
         .filter((row) => row.organizationId === club.id)
-        .map((row) => ({ displayName: row.displayName, notifiedAt: row.notifiedAt.toISOString(), recipients: row.pastorNotified ? "lead and pastor" as const : "lead" as const })),
+        .map((row) => ({
+          id: row.id,
+          displayName: row.displayName,
+          notifiedAt: row.notifiedAt.toISOString(),
+          recipients: row.pastorNotified ? "lead and pastor" as const : "lead" as const,
+          followedUpAt: row.followedUpAt?.toISOString() ?? null,
+          note: row.followUpNote,
+        })),
     }))
     .sort((left, right) => left.clubName.localeCompare(right.clubName));
-  return { enabled, leadEmails: setting?.leadEmails ?? [], clubs: result };
+  return { enabled, eventName: event.name, leadEmails: setting?.leadEmails ?? [], clubs: result };
 }
