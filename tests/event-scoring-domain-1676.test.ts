@@ -44,8 +44,8 @@ describe("camporee scoring is an optional tool (#1676)", () => {
     expect(creationModuleKeys("GENERAL", ["event-scoring"])).not.toContain("event-scoring");
   });
 
-  it("is switchable by the narrow path beside Club teachers, and by no other", () => {
-    expect(scopedToggleModuleKeys).toEqual(["club-teachers", "event-scoring", "inspection-scoring", "attendance-points", "debrief", "event-budget", "event-staffing", "recognitions"]);
+  it("is switchable by the narrow path, as one of the listed tools (including Baptism follow-up #1680), and by no other", () => {
+    expect(scopedToggleModuleKeys).toEqual(["club-teachers", "event-scoring", "inspection-scoring", "attendance-points", "debrief", "event-budget", "event-staffing", "recognitions", "baptism-follow-up"]);
   });
 });
 

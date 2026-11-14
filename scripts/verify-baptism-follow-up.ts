@@ -184,41 +184,61 @@ async function main() {
   const staff = { kind: "staff" as const, userId: ids.user };
   const coordinator = { kind: "area-coordinator" as const, accountId: ids.ac };
   const target = (await ledger(ids.club)).find((row) => row.normalizedName === "ava sample")!;
+  /** What an up-to-date form sends: the values the row holds now, as the form last saw them. */
+  const saveUpToDate = async (actor: Parameters<typeof updateBaptismFollowUp>[0], eventId: string, input: { followedUp?: boolean; note?: string }) => {
+    const current = await prisma.baptismFollowUp.findUniqueOrThrow({ where: { id: target.id }, select: { followedUpAt: true, followUpNote: true } });
+    return updateBaptismFollowUp(actor, eventId, target.id, { ...input, expectedFollowedUpAt: current.followedUpAt?.toISOString() ?? null, expectedNote: current.followUpNote });
+  };
   const statusAudits = () => prisma.auditLog.findMany({ where: { eventId: ids.event, action: "BAPTISM_FOLLOW_UP_STATUS_CHANGED" } });
   const note = "Called the family on Sunday";
-  const marked = await updateBaptismFollowUp(staff, ids.event, target.id, { followedUp: true, note: `  ${note}  ` });
+  const marked = await saveUpToDate(staff, ids.event, { followedUp: true, note: `  ${note}  ` });
   assert(marked.followedUpAt !== null && marked.note === note, "marking sets the time and keeps the trimmed note");
   let row = await prisma.baptismFollowUp.findUniqueOrThrow({ where: { id: target.id } });
   assert(row.followedUpByUserId === ids.user && row.followedUpByAttendeeAccountId === null, "a staff mark records the staff user only");
   assert((await statusAudits()).length === 1, "one audit entry for the mark");
-  await updateBaptismFollowUp(staff, ids.event, target.id, { followedUp: true, note });
+  await saveUpToDate(staff, ids.event, { followedUp: true, note });
   assert((await statusAudits()).length === 1, "a repeat that changes nothing writes no audit entry");
-  await updateBaptismFollowUp(staff, ids.event, target.id, { followedUp: false });
+  await saveUpToDate(staff, ids.event, { followedUp: false });
   row = await prisma.baptismFollowUp.findUniqueOrThrow({ where: { id: target.id } });
   assert(row.followedUpAt === null && row.followedUpByUserId === null && row.followUpNote === note, "unmarking clears when and who and keeps the note");
-  await updateBaptismFollowUp(staff, ids.event, target.id, { note: "Visited" });
+  await saveUpToDate(staff, ids.event, { note: "Visited" });
   assert((await prisma.baptismFollowUp.findUniqueOrThrow({ where: { id: target.id } })).followUpNote === "Visited", "a note-only change is saved");
-  await updateBaptismFollowUp(staff, ids.event, target.id, { note: "" });
+  await saveUpToDate(staff, ids.event, { note: "" });
   assert((await prisma.baptismFollowUp.findUniqueOrThrow({ where: { id: target.id } })).followUpNote === null, "an emptied note is cleared");
   const refused = async (run: () => Promise<unknown>, code: string, label: string) => {
     let thrown: unknown;
     await run().catch((error) => { thrown = error; });
     assert((thrown as { code?: string } | undefined)?.code === code, label);
   };
-  await refused(() => updateBaptismFollowUp(staff, ids.event, target.id, { note: "x".repeat(501) }), "INVALID_NOTE", "a note over 500 characters is refused");
+  await refused(() => saveUpToDate(staff, ids.event, { note: "x".repeat(501) }), "INVALID_NOTE", "a note over 500 characters is refused");
   await prisma.event.create({ data: { id: ids.event2, slug: `${P}-event2`, name: "Sample Other Camporee 2027", audience: "CLUB", timezone: "America/Chicago", isPublished: true, billingMode: "DEFERRED_ORGANIZATION_INVOICE", startsAt: new Date("2027-11-05T14:00:00Z"), endsAt: new Date("2027-11-07T17:00:00Z") } });
   await prisma.eventModule.create({ data: { eventId: ids.event2, moduleKey: "baptism-follow-up" } });
-  await refused(() => updateBaptismFollowUp(staff, ids.event2, target.id, { followedUp: true }), "FOLLOW_UP_NOT_FOUND", "a row of another event is not found");
+  await refused(() => saveUpToDate(staff, ids.event2, { followedUp: true }), "FOLLOW_UP_NOT_FOUND", "a row of another event is not found");
   assert((await prisma.baptismFollowUp.findUniqueOrThrow({ where: { id: target.id } })).followedUpAt === null, "the other event's call changed nothing");
 
+  // A stale form is refused, in both directions, and nothing is overwritten.
+  const loadedBefore = await prisma.baptismFollowUp.findUniqueOrThrow({ where: { id: target.id }, select: { followedUpAt: true, followUpNote: true } });
+  await saveUpToDate(coordinator, ids.event, { followedUp: true });
+  const auditsBefore = (await statusAudits()).length;
+  await refused(() => updateBaptismFollowUp(staff, ids.event, target.id, { note: "Stale staff note", expectedFollowedUpAt: loadedBefore.followedUpAt?.toISOString() ?? null, expectedNote: loadedBefore.followUpNote }), "CONFLICT", "staff saving a form loaded before the coordinator's mark is refused");
+  row = await prisma.baptismFollowUp.findUniqueOrThrow({ where: { id: target.id } });
+  assert(row.followedUpAt !== null && row.followedUpByAttendeeAccountId === ids.ac && row.followUpNote === null, "the coordinator's mark is still there");
+  const markedForm = { expectedFollowedUpAt: row.followedUpAt!.toISOString(), expectedNote: row.followUpNote };
+  await saveUpToDate(staff, ids.event, { followedUp: false });
+  await refused(() => updateBaptismFollowUp(coordinator, ids.event, target.id, { followedUp: true, ...markedForm }), "CONFLICT", "a coordinator saving a form loaded before staff unmarked it is refused");
+  assert((await prisma.baptismFollowUp.findUniqueOrThrow({ where: { id: target.id } })).followedUpAt === null, "staff's unmark is still there");
+  assert((await statusAudits()).length === auditsBefore + 1, "a refused stale save writes no audit entry");
+  await prisma.baptismFollowUp.update({ where: { id: target.id }, data: { followedUpAt: null, followUpNote: null, followedUpByUserId: null, followedUpByAttendeeAccountId: null } });
+  await prisma.auditLog.deleteMany({ where: { eventId: ids.event, action: "BAPTISM_FOLLOW_UP_STATUS_CHANGED" } });
+
   // An Area Coordinator: the same actions, recorded as the account; a revoked grant and an unpublished event are refused.
-  await updateBaptismFollowUp(coordinator, ids.event, target.id, { followedUp: true, note: "Coordinator note" });
+  await saveUpToDate(coordinator, ids.event, { followedUp: true, note: "Coordinator note" });
   row = await prisma.baptismFollowUp.findUniqueOrThrow({ where: { id: target.id } });
   assert(row.followedUpByAttendeeAccountId === ids.ac && row.followedUpByUserId === null && row.followedUpAt !== null, "a coordinator mark records the account only");
   const viaCoordinator = (await statusAudits()).filter((entry) => entry.actorUserId === null);
   assert(viaCoordinator.length === 1 && (viaCoordinator[0]!.metadata as { actorAttendeeAccountId?: string }).actorAttendeeAccountId === ids.ac, "the coordinator's change is audited under the account");
   assert(!/Ava|Coordinator note|Called the family|Visited/.test(JSON.stringify(await statusAudits())), "no audit entry holds a name or a note");
-  await refused(() => updateBaptismFollowUp({ kind: "area-coordinator", accountId: ids.revoked }, ids.event, target.id, { followedUp: false }), "NOT_AVAILABLE", "a revoked grant is refused");
+  await refused(() => saveUpToDate({ kind: "area-coordinator", accountId: ids.revoked }, ids.event, { followedUp: false }), "NOT_AVAILABLE", "a revoked grant is refused");
   await saveBaptismLeadEmails(coordinator, ids.event, `${P}-lead3@example.test`);
   assert((await prisma.baptismFollowUpSetting.findUniqueOrThrow({ where: { eventId: ids.event } })).leadEmails.join() === `${P}-lead3@example.test`, "a coordinator saves the lead addresses");
   await prisma.baptismFollowUpSetting.update({ where: { eventId: ids.event }, data: { leadEmails: [lead, second] } });
@@ -235,7 +255,7 @@ async function main() {
 
   // Switched off: the status and note are refused, and kept.
   assert((await applyBaptismFollowUpSwitch(coordinator, ids.event, false)).enabled === false, "a coordinator switches it off");
-  await refused(() => updateBaptismFollowUp(staff, ids.event, target.id, { followedUp: false }), "MODULE_OFF", "module off: a status change is refused");
+  await refused(() => saveUpToDate(staff, ids.event, { followedUp: false }), "MODULE_OFF", "module off: a status change is refused");
   assert((await prisma.baptismFollowUp.findUniqueOrThrow({ where: { id: target.id } })).followUpNote === "Coordinator note", "off keeps the note");
   assert((await applyBaptismFollowUpSwitch(staff, ids.event, true)).enabled === true, "staff switch it back on");
 

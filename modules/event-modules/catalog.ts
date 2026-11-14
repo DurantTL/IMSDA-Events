@@ -237,7 +237,7 @@ export const eventModuleCatalog: readonly EventModuleDefinition[] = [
     key: "baptism-follow-up",
     cardKey: "baptism-follow-up",
     title: "Baptism follow-up",
-    description: "When a club names someone for baptism on its registration, email the event lead and the club's church pastor a short note asking them to follow up. Staff then mark each name followed up and keep a note. Off until a system administrator, an event administrator, the Clubs Administrator or an Area Coordinator turns it on and adds an event lead.",
+    description: "When a club names someone for baptism on its registration, email the event lead and the club's church pastor a short note asking them to follow up. Staff and Area Coordinators then mark each name followed up and keep a note. Off until a system administrator, an event administrator, the Clubs Administrator or an Area Coordinator turns it on and adds an event lead.",
     appliesTo: "club-audience",
     launcherGroup: "people-access",
     alwaysOn: false,

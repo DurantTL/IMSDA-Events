@@ -52,7 +52,7 @@ export function BaptismFollowUpStatus({ id, name, endpoint, initial }: { id: str
     }
     setBusy(true);
     try {
-      const response = await fetch(`${endpoint}/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ followedUp, note }) });
+      const response = await fetch(`${endpoint}/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ followedUp, note, expectedFollowedUpAt: saved.followedUpAt, expectedNote: saved.note }) });
       const result = await response.json().catch(() => ({})) as { status?: Status & { id: string }; message?: string; error?: string };
       if (!response.ok || !result.status) {
         const reason = result.message ?? "Try Save again.";

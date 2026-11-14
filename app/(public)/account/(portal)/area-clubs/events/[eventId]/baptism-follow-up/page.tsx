@@ -7,7 +7,7 @@ import { BaptismFollowUpSwitch } from "@/components/baptism-follow-up-switch";
 import { CoordinatorUnavailable } from "@/components/coordinator-overview";
 import { logError } from "@/lib/logger";
 import { recordBaptismListViewed } from "@/modules/baptism-follow-up/follow-up";
-import { BaptismFollowUpError, loadBaptismFollowUpPage, loadClubEvent } from "@/modules/baptism-follow-up/settings";
+import { BaptismFollowUpError, loadBaptismFollowUpPage } from "@/modules/baptism-follow-up/settings";
 import { assertScopedToggleAllowed, requireAreaCoordinatorToggleActor } from "@/modules/event-modules/scoped-toggle";
 import { BAPTISM_FOLLOW_UP_MODULE_KEY } from "@/modules/baptism-follow-up/domain";
 import { currentAreaCoordinator, currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
@@ -30,9 +30,8 @@ export default async function AreaBaptismFollowUpPage({ params }: { params: Prom
       const actor = await requireAreaCoordinatorToggleActor();
       await assertScopedToggleAllowed(BAPTISM_FOLLOW_UP_MODULE_KEY, actor);
       const state = await loadBaptismFollowUpPage(eventId, "area-coordinator");
-      const event = await loadClubEvent(eventId, "area-coordinator");
       if (state.enabled) await recordBaptismListViewed(actor, eventId, state.clubs.reduce((sum, club) => sum + club.names.length, 0));
-      return { state, eventName: event.name };
+      return { state, eventName: state.eventName };
     })().catch((error: unknown) => {
       if (error instanceof BaptismFollowUpError && error.code === "EVENT_NOT_FOUND") return "missing" as const;
       logError("Coordinator baptism follow-up read failed", error, { eventId });

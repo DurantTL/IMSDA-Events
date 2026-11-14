@@ -16,7 +16,7 @@ export function baptismApiError(error: unknown, failed: { log: string; message: 
   if (error instanceof AccessDeniedError) return jsonNoStore({ error: error.code, message: error.message }, error.status);
   if (error instanceof ScopedToggleError) return jsonNoStore({ error: error.code, message: error.message }, 404);
   if (error instanceof BaptismFollowUpError) {
-    const status = error.code === "EVENT_NOT_FOUND" || error.code === "FOLLOW_UP_NOT_FOUND" ? 404 : 422;
+    const status = error.code === "EVENT_NOT_FOUND" || error.code === "FOLLOW_UP_NOT_FOUND" ? 404 : error.code === "CONFLICT" ? 409 : 422;
     return jsonNoStore({ error: error.code, message: error.message }, status);
   }
   logError(failed.log, error);

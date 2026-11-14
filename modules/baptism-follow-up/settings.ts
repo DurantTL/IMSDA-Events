@@ -23,7 +23,7 @@ import {
  */
 
 export class BaptismFollowUpError extends Error {
-  constructor(public readonly code: "EVENT_NOT_FOUND" | "MODULE_OFF" | "INVALID_ADDRESSES" | "INVALID_NOTE" | "FOLLOW_UP_NOT_FOUND", message: string) {
+  constructor(public readonly code: "EVENT_NOT_FOUND" | "MODULE_OFF" | "INVALID_ADDRESSES" | "INVALID_NOTE" | "FOLLOW_UP_NOT_FOUND" | "CONFLICT", message: string) {
     super(message);
     this.name = "BaptismFollowUpError";
   }
@@ -111,11 +111,11 @@ export type BaptismClubRow = {
   names: Array<{ id: string; displayName: string; notifiedAt: string; recipients: BaptismRecipients; followedUpAt: string | null; note: string | null }>;
 };
 
-export type BaptismFollowUpPage = { enabled: boolean; leadEmails: string[]; clubs: BaptismClubRow[] };
+export type BaptismFollowUpPage = { enabled: boolean; eventName: string; leadEmails: string[]; clubs: BaptismClubRow[] };
 
 /** What the page shows: the switch, the lead addresses, and the notified names by club. Registered clubs with no pastor on file are listed too. */
 export async function loadBaptismFollowUpPage(eventId: string, scope: ScopedToggleActor["kind"] = "staff"): Promise<BaptismFollowUpPage> {
-  await loadClubEvent(eventId, scope);
+  const event = await loadClubEvent(eventId, scope);
   const prisma = getPrisma();
   const [enabled, setting, rows, registered] = await Promise.all([
     baptismFollowUpIsOn(eventId),
@@ -161,5 +161,5 @@ export async function loadBaptismFollowUpPage(eventId: string, scope: ScopedTogg
         })),
     }))
     .sort((left, right) => left.clubName.localeCompare(right.clubName));
-  return { enabled, leadEmails: setting?.leadEmails ?? [], clubs: result };
+  return { enabled, eventName: event.name, leadEmails: setting?.leadEmails ?? [], clubs: result };
 }

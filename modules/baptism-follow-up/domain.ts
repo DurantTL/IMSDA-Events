@@ -138,8 +138,13 @@ export function parseFollowUpNote(raw: string): FollowUpNoteResult {
 export const followUpInputSchema = z.strictObject({
   followedUp: z.boolean().optional(),
   note: z.string().max(5000).optional(),
+  /** What the form loaded or last saved: when it was followed up (ISO) or null, and the note. The save applies only if these still match. */
+  expectedFollowedUpAt: z.string().datetime().nullable(),
+  expectedNote: z.string().max(5000).nullable(),
 }).refine((input) => input.followedUp !== undefined || input.note !== undefined, { message: "Choose what to change." });
 
 export type FollowUpInput = z.infer<typeof followUpInputSchema>;
+
+export const FOLLOW_UP_CHANGED_MESSAGE = "This name was changed by someone else since you opened the page. Reload to see it.";
 
 export const baptismSwitchInputSchema = z.strictObject({ enabled: z.boolean() });

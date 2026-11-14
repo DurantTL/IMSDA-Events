@@ -2,7 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { BAPTISM_FOLLOW_UP_MODULE_KEY, parseFollowUpNote, type FollowUpInput } from "@/modules/baptism-follow-up/domain";
+import { BAPTISM_FOLLOW_UP_MODULE_KEY, FOLLOW_UP_CHANGED_MESSAGE, parseFollowUpNote, type FollowUpInput } from "@/modules/baptism-follow-up/domain";
 import { BaptismFollowUpError, baptismFollowUpIsOn, loadClubEvent } from "@/modules/baptism-follow-up/settings";
 import { assertScopedToggleAllowed, scopedActorAudit, type ScopedToggleActor } from "@/modules/event-modules/scoped-toggle";
 
@@ -32,6 +32,9 @@ export async function updateBaptismFollowUp(actor: ScopedToggleActor, eventId: s
     const wasFollowedUp = row.followedUpAt !== null;
     const statusChanged = input.followedUp !== undefined && input.followedUp !== wasFollowedUp;
     const noteChanged = nextNote !== undefined && nextNote !== row.followUpNote;
+    // The form saves what it saw: if the row is no longer as the form loaded it, someone else changed it. Nothing is overwritten.
+    const sameMoment = (row.followedUpAt?.toISOString() ?? null) === input.expectedFollowedUpAt;
+    if (!sameMoment || row.followUpNote !== input.expectedNote) throw new BaptismFollowUpError("CONFLICT", FOLLOW_UP_CHANGED_MESSAGE);
     if (!statusChanged && !noteChanged) return { id: row.id, followedUpAt: row.followedUpAt?.toISOString() ?? null, note: row.followUpNote };
     const data: { followedUpAt?: Date | null; followedUpByUserId?: string | null; followedUpByAttendeeAccountId?: string | null; followUpNote?: string | null } = {};
     if (statusChanged) {
@@ -47,7 +50,10 @@ export async function updateBaptismFollowUp(actor: ScopedToggleActor, eventId: s
       }
     }
     if (noteChanged) data.followUpNote = nextNote ?? null;
-    const updated = await tx.baptismFollowUp.update({ where: { id: row.id }, data, select: { id: true, followedUpAt: true, followUpNote: true } });
+    // Conditional write: only while the row still holds the expected values (a racing save leaves count 0).
+    const changed = await tx.baptismFollowUp.updateMany({ where: { id: row.id, eventId, followedUpAt: row.followedUpAt, followUpNote: row.followUpNote }, data });
+    if (changed.count === 0) throw new BaptismFollowUpError("CONFLICT", FOLLOW_UP_CHANGED_MESSAGE);
+    const updated = await tx.baptismFollowUp.findFirstOrThrow({ where: { id: row.id }, select: { id: true, followedUpAt: true, followUpNote: true } });
     await writeAuditLog({
       eventId,
       ...(who.actorUserId ? { actorUserId: who.actorUserId } : {}),
