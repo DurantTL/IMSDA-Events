@@ -231,6 +231,15 @@ enum MerchandiseOrderStatus {
   PAID
   CANCELLED
   REFUNDED
+  /// Staff waived the charge (#148). Not paid money: nothing refundable, but the items still count for pickup and stock.
+  COMPED
+}
+
+/// The staff action behind a `MerchandiseOrderStatusChange` row (#148). Null on rows written before actions existed.
+enum MerchandiseOrderAction {
+  MARK_PAID
+  COMP
+  CANCEL
 }
 
 enum MerchandiseInventoryPolicy {
@@ -601,6 +610,8 @@ enum MessageTemplateKey {
   REGISTRATION_CONTACT_UPDATED
   REGISTRATION_UPDATED
   PAYMENT_RECEIPT
+  /// Receipt for a merchandise order staff marked paid or comped (#148). Never carries registration charges.
+  MERCHANDISE_RECEIPT
   REFUND_NOTICE
   BALANCE_REMINDER
   REGISTRATION_TRANSFERRED_NEW_CONTACT
@@ -4960,6 +4971,10 @@ model MerchandiseOrder {
   totalCents        Int
   paymentMethod     PaymentMethod?
   paymentReference  String?
+  /// When staff recorded the payment (#148). Null for an unpaid, comped or cancelled order.
+  paidAt            DateTime?
+  /// Per-event sequential receipt number (for example M-0001), given when an order is marked paid or comped (#148).
+  receiptNumber     String?
   createdByUserId   String?
   createdAt         DateTime               @default(now())
   updatedAt         DateTime               @updatedAt
@@ -4971,6 +4986,7 @@ model MerchandiseOrder {
   statusChanges MerchandiseOrderStatusChange[]
 
   @@unique([eventId, clientRequestId])
+  @@unique([eventId, receiptNumber])
   @@index([eventId, status, createdAt])
   @@index([registrationId])
 }
@@ -5019,12 +5035,21 @@ model MerchandiseOrderStatusChange {
   toStatus    MerchandiseOrderStatus
   actorUserId String
   reason      String?
+  /// The staff action (#148). A comp or cancel reason is in `reason`; a mark-paid note is too.
+  action           MerchandiseOrderAction?
+  paymentMethod    PaymentMethod?
+  paymentReference String?
+  /// Money received by a mark-paid action; null for a comp or a cancel.
+  amountCents      Int?
+  /// One per staff submission, reused on every retry of it, so a retry changes nothing twice.
+  clientRequestId  String?
   createdAt   DateTime               @default(now())
 
   order MerchandiseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   event Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
   actor User             @relation("MerchandiseOrderStatusActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
+  @@unique([orderId, clientRequestId])
   @@index([orderId, createdAt])
   @@index([eventId, createdAt])
 }

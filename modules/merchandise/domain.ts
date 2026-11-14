@@ -4,7 +4,7 @@ import type { StatusWord } from "@/modules/registrations/status-words";
 export type MerchandiseInventoryPolicy = "UNLIMITED" | "TRACKED";
 export type MerchandiseTaxTreatment = "TAXABLE" | "TAX_EXEMPT";
 export type MerchandiseFeePolicy = "ABSORBED_BY_EVENT" | "PASSED_TO_BUYER";
-export type MerchandiseOrderStatusValue = "PENDING" | "PAID" | "CANCELLED" | "REFUNDED";
+export type MerchandiseOrderStatusValue = "PENDING" | "PAID" | "CANCELLED" | "REFUNDED" | "COMPED";
 
 /** The shared status word for a merchandise order (#1479, rule B12). Display only: the stored values do not change. */
 export const merchandiseOrderStatusWords = {
@@ -12,6 +12,8 @@ export const merchandiseOrderStatusWords = {
   PAID: "Confirmed",
   CANCELLED: "Cancelled",
   REFUNDED: "Refunded",
+  // Rule B12: no new word. A comped order is confirmed; the staff panel adds a visible "Comped" tag.
+  COMPED: "Confirmed",
 } as const satisfies Record<MerchandiseOrderStatusValue, StatusWord>;
 
 export type MerchandiseCatalog = {

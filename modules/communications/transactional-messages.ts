@@ -54,6 +54,7 @@ type TransactionalTemplateKey =
   | "EVENT_ANNOUNCEMENT"
   | "CUSTOM_MESSAGE"
   | "PAYMENT_RECEIPT"
+  | "MERCHANDISE_RECEIPT"
   | "REFUND_NOTICE"
   | "CANCELLATION_REQUEST_RECEIVED"
   | "CANCELLATION_REQUEST_UPDATED"
@@ -83,6 +84,8 @@ type TransactionalMessageInput = {
   waitlistRemovalReason?: string;
   paymentAmountCents?: number;
   paymentReference?: string;
+  /** The receipt section of a merchandise receipt (#148), built from the order by the caller. */
+  merchandiseReceiptBlock?: string;
   refundAmountCents?: number;
   refundReference?: string;
   /**
@@ -618,6 +621,7 @@ async function enqueueTransactionalMessage(
     }),
     payment_amount: formatMessageMoney(input.paymentAmountCents ?? 0),
     payment_reference: input.paymentReference?.trim() || "Not provided",
+    merchandise_receipt_block: input.merchandiseReceiptBlock ?? "",
     refund_amount: formatMessageMoney(input.refundAmountCents ?? 0),
     refund_reference: input.refundReference?.trim() || "Not provided",
     prior_person_name: input.priorPersonName?.trim() || "Prior attendee",
@@ -963,6 +967,33 @@ export function enqueueCancellationRequestMessage(
     transitionKey: `cancellation-request:${input.requestId}:${input.stepId}`,
     requestStatus: { label: input.statusLabel, detail: input.statusDetail },
     metadata: { requestId: input.requestId, stepId: input.stepId, status: input.status },
+  });
+}
+
+/**
+ * The receipt for a merchandise order staff marked paid or comped (#148), queued in the action's own transaction. One
+ * message per order and action, so a retried action queues nothing twice. It carries the order only, never the
+ * registration's charges. The caller passes the order's registration; an order with none gets no email.
+ */
+export function enqueueMerchandiseReceiptMessage(
+  tx: Prisma.TransactionClient,
+  input: {
+    eventId: string;
+    registrationId: string;
+    orderId: string;
+    action: "MARK_PAID" | "COMP";
+    merchandiseReceiptBlock: string;
+    correlationId?: string;
+  },
+) {
+  return enqueueTransactionalMessage(tx, {
+    eventId: input.eventId,
+    registrationId: input.registrationId,
+    templateKey: "MERCHANDISE_RECEIPT",
+    correlationId: input.correlationId ?? randomUUID(),
+    transitionKey: `merchandise-order:${input.orderId}:${input.action}`,
+    merchandiseReceiptBlock: input.merchandiseReceiptBlock,
+    metadata: { merchandiseOrderId: input.orderId, action: input.action },
   });
 }
 

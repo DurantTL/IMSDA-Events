@@ -123,8 +123,8 @@ describe("club status words (#1479)", () => {
   });
 
   it("maps every merchandise order status to a shared word, and refunded reads Refunded", () => {
-    expect(Object.keys(merchandiseOrderStatusWords).sort()).toEqual(["CANCELLED", "PAID", "PENDING", "REFUNDED"]);
-    expect(merchandiseOrderStatusWords).toEqual({ PENDING: "Pending payment", PAID: "Confirmed", CANCELLED: "Cancelled", REFUNDED: "Refunded" });
+    expect(Object.keys(merchandiseOrderStatusWords).sort()).toEqual(["CANCELLED", "COMPED", "PAID", "PENDING", "REFUNDED"]);
+    expect(merchandiseOrderStatusWords).toEqual({ PENDING: "Pending payment", PAID: "Confirmed", CANCELLED: "Cancelled", REFUNDED: "Refunded", COMPED: "Confirmed" });
     for (const word of Object.values(merchandiseOrderStatusWords)) expect(eight).toContain(word);
   });
 

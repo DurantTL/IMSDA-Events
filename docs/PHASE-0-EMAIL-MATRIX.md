@@ -51,6 +51,7 @@ The full event templates require pre-arrival content, but the current `EVENT_ANN
 | Attendee substitution | `ATTENDEE_SUBSTITUTED`; the same immutable template is rendered separately for each distinct eligible recipient |
 | Cancellation | `REGISTRATION_CANCELLED` |
 | Payment receipt | `PAYMENT_RECEIPT` |
+| Merchandise receipt | `MERCHANDISE_RECEIPT`, sent when staff mark a merchandise order paid or comp it (#148); merchandise only, never registration charges, and not a readiness requirement |
 | Balance reminder | `BALANCE_REMINDER` through a reviewed, fingerprinted batch |
 | Staff resend/corrected address | Copies the selected immutable source snapshots; it does not create a second content template |
 | Announcement/pre-arrival | `EVENT_ANNOUNCEMENT` with staff-authored event content |

@@ -1,3 +1,9 @@
 .note { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .subheading { margin: 12px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .items { margin: 0; padding-left: 16px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button { min-height: var(--touch-target); }
+.facts { display: grid; gap: 2px; margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.history { margin: 6px 0 0; }
+.history summary { min-height: var(--touch-target); display: flex; align-items: center; cursor: pointer; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.history ol { margin: 0; padding-left: 16px; display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
