@@ -59,7 +59,7 @@ function memberListRefusals(field: RegistrationFormField): string[] {
 
 function fieldRefusals(field: RegistrationFormField): string[] {
   const reasons: string[] = [...memberListRefusals(field)];
-  if (field.priceCents !== undefined || field.choicePricesCents) reasons.push("information forms cannot carry prices");
+  if (field.priceCents !== undefined || field.choicePricesCents || field.attendeeTypePricesCents) reasons.push("information forms cannot carry prices");
   if (field.latePricing || field.pricingWindows || field.basePricingLabel) reasons.push("information forms cannot carry late pricing");
   if (field.creditCentsPerUnit !== undefined || field.capUnitsAtAttendeeCount) reasons.push("information forms cannot carry credits");
   if (field.type === "SIGNATURE") reasons.push("information forms cannot carry typed signatures");

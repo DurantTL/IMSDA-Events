@@ -69,6 +69,7 @@ export function acknowledgmentTypePatch(field: RegistrationFormField, nextType: 
       choicePricesCents: undefined,
       creditCentsPerUnit: undefined,
       capUnitsAtAttendeeCount: undefined,
+      attendeeTypePricesCents: undefined,
       latePricing: undefined,
       pricingWindows: undefined,
       basePricingLabel: undefined,

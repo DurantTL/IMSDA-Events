@@ -375,7 +375,7 @@ function attendeeTypeFieldCount(definition: ParsedDefinition) {
 function pricedFieldCounts(definition: ParsedDefinition) {
   const fields = definition.sections.flatMap((section) => section.fields);
   return {
-    priced: fields.filter((field) => field.priceCents !== undefined || field.choicePricesCents !== undefined || field.creditCentsPerUnit !== undefined).length,
+    priced: fields.filter((field) => field.priceCents !== undefined || field.choicePricesCents !== undefined || field.attendeeTypePricesCents !== undefined || field.creditCentsPerUnit !== undefined).length,
     latePriced: fields.filter((field) => fieldPriceWindows(field).length > 0).length,
     cardFees: definition.payment?.enabled ? 1 : 0,
   };

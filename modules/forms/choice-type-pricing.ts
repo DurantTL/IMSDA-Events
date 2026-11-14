@@ -33,12 +33,14 @@ export function hiddenPricePatchForType(
  * is spread last, so it wins over the carried-over `latePricing`.
  */
 export function pricingPatchForTypeChange(
-  field: Pick<RegistrationFormField, "type" | "latePricing" | "pricingWindows" | "basePricingLabel">,
+  field: Pick<RegistrationFormField, "type" | "latePricing" | "pricingWindows" | "basePricingLabel" | "attendeeTypePricesCents">,
   nextType: string,
-): Partial<Pick<RegistrationFormField, "priceCents" | "latePricing" | "pricingWindows" | "basePricingLabel">> {
+): Partial<Pick<RegistrationFormField, "priceCents" | "attendeeTypePricesCents" | "latePricing" | "pricingWindows" | "basePricingLabel">> {
   const changedPricingKind = isChoiceFieldType(nextType) !== isChoiceFieldType(field.type);
   return {
     latePricing: changedPricingKind ? undefined : field.latePricing,
+    // Prices by attendee type (#1509) are per-person prices of a non-choice field: they do not survive a move to a choice type.
+    ...(field.attendeeTypePricesCents !== undefined && (changedPricingKind || nextType === "ADDRESS" || nextType === "SIGNATURE" || nextType === "INFORMATION" || nextType === "ACKNOWLEDGMENT") ? { attendeeTypePricesCents: undefined } : {}),
     // Only written when the field has them, so a field without windows gets the same patch as before.
     ...(field.pricingWindows !== undefined ? { pricingWindows: changedPricingKind ? undefined : field.pricingWindows } : {}),
     ...(field.basePricingLabel !== undefined ? { basePricingLabel: changedPricingKind ? undefined : field.basePricingLabel } : {}),

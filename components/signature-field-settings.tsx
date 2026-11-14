@@ -23,6 +23,7 @@ export function signatureTypePatch(field: RegistrationFormField, nextType: Regis
       choicePricesCents: undefined,
       creditCentsPerUnit: undefined,
       capUnitsAtAttendeeCount: undefined,
+      attendeeTypePricesCents: undefined,
       latePricing: undefined,
       pricingWindows: undefined,
       basePricingLabel: undefined,

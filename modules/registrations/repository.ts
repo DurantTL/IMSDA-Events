@@ -24,6 +24,7 @@ import {
   reservationHeld,
 } from "@/modules/payments/deposit-domain";
 import { formatPersonName } from "@/lib/person-name";
+import { attendeeShareCentsFrom } from "@/modules/registrations/person-price";
 import { snapshotIsYouthNotPathfinder } from "@/modules/club-registrations/domain";
 
 type RegistrationWithRelations = Awaited<ReturnType<typeof getRegistrationQuery>>[number];
@@ -289,7 +290,7 @@ function serializeRegistration(registration: RegistrationWithRelations, director
       email: contactValue("email", registration.accountHolderPerson.normalizedEmail ?? ""),
       phone: contactValue("phone", registration.accountHolderPerson.phone ?? ""),
     },
-    attendees: registration.attendees.map((attendee) => {
+    attendees: registration.attendees.map((attendee, attendeeIndex) => {
       const activeCheckIn = attendee.checkIns.at(0);
       const profile = recordFromJson(attendee.profileSnapshot);
       return {
@@ -304,6 +305,12 @@ function serializeRegistration(registration: RegistrationWithRelations, director
         phone: typeof profile.phone === "string" ? profile.phone : attendee.person.phone ?? "",
         attendeeType: attendee.attendeeType,
         attendeeTypeDefinitionCode: attendee.attendeeTypeDefinition?.code ?? null,
+        /** What this person currently owes for themselves, adjustments included (#1509); null when the registration has no per-person price. */
+        currentPriceCents: attendeeShareCentsFrom(
+          registration,
+          attendeeIndex,
+          registration.adjustments.filter((adjustment) => adjustment.registrationAttendeeId === attendee.id && adjustment.kind !== "MEAL" && adjustment.kind !== "ASSET").reduce((total, adjustment) => total + adjustment.amountCents, 0),
+        ),
         position: attendee.position,
         source: profile.source === "PUBLIC_REGISTRATION" ? "PUBLIC_REGISTRATION" as const : "STAFF" as const,
         responses: recordFromJson(attendee.formResponses),
@@ -387,7 +394,7 @@ export type RegistrationRecord = Omit<SerializedRegistration, "attendees" | "pub
   location?: { id: string; name: string } | null;
   /** Optional like `location`: the place in line at the location while waitlisted there (#599). */
   locationWaitlistPlace?: number | null;
-  attendees: Array<Omit<SerializedRegistration["attendees"][number], "attendeeTypeDefinitionCode" | "youthGuestNotPathfinder"> & { attendeeTypeDefinitionCode?: string | null; youthGuestNotPathfinder?: boolean }>;
+  attendees: Array<Omit<SerializedRegistration["attendees"][number], "attendeeTypeDefinitionCode" | "youthGuestNotPathfinder" | "currentPriceCents"> & { attendeeTypeDefinitionCode?: string | null; youthGuestNotPathfinder?: boolean; currentPriceCents?: number | null }>;
   publicSubmission: SerializedRegistration["publicSubmission"] extends infer Submission
     ? Submission extends null ? null : Omit<Submission, "attendeeTypeOptions"> & { attendeeTypeOptions?: AttendeeTypeOption[] }
     : never;

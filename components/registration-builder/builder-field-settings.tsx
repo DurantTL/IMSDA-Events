@@ -10,6 +10,7 @@ import { hasOfferedChoices, resolveFieldFlags, resolveFieldOffer, sectionTitleLo
 import { defaultTypeForNewChoiceField, singleChoiceTypeHint } from "@/modules/forms/choice-defaults";
 import { creditPatchForKindChange, hasCredit } from "@/modules/forms/credit-fields";
 import { pricingPatchForTypeChange } from "@/modules/forms/choice-type-pricing";
+import { clearAttendeeTypePricesPatch } from "@/modules/forms/price-windows";
 import { fieldTypeLabels } from "./builder-types";
 import { autoFieldKey } from "./field-keys";
 import { BuilderChoiceSettings } from "./builder-choice-settings";
@@ -27,6 +28,7 @@ export function scopeChangePatch(field: RegistrationFormField, scope: Registrati
   const crossesScope = visibilityControllerKeys(field).some((key) => allFields.find((candidate) => candidate.key === key)?.scope === "ATTENDEE");
   return {
     scope,
+    ...(scope === "REGISTRATION" ? clearAttendeeTypePricesPatch(field) : {}),
     ...creditPatchForKindChange(field, { scope }),
     ...(scope === "REGISTRATION" && crossesScope ? { conditional: undefined, conditionalGroup: undefined } : { conditional: field.conditional, conditionalGroup: field.conditionalGroup }),
     optionalWhen: scope === "REGISTRATION" && allFields.find((candidate) => candidate.key === field.optionalWhen?.fieldKey)?.scope === "ATTENDEE" ? undefined : field.optionalWhen,
@@ -90,7 +92,7 @@ export function BuilderFieldSettings({ section, field, sectionIndex, fieldIndex,
                     </>;
                   })()}
                 </div>}
-                {!information && (field.type === "SELECT" || field.type === "RADIO") && field.scope === "ATTENDEE" && <label className="required-toggle"><input disabled={!canEdit || (!field.optionSource && allFields.some((candidate) => candidate.optionSource === "ATTENDEE_TYPES"))} type="checkbox" checked={field.optionSource === "ATTENDEE_TYPES"} onChange={(event) => updateField(sectionIndex, fieldIndex, { optionSource: event.target.checked ? "ATTENDEE_TYPES" : undefined, optionLabels: event.target.checked ? field.optionLabels : undefined, required: event.target.checked ? true : field.required, availabilityMode: event.target.checked ? "NONE" : field.availabilityMode, choiceLimits: event.target.checked ? undefined : field.choiceLimits, choicePricesCents: event.target.checked ? undefined : field.choicePricesCents, latePricing: event.target.checked ? undefined : field.latePricing, pricingWindows: event.target.checked ? undefined : field.pricingWindows, basePricingLabel: event.target.checked ? undefined : field.basePricingLabel })} /> Source attendee types from event configuration</label>}
+                {!information && (field.type === "SELECT" || field.type === "RADIO") && field.scope === "ATTENDEE" && <label className="required-toggle"><input disabled={!canEdit || (!field.optionSource && allFields.some((candidate) => candidate.optionSource === "ATTENDEE_TYPES"))} type="checkbox" checked={field.optionSource === "ATTENDEE_TYPES"} onChange={(event) => updateField(sectionIndex, fieldIndex, { optionSource: event.target.checked ? "ATTENDEE_TYPES" : undefined, optionLabels: event.target.checked ? field.optionLabels : undefined, required: event.target.checked ? true : field.required, availabilityMode: event.target.checked ? "NONE" : field.availabilityMode, choiceLimits: event.target.checked ? undefined : field.choiceLimits, choicePricesCents: event.target.checked ? undefined : field.choicePricesCents, attendeeTypePricesCents: event.target.checked ? undefined : field.attendeeTypePricesCents, latePricing: event.target.checked ? undefined : field.latePricing, pricingWindows: event.target.checked ? undefined : field.pricingWindows, basePricingLabel: event.target.checked ? undefined : field.basePricingLabel })} /> Source attendee types from event configuration</label>}
                 {(field.type === "SELECT" || field.type === "RADIO") && field.scope === "REGISTRATION" && (["CLUBS_DIRECTORY", "CHURCHES_DIRECTORY", "SCHOOLS_DIRECTORY"] as const).map((source) => (
                   <label className="required-toggle" key={source}>
                     <input

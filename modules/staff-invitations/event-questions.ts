@@ -37,6 +37,7 @@ function priced(field: RegistrationFormField) {
   return field.type === "CALCULATED"
     || field.priceCents !== undefined
     || field.choicePricesCents !== undefined
+    || field.attendeeTypePricesCents !== undefined
     || field.latePricing !== undefined
     || field.pricingWindows !== undefined
     || field.creditCentsPerUnit !== undefined;

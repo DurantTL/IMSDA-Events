@@ -1,5 +1,5 @@
 import type { RegistrationFormDefinition, RegistrationFormField } from "@/modules/forms/definition";
-import { fieldPriceWindows, resolveResponsibleOrganization } from "@/modules/forms/definition";
+import { fieldPriceWindows, hasAttendeeTypePrices, resolveResponsibleOrganization } from "@/modules/forms/definition";
 import { formatPerPersonAmount, type PerPersonPrice } from "@/modules/club-registrations/per-person-price";
 import { hasVisibilityRule } from "@/modules/forms/visibility-rule";
 
@@ -53,6 +53,7 @@ function dayBefore(iso: string) {
 function isPriced(field: RegistrationFormField) {
   return (field.priceCents !== undefined && field.priceCents > 0)
     || Object.keys(field.choicePricesCents ?? {}).length > 0
+    || hasAttendeeTypePrices(field)
     || fieldPriceWindows(field).some((window) => Object.keys(window.choicePricesCents ?? {}).length > 0 || (window.priceCents !== undefined && window.priceCents > 0));
 }
 
@@ -67,6 +68,8 @@ function soleFeeField(definition: RegistrationFormDefinition): RegistrationFormF
   if (priced.length !== 1) return null;
   const fee = priced[0];
   if (fee.type !== "CALCULATED" || !fee.priceCents || Object.keys(fee.choicePricesCents ?? {}).length > 0 || fieldPriceWindows(fee).some((window) => Object.keys(window.choicePricesCents ?? {}).length > 0)) return null;
+  // Prices by attendee type (#1509) differ per person, so no one "per attendee" amount can be stated.
+  if (hasAttendeeTypePrices(fee)) return null;
   if (hasVisibilityRule(fee) || fee.optionalWhen) return null;
   if (definition.attendeeRoster?.enabled && fee.scope !== "ATTENDEE") return null;
   return fee;

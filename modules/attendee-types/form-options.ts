@@ -74,6 +74,7 @@ export function stripAttendeeTypeOptions(definition: RegistrationFormDefinition)
         optionDescriptions: undefined,
         choiceLimits: undefined,
         choicePricesCents: undefined,
+        attendeeTypePricesCents: undefined,
         latePricing: undefined,
         pricingWindows: undefined,
         basePricingLabel: undefined,
