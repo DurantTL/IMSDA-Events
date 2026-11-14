@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { merchandiseOrderStatusWords, type MerchandiseOrderStatusValue } from "@/modules/merchandise/domain";
+import { merchandiseOrderStatusWords, type MerchandiseOrderStatusValue } from "@/modules/merchandise/status-words";
 
 /**
  * Staff actions on a merchandise order (#148): mark paid, comp, cancel. Pure rules only; the transaction that applies

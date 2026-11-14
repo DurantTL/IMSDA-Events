@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { EditorDialog } from "@/components/editor-dialog";
 import { FormMessage, notSavedMessage } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { formatMerchandiseMoney, merchandiseEndpoint } from "@/components/merchandise-admin-ui";
 import {
   availableMerchandiseOrderActions,
@@ -14,7 +15,7 @@ import {
   type MerchandiseOrderActionValue,
   type MerchandiseRecordedMethod,
 } from "@/modules/merchandise/order-actions-domain";
-import type { MerchandiseOrderStatusValue } from "@/modules/merchandise/domain";
+import type { MerchandiseOrderStatusValue } from "@/modules/merchandise/status-words";
 import styles from "./merchandise-orders-panel.module.css";
 
 const buttonLabels: Record<MerchandiseOrderActionValue, string> = { MARK_PAID: "Mark paid", COMP: "Comp", CANCEL: "Cancel order" };
@@ -37,6 +38,9 @@ export function MerchandiseOrderActions({ eventId, orderId, purchaserName, statu
   const [method, setMethod] = useState<MerchandiseRecordedMethod>("CASH");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  // Something typed in an open form: leaving the page asks first (rule B6).
+  const [dirty, setDirty] = useState(false);
+  useUnsavedChangesGuard(open !== null && dirty);
   // One id per opened form, kept for a retry of the same submission so a second tap cannot apply it twice.
   const requestId = useRef("");
   const actions = availableMerchandiseOrderActions(status).filter((action) => merchandiseOrderActionAllowed(action, status, permissions));
@@ -46,6 +50,7 @@ export function MerchandiseOrderActions({ eventId, orderId, purchaserName, statu
     requestId.current = crypto.randomUUID();
     setMethod("CASH");
     setError("");
+    setDirty(false);
     setOpen(action);
   }
 
@@ -63,6 +68,7 @@ export function MerchandiseOrderActions({ eventId, orderId, purchaserName, statu
       const response = await fetch(merchandiseEndpoint(eventId, `/orders/${encodeURIComponent(orderId)}/actions`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message ?? "The order could not be changed.");
+      setDirty(false);
       setOpen(null);
       router.refresh();
     } catch (caught) {
@@ -80,7 +86,7 @@ export function MerchandiseOrderActions({ eventId, orderId, purchaserName, statu
       </div>
       {open && (
         <EditorDialog closeLabel="Close" eyebrow={purchaserName} onRequestClose={() => !submitting && setOpen(null)} title={titles[open]}>
-          <form className="form-stack" onSubmit={submit}>
+          <form className="form-stack" onInput={() => setDirty(true)} onSubmit={submit}>
             {open === "MARK_PAID" && (
               <>
                 <p className={styles.note}>This records a payment you already received. It does not charge anyone. Amount: {formatMerchandiseMoney(totalCents)}, the full order total.</p>
