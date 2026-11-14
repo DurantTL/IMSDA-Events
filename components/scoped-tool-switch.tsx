@@ -20,7 +20,18 @@ export function ScopedToolSwitch({ endpoint, enabled, toolName, offHelp, formCla
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [asking, setAsking] = useState(false);
   const [error, setError] = useState("");
+
+  // One confirmation at a time: the button stays disabled while the unsaved-changes dialog is open.
+  async function request() {
+    setAsking(true);
+    try {
+      await guardedNavigate(() => { void change(); });
+    } finally {
+      setAsking(false);
+    }
+  }
 
   async function change() {
     setBusy(true);
@@ -40,7 +51,7 @@ export function ScopedToolSwitch({ endpoint, enabled, toolName, offHelp, formCla
   return (
     <div className={formClassName}>
       {enabled && <p className={helpClassName}>{offHelp}</p>}
-      <button className={enabled ? "secondary-button" : "primary-button"} disabled={busy} onClick={() => { void guardedNavigate(() => { void change(); }); }} type="button">{busy ? "Saving…" : enabled ? `Turn ${toolName} off` : `Turn ${toolName} on`}</button>
+      <button className={enabled ? "secondary-button" : "primary-button"} disabled={busy || asking} onClick={() => { void request(); }} type="button">{busy ? "Saving…" : enabled ? `Turn ${toolName} off` : `Turn ${toolName} on`}</button>
       <FormMessage alwaysMounted message={error} tone="error" />
     </div>
   );
