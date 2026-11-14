@@ -25,6 +25,7 @@ export function informationTypePatch(field: RegistrationFormField, nextType: Reg
       choicePricesCents: undefined,
       creditCentsPerUnit: undefined,
       capUnitsAtAttendeeCount: undefined,
+      attendeeTypePricesCents: undefined,
       latePricing: undefined,
       pricingWindows: undefined,
       basePricingLabel: undefined,

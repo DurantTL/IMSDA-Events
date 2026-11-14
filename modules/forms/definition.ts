@@ -26,6 +26,8 @@ export const availabilityModes = ["NONE", "CAPACITY", "RANKED_INTEREST"] as cons
 const attendeeNameKeys = ["full_name", "name", "attendee_name", "guest_name"] as const;
 
 const priceCentsSchema = z.number().int().min(0).max(10000000);
+/** A price for each attendee type, keyed by the type's code (#1509); see `resolveFieldPrices`. */
+const attendeeTypePricesSchema = z.record(z.string().regex(/^[A-Z][A-Z0-9_]*$/, "Attendee type codes use uppercase letters, numbers, and underscores."), priceCentsSchema);
 // A credit is entered as a negative price per unit on a REGISTRATION-scope
 // NUMBER field (e.g. Camporee's per-person meal sponsorship, #409): each unit
 // in the answer subtracts this amount, optionally capped at the
@@ -280,7 +282,26 @@ export const priceWindowSchema = z.object({
   label: z.string().trim().min(2).max(80).default("Late registration pricing"),
   priceCents: priceCentsSchema.optional(),
   choicePricesCents: z.record(z.string(), priceCentsSchema).optional(),
+  /** Per-attendee-type prices from this window's date (#1509). Cumulative across started windows like `choicePricesCents`. */
+  attendeeTypePricesCents: attendeeTypePricesSchema.optional(),
 });
+
+/** Whether the field, or any of its price windows, has "Prices by attendee type" turned on (#1509). */
+export function hasAttendeeTypePrices(field: { attendeeTypePricesCents?: unknown; latePricing?: { attendeeTypePricesCents?: unknown } | undefined; pricingWindows?: ReadonlyArray<{ attendeeTypePricesCents?: unknown }> | undefined }): boolean {
+  // Present, even empty: the builder keeps `{}` while "Prices by attendee type" is on and no price is entered yet.
+  const filled = (map: unknown) => typeof map === "object" && map !== null;
+  return filled(field.attendeeTypePricesCents) || filled(field.latePricing?.attendeeTypePricesCents) || (field.pricingWindows ?? []).some((window) => filled(window.attendeeTypePricesCents));
+}
+
+/** Why a field cannot take per-attendee-type prices, or undefined when it can (only the field itself; the form must also have a selector). */
+export function attendeeTypePricesRefusal(field: { type: string; scope: string; optionSource?: string | undefined; creditCentsPerUnit?: number | undefined }): string | undefined {
+  if (field.optionSource === "ATTENDEE_TYPES") return "The attendee-type question itself cannot be priced by attendee type.";
+  if (isChoiceFieldType(field.type)) return "Prices by attendee type are not available on a choice question; price each choice instead.";
+  if (field.type === "INFORMATION" || field.type === "SIGNATURE" || field.type === "ACKNOWLEDGMENT" || field.type === "ADDRESS") return "This kind of question carries no price, so it cannot have prices by attendee type.";
+  if (field.creditCentsPerUnit !== undefined) return "A credit cannot have prices by attendee type.";
+  if (field.scope !== "ATTENDEE") return "Prices by attendee type only apply to a question asked of each person.";
+  return undefined;
+}
 
 export const formFieldSchema = z.object({
   id: z.string().trim().min(3).max(80),
@@ -304,6 +325,12 @@ export const formFieldSchema = z.object({
   choiceLimits: z.record(z.string(), z.number().int().min(1).max(10000)).optional(),
   priceCents: priceCentsSchema.optional(),
   choicePricesCents: z.record(z.string(), priceCentsSchema).optional(),
+  /**
+   * "Prices by attendee type" (#1509): the price for a person of each type (keyed by type code), replacing `priceCents`
+   * for that person. A type with no entry pays `priceCents`. Only on a per-person, non-choice priced field of a form with
+   * an attendee-type selector. Read through `resolveFieldPrices`.
+   */
+  attendeeTypePricesCents: attendeeTypePricesSchema.optional(),
   creditCentsPerUnit: creditCentsPerUnitSchema.optional(),
   capUnitsAtAttendeeCount: z.boolean().optional(),
   latePricing: priceWindowSchema.optional(),
@@ -398,7 +425,7 @@ export const formFieldSchema = z.object({
     if (!field.information) {
       context.addIssue({ code: "custom", path: ["information"], message: "An information block needs its text." });
     }
-    if (field.required || field.scope !== "REGISTRATION" || field.options.length > 0 || field.optionSource || field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.pricingWindows || field.basePricingLabel || field.creditCentsPerUnit !== undefined || field.capUnitsAtAttendeeCount || field.ageBounds || field.autoDate || field.optionalWhen || field.availabilityMode || field.choiceLimits || field.memberColumns || field.acknowledgment || field.signature) {
+    if (field.required || field.scope !== "REGISTRATION" || field.options.length > 0 || field.optionSource || field.priceCents !== undefined || field.choicePricesCents || field.attendeeTypePricesCents || field.latePricing || field.pricingWindows || field.basePricingLabel || field.creditCentsPerUnit !== undefined || field.capUnitsAtAttendeeCount || field.ageBounds || field.autoDate || field.optionalWhen || field.availabilityMode || field.choiceLimits || field.memberColumns || field.acknowledgment || field.signature) {
       context.addIssue({ code: "custom", path: ["type"], message: "An information block is shown once for the whole registration and carries no answer, choices, price, credit or requirement." });
     }
   } else if (field.information) {
@@ -408,7 +435,7 @@ export const formFieldSchema = z.object({
     if (!field.signature) {
       context.addIssue({ code: "custom", path: ["signature"], message: "A signature needs the statement to be signed." });
     }
-    if (field.options.length > 0 || field.optionSource || field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.pricingWindows || field.basePricingLabel || field.creditCentsPerUnit !== undefined || field.ageBounds || field.autoDate) {
+    if (field.options.length > 0 || field.optionSource || field.priceCents !== undefined || field.choicePricesCents || field.attendeeTypePricesCents || field.latePricing || field.pricingWindows || field.basePricingLabel || field.creditCentsPerUnit !== undefined || field.ageBounds || field.autoDate) {
       context.addIssue({ code: "custom", path: ["type"], message: "A signature carries no choices, price, credit, age range or automatic date." });
     }
   } else if (field.signature) {
@@ -418,7 +445,7 @@ export const formFieldSchema = z.object({
     if (!field.acknowledgment) {
       context.addIssue({ code: "custom", path: ["acknowledgment"], message: "An acknowledgment needs its wording or a policy version." });
     }
-    if (field.options.length > 0 || field.optionSource || field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.pricingWindows || field.basePricingLabel || field.creditCentsPerUnit !== undefined || field.ageBounds || field.autoDate) {
+    if (field.options.length > 0 || field.optionSource || field.priceCents !== undefined || field.choicePricesCents || field.attendeeTypePricesCents || field.latePricing || field.pricingWindows || field.basePricingLabel || field.creditCentsPerUnit !== undefined || field.ageBounds || field.autoDate) {
       context.addIssue({ code: "custom", path: ["type"], message: "An acknowledgment carries no choices, price, credit, age range or automatic date." });
     }
   } else if (field.acknowledgment) {
@@ -488,6 +515,14 @@ export const formFieldSchema = z.object({
   for (const choice of Object.keys(field.choicePricesCents ?? {})) {
     if (!field.options.includes(choice)) context.addIssue({ code: "custom", path: ["choicePricesCents", choice], message: "Choice prices must reference a configured choice." });
   }
+  const typePriceWindows = field.pricingWindows ?? (field.latePricing ? [field.latePricing] : []);
+  if (hasAttendeeTypePrices(field)) {
+    const reason = attendeeTypePricesRefusal(field);
+    if (reason) {
+      const path: Array<string | number> = field.attendeeTypePricesCents ? ["attendeeTypePricesCents"] : field.pricingWindows ? ["pricingWindows", typePriceWindows.findIndex((window) => window.attendeeTypePricesCents)] : ["latePricing", "attendeeTypePricesCents"];
+      context.addIssue({ code: "custom", path, message: reason });
+    }
+  }
   if (field.latePricing && field.pricingWindows) {
     context.addIssue({ code: "custom", path: ["pricingWindows"], message: "Use either one late-pricing window or a list of price windows, not both." });
   }
@@ -504,7 +539,7 @@ export const formFieldSchema = z.object({
   });
   // A stored `{}` base map still satisfies this rule so forms saved by the old builder keep parsing (#680);
   // a window's map counts too, since the engine charges its entries from that window's date.
-  if (priceWindows.length > 0 && field.priceCents === undefined && !field.choicePricesCents && !priceWindows.some((window) => Object.keys(window.choicePricesCents ?? {}).length > 0)) {
+  if (priceWindows.length > 0 && field.priceCents === undefined && !field.choicePricesCents && !hasAttendeeTypePrices(field) && !priceWindows.some((window) => Object.keys(window.choicePricesCents ?? {}).length > 0)) {
     context.addIssue({ code: "custom", path: [windowsPath], message: "Late pricing requires a regular field or choice price." });
   }
   if (field.basePricingLabel && priceWindows.length === 0) {
@@ -514,7 +549,7 @@ export const formFieldSchema = z.object({
     if (field.type !== "NUMBER" || field.scope !== "REGISTRATION") {
       context.addIssue({ code: "custom", path: ["creditCentsPerUnit"], message: "A per-unit credit can only be set on a registration-level number field." });
     }
-    if (field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.pricingWindows || field.basePricingLabel) {
+    if (field.priceCents !== undefined || field.choicePricesCents || field.attendeeTypePricesCents || field.latePricing || field.pricingWindows || field.basePricingLabel) {
       context.addIssue({ code: "custom", path: ["creditCentsPerUnit"], message: "A field can charge a price or apply a credit, not both." });
     }
   }
@@ -680,6 +715,11 @@ export const formTemplateDefinitionSchema = z.object({
   const allFields = definition.sections.flatMap((section) => section.fields);
   if (allFields.filter((field) => field.optionSource === "ATTENDEE_TYPES").length > 1) {
     context.addIssue({ code: "custom", path: ["sections"], message: "A form can designate only one attendee-type selector." });
+  }
+  if (!allFields.some((field) => field.optionSource === "ATTENDEE_TYPES")) {
+    definition.sections.forEach((section, sectionIndex) => section.fields.forEach((field, fieldIndex) => {
+      if (hasAttendeeTypePrices(field)) context.addIssue({ code: "custom", path: ["sections", sectionIndex, "fields", fieldIndex, "attendeeTypePricesCents"], message: "Prices by attendee type need an attendee-type question on the form." });
+    }));
   }
   const requiredKeys = definition.requireAtLeastOne?.fieldKeys ?? [];
   for (const key of requiredKeys) {
@@ -1893,16 +1933,40 @@ function attendeeDisplayName(responses: Record<string, unknown>, index: number, 
  * late-pricing toggle) falls back to `priceCents`. An entry of 0 is an
  * explicit free choice and still counts. Shared so a display of prices can
  * never disagree with what is charged.
+ *
+ * Prices by attendee type (#1509) merge the same way, per type code: the base
+ * map, then each started window's map in date order. The merged map, when it
+ * has an entry, replaces the flat price for a person of that type (see
+ * `priceForAttendeeType`); a field without the key resolves exactly as before.
  */
-export function resolveFieldPrices(field: Pick<RegistrationFormField, "priceCents" | "choicePricesCents" | "latePricing" | "pricingWindows">, pricingDate = localCalendarDate()) {
+export function resolveFieldPrices(field: Pick<RegistrationFormField, "priceCents" | "choicePricesCents" | "latePricing" | "pricingWindows"> & { attendeeTypePricesCents?: Record<string, number> | undefined }, pricingDate = localCalendarDate()) {
   let priceCents = field.priceCents;
   const merged: Record<string, number> = { ...(field.choicePricesCents ?? {}) };
+  const typeMerged: Record<string, number> = { ...(field.attendeeTypePricesCents ?? {}) };
   for (const window of activePriceWindows(field, pricingDate)) {
     priceCents = window.priceCents ?? priceCents;
     Object.assign(merged, window.choicePricesCents ?? {});
+    Object.assign(typeMerged, window.attendeeTypePricesCents ?? {});
   }
   const choicePricesCents = Object.keys(merged).length > 0 ? merged : undefined;
-  return { priceCents, choicePricesCents };
+  return {
+    priceCents,
+    choicePricesCents,
+    ...(Object.keys(typeMerged).length > 0 ? { attendeeTypePricesCents: typeMerged } : {}),
+  };
+}
+
+/** The flat price, or the price for the attendee's type when the field has one for it. A type with no entry (or a deactivated one) pays the flat price. */
+export function priceForAttendeeType(resolved: { priceCents: number | undefined; attendeeTypePricesCents?: Record<string, number> | undefined }, attendeeTypeCode: unknown): number | undefined {
+  if (typeof attendeeTypeCode === "string" && resolved.attendeeTypePricesCents && Object.hasOwn(resolved.attendeeTypePricesCents, attendeeTypeCode)) {
+    return resolved.attendeeTypePricesCents[attendeeTypeCode];
+  }
+  return resolved.priceCents;
+}
+
+/** The key of the form's attendee-type selector, if it has one. */
+function attendeeTypeSelectorKey(definition: RegistrationFormDefinition): string | undefined {
+  return definition.sections.flatMap((section) => section.fields).find((field) => field.optionSource === "ATTENDEE_TYPES")?.key;
 }
 
 function pricedLineItem(
@@ -1911,6 +1975,7 @@ function pricedLineItem(
   pricingDate: string,
   attendee?: { index: number; label: string },
   registrationContext?: { attendeeCount: number },
+  attendeeTypeKey?: string,
 ): FormCalculation["lineItems"][number] | null {
   // An Information block (#284) is never priced.
   if (isInformationField(field)) return null;
@@ -1929,7 +1994,9 @@ function pricedLineItem(
     if (creditCents === 0) return null;
     return { key: field.key, label: field.label, amountCents: Math.round(creditCents) };
   }
-  const { priceCents, choicePricesCents } = resolveFieldPrices(field, pricingDate);
+  const resolved = resolveFieldPrices(field, pricingDate);
+  const { choicePricesCents } = resolved;
+  const priceCents = attendeeTypeKey && field.scope === "ATTENDEE" ? priceForAttendeeType(resolved, responses[attendeeTypeKey]) : resolved.priceCents;
   const pricingLabel = fieldPricingLabel(field, pricingDate);
   let amountCents = 0;
   if (choicePricesCents) {
@@ -2053,9 +2120,10 @@ export function processingFeeForSubtotal(
 export function calculateFormLineItems(definition: RegistrationFormDefinition, responses: Record<string, unknown>, pricingDate = localCalendarDate()): FormCalculation["lineItems"] {
   // No repeatable roster: the registrant is the one person on it.
   const registrationContext = { attendeeCount: 1 };
+  const typeKey = attendeeTypeSelectorKey(definition);
   return definition.sections
     .flatMap((section) => section.fields)
-    .map((field) => pricedLineItem(field, responses, pricingDate, undefined, registrationContext))
+    .map((field) => pricedLineItem(field, responses, pricingDate, undefined, registrationContext, typeKey))
     .filter((item): item is NonNullable<typeof item> => item !== null);
 }
 
@@ -2072,6 +2140,7 @@ export function calculateRosterLineItems(
 ): FormCalculation["lineItems"] {
   const fields = definition.sections.flatMap((section) => section.fields);
   const registrationContext = { attendeeCount: attendeeResponses.length };
+  const typeKey = attendeeTypeSelectorKey(definition);
   const lineItems: FormCalculation["lineItems"] = fields
     .filter((field) => field.scope === "REGISTRATION")
     .map((field) => pricedLineItem(field, registrationResponses, pricingDate, undefined, registrationContext))
@@ -2082,7 +2151,7 @@ export function calculateRosterLineItems(
     const label = attendeeDisplayName(responses, index, roster.attendeeLabel);
     for (const field of fields) {
       if (field.scope !== "ATTENDEE") continue;
-      const item = pricedLineItem(field, mergedResponses, pricingDate, { index, label });
+      const item = pricedLineItem(field, mergedResponses, pricingDate, { index, label }, undefined, typeKey);
       if (item) lineItems.push(item);
     }
   });

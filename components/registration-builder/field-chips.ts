@@ -21,6 +21,7 @@ export function sourceModuleName(field: Pick<RegistrationFormField, "key" | "typ
 export function affectsPrice(field: RegistrationFormField) {
   return field.priceCents !== undefined
     || Object.keys(field.choicePricesCents ?? {}).length > 0
+    || Object.keys(field.attendeeTypePricesCents ?? {}).length > 0
     || Boolean(field.latePricing)
     || Boolean(field.pricingWindows)
     || field.creditCentsPerUnit !== undefined;

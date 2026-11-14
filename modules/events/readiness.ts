@@ -291,6 +291,8 @@ type FeeFieldShape = {
   scope?: string;
   label: string;
   priceCents?: number;
+  /** A price per attendee type (#1509) is a deliberate price, so the fee is not "unset". */
+  attendeeTypePricesCents?: Record<string, number> | undefined;
 };
 
 /** The label the registration builder puts on a fee field's amount input. */
@@ -310,7 +312,7 @@ export function unpricedFeeFields(
 ): UnpricedFeeField[] {
   return definition.sections
     .flatMap((section) => section.fields)
-    .filter((field) => field.type === "CALCULATED" && field.scope === "ATTENDEE" && field.priceCents === undefined)
+    .filter((field) => field.type === "CALCULATED" && field.scope === "ATTENDEE" && field.priceCents === undefined && Object.keys(field.attendeeTypePricesCents ?? {}).length === 0)
     .map((field) => ({ label: field.label, fieldId: field.id, formId }));
 }
 

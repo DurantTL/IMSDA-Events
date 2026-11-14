@@ -331,6 +331,7 @@ export function summarizePublicRegistrationForm(
   const hasPricing = fields.some((field) => (
     field.priceCents !== undefined
     || Object.keys(field.choicePricesCents ?? {}).length > 0
+    || Object.keys(field.attendeeTypePricesCents ?? {}).length > 0
   ));
 
   return {

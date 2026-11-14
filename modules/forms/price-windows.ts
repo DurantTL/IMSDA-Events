@@ -1,4 +1,4 @@
-import { fieldPriceWindows, type FieldPriceWindow, type RegistrationFormField } from "@/modules/forms/definition";
+import { fieldPriceWindows, hasAttendeeTypePrices, type FieldPriceWindow, type RegistrationFormField } from "@/modules/forms/definition";
 
 /**
  * Editing helpers for a field's price windows (#1509), shared by the form
@@ -55,4 +55,33 @@ export function pruneWindowChoicePrices(windows: FieldPriceWindow[], options: re
     const kept = Object.fromEntries(Object.entries(window.choicePricesCents ?? {}).filter(([choice]) => options.includes(choice)));
     return { ...window, choicePricesCents: Object.keys(kept).length > 0 ? kept : undefined };
   });
+}
+
+type TypePriceFields = Pick<RegistrationFormField, "attendeeTypePricesCents" | "latePricing" | "pricingWindows" | "basePricingLabel">;
+
+/**
+ * "Prices by attendee type" (#1509) turned off, or no longer allowed (the question moved to the whole registration):
+ * the starting map and every window's map are dropped. Empty for a field that never used it, so nothing else changes.
+ */
+export function clearAttendeeTypePricesPatch(field: TypePriceFields): Partial<TypePriceFields> {
+  if (!hasAttendeeTypePrices(field)) return {};
+  const windows = fieldPriceWindows(field).map((window) => ({ ...window, attendeeTypePricesCents: undefined }));
+  return { attendeeTypePricesCents: undefined, ...priceWindowsPatch(windows, field.basePricingLabel) };
+}
+
+/**
+ * The patch that sets (or, with `cents` undefined, clears) one attendee type's price in the starting prices
+ * (`windowIndex` null) or in one window. An emptied map stays `{}` at the start, so the option stays on, and goes
+ * away in a window.
+ */
+export function setAttendeeTypePricePatch(field: TypePriceFields, windowIndex: number | null, code: string, cents: number | undefined): Partial<TypePriceFields> {
+  const apply = (map: Record<string, number> | undefined) => {
+    const next = { ...(map ?? {}) };
+    if (cents === undefined) delete next[code]; else next[code] = cents;
+    return next;
+  };
+  if (windowIndex === null) return { attendeeTypePricesCents: apply(field.attendeeTypePricesCents) };
+  const windows = fieldPriceWindows(field);
+  const next = apply(windows[windowIndex]?.attendeeTypePricesCents);
+  return priceWindowsPatch(updatePriceWindow(windows, windowIndex, { attendeeTypePricesCents: Object.keys(next).length > 0 ? next : undefined }), field.basePricingLabel);
 }

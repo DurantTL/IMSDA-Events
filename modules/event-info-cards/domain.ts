@@ -1,5 +1,5 @@
 import { formatCents } from "@/modules/payments/format-cents";
-import { fieldPriceWindows, resolveFieldPrices, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { fieldPriceWindows, hasAttendeeTypePrices, priceForAttendeeType, resolveFieldPrices, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { effectiveLocationDates } from "@/modules/event-locations/domain";
 import { getPublicRegistrationStepPlan } from "@/modules/forms/public-registration-steps";
 
@@ -410,7 +410,19 @@ function chargedIn(field: RegistrationFormField, pricingDate: string | null, opt
   return priceCents ?? null;
 }
 
+/** What a person of one attendee type is charged on a date (before every window when null); null when nothing is priced (#1509). */
+function chargedForType(field: RegistrationFormField, pricingDate: string | null, code: string | null): number | null {
+  return priceForAttendeeType(resolveFieldPrices(field, pricingDate ?? BEFORE_ALL_WINDOWS), code) ?? null;
+}
+
+/** "ADULT" or "YOUTH_GROUP" as plain words when the form carries no label for the type. */
+function typeCodeWords(code: string) {
+  const words = code.toLowerCase().replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 function feeGroupsFor(form: InfoCardForm): FeeGroup[] {
+  const typeSelector = form.definition.sections.flatMap((section) => section.fields).find((field) => field.optionSource === "ATTENDEE_TYPES");
   const groups: FeeGroup[] = [];
   const singles: FeeLine[] = [];
   const seen = new Set<string>();
@@ -467,6 +479,28 @@ function feeGroupsFor(form: InfoCardForm): FeeGroup[] {
         if (lines.length > 0 && !seen.has(key)) {
           seen.add(key);
           groups.push({ title: field.label, lines });
+        }
+        continue;
+      }
+
+      if (hasAttendeeTypePrices(field)) {
+        // Prices by attendee type (#1509): one line per type with its own price, so no single wrong number is shown.
+        const codes = [...new Set([
+          ...Object.keys(field.attendeeTypePricesCents ?? {}),
+          ...windows.flatMap((window) => Object.keys(window.attendeeTypePricesCents ?? {})),
+        ])];
+        const typeStates = (code: string | null): PriceState[] => [
+          { startsOn: null, cents: chargedForType(field, null, code) },
+          ...windows.map((window) => ({ startsOn: window.startsOn, cents: chargedForType(field, window.startsOn, code) })),
+        ];
+        const lines: FeeLine[] = codes.map((code) => ({ label: `${field.label} — ${typeSelector?.optionLabels?.[code] ?? typeCodeWords(code)}`, unit, tiers: tiersFromStates(typeStates(code)) }));
+        // A type with no price of its own pays the field's usual price.
+        if (field.priceCents !== undefined || windows.some((window) => window.priceCents !== undefined)) lines.push({ label: `${field.label} — any other type`, unit, tiers: tiersFromStates(typeStates(null)) });
+        const shown = lines.filter((line) => line.tiers.length > 0);
+        const key = `types:${field.label}:${JSON.stringify(shown)}`;
+        if (shown.length > 0 && !seen.has(key)) {
+          seen.add(key);
+          groups.push({ title: field.label, lines: shown });
         }
         continue;
       }

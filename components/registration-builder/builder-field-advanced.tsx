@@ -11,6 +11,7 @@ import { isMealTicketField, moduleOwnedSettings } from "./module-owned-settings"
 import { useLoadedBuilder } from "./builder-context";
 import { BuilderShowWhen } from "./builder-show-when";
 import { PriceWindowsEditor } from "./price-windows-editor";
+import { AttendeeTypePricesEditor } from "./attendee-type-prices-editor";
 
 type FieldTarget = { field: RegistrationFormField; sectionIndex: number; fieldIndex: number };
 const fieldTypesWithoutPlaceholder = ["SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE", "DATE", "CALCULATED", "ADDRESS", "ACKNOWLEDGMENT", "SIGNATURE"];
@@ -43,6 +44,7 @@ export function BuilderFieldAdvanced({ field, sectionIndex, fieldIndex, variant 
                 {variant === "inline" && <BuilderPlaceholderInput field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />}
                 {!information && <>
                 {!isMealTicketField(field) && !hasCredit(field) && !hidesFieldPrice(field.type) && field.type !== "ACKNOWLEDGMENT" && <PriceWindowsEditor field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} mode="price" />}
+                {!isMealTicketField(field) && !hasCredit(field) && !hidesFieldPrice(field.type) && <AttendeeTypePricesEditor field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />}
                 </>}
                 {/* Show this question when (#1072): in the editor sidebar it has its own section, so only the inline settings show it here. */}
                 {variant === "inline" && <div className="field-full"><BuilderShowWhen field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} /></div>}
