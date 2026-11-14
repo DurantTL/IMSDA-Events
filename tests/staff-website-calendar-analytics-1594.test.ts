@@ -107,7 +107,8 @@ describe("the analytics page (#1594)", () => {
   it("draws its own header and keeps the privacy wording", () => {
     const source = read("app/(workspace)/admin/analytics/page.tsx");
     expect(source).toContain('title="Public analytics"');
-    expect(source).toContain("Nothing here identifies a person, a device, a search or a private event.");
+    expect(source).toContain("Nothing here identifies a person, a device or a private event.");
+    expect(source).toContain("each shown only once it reaches {minimumShownCount} uses");
     expect(source).toContain("Visitors who send a Global Privacy Control or Do Not Track signal are not counted");
     expect(source).toContain('user.globalRole !== "SYSTEM_ADMIN"');
     expect(source).not.toContain("style={{");

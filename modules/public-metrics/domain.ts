@@ -1,7 +1,9 @@
 /**
- * Privacy-safe public analytics (#111): the rules, all pure. A metric is a daily count with one allowlisted dimension.
- * Nothing about a person, a device, a search, an address or a page address is ever a dimension; anything outside the
- * allowlists is dropped, never stored. See docs/PUBLIC-ANALYTICS.md.
+ * Privacy-safe public analytics (#111): the rules, all pure. A metric is a daily count with one dimension. Nothing about
+ * a person, a device, an address or a page address is ever a dimension; anything outside the allowlists is dropped,
+ * never stored. Three metrics (#1560) carry short normalized free text: the referring site's host, campaign tags and a
+ * search that found nothing. Each is cleaned and checked here, capped per day, shown only once it reaches a minimum
+ * count and deleted after 30 days if it never does. See docs/PUBLIC-ANALYTICS.md.
  */
 
 import { z } from "zod";
@@ -10,11 +12,12 @@ import { addDays } from "@/modules/calendar/domain";
 export const publicMetrics = [
   "EVENT_PAGE_VIEW", "DIRECTORY_SEARCH", "DIRECTORY_FILTER", "REGISTRATION_START", "REGISTRATION_COMPLETE",
   "LOGIN_SUCCESS", "LOGIN_FAILURE", "NOT_FOUND", "IMAGE_ERROR", "WEB_VITAL",
+  "REFERRER_SITE", "CAMPAIGN_VISIT", "SEARCH_NO_RESULTS",
 ] as const;
 export type PublicMetricName = (typeof publicMetrics)[number];
 
 /** What the browser beacon may report. Sign-ins and completed registrations are recorded on the server only. */
-export const beaconMetrics = ["EVENT_PAGE_VIEW", "REGISTRATION_START", "DIRECTORY_SEARCH", "DIRECTORY_FILTER", "NOT_FOUND", "IMAGE_ERROR", "WEB_VITAL"] as const satisfies readonly PublicMetricName[];
+export const beaconMetrics = ["EVENT_PAGE_VIEW", "REGISTRATION_START", "DIRECTORY_SEARCH", "DIRECTORY_FILTER", "NOT_FOUND", "IMAGE_ERROR", "WEB_VITAL", "REFERRER_SITE", "CAMPAIGN_VISIT", "SEARCH_NO_RESULTS"] as const satisfies readonly PublicMetricName[];
 export type BeaconMetric = (typeof beaconMetrics)[number];
 
 export const eventMetrics = ["EVENT_PAGE_VIEW", "REGISTRATION_START", "REGISTRATION_COMPLETE"] as const satisfies readonly PublicMetricName[];
@@ -31,6 +34,83 @@ export const vitalRatings = ["good", "needs-improvement", "poor"] as const;
 
 const slugPattern = /^[a-z0-9][a-z0-9-]{0,99}$/;
 
+/* ------------------------------------------------------------------ Sources and no-result searches (#1560) */
+
+/** The metrics whose dimension is short normalized free text: capped per day, shown from a minimum count, pruned when rare. */
+export const freeTextMetrics = ["REFERRER_SITE", "CAMPAIGN_VISIT", "SEARCH_NO_RESULTS"] as const satisfies readonly PublicMetricName[];
+export const isFreeTextMetric = (metric: PublicMetricName) => (freeTextMetrics as readonly string[]).includes(metric);
+/** At most this many different values per day and metric; an already-stored value still counts up, a new one beyond it is dropped. */
+export const freeTextDailyCap = 200;
+/** A term, site or tag is shown on the analytics page only when its total in the period reaches this; rare ones are deleted after 30 days. */
+export const minimumShownCount = 3;
+export const rareFreeTextRetentionDays = 30;
+
+const digitCount = (text: string) => (text.match(/\p{Nd}/gu) ?? []).length;
+
+/** A referring site: host only, lower case, no trailing dot or leading "www.". Null when it is not a plain public hostname (ports, userinfo, IP addresses and localhost are dropped). */
+export function normalizeReferrerHost(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  let host = raw.trim().toLowerCase();
+  if (host.endsWith(".")) host = host.slice(0, -1);
+  if (host.startsWith("www.")) host = host.slice(4);
+  if (host.length === 0 || host.length > 100 || host === "localhost" || !host.includes(".")) return null;
+  const labels = host.split(".");
+  if (!labels.every((label) => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) return null;
+  // An address such as 192.168.0.1 ends in digits only; a real top-level name has a letter.
+  if (!/[a-z]/.test(labels[labels.length - 1])) return null;
+  return host;
+}
+
+/** One campaign tag part: lower case, spaces to hyphens, [a-z0-9._-], 1 to 30 characters; null drops the whole hit (an "@" or 7 or more digits could be an email, phone number or id). */
+export function normalizeCampaignPart(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const value = raw.trim().toLowerCase().replace(/\s+/g, "-");
+  if (value.includes("@") || digitCount(value) >= 7) return null;
+  return /^[a-z0-9._-]{1,30}$/.test(value) ? value : null;
+}
+
+/**
+ * The stored campaign dimension "source / medium / campaign" ("-" for a missing part), from three raw tags. The source is
+ * required; a missing medium or campaign is "-". Any part that fails drops the whole hit.
+ */
+export function campaignDimension(source: unknown, medium: unknown, campaign: unknown): string | null {
+  const missing = (part: unknown) => part === undefined || part === null || (typeof part === "string" && part.trim() === "");
+  if (missing(source)) return null;
+  const parts: string[] = [];
+  for (const [index, part] of [source, medium, campaign].entries()) {
+    if (index > 0 && missing(part)) { parts.push("-"); continue; }
+    const normalized = normalizeCampaignPart(part);
+    if (normalized === null) return null;
+    parts.push(normalized);
+  }
+  return parts.join(" / ");
+}
+
+function campaignFromStored(value: string): string | null {
+  const parts = value.split(" / ");
+  if (parts.length !== 3) return null;
+  if (parts[0] === "-") return null;
+  return campaignDimension(parts[0], parts[1] === "-" ? "" : parts[1], parts[2] === "-" ? "" : parts[2]);
+}
+
+/** A search that found nothing, cleaned for counting: NFKC, lower case, letters, digits, spaces, hyphens and apostrophes only, 3 to 40 characters. Null when it holds "@" or 7 or more digits, or is too short or long. */
+export function normalizeSearchTerm(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const folded = raw.normalize("NFKC").toLowerCase().replace(/\u2019/g, "'");
+  if (folded.includes("@") || digitCount(folded) >= 7) return null;
+  const term = folded.replace(/[^\p{L}\p{Nd} '-]/gu, "").replace(/\s+/g, " ").trim();
+  return term.length >= 3 && term.length <= 40 ? term : null;
+}
+
+export type MinimumCounted<T extends { count: number }> = { shown: T[]; /** How many different values were below the minimum. */ hiddenCount: number; /** Their counts added together: the only thing said about them. */ hiddenTotal: number };
+
+/** Splits rows (one per value, totals for the period) into those at or above the minimum and a count-only roll-up of the rest. */
+export function applyMinimumCount<T extends { count: number }>(rows: readonly T[], minimum: number = minimumShownCount): MinimumCounted<T> {
+  const shown = rows.filter((row) => row.count >= minimum);
+  const hidden = rows.filter((row) => row.count < minimum);
+  return { shown, hiddenCount: hidden.length, hiddenTotal: hidden.reduce((sum, row) => sum + row.count, 0) };
+}
+
 export type DimensionDecision =
   | { kind: "ok"; dimension: string }
   /** Valid in shape; the server must confirm the event is public and published before it is counted. */
@@ -39,7 +119,7 @@ export type DimensionDecision =
 
 /**
  * Turns what a client sent into a stored dimension, or drops it. Only values from fixed lists (or a well-formed event
- * slug, checked against the database) get through, so free text can never reach the table.
+ * slug, checked against the database) get through, so unchecked free text can never reach the table.
  */
 export function decideDimension(metric: PublicMetricName, raw: unknown): DimensionDecision {
   const value = typeof raw === "string" ? raw : "";
@@ -60,6 +140,18 @@ export function decideDimension(metric: PublicMetricName, raw: unknown): Dimensi
       return { kind: "ok", dimension: (publicSections as readonly string[]).includes(value) ? value : "other" };
     case "IMAGE_ERROR":
       return (imageOrigins as readonly string[]).includes(value) ? { kind: "ok", dimension: value } : { kind: "drop" };
+    case "REFERRER_SITE": {
+      const host = normalizeReferrerHost(value);
+      return host ? { kind: "ok", dimension: host } : { kind: "drop" };
+    }
+    case "CAMPAIGN_VISIT": {
+      const dimension = campaignFromStored(value);
+      return dimension ? { kind: "ok", dimension } : { kind: "drop" };
+    }
+    case "SEARCH_NO_RESULTS": {
+      const term = normalizeSearchTerm(value);
+      return term ? { kind: "ok", dimension: term } : { kind: "drop" };
+    }
     case "WEB_VITAL": {
       const [name, rating, ...rest] = value.split(":");
       return rest.length === 0 && (vitalNames as readonly string[]).includes(name) && (vitalRatings as readonly string[]).includes(rating)

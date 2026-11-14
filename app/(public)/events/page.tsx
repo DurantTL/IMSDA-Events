@@ -6,7 +6,7 @@ import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
 import { BrandLink } from "@/components/brand-link";
 import { PublicExploreNav } from "@/components/public-explore-nav";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
-import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
+import { NoResultSearchBeacon, PublicMetricsBeacon } from "@/components/public-metrics-beacon";
 import { HubLink, SiteNoticesView } from "@/components/site-notices-view";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { addDays, calendarCountLabel, calendarItemStatusLine, formatDateRange, type CalendarItem } from "@/modules/calendar/domain";
@@ -28,7 +28,7 @@ import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/rep
 import { pinFeatured } from "@/modules/events/featured-domain";
 import { listFeaturedEventRows } from "@/modules/events/featured";
 import { getPublishedHubContent } from "@/modules/site-content/hub-content";
-import { directoryFiltersInUse } from "@/modules/public-metrics/domain";
+import { directoryFiltersInUse, normalizeSearchTerm } from "@/modules/public-metrics/domain";
 import { activeNotices, applyCategoryPreferences, splitVerse } from "@/modules/site-content/hub-content-domain";
 import { clubRegistrationEntryPath } from "@/modules/club-registrations/entry-path";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
@@ -104,6 +104,13 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
   // Staff can reorder and hide category choices (#111); hiding only removes the choice, the events stay listed.
   const categories = applyCategoryPreferences(allCategories, hubContent.calendarCategories, filters.category);
   const { items, pinned } = pinFeatured(applyEventDirectoryFilters(openItems, filters), featuredRows);
+  // "No results" means the search words alone match none of the open events (#1560): not a list emptied by a filter, and not
+  // an empty calendar. It is checked against every open event, whatever audience tab is chosen. The cleaned term, never the
+  // raw text, goes to the beacon.
+  const allOpenItems = filter === "all" ? openItems : selectOpenRegistrationItems(calendarItems, "all");
+  const noResultTerm = filters.q && allOpenItems.length > 0 && applyEventDirectoryFilters(allOpenItems, { q: filters.q, from: "", to: "", category: "", location: "", audience: "all" }).length === 0
+    ? normalizeSearchTerm(filters.q)
+    : null;
   const clearHref = eventDirectoryHref({ audience: filter });
   const verse = hubContent.footer.verse ? splitVerse(hubContent.footer.verse) : null;
 
@@ -121,6 +128,7 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
         ...(used.search ? [{ metric: "DIRECTORY_SEARCH" as const }] : []),
         ...used.filters.map((name) => ({ metric: "DIRECTORY_FILTER" as const, dimension: name })),
       ]} />
+      <NoResultSearchBeacon term={noResultTerm} />
       <SiteNoticesView notices={activeNotices(hubContent, today)} />
 
       <section className="public-registration-hero calendar-hero public-home-banner">

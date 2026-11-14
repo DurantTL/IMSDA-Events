@@ -2,12 +2,13 @@
 
 import { useEffect } from "react";
 import { useReportWebVitals } from "next/web-vitals";
-import { firstPathSegment, isStaffWorkspacePath, vitalNames, type BeaconMetric } from "@/modules/public-metrics/domain";
+import { campaignDimension, firstPathSegment, isStaffWorkspacePath, vitalNames, type BeaconMetric } from "@/modules/public-metrics/domain";
 
 /**
  * The one first-party analytics beacon for public pages (#111). It sends a metric name and an allowlisted dimension to
  * `/api/public-metrics` with `navigator.sendBeacon`: no cookie, no identifier, no third-party script, and no address,
- * search text or referrer. It does nothing at all when the browser signals Global Privacy Control or Do Not Track.
+ * page address or query string. Three hits carry short normalized text (#1560): the referring site's host, the utm
+ * campaign tags, and a search that found nothing. It does nothing at all when the browser signals Global Privacy Control or Do Not Track.
  * The server re-checks everything it is sent.
  */
 export type BeaconHit = { metric: BeaconMetric; dimension?: string };
@@ -84,14 +85,97 @@ export function reportVital(metric: { name: string; rating?: string }) {
 
 /** Test hook: forget the landing page and the measures already sent. */
 export function resetVitalsForTests() {
+  sourcesSent = false;
   landingPath = null;
   reportedVitals.clear();
+}
+
+let sourcesSent = false;
+
+/**
+ * Where this visit came from (#1560), sent once per page load, from the landing page only: the referring site's host,
+ * and the utm_source, utm_medium and utm_campaign tags (nothing else from the address). Skipped when the visitor opted
+ * out, on the staff workspace, for a reload or back/forward, and for a referrer on this same site. Nothing is stored in
+ * the browser. The server cleans and checks both values again.
+ */
+export function sendLandingSources() {
+  if (sourcesSent || typeof window === "undefined" || !measuringAllowed()) return;
+  sourcesSent = true;
+  if (isStaffWorkspacePath(window.location.pathname)) return;
+  const navigation = performance.getEntriesByType?.("navigation")[0] as PerformanceNavigationTiming | undefined;
+  if (navigation?.type === "reload" || navigation?.type === "back_forward") return;
+  try {
+    const referrer = document.referrer ? new URL(document.referrer) : null;
+    if (referrer && (referrer.protocol === "http:" || referrer.protocol === "https:") && referrer.origin !== window.location.origin) {
+      sendHit({ metric: "REFERRER_SITE", dimension: referrer.hostname });
+    }
+  } catch {
+    // An unreadable referrer is simply not counted.
+  }
+  const query = new URLSearchParams(window.location.search);
+  const dimension = campaignDimension(query.get("utm_source"), query.get("utm_medium"), query.get("utm_campaign"));
+  if (dimension) sendHit({ metric: "CAMPAIGN_VISIT", dimension });
 }
 
 /** Mounted once, in the root layout, so the listeners are registered once for the whole visit. */
 export function PublicWebVitals() {
   // Remembered once, at the first render of the visit (the layout never remounts on client navigation).
-  useEffect(() => { landingPath ??= window.location.pathname; }, []);
+  useEffect(() => { landingPath ??= window.location.pathname; sendLandingSources(); }, []);
   useReportWebVitals(reportVital);
+  return null;
+}
+
+/* ------------------------------------------------------------------ Search with no results (#1560) */
+
+/** The term the document loaded with (undefined until the first mount), the latest term waiting to be sent, and what was sent. All in memory. */
+let loadedTerm: string | null | undefined;
+let pendingTerm: string | null = null;
+const sentTerms = new Set<string>();
+let noResultListeners = false;
+let noResultMounted = 0;
+
+/** Sends the final term once per document. Skipped for a reload or back/forward while the term is still the one the page loaded with. */
+function flushNoResultTerm() {
+  const term = pendingTerm;
+  if (!term || sentTerms.has(term)) return;
+  const navigation = typeof performance !== "undefined" ? (performance.getEntriesByType?.("navigation")[0] as PerformanceNavigationTiming | undefined) : undefined;
+  if ((navigation?.type === "reload" || navigation?.type === "back_forward") && term === loadedTerm) return;
+  sentTerms.add(term);
+  sendHit({ metric: "SEARCH_NO_RESULTS", dimension: term });
+}
+
+/** Test hook: forget everything this document remembered about no-result searches. */
+export function resetNoResultForTests() {
+  loadedTerm = undefined;
+  pendingTerm = null;
+  sentTerms.clear();
+  noResultMounted = 0;
+}
+
+/**
+ * A search on the events list that showed no events (#1560). The page gives the cleaned term, or null when the visitor
+ * saw results. Typing changes the term as it goes, so only the latest one is kept, and it is sent once, when the page
+ * is hidden or closed or the visitor leaves the events list: a term replaced by a later one is never sent.
+ */
+export function NoResultSearchBeacon({ term }: { term: string | null }) {
+  useEffect(() => {
+    if (loadedTerm === undefined) loadedTerm = term;
+    pendingTerm = term;
+  }, [term]);
+
+  useEffect(() => {
+    noResultMounted += 1;
+    if (!noResultListeners) {
+      noResultListeners = true;
+      window.addEventListener("pagehide", flushNoResultTerm);
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushNoResultTerm(); });
+    }
+    return () => {
+      noResultMounted -= 1;
+      // Leaving the events list sends its last term. Checked on the next tick so a development double mount never counts as leaving.
+      setTimeout(() => { if (noResultMounted === 0) flushNoResultTerm(); }, 0);
+    };
+  }, []);
+
   return null;
 }
