@@ -69,6 +69,9 @@ Then `npm run dev`.
 - **Mobile layout audit:** run it on the affected pages while iterating
   (`MOBILE_LAYOUT_ONLY=...`), then once in full before opening a PR that changes
   UI. Run the eight-width set only for shared layout changes.
+- **Visual check (#1774):** `npm run test:visual` opens about 40 key pages at 1280 and 390 px
+  with a fixed clock and compares them with the pictures in `tests/visual/baselines`. A PR that
+  changes a look on purpose updates them (`docs/VISUAL-CHECK.md`) and the reviewer looks at the pictures.
 - **Site rules browser check:** every review of a change to a page opens each
   changed page in a real browser (Playwright, against the app on port 3000 with
   the seeded database) at 1280 px and 390 px wide, tries each rule in
