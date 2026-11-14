@@ -885,6 +885,7 @@ model User {
   id            String            @id @default(cuid())
   attendeeProfileChangesMade   AttendeeProfileChange[]       @relation("AttendeeProfileChangeActorUser")
   registrationSavedViews RegistrationSavedView[] @relation("RegistrationSavedViewOwner")
+  baptismFollowUpsMarked       BaptismFollowUp[]             @relation("BaptismFollowUpFollowedUpBy")
   personMergesActed            PersonMerge[]                 @relation("PersonMergeActor")
   personMergesReversed         PersonMerge[]                 @relation("PersonMergeReversedBy")
   personAnonymizationsApproved PersonAnonymization[]         @relation("PersonAnonymizationApprovedBy")
@@ -1274,6 +1275,7 @@ model AttendeeAccount {
   monthlyRecordItemReviews ClubMonthlyReportItemReview[]
   leaderDirectoryPreference LeaderDirectoryPreference?
   teamPermissionDecisions ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedByAccount")
+  baptismFollowUpsMarked BaptismFollowUp[] @relation("BaptismFollowUpFollowedUpByAccount")
   /// The staff `User` linked to this account (#554), if any. See `User.attendeeAccountId`.
   linkedUser         User?                 @relation("UserAttendeeLink")
   informationFormResponses InformationFormResponse[]
@@ -2329,7 +2331,9 @@ model BaptismFollowUpSetting {
 
 /// One baptism name a club entered for an event that has the Baptism follow-up module on (#1680), kept so a name is
 /// notified once. `normalizedName` is the name in lower case with spacing collapsed; `displayName` is as the club typed it.
-/// `leadNotified` and `pastorNotified` record who the notice was queued for (never an address). Nothing else about the person is stored.
+/// `leadNotified` and `pastorNotified` record who the notice was queued for (never an address). Staff then mark a name followed up
+/// (`followedUpAt`, and who: a staff user or an Area Coordinator's attendee account, never both) and may keep a short note (`followUpNote`, staff's own text, up to 500 characters). The note
+/// stays on this row: it is never emailed and never copied into an audit entry, and neither is the name. Nothing else about the person is stored.
 model BaptismFollowUp {
   id             String   @id @default(cuid())
   eventId        String
@@ -2339,12 +2343,20 @@ model BaptismFollowUp {
   leadNotified   Boolean  @default(false)
   pastorNotified Boolean  @default(false)
   notifiedAt     DateTime @default(now())
+  followedUpAt   DateTime?
+  followUpNote   String?
+  followedUpByUserId String?
+  followedUpByAttendeeAccountId String?
 
   event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  followedUpBy User?        @relation("BaptismFollowUpFollowedUpBy", fields: [followedUpByUserId], references: [id], onDelete: SetNull)
+  followedUpByAccount AttendeeAccount? @relation("BaptismFollowUpFollowedUpByAccount", fields: [followedUpByAttendeeAccountId], references: [id], onDelete: SetNull)
 
   @@unique([eventId, organizationId, normalizedName])
   @@index([eventId, notifiedAt])
+  @@index([followedUpByUserId])
+  @@index([followedUpByAttendeeAccountId])
 }
 
 /// The debrief module's own settings for one event (#1679): the club director evaluation's switch (off by default) and the

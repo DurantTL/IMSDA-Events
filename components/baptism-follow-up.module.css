@@ -10,3 +10,13 @@
 .names { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .muted { color: var(--muted); margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .heading { margin: 0 0 8px; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.names li { display: grid; gap: 6px; }
+.status { display: grid; gap: 10px; margin: 4px 0 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); max-width: 560px; }
+.statusLine { margin: 0; font-weight: 600; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.check input { width: 24px; height: 24px; flex: none; }
+.noteField { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.noteField textarea { min-height: 88px; padding: 10px 12px; font: inherit; font-weight: 400; }
+.noteText { margin: 0; color: var(--muted); overflow-wrap: anywhere; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.switch { display: grid; gap: 8px; max-width: 560px; }
+.switch button { min-height: 44px; justify-self: start; }

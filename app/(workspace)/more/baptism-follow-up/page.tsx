@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AccessRestricted } from "@/components/access-restricted";
 import { BaptismFollowUpList } from "@/components/baptism-follow-up-list";
+import { BaptismFollowUpSwitch } from "@/components/baptism-follow-up-switch";
 import { BaptismFollowUpPanel } from "@/components/baptism-follow-up-panel";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
 import { staffPageTitles } from "@/components/staff-navigation";
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 /**
  * Staff screen for the optional Baptism follow-up (#1680): the event lead addresses and the names passed on. Only people
  * `resolveClubOversight` admits (system administrators, Event Admins, the Clubs Administrator), checked on the server, and the
- * save route checks again. A system administrator turns the module on from the event features page.
+ * routes check again. The same people (and an Area Coordinator from their own page) switch the module on or off here.
  */
 export default async function BaptismFollowUpPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const requested = (await searchParams).event;
@@ -44,6 +45,7 @@ export default async function BaptismFollowUpPage({ searchParams }: { searchPara
       </section>
     );
   }
+  const endpoint = `/api/events/${encodeURIComponent(event.id)}/baptism-follow-up`;
   return (
     <section className="page-stack">
       <div className="panel page-stack">
@@ -51,26 +53,26 @@ export default async function BaptismFollowUpPage({ searchParams }: { searchPara
         <p className="field-help">
           An optional tool. When a club names someone for baptism on its registration, the event lead and the club&apos;s church pastor each get one short email with the name, the club,
           the event and its dates, asking them to follow up. Each name is sent once, and nothing else about the person is included.
-          It starts off for every event; a system administrator turns it on from the event features page.
+          Staff then mark each name followed up and may keep a note with it. It starts off for every event; an event administrator, the Clubs Administrator or a system administrator turns it on here.
         </p>
         {state.enabled ? (
           <>
             <p className="field-help" role="status">Baptism follow-up is on for this event.</p>
-            <BaptismFollowUpPanel endpoint={`/api/events/${encodeURIComponent(event.id)}/baptism-follow-up`} initialEmails={state.leadEmails} />
+            <BaptismFollowUpPanel endpoint={endpoint} initialEmails={state.leadEmails} />
             {state.leadEmails.length === 0 && <p className="field-help">No event lead is set, so no notices are sent. Add an address above.</p>}
+            <BaptismFollowUpSwitch enabled endpoint={endpoint} />
           </>
         ) : (
-          <p className="field-help" role="status">Baptism follow-up is off for this event, so no notices are sent.{" "}
-            {systemAdmin
-              ? <Link className="text-button" href={`/more/features?event=${encodeURIComponent(event.id)}`}>Turn it on from the event features page</Link>
-              : "A system administrator can turn it on from the event features page."}
-          </p>
+          <>
+            <p className="field-help" role="status">Baptism follow-up is off for this event, so no notices are sent.</p>
+            <BaptismFollowUpSwitch enabled={false} endpoint={endpoint} />
+          </>
         )}
       </div>
       {state.enabled && (
         <div className="panel page-stack">
           <h2>Names passed on</h2>
-          <BaptismFollowUpList canAddPastor={systemAdmin} clubs={state.clubs} />
+          <BaptismFollowUpList canAddPastor={systemAdmin} clubs={state.clubs} statusEndpoint={endpoint} />
         </div>
       )}
     </section>

@@ -1,6 +1,7 @@
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import type { BaptismClubRow } from "@/modules/baptism-follow-up/settings";
 import Link from "next/link";
+import { BaptismFollowUpStatus } from "@/components/baptism-follow-up-status";
 import styles from "@/components/baptism-follow-up.module.css";
 
 function notifiedOn(iso: string) {
@@ -8,10 +9,11 @@ function notifiedOn(iso: string) {
 }
 
 /**
- * The names passed on, by club (#1680). Read only: name, club, the date the notice was queued and who it went to. A club with no
+ * The names passed on, by club (#1680): name, club, the date the notice was queued and who it went to, then each name's followed-up
+ * status and note, with a small form to change them when `statusEndpoint` is given (the server decides who may save). A club with no
  * pastor on file says so, so staff can ask the church office to add one. Plain words, never colour alone. A list, so it reads on a phone.
  */
-export function BaptismFollowUpList({ clubs, canAddPastor = false }: { clubs: BaptismClubRow[]; canAddPastor?: boolean }) {
+export function BaptismFollowUpList({ clubs, canAddPastor = false, statusEndpoint }: { clubs: BaptismClubRow[]; canAddPastor?: boolean; statusEndpoint?: string }) {
   const withNames = clubs.filter((club) => club.names.length > 0);
   const noPastor = clubs.filter((club) => !club.pastorOnFile);
   return (
@@ -29,8 +31,9 @@ export function BaptismFollowUpList({ clubs, canAddPastor = false }: { clubs: Ba
                 </div>
                 <ul className={styles.names}>
                   {club.names.map((name) => (
-                    <li key={name.displayName}>
-                      <span translate="no">{name.displayName}</span>: notified {notifiedOn(name.notifiedAt)}, sent to {name.recipients === "lead" ? "the event lead" : "the event lead and the pastor"}
+                    <li key={name.id}>
+                      <span><span translate="no">{name.displayName}</span>: notified {notifiedOn(name.notifiedAt)}, sent to {name.recipients === "lead" ? "the event lead" : "the event lead and the pastor"}</span>
+                      <BaptismFollowUpStatus endpoint={statusEndpoint} id={name.id} initial={{ followedUpAt: name.followedUpAt, note: name.note }} name={name.displayName} />
                     </li>
                   ))}
                 </ul>

@@ -39,6 +39,10 @@ const WRITE_ROUTES: Record<string, { gate: string; actingStaff: "allowed" | "ref
   "events/[eventId]/staffing/route.ts": { gate: "requireAreaCoordinatorStaffingToggleActor", actingStaff: "refused" },
   "events/[eventId]/staffing/activities/route.ts": { gate: "requireAreaCoordinatorStaffingActor", actingStaff: "refused" },
   "events/[eventId]/staffing/assignments/route.ts": { gate: "requireAreaCoordinatorStaffingActor", actingStaff: "refused" },
+  // Baptism follow-up (#1680): the switch, the lead addresses and each name's status all use the shared tool-switch check.
+  "events/[eventId]/baptism-follow-up/route.ts": { gate: "requireAreaCoordinatorToggleActor", actingStaff: "refused" },
+  "events/[eventId]/baptism-follow-up/settings/route.ts": { gate: "requireAreaCoordinatorToggleActor", actingStaff: "refused" },
+  "events/[eventId]/baptism-follow-up/[followUpId]/route.ts": { gate: "requireAreaCoordinatorToggleActor", actingStaff: "refused" },
   "events/[eventId]/club-teachers/route.ts": { gate: "requireAreaCoordinatorTeacherActor", actingStaff: "refused" },
   "events/[eventId]/event-scoring/route.ts": { gate: "requireAreaCoordinatorScoringActor", actingStaff: "refused" },
   "events/[eventId]/inspections/route.ts": { gate: "requireAreaCoordinatorScoringActor", actingStaff: "refused" },
