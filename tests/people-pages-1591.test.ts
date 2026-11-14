@@ -87,7 +87,7 @@ function person(over: Partial<PersonDetail> = {}): PersonDetail {
     areaCoordinator: false,
     staff: { status: "ACTIVE", signInDisabled: false, displayName: "Sample Person", jobTitle: "", phone: "", bio: "", twoStep: "On", lastSignedInAt: null },
     account: { status: "ACTIVE", signInDisabled: false, emailVerified: true, twoStep: "On", lastSignedInAt: null },
-    events: [{ membershipId: "m-1", eventId: "e-1", eventName: "Synthetic Event One", role: "READ_ONLY_STAFF", active: true, healthInformation: true, finalizeInvoices: false }],
+    events: [{ membershipId: "m-1", eventId: "e-1", eventName: "Synthetic Event One", role: "READ_ONLY_STAFF", active: true, healthInformation: true, finalizeInvoices: false, registrationOverride: false }],
     clubs: [{ grantId: "g-1", organizationId: "o-1", clubName: "Synthetic Club", role: "DIRECTOR", status: "active", effectiveFrom: "2026-01-01T00:00:00.000Z" }],
     ...over,
   };
@@ -248,7 +248,7 @@ describe("/admin/people/[kind]/[id] (#1591)", () => {
       grantId: `g-${index}`, organizationId: `o-${index}`, clubName: `Synthetic Club ${index + 1}`, role: "DIRECTOR", status: "active" as const, effectiveFrom: "2026-01-01T00:00:00.000Z",
     }));
     const events = Array.from({ length: 12 }, (_, index) => ({
-      membershipId: `m-${index}`, eventId: `e-${index}`, eventName: `Synthetic Event ${index + 1}`, role: "READ_ONLY_STAFF", active: true, healthInformation: index % 2 === 0, finalizeInvoices: index % 3 === 0,
+      membershipId: `m-${index}`, eventId: `e-${index}`, eventName: `Synthetic Event ${index + 1}`, role: "READ_ONLY_STAFF", active: true, healthInformation: index % 2 === 0, finalizeInvoices: index % 3 === 0, registrationOverride: false,
     }));
     mocks.getPersonDetail.mockResolvedValue(person({ clubs, events }));
     const html = await renderPerson();

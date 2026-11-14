@@ -116,5 +116,9 @@ A `SIGNATURE` form field records a typed name against the exact statement shown,
   VIEW_SENSITIVE_DATA, decided on the server.
 - **Left out of:** the attendee roster file, other exports, the registration PDF, notification emails, confirmation summaries and
   saved drafts. Amendments keep the stored name; staff acting as a director cannot sign for them.
+- **Staff finishing a registration for the registrant (#1510):** staff cannot sign for someone, so a typed-signature answer is
+  dropped and not required on that submit, and no signature row is written. Acknowledgments are recorded in the same transaction as
+  paper evidence (with where the paper is kept) for a paper source, or as staff-entered for a phone call or walk-in, naming the
+  staff user, never as the registrant's own online consent. The metadata has no user agent and no IP.
 
 Verified by `npm run test:signatures` (real PostgreSQL, wired into CI) and `tests/signature-*.test.ts`.

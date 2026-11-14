@@ -56,6 +56,9 @@ enum EventPermission {
   FINALIZE_INVOICES
   /// Enter the kitchen's own meal counts (#1029). Carried by the Kitchen staff role and Event Admin; opens no registration or people page.
   MANAGE_KITCHEN_COUNTS
+  /// Sending a phone, paper or walk-in registration past a closed or full event, with a reason (#1510). Never part
+  /// of a role, Event Admin included: a system administrator has it everywhere and grants it one membership at a time.
+  OVERRIDE_REGISTRATION_RULES
 }
 
 enum MembershipStatus {
@@ -1046,6 +1049,7 @@ model User {
   createdStaffRegistrationDrafts     StaffRegistrationDraft[]     @relation("StaffRegistrationDraftCreatedBy")
   updatedStaffRegistrationDrafts     StaffRegistrationDraft[]     @relation("StaffRegistrationDraftUpdatedBy")
   handedOffStaffRegistrationDrafts   StaffRegistrationDraft[]     @relation("StaffRegistrationDraftHandedOffBy")
+  submittedStaffRegistrationDrafts   StaffRegistrationDraft[]     @relation("StaffRegistrationDraftSubmittedBy")
   enteredClubFormSubmissions         ClubFormSubmission[]         @relation("ClubFormSubmissionEnteredByUser")
   verifiedBillingContacts      OrganizationBillingContact[]              @relation("BillingContactVerifiedBy")
   createdBillingContacts       OrganizationBillingContact[]              @relation("BillingContactCreatedBy")
@@ -5750,6 +5754,8 @@ model StaffRegistrationDraft {
   handOffExpiresAt  DateTime?
   handedOffAt       DateTime?
   handedOffByUserId String?
+  /// The staff user who sent the registration themselves (#1510); null when the registrant submitted it.
+  submittedByUserId String?
   /// The outbox message that carries the link, for delivery-time minting.
   handOffMessageId  String?                      @unique
   /// The registration the registrant's submit created; the provenance link.
@@ -5765,6 +5771,7 @@ model StaffRegistrationDraft {
   createdBy    User                    @relation("StaffRegistrationDraftCreatedBy", fields: [createdByUserId], references: [id])
   updatedBy    User                    @relation("StaffRegistrationDraftUpdatedBy", fields: [updatedByUserId], references: [id])
   handedOffBy  User?                   @relation("StaffRegistrationDraftHandedOffBy", fields: [handedOffByUserId], references: [id], onDelete: SetNull)
+  submittedBy  User?                   @relation("StaffRegistrationDraftSubmittedBy", fields: [submittedByUserId], references: [id], onDelete: SetNull)
   registration Registration?           @relation(fields: [registrationId], references: [id], onDelete: SetNull)
 
   @@index([eventId, status, updatedAt])

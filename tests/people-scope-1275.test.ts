@@ -55,7 +55,7 @@ const person: PersonDetail = {
   areaCoordinator: false,
   staff: { status: "ACTIVE", signInDisabled: false, displayName: "Sample Person", jobTitle: "", phone: "", bio: "", twoStep: "On", lastSignedInAt: null },
   account: { status: "ACTIVE", signInDisabled: false, emailVerified: false, twoStep: "On", lastSignedInAt: null },
-  events: [{ membershipId: "m-1", eventId: "e-1", eventName: "Synthetic Event One", role: "READ_ONLY_STAFF", active: true, healthInformation: false, finalizeInvoices: false }],
+  events: [{ membershipId: "m-1", eventId: "e-1", eventName: "Synthetic Event One", role: "READ_ONLY_STAFF", active: true, healthInformation: false, finalizeInvoices: false, registrationOverride: false }],
   clubs: [
     { grantId: "g-1", organizationId: "o-1", clubName: "Synthetic Club", role: "DIRECTOR", status: "active", effectiveFrom: "2026-01-01T00:00:00.000Z" },
     { grantId: "g-2", organizationId: "o-1", clubName: "Synthetic Club", role: "DEPUTY", status: "scheduled", effectiveFrom: "2027-02-03T00:00:00.000Z" },

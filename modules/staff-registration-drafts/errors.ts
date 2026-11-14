@@ -7,7 +7,8 @@ export type StaffDraftErrorCode =
   | "FORM_CHANGED"
   | "EMAIL_REQUIRED"
   | "REGISTRATION_NOT_OPEN"
-  | "EMAIL_NOT_CONFIGURED";
+  | "EMAIL_NOT_CONFIGURED"
+  | "OVERRIDE_NOT_ALLOWED";
 
 const statusByCode: Record<StaffDraftErrorCode, number> = {
   DRAFT_NOT_FOUND: 404,
@@ -19,6 +20,7 @@ const statusByCode: Record<StaffDraftErrorCode, number> = {
   EMAIL_REQUIRED: 422,
   REGISTRATION_NOT_OPEN: 409,
   EMAIL_NOT_CONFIGURED: 503,
+  OVERRIDE_NOT_ALLOWED: 403,
 };
 
 export class StaffDraftError extends Error {

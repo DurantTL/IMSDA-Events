@@ -34,8 +34,8 @@ export default async function StaffDraftsPage({ searchParams }: { searchParams: 
           <p className="eyebrow">Registration</p>
           <h2>Phone and paper registrations</h2>
           <p>
-            Start a registration for someone who called, mailed a paper form or came to the door. The registrant finishes it, so
-            their consents, signatures and health answers are theirs.
+            Start a registration for someone who called, mailed a paper form or came to the door. Send it to the registrant to
+            finish, or finish it yourself for a phone, paper or walk-in registration.
           </p>
         </div>
       </div>

@@ -11,6 +11,7 @@ import { rolePermissions } from "@/modules/access/permissions";
 import { clubEventIdsAdministeredAsClubsAdministrator, clubsAdministratorPermissions } from "@/modules/access/club-event-access";
 import { stripHealthAccess } from "@/modules/coordinator-health/membership-grants";
 import { stripInvoiceFinalizationAccess } from "@/modules/invoices/finalize-access";
+import { stripRegistrationOverrideAccess } from "@/modules/staff-registration-drafts/override-access";
 
 export class MembershipOperationError extends Error {
   constructor(
@@ -196,6 +197,8 @@ export async function assignEventMembership(
   if (existing) await stripHealthAccess(tx, existing, actorUserId, "RE_ADDED");
   // Nor does permission to finalize invoices (#167).
   if (existing) await stripInvoiceFinalizationAccess(tx, existing, actorUserId, "RE_ADDED");
+  // Nor does permission to override registration rules (#1510).
+  if (existing) await stripRegistrationOverrideAccess(tx, existing, actorUserId, "RE_ADDED");
   const membership = existing
     ? await tx.eventMembership.update({ where: { id: existing.id }, data: { role: input.role, status: "ACTIVE" } })
     : await tx.eventMembership.create({ data: { eventId, userId: user.userId, role: input.role, status: "ACTIVE" } });
@@ -247,6 +250,7 @@ export async function updateStaffMembership(eventId: string, membershipId: strin
       await stripHealthAccess(tx, current, actorUserId, reason);
       // The same for permission to finalize invoices (#167): only a system administrator grants it again.
       await stripInvoiceFinalizationAccess(tx, current, actorUserId, reason);
+      await stripRegistrationOverrideAccess(tx, current, actorUserId, reason);
     }
     const updated = await tx.eventMembership.update({ where: { id: current.id }, data: input });
     await writeAuditLog({

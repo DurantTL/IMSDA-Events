@@ -3,6 +3,7 @@ import { draftDefinition } from "./support/staff-draft-definition";
 
 const mocks = vi.hoisted(() => ({
   checkPublicRegistration: vi.fn(),
+  submitPublicRegistration: vi.fn(),
   processAccountEmailQueue: vi.fn(),
   draftCreate: vi.fn(),
   draftUpdate: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock("@/modules/communications/account-email", () => ({
 vi.mock("@/modules/forms/public-repository", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/modules/forms/public-repository")>()),
   checkPublicRegistration: mocks.checkPublicRegistration,
+  submitPublicRegistration: mocks.submitPublicRegistration,
 }));
 
 import { hashOpaqueToken } from "@/modules/access/tokens";
@@ -48,6 +50,7 @@ import { PublicRegistrationError } from "@/modules/forms/public-repository";
 import {
   checkStaffDraft,
   createStaffDraft,
+  submitStaffDraft,
   discardStaffDraft,
   handOffStaffDraft,
   resolveStaffDraftLink,
@@ -304,5 +307,20 @@ describe("checking a staff draft (#1510)", () => {
     expect(await checkStaffDraft("event-1", "draft-1", "staff-1")).toMatchObject({ ok: false, kind: "UNAVAILABLE" });
     mocks.formFindFirst.mockResolvedValue(publishedForm({ versionId: "v2" }));
     await expect(checkStaffDraft("event-1", "draft-1", "staff-1")).rejects.toMatchObject({ code: "FORM_CHANGED", message: "The form changed; reopen the draft." });
+  });
+});
+
+describe("submitStaffDraft keeps the registrant's private link out of what staff see (#1510)", () => {
+  it("drops the manage link fields and keeps the rest of the confirmation", async () => {
+    mocks.draftFindFirst.mockResolvedValue({ form: { slug: "camp" }, event: { slug: "synthetic-camp" } });
+    mocks.submitPublicRegistration.mockResolvedValue({
+      confirmationCode: "REG-SYNTHETIC",
+      managePath: "/manage/synthetic-token",
+      manageLinkExpiresAt: "2027-01-01T00:00:00.000Z",
+      totalCents: 7_500,
+    });
+    const result = await submitStaffDraft("event-1", "draft-1", { userId: "staff-1", canOverride: false }, { input: { versionId: "v1", idempotencyKey: "3f2b8c1e-5a4d-4e7b-9c6a-1d2e3f4a5b6c", responses: {} }, paperLocation: null, override: null });
+    expect(result).toEqual({ confirmationCode: "REG-SYNTHETIC", totalCents: 7_500 });
+    expect(JSON.stringify(result)).not.toContain("synthetic-token");
   });
 });

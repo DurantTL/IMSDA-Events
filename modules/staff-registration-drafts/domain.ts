@@ -32,6 +32,11 @@ export const STAFF_DRAFT_STATUS_LABELS: Record<StaffDraftStatus, string> = {
   DISCARDED: "Discarded",
 };
 
+/** The status in words (#1510): a registration staff sent themselves names the staff member; a registrant's own submit does not. */
+export function staffDraftStatusLabel(status: StaffDraftStatus, submittedByStaffName: string | null | undefined) {
+  return status === "SUBMITTED" && submittedByStaffName ? `Sent by staff (${submittedByStaffName})` : STAFF_DRAFT_STATUS_LABELS[status];
+}
+
 /** The private link works for 14 days, the same window as a browser draft. */
 export const STAFF_DRAFT_LINK_LIFETIME_DAYS = 14;
 const dayMilliseconds = 24 * 60 * 60 * 1000;

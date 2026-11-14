@@ -15,7 +15,7 @@ import {
   HAND_LINK_REASON_LABELS,
   type HandLinkReasonCode,
 } from "@/modules/account-merge/hand-link-reasons";
-import { eventRoles, type EventRole } from "@/modules/access/permissions";
+import { eventRoles, rolePermissions, type EventRole } from "@/modules/access/permissions";
 import { roleLabel } from "@/modules/access/role-display";
 import { RoleDetails } from "@/components/role-details";
 import { systemRoleText } from "@/modules/access/role-descriptions";
@@ -236,6 +236,7 @@ export type EventMembershipView = {
   active: boolean;
   healthInformation: boolean;
   finalizeInvoices: boolean;
+  registrationOverride: boolean;
 };
 
 /** One event membership: role and access (removal keeps the row as inactive), plus the two extras. */
@@ -260,7 +261,7 @@ export function EventMembershipControls({ membership, targetIsSystemAdministrato
     }, "The staff assignment could not be updated.");
   }
 
-  async function extra(path: "health-access" | "invoice-finalization-access", granted: boolean, label: string) {
+  async function extra(path: "health-access" | "invoice-finalization-access" | "registration-override-access", granted: boolean, label: string) {
     await run(async () => {
       await callJson(`${base}/${path}`, { method: "PUT", json: { granted } }, `${label} could not be changed.`);
       return `${label} ${granted ? "given to" : "removed from"} ${name} for ${membership.eventName}.`;
@@ -298,6 +299,7 @@ export function EventMembershipControls({ membership, targetIsSystemAdministrato
             type="button"
           >
             {membership.healthInformation ? "Remove health information" : "Give health information"}
+            <span className="sr-only"> for {membership.eventName}</span>
           </button>
           {membership.active ? (
             <button
@@ -308,6 +310,19 @@ export function EventMembershipControls({ membership, targetIsSystemAdministrato
               type="button"
             >
               {membership.finalizeInvoices ? "Remove finalize invoices" : "Give finalize invoices"}
+              <span className="sr-only"> for {membership.eventName}</span>
+            </button>
+          ) : null}
+          {membership.active && (membership.registrationOverride || (rolePermissions[membership.role as EventRole] ?? []).includes("MANAGE_REGISTRATION")) ? (
+            <button
+              aria-pressed={membership.registrationOverride}
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => void extra("registration-override-access", !membership.registrationOverride, "Permission for registration overrides")}
+              type="button"
+            >
+              {membership.registrationOverride ? "Remove registration overrides" : "Give registration overrides"}
+              <span className="sr-only"> for {membership.eventName}</span>
             </button>
           ) : null}
         </div>

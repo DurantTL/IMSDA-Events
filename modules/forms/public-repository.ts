@@ -50,9 +50,12 @@ import {
   evaluateEventRegistrationPhase,
   hasEventEnded,
   registrationClosedMessage,
+  decideEventCapacity,
+  remainingEventCapacity,
   type CapacityDecision,
   type EventRegistrationPhase,
 } from "@/modules/events/lifecycle";
+import { effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { issueRegistrationAccessToken } from "@/modules/public-access/repository";
 import { logError } from "@/lib/logger";
 import { groupFormDefinition } from "@/modules/group-registrations/domain";
@@ -78,7 +81,7 @@ import { matchLegacyAttendeeTypeAnswer } from "@/modules/attendee-types/legacy-a
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { recordRegistrationDeclarations } from "@/modules/guardian-authority/repository";
 import { AcknowledgmentError, loadAcknowledgmentDisplayContent, recordSubmissionAcknowledgments } from "@/modules/acknowledgments/repository";
-import { acknowledgmentFields } from "@/modules/acknowledgments/domain";
+import { acknowledgmentFields, normalizePaperLocation, planAcknowledgments } from "@/modules/acknowledgments/domain";
 import { signatureFields } from "@/modules/signatures/fields";
 import { recordSubmissionSignatures } from "@/modules/signatures/repository";
 import type { AcknowledgmentDisplay } from "@/modules/acknowledgments/domain";
@@ -118,7 +121,9 @@ export type PublicRegistrationErrorCode =
   /** The private link from a registration staff started (#1510) was used, withdrawn or has expired. */
   | "STAFF_DRAFT_LINK_UNAVAILABLE"
   /** The registration behind that link was already sent. */
-  | "STAFF_DRAFT_ALREADY_SUBMITTED";
+  | "STAFF_DRAFT_ALREADY_SUBMITTED"
+  /** Staff sent a draft that does not exist for this event and form, or was discarded (#1510). */
+  | "STAFF_DRAFT_UNAVAILABLE";
 
 /**
  * A club registration (#358) runs through this same transaction so it gets the
@@ -249,12 +254,59 @@ export class PublicRegistrationError extends Error {
     message: string,
     public readonly issues: PublicRegistrationIssue[] = [],
     /** Set for a lodging roommate lookup that found nobody, so the route can audit it outside the rolled-back transaction. */
-    public readonly meta: { roommateMiss?: boolean; eventId?: string } = {},
+    public readonly meta: { roommateMiss?: boolean; eventId?: string; overridable?: boolean } = {},
   ) {
     super(message);
     this.name = "PublicRegistrationError";
   }
+
+  /**
+   * True when a staff submit or check (#1510) was refused by a rule that someone holding the registration override
+   * permission can go past with a reason: `code` names the rule (REGISTRATION_NOT_OPEN, REGISTRATION_CLOSED or EVENT_FULL).
+   * Never true on the public or hand-off path.
+   */
+  get overridable() {
+    return this.meta.overridable === true;
+  }
 }
+
+/** The rules a staff override can go past (#1510), as recorded in the override audit row. */
+export const OVERRIDABLE_RULES = ["REGISTRATION_NOT_OPEN", "REGISTRATION_CLOSED", "EVENT_FULL"] as const;
+export type OverridableRule = (typeof OVERRIDABLE_RULES)[number];
+
+const overriddenRuleLabels: Record<OverridableRule, string> = {
+  REGISTRATION_NOT_OPEN: "registration not open yet",
+  REGISTRATION_CLOSED: "registration closed",
+  EVENT_FULL: "event full",
+};
+
+/**
+ * Staff finishing a phone, paper or walk-in registration themselves (#1510). `overrideAllowed` is the caller's
+ * OVERRIDE_REGISTRATION_RULES check; the transaction honors `override` only when it is true (the route checks too).
+ * The draft's own source (phone, paper or walk-in) is read from the locked draft row, never taken from the caller.
+ */
+export type StaffSubmitContext = {
+  draftId: string;
+  actorUserId: string;
+  /** Where the paper form is kept. Required when the draft's source is PAPER, refused otherwise. Never what it says. */
+  paperLocation: string | null;
+  override: { reason: string } | null;
+  overrideAllowed: boolean;
+};
+
+/**
+ * Whether a registration phase that is not open can be overridden by staff (#1510): only while the event has not ended and is
+ * not archived or in a closed-out state (complete, financial reconciliation, closed). A date that has not arrived or has
+ * passed, or registration closed by hand, can be; an ended or closed-out event never.
+ */
+export function staffOverridableClosedState(event: Parameters<typeof evaluateEventRegistrationPhase>[0], now: Date) {
+  if (event.archivedAt || hasEventEnded(event, now)) return false;
+  const state = effectiveLifecycleState(event);
+  return state !== "COMPLETE" && state !== "FINANCIAL_RECONCILIATION" && state !== "CLOSED" && state !== "ARCHIVED";
+}
+
+const staffCardPaymentMessage = "Staff can't choose card payment for the registrant. Choose another payment option.";
+const staffDraftUnavailableMessage = "That registration isn't available to send. It may have been discarded.";
 
 type PricingSnapshot = {
   currency: "USD";
@@ -847,8 +899,11 @@ async function createPublicRegistrationTransaction(
   bulk: BulkSubmissionContext | undefined,
   requestContext: SubmissionRequestContext | undefined,
   notifications: { staffCopyEnabled: boolean; notifyApprovers: boolean; formNotificationsEnabled: boolean; existingClubIds: ReadonlySet<string> },
-  /** `checkOnly` (#1510): run every step, then roll everything back with the computed confirmation (see `checkPublicRegistration`). */
-  options: { checkOnly?: boolean } = {},
+  /**
+   * `checkOnly` (#1510): run every step, then roll everything back with the computed confirmation (see `checkPublicRegistration`).
+   * `staff` (#1510): staff finish a draft for the registrant (see `StaffSubmitContext`).
+   */
+  options: { checkOnly?: boolean; staff?: StaffSubmitContext } = {},
 ) {
   const group = bulk && "group" in bulk ? bulk : undefined;
   const club = bulk && !("group" in bulk) ? bulk : undefined;
@@ -920,7 +975,53 @@ async function createPublicRegistrationTransaction(
   // A registration staff started (#1510): the draft is checked after the replay, so the same key still replays, and a new
   // key on a draft already sent is refused here rather than creating a second registration. A check never touches drafts.
   let staffDraftId: string | null = null;
-  if (input.staffDraftToken && !options.checkOnly) {
+  let staffDraft: { source: "PHONE" | "PAPER" | "WALK_IN"; handOffMessageId: string | null } | null = null;
+  const staff = options.checkOnly ? undefined : options.staff;
+  if (staff) {
+    // Staff send the draft themselves: never together with the registrant's link, and never on a club or group registration.
+    if (bulk || input.staffDraftToken) throw new PublicRegistrationError("STAFF_DRAFT_UNAVAILABLE", staffDraftUnavailableMessage);
+    await tx.$queryRaw`SELECT "id" FROM "StaffRegistrationDraft" WHERE "id" = ${staff.draftId} FOR UPDATE`;
+    const draft = await tx.staffRegistrationDraft.findUnique({
+      where: { id: staff.draftId },
+      select: { id: true, eventId: true, formId: true, status: true, source: true, handOffMessageId: true },
+    });
+    if (!draft || draft.eventId !== form.eventId || draft.formId !== form.id) {
+      throw new PublicRegistrationError("STAFF_DRAFT_UNAVAILABLE", staffDraftUnavailableMessage);
+    }
+    if (draft.status === "SUBMITTED") {
+      throw new PublicRegistrationError("STAFF_DRAFT_ALREADY_SUBMITTED", staffDraftAlreadySubmittedMessage);
+    }
+    if (draft.status !== "OPEN" && draft.status !== "HANDED_OFF") {
+      throw new PublicRegistrationError("STAFF_DRAFT_UNAVAILABLE", staffDraftUnavailableMessage);
+    }
+    staffDraftId = draft.id;
+    staffDraft = { source: draft.source, handOffMessageId: draft.handOffMessageId };
+  }
+  // Paper evidence records where the paper is kept. Any other source records none and refuses one here; a paper source's
+  // location is checked once the acknowledgments are known (it is needed only when one is recorded).
+  const staffAcknowledgmentChannel = staffDraft ? (staffDraft.source === "PAPER" ? "PAPER" as const : "STAFF_ENTERED" as const) : null;
+  const paperLocationError = (message: string) => new PublicRegistrationError("INVALID_SUBMISSION", message, [{
+    kind: "validation",
+    code: "INVALID_RESPONSE",
+    fieldId: null,
+    key: "paperLocation",
+    path: "paperLocation",
+    attendeeIndex: null,
+    message,
+  }]);
+  if (staff && staffAcknowledgmentChannel === "STAFF_ENTERED") {
+    const stray = normalizePaperLocation("STAFF_ENTERED", staff.paperLocation);
+    if (!stray.ok) throw paperLocationError(stray.message);
+  }
+  // Overrides go past only the rules in OVERRIDABLE_RULES, only on a staff submit, only with the permission and a reason.
+  const overrideHonored = Boolean(staff?.override && staff.overrideAllowed);
+  const overriddenRules: OverridableRule[] = [];
+  const noteOverride = (rule: OverridableRule) => {
+    if (!overriddenRules.includes(rule)) overriddenRules.push(rule);
+  };
+  // A staff submit or check refused by one of those rules says so, so staff can be offered the override (#1510).
+  const staffFlow = Boolean(staff) || Boolean(options.checkOnly);
+  if (input.staffDraftToken && !options.checkOnly && !staff) {
     if (bulk) throw new PublicRegistrationError("STAFF_DRAFT_LINK_UNAVAILABLE", staffDraftLinkUnavailableMessage);
     const locked = await tx.$queryRaw<Array<{ id: string }>>`
       SELECT "id" FROM "StaffRegistrationDraft"
@@ -998,13 +1099,21 @@ async function createPublicRegistrationTransaction(
   const assertRegistrationOpen = (source: typeof form.event, locationName?: string) => {
     const subject = locationName ?? "this event";
     const sourcePhase = evaluateEventRegistrationPhase(source, now);
+    // An event that has ended, is archived or is in a closed-out state is never overridable; a date or manual close is.
+    const overridable = staffFlow && staffOverridableClosedState(source, now);
     if (sourcePhase === "UPCOMING") {
       const opening = form.event.registrationOpensOn
         ? ` Registration opens on ${form.event.registrationOpensOn} in the event timezone.`
         : "";
+      if (overrideHonored && overridable) {
+        noteOverride("REGISTRATION_NOT_OPEN");
+        return;
+      }
       throw new PublicRegistrationError(
         "REGISTRATION_NOT_OPEN",
-        `Registration for ${subject} is not open yet.${opening}`
+        `Registration for ${subject} is not open yet.${opening}`,
+        [],
+        overridable ? { overridable: true } : {},
       );
     }
     if (sourcePhase === "CLOSED" && hasEventEnded(source, now)) {
@@ -1017,9 +1126,15 @@ async function createPublicRegistrationTransaction(
       const closing = source.registrationClosesOn
         ? ` Registration closed after ${source.registrationClosesOn} in the event timezone.`
         : "";
+      if (overrideHonored && overridable) {
+        noteOverride("REGISTRATION_CLOSED");
+        return;
+      }
       throw new PublicRegistrationError(
         "REGISTRATION_CLOSED",
-        `Registration for ${subject} is closed.${closing}`
+        `Registration for ${subject} is closed.${closing}`,
+        [],
+        overridable ? { overridable: true } : {},
       );
     }
     if (sourcePhase !== "OPEN") {
@@ -1081,14 +1196,26 @@ async function createPublicRegistrationTransaction(
     { occupied, requested: requestedAttendees },
     now
   );
-  if (admission.capacityDecision === "FULL") {
-    const remaining = admission.remainingSpots ?? 0;
-    throw new PublicRegistrationError(
-      "EVENT_FULL",
-      `Only ${remaining} attendee spot${remaining === 1 ? "" : "s"} remain for this event, and its waitlist is not enabled.`
-    );
+  // A phase rule that was overridden leaves the admission without a seat decision (it only decides while registration is
+  // open), so the seats are decided the same way here: a full event still waitlists, or is refused, as it would be open.
+  const capacityDecision = overriddenRules.length > 0
+    ? decideEventCapacity({ capacity: lifecycle.capacity, occupied, requested: requestedAttendees, waitlistEnabled: lifecycle.waitlistEnabled })
+    : admission.capacityDecision;
+  if (capacityDecision === "FULL") {
+    if (overrideHonored) {
+      noteOverride("EVENT_FULL");
+    } else {
+      // From the capacity itself, so the count is real whether or not a phase rule was overridden first.
+      const remaining = remainingEventCapacity(lifecycle.capacity, occupied) ?? 0;
+      throw new PublicRegistrationError(
+        "EVENT_FULL",
+        `Only ${remaining} attendee spot${remaining === 1 ? "" : "s"} remain for this event, and its waitlist is not enabled.`,
+        [],
+        staffFlow ? { overridable: true } : {},
+      );
+    }
   }
-  const isWaitlisted = admission.capacityDecision === "WAITLIST" || locationWaitlisted;
+  const isWaitlisted = capacityDecision === "WAITLIST" || locationWaitlisted;
   const reservations = isWaitlisted
     ? []
     : await tx.registrationCapacityReservation.findMany({
@@ -1103,16 +1230,18 @@ async function createPublicRegistrationTransaction(
   // What the form as published says about payment, kept before the definition may be rebound without its online
   // choices: the deferral marker and the currency follow the form, not the stripped copy (#1405).
   const publishedPayment = definition.payment;
-  if (!isWaitlisted && definition.payment?.enabled && !onlineCardPaymentPossible({
+  // Staff never choose card payment for the registrant (#1510): the same path as card payment being unavailable, so nothing is
+  // charged and nothing is marked received, with its own message.
+  if (!isWaitlisted && definition.payment?.enabled && (Boolean(staff) || !onlineCardPaymentPossible({
     paymentEnabled: true,
     squareConfigured: getSquareConfiguration().paymentConfigured,
     billingMode: form.event.billingMode,
-  })) {
+  }))) {
     const paymentKey = definition.payment.paymentMethodFieldKey;
     if (onlinePaymentOptionValues(definition).includes(input.responses[paymentKey] as string)) {
       throw new PublicRegistrationError(
         "INVALID_SUBMISSION",
-        "Review the highlighted fields and submit again.",
+        staff ? staffCardPaymentMessage : "Review the highlighted fields and submit again.",
         [{
           kind: "validation",
           code: "INVALID_RESPONSE",
@@ -1120,7 +1249,7 @@ async function createPublicRegistrationTransaction(
           key: paymentKey,
           path: `responses.${paymentKey}`,
           attendeeIndex: null,
-          message: "Card payment is not available for this event right now. Choose another payment option.",
+          message: staff ? staffCardPaymentMessage : "Card payment is not available for this event right now. Choose another payment option.",
         }],
       );
     }
@@ -1139,9 +1268,14 @@ async function createPublicRegistrationTransaction(
   // is made without acknowledgments: any ticked answer is dropped, a required one is not asked for, and no evidence is recorded.
   // The acknowledgment stays "not acknowledged" until the director gives it, or staff record it on paper afterward.
   // The same goes for typed signatures (#1265): staff cannot sign for the director, so those answers are dropped and not required.
+  // Staff finishing a registration for the registrant (#1510) is the same for typed signatures only: staff cannot sign for them
+  // (#1265), so those answers are dropped and not required and no signature evidence is recorded. Acknowledgments stay required
+  // and are recorded below as paper or staff-entered.
   const actAsAcknowledgmentKeys = club?.submittedByUserId
     ? new Set([...acknowledgmentFields(definition), ...signatureFields(definition)].map((field) => field.key))
-    : new Set<string>();
+    : staff
+      ? new Set(signatureFields(definition).map((field) => field.key))
+      : new Set<string>();
   // A staff check (#1510) works like that: the answers a staff draft can never hold (medical, consent, signature, payment choice,
   // birth date, notes) are left out and not required, so the check can still reach pricing and show an estimate. Only when
   // `checkOnly` is set; a real submit asks for every one of them as before. With no payment choice, nothing is priced as card.
@@ -1172,6 +1306,21 @@ async function createPublicRegistrationTransaction(
       capacityIssue ? "One of your selections just became full. Review the highlighted choice and submit again." : "Review the highlighted fields and submit again.",
       prepared.issues
     );
+  }
+
+  // A paper source names where the paper is kept only when an acknowledgment is recorded from it (a visible, ticked one);
+  // otherwise the location is optional and ignored.
+  let staffPaperEvidenceLocation: string | null = null;
+  if (staff && staffAcknowledgmentChannel === "PAPER") {
+    const willRecord = planAcknowledgments(definition, {
+      registrationResponses: prepared.registrationResponses,
+      attendees: prepared.attendees.map((attendee) => ({ clientId: attendee.clientId, responses: attendee.responses })),
+    }).length > 0;
+    if (willRecord) {
+      const location = normalizePaperLocation("PAPER", staff.paperLocation);
+      if (!location.ok) throw paperLocationError(location.message);
+      staffPaperEvidenceLocation = location.value;
+    }
   }
 
   // "Responsible adult" for each minor (#131): decided from the submitted ages, never from the browser. Club and
@@ -1519,6 +1668,8 @@ async function createPublicRegistrationTransaction(
       eventId: form.eventId,
       registrationId: registration.id,
       actorPersonId: accountHolder.id,
+      // Staff typed these in for the registrant: the staff user is recorded beside the registrant (the source stays the form's).
+      ...(staff ? { recordedByUserId: staff.actorUserId } : {}),
       declarations: responsibleAdultPlan.declarations.map((declaration) => ({
         minorPersonId: personByClientId.get(declaration.minorKey)!,
         adultPersonId: declaration.adultKey ? personByClientId.get(declaration.adultKey)! : null,
@@ -1530,8 +1681,9 @@ async function createPublicRegistrationTransaction(
   // Staff acting as a director cannot acknowledge for them: evidence names a person who acknowledged, never a staff stand-in,
   // and recording it under the director would claim they said something they did not. Their answers were dropped above, so
   // an act-as registration records no evidence at all.
+  let acknowledgmentsRecorded = 0;
   try {
-    await recordSubmissionAcknowledgments(tx, {
+    const acknowledgmentOutcome = await recordSubmissionAcknowledgments(tx, {
       eventId: form.eventId,
       registrationId: registration.id,
       formVersionId: version.id,
@@ -1544,11 +1696,19 @@ async function createPublicRegistrationTransaction(
         responses: attendee.responses,
       })),
       actedByPersonId: accountHolder.id,
-      // Only the registrant's own online acknowledgment is recorded here; staff recording uses its own route.
-      channel: "ONLINE",
-      recordedByUserId: null,
+      // The registrant's own online acknowledgment, or, when staff finished the registration for them (#1510), never ONLINE:
+      // PAPER with the paper's location for a paper form, STAFF_ENTERED for a phone call or walk-in, named for the staff user.
+      // `actedByPersonId` stays the account holder, so a minor's acknowledgment still needs their declared responsible adult.
+      ...(staff && staffAcknowledgmentChannel
+        ? {
+            channel: staffAcknowledgmentChannel,
+            ...(staffAcknowledgmentChannel === "PAPER" ? { paperLocation: staffPaperEvidenceLocation } : {}),
+            recordedByUserId: staff.actorUserId,
+          }
+        : { channel: "ONLINE" as const, recordedByUserId: null }),
       submissionKey: input.idempotencyKey,
       acknowledgedAt: now,
+      // A staff submit passes no request context, so no user agent (a null hash) and no IP are recorded.
       requestMetadata: {
         userAgentHash: hashUserAgent(requestContext?.userAgent ?? null),
         formVersionId: version.id,
@@ -1556,6 +1716,7 @@ async function createPublicRegistrationTransaction(
       },
       event: { startsAt: form.event.startsAt, timezone: form.event.timezone, ageOfMajority: form.event.ageOfMajority },
     });
+    acknowledgmentsRecorded = acknowledgmentOutcome.recorded;
   } catch (error) {
     if (!(error instanceof AcknowledgmentError) || error.refusals.length === 0) throw error;
     const indexByClientId = new Map(prepared.attendees.map((attendee, position) => [attendee.clientId, position]));
@@ -1579,7 +1740,8 @@ async function createPublicRegistrationTransaction(
     );
   }
   // Typed-name signatures (#1265): the name, the exact statement, the moment and the trusted client IP, recorded with the
-  // registration or not at all. Staff acting as a director gave no signature answers (dropped above), so none is recorded.
+  // registration or not at all. Staff acting as a director, or finishing a registration for the registrant (#1510), gave no
+  // signature answers (dropped above), so none is recorded: staff cannot sign for someone.
   await recordSubmissionSignatures(tx, {
     eventId: form.eventId,
     registrationId: registration.id,
@@ -1727,7 +1889,61 @@ async function createPublicRegistrationTransaction(
     },
   });
 
-  if (staffDraftId) {
+  if (staffDraftId && staff && staffDraft) {
+    // Staff sent it themselves (#1510): the same link as below, plus the pending hand-off email withdrawn so an old message can
+    // never revive a link for a registration that now exists. The token's hash stays, so the link says "already sent".
+    if (staffDraft.handOffMessageId) {
+      await tx.messageOutbox.updateMany({ where: { id: staffDraft.handOffMessageId, status: "PENDING" }, data: { status: "CANCELLED" } });
+    }
+    await tx.staffRegistrationDraft.update({
+      where: { id: staffDraftId },
+      data: { status: "SUBMITTED", registrationId: registration.id, submittedAt: now, responses: {}, handOffExpiresAt: null, updatedByUserId: staff.actorUserId, submittedByUserId: staff.actorUserId },
+    });
+    // Counts, ids and states only: never an answer value.
+    await tx.auditLog.create({
+      data: {
+        eventId: form.eventId,
+        actorUserId: staff.actorUserId,
+        action: "STAFF_REGISTRATION_DRAFT_SUBMITTED_BY_STAFF",
+        entityType: "StaffRegistrationDraft",
+        entityId: staffDraftId,
+        correlationId: randomUUID(),
+        summary: `Staff sent the registration they started (${confirmationCode}) for the registrant.`,
+        metadata: {
+          registrationId: registration.id,
+          formVersionId: version.id,
+          source: staffDraft.source,
+          acknowledgmentChannel: staffAcknowledgmentChannel,
+          acknowledgmentCount: acknowledgmentsRecorded,
+          attendeeCount: createdAttendees.length,
+          registrationStatus: isWaitlisted ? "WAITLISTED" : "SUBMITTED",
+          overridden: overriddenRules.length > 0,
+          paymentCollected: false,
+        },
+      },
+    });
+    if (overriddenRules.length > 0 && staff.override) {
+      // Its own row, so overrides can be found and reviewed on their own. The summary names the rules; the reason is in the metadata.
+      await tx.auditLog.create({
+        data: {
+          eventId: form.eventId,
+          actorUserId: staff.actorUserId,
+          action: "REGISTRATION_RULE_OVERRIDDEN",
+          entityType: "Registration",
+          entityId: registration.id,
+          correlationId: randomUUID(),
+          summary: `Registration ${confirmationCode} was sent past a rule by staff: ${overriddenRules.map((rule) => overriddenRuleLabels[rule]).join(", ")}.`,
+          metadata: {
+            rules: overriddenRules,
+            reason: staff.override.reason,
+            draftId: staffDraftId,
+            source: staffDraft.source,
+            paymentCollected: false,
+          },
+        },
+      });
+    }
+  } else if (staffDraftId) {
     // The provenance link (#1510): same transaction as the registration, so it is linked or it does not exist. The answers
     // and the token are dropped; the token's hash stays so a repeat is told it was already sent.
     await tx.staffRegistrationDraft.update({
@@ -1874,7 +2090,7 @@ async function createPublicRegistrationTransaction(
   await tx.auditLog.create({
     data: {
       eventId: form.eventId,
-      actorUserId: club?.submittedByUserId ?? club?.auditActorUserId ?? null,
+      actorUserId: club?.submittedByUserId ?? club?.auditActorUserId ?? staff?.actorUserId ?? null,
       action: club
         ? "CLUB_REGISTRATION_SUBMITTED"
         : group ? "GROUP_REGISTRATION_SUBMITTED"
@@ -1895,7 +2111,8 @@ async function createPublicRegistrationTransaction(
         discountAmountCents:
           admittedCalculation.discountAmountCents ?? 0,
         attendeeCount: createdAttendees.length,
-        capacityDecision: admission.capacityDecision,
+        capacityDecision: capacityDecision === "FULL" ? "REGISTER" : capacityDecision,
+        ...(staff ? { submittedByStaffUserId: staff.actorUserId, staffDraftId, ...(overriddenRules.length > 0 ? { overriddenRules } : {}) } : {}),
         waitlistPosition,
         paymentEligible: !isWaitlisted,
         paymentCollected: false,
@@ -2032,6 +2249,8 @@ export async function submitPublicRegistration(
   now = new Date(),
   bulk?: BulkSubmissionContext,
   requestContext?: SubmissionRequestContext,
+  /** Staff finishing a draft for the registrant (#1510); absent on every public, club and group submission. */
+  staff?: StaffSubmitContext,
 ) {
   const prisma = getPrisma();
   // Read before any transaction opens (#1016): a read inside one would need a second pool connection.
@@ -2054,7 +2273,7 @@ export async function submitPublicRegistration(
   for (let attempt = 0; attempt < submitAttempts; attempt += 1) {
     try {
       const result = await prisma.$transaction(
-        (tx) => createPublicRegistrationTransaction(tx, eventSlug, formSlug, input, now, bulk, requestContext, { staffCopyEnabled, notifyApprovers, formNotificationsEnabled, existingClubIds }),
+        (tx) => createPublicRegistrationTransaction(tx, eventSlug, formSlug, input, now, bulk, requestContext, { staffCopyEnabled, notifyApprovers, formNotificationsEnabled, existingClubIds }, staff ? { staff } : {}),
         {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
           // A club or group may wait up to 5s on its location's row lock (#413); the
