@@ -1325,15 +1325,12 @@ async function seedBaptismFollowUp(prisma: PrismaClient): Promise<void> {
     create: { eventId: clubEventId, leadEmails: ["lead@example.test"] },
     update: {},
   });
-  // One synthetic name, so the names list shows the followed-up status and its note form.
-  const club = await prisma.clubEventRegistration.findFirst({ where: { eventId: clubEventId }, select: { organizationId: true } });
-  if (club) {
-    await prisma.baptismFollowUp.upsert({
-      where: { eventId_organizationId_normalizedName: { eventId: clubEventId, organizationId: club.organizationId, normalizedName: "ava sample" } },
-      create: { eventId: clubEventId, organizationId: club.organizationId, normalizedName: "ava sample", displayName: "Ava Sample", leadNotified: true },
-      update: {},
-    });
-  }
+  // One synthetic name on a synthetic club, so the names list shows the followed-up status and its note form.
+  await prisma.baptismFollowUp.upsert({
+    where: { eventId_organizationId_normalizedName: { eventId: clubEventId, organizationId: clubB, normalizedName: "ava sample" } },
+    create: { eventId: clubEventId, organizationId: clubB, normalizedName: "ava sample", displayName: "Ava Sample", leadNotified: true },
+    update: {},
+  });
 }
 
 /** Recognitions (#1683) switched on for the club weekend with one synthetic recognition, so the page shows the search list and the add form and not only the off notice. */
