@@ -971,6 +971,7 @@ model User {
   merchandiseOrderStatusChanges  MerchandiseOrderStatusChange[]   @relation("MerchandiseOrderStatusActor")
   authoredStaffNotes             StaffNote[]                      @relation("StaffNoteAuthor")
   audienceSnapshots              EventAudienceSnapshot[]          @relation("EventAudienceSnapshotCreatedBy")
+  bulkActionRuns                 BulkActionRun[]                  @relation("BulkActionRunActor")
   scheduledEmailsCreated         ScheduledEmailBatch[]            @relation("ScheduledEmailCreatedBy")
   scheduledEmailsActivated       ScheduledEmailBatch[]            @relation("ScheduledEmailActivatedBy")
   authoredStaffNoteRevisions     StaffNoteRevision[]              @relation("StaffNoteRevisionAuthor")
@@ -2278,6 +2279,7 @@ model Event {
   lodgingWaitlistHistory              EventLodgingWaitlistHistory[]
   notes                               StaffNote[]
   audienceSnapshots                   EventAudienceSnapshot[]
+  bulkActionRuns                      BulkActionRun[]
   scheduledEmailBatches               ScheduledEmailBatch[]
   registrationTagAssignments          RegistrationTagAssignment[]
   attendeeTagAssignments              AttendeeTagAssignment[]
@@ -2746,6 +2748,96 @@ model EventAudienceSnapshot {
 
   @@index([eventId, createdAt])
   @@index([eventId, fingerprint])
+}
+
+/// The closed list of actions the reviewed bulk-action framework (#182) can run. There is no generic "set field" action:
+/// anything else (refund, cancel, transfer, identity merge, lodging or session assignment, payment, price or capacity
+/// edits, protected records) is refused and sent to its own page. A new action is a new value here plus a handler in
+/// `modules/bulk-actions`.
+enum BulkActionKey {
+  APPLY_TAG
+  REMOVE_TAG
+  EXPORT_FIELDS
+}
+
+enum BulkActionScopeKind {
+  FILTER
+  SELECTED
+}
+
+/// PREVIEWED: shown to the person, nothing changed. APPLYING: confirmed and being applied. APPLIED: finished, with
+/// per-record outcomes. EXPIRED: the preview went stale before it was confirmed.
+enum BulkActionRunStatus {
+  PREVIEWED
+  APPLYING
+  APPLIED
+  EXPIRED
+}
+
+enum BulkActionOutcome {
+  COMPLETED
+  SKIPPED
+  CONFLICT
+  FAILED
+  OBSOLETE
+}
+
+/// One reviewed bulk action over registrations of ONE event (#182): the preview, the confirmation and the result. It
+/// stores keys, ids, versions and counts only. It never stores a registrant's name, email or phone number, or an exported
+/// file. `queryString` is the staff member's own search; while the run is PREVIEWED it can hold the search text they typed,
+/// and that text is replaced by "[text]" once the run is confirmed or expires.
+/// `id` is the client-generated UUID. `snapshot` is the candidate registrations as `{ id, v }`, where `v` is the
+/// registration's `updatedAt` at preview time; apply refuses to overwrite one that changed since.
+model BulkActionRun {
+  id             String              @id
+  eventId        String
+  actorUserId    String
+  action         BulkActionKey
+  /// A tag id, or the exported field keys.
+  params         Json
+  scopeKind      BulkActionScopeKind
+  /// The canonical operations-search query the run started from.
+  queryString    String
+  /// SELECTED scope only: the ids the person picked (the run covers their intersection with the query's result).
+  selectedIds    Json?
+  recordUnit     String              @default("registrations")
+  candidateCount Int
+  snapshot       Json
+  fingerprint    String
+  status         BulkActionRunStatus @default(PREVIEWED)
+  idempotencyKey String?
+  previewedAt    DateTime            @default(now())
+  expiresAt      DateTime
+  confirmedAt    DateTime?
+  completedAt    DateTime?
+  completedCount Int                 @default(0)
+  skippedCount   Int                 @default(0)
+  conflictCount  Int                 @default(0)
+  failedCount    Int                 @default(0)
+  obsoleteCount  Int                 @default(0)
+  exportRowCount Int?
+
+  event    Event                      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  actor    User                       @relation("BulkActionRunActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  outcomes BulkActionRecordOutcome[]
+
+  @@unique([eventId, idempotencyKey])
+  @@index([eventId, previewedAt])
+}
+
+/// What happened to one registration in one bulk action run. `reason` is a short code, never free text or personal data.
+model BulkActionRecordOutcome {
+  id             String            @id @default(cuid())
+  runId          String
+  registrationId String
+  outcome        BulkActionOutcome
+  reason         String?
+
+  run          BulkActionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  registration Registration  @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, registrationId])
+  @@index([registrationId])
 }
 
 /// How a scheduled email batch is timed (#177). ONE_TIME is a calendar date and wall-clock time in the event's own
@@ -3996,6 +4088,7 @@ model Registration {
   honorEnrollments        HonorEnrollment[]
   honorClassWaitlist      HonorClassWaitlistEntry[]
   adjustments             RegistrationAdjustment[]
+  bulkActionOutcomes      BulkActionRecordOutcome[]
   scholarshipAwards       ScholarshipAward[]
   memberTransferMovesFrom MemberTransferRegistrationMove[] @relation("MemberTransferMoveFrom")
   memberTransferMovesTo   MemberTransferRegistrationMove[] @relation("MemberTransferMoveTo")

@@ -39,7 +39,7 @@ import { StaffContextualHelp } from "@/components/contextual-help-slot";
 import { PageHeader } from "@/components/page-header";
 import { ExportLink } from "@/components/export-link";
 import listStyles from "@/components/people-list.module.css";
-import { ClipboardCheck, CopyCheck, Download, ExternalLink, FileUp, ListChecks, Phone, UserPen } from "lucide-react";
+import { ClipboardCheck, CopyCheck, Download, ExternalLink, FileUp, ListChecks, Phone, Tags, UserPen } from "lucide-react";
 
 export const metadata: Metadata = { title: staffPageTitles.registrations };
 
@@ -117,6 +117,13 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   const searchParamsForLinks = new URLSearchParams(serializeOperationsSearchQuery(searchQuery));
   searchParamsForLinks.set("event", event.id);
   if (filter) searchParamsForLinks.set("filter", filter);
+  // The bulk actions page starts from exactly the filters on this page (#182), in canonical form with no page number.
+  const bulkActionsParams = new URLSearchParams(currentViewQuery);
+  bulkActionsParams.set("event", event.id);
+  // The quick filter and the form answer filter are not search filters, so the bulk page cannot apply them; it says so.
+  const notCarried = [filter && filter !== "ALL" ? "quick filter" : null, answerQuestion || answerValue ? "form answer filter" : null].filter(Boolean);
+  if (notCarried.length > 0) bulkActionsParams.set("notCarried", notCarried.join(","));
+  const bulkActionsHref = `/people/bulk-actions?${bulkActionsParams.toString()}`;
   return <>
       <AdminPageHeader path="/people" eventId={event.id} />
     <section className="page-stack">
@@ -136,6 +143,8 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
         {/* The cross-event identity queue lives beside the event's own review queues, not in the sidebar; the page checks the role again. */}
         {canReviewPeopleMatches && <li><a href="/people/matches"><CopyCheck aria-hidden="true" size={16} /> Possible duplicate people (all events)</a></li>}
         {canReviewPeopleMatches && <li><a href="/people/profile-updates"><UserPen aria-hidden="true" size={16} /> Profile updates (all attendees)</a></li>}
+        {/* Reviewed bulk actions on the registrations this filter shows (#182): the page carries the current search. */}
+        <li><a href={bulkActionsHref}><Tags aria-hidden="true" size={16} /> Bulk actions</a></li>
         <li><ExportLink href={`/api/events/${event.id}/exports/registrations${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink></li>
       </>}
     />
