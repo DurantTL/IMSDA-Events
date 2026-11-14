@@ -1,29 +1,27 @@
 <!-- @dsCard group="Navigation" height=420 -->
 <style>
-  .page-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 24px; margin: 0 0 16px; }
-  .page-header-text { min-width: 0; flex: 1 1 18rem; }
-  .page-header h1 { margin: 0; color: var(--ink); font-size: 1.6rem; line-height: 1.2; }
-  .page-header p.page-header-description { margin: 6px 0 0; color: var(--muted); font-size: 0.875rem; max-width: 60ch; }
-  .page-header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-  .page-header-back { display: inline-flex; min-height: 44px; align-items: center; color: var(--imsda-navy); font-weight: 700; font-size: 0.875rem; text-decoration: none; }
+  /* A phone-width frame. The app drops the actions under the title below 640px (a viewport media query);
+     these rules show that layout inside a frame at any width. */
   .page-header-phone { width: 358px; max-width: 100%; border: 1px dashed var(--line); border-radius: 14px; padding: 14px; }
-  .page-header-phone .page-header-actions { width: 100%; }
-  .page-header-phone .page-header-actions button { flex: 1 1 100%; }
+  .page-header-phone .page-header__actions { width: 100%; flex-direction: column; align-items: stretch; justify-content: flex-start; }
+  .page-header-phone .page-header__actions > button { justify-content: center; width: 100%; }
 </style>
 <div class="ds-stage">
-  <header class="page-header">
-    <div class="page-header-text"><h1>Lodging requests</h1><p class="page-header-description">What guests asked for, before anyone is placed.</p></div>
-    <div class="page-header-actions"><button class="secondary-button">Download CSV</button><button class="primary-button">Assign rooms</button></div>
+  <header class="page-header__header">
+    <div class="page-header__row">
+      <div class="page-header__text"><h1 class="page-header__title">Lodging requests</h1><p class="page-header__description">What guests asked for, before anyone is placed.</p></div>
+      <div class="page-header__actions"><button class="secondary-button">Download CSV</button><button class="primary-button">Assign rooms</button></div>
+    </div>
   </header>
   <p class="ds-caption">Opened from a tab: title once, one sentence, one filled button.</p>
-  <header>
-    <a class="page-header-back" href="#">‹ Back to club forms</a>
-    <div class="page-header"><div class="page-header-text"><p class="eyebrow">Club year 2026–2027</p><h1>Permission slip</h1></div><div class="page-header-actions"><button class="primary-button">Send a private link</button></div></div>
+  <header class="page-header__header">
+    <a class="text-button back-link" href="#">&larr; Back to club forms</a>
+    <div class="page-header__row"><div class="page-header__text"><p class="eyebrow page-header__eyebrow">Club year 2026–2027</p><h1 class="page-header__title">Permission slip</h1></div><div class="page-header__actions"><button class="primary-button">Send a private link</button></div></div>
   </header>
   <p class="ds-caption">Detail page: one back link, an eyebrow only when it adds something.</p>
-  <div class="page-header-phone"><header class="page-header" style="margin:0">
-    <div class="page-header-text"><h1>Roster</h1></div>
-    <div class="page-header-actions"><button class="primary-button">Add a person</button></div>
+  <div class="page-header-phone"><header class="page-header__header" style="margin:0;padding-top:0">
+    <div class="page-header__row"><div class="page-header__text"><h1 class="page-header__title">Roster</h1></div>
+    <div class="page-header__actions"><button class="primary-button">Add a person</button></div></div>
   </header></div>
   <p class="ds-caption">Phone: the action drops under the title, full width.</p>
 </div>

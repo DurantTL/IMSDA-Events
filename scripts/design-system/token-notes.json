@@ -1,0 +1,971 @@
+{
+ "color": {
+  "themes": [
+   {
+    "id": "light",
+    "name": "Light"
+   },
+   {
+    "id": "dark",
+    "name": "Dark (public blocks and info cards only)"
+   }
+  ],
+  "tokens": [
+   {
+    "name": "imsda-navy",
+    "usage": "Brand navy. Primary buttons, headings, active account tab, today in the calendar, focus ring on light surfaces. Navy text reads 11.8:1 on card; white on navy 11.8:1.",
+    "css": "--imsda-navy"
+   },
+   {
+    "name": "imsda-navy-deep",
+    "usage": "Deep navy. End of the staff rail gradient.",
+    "css": "--imsda-navy-deep"
+   },
+   {
+    "name": "imsda-navy-soft",
+    "usage": "Navy tint. Hover fills, count badges, open actions-menu trigger, calendar event chips (navy text on it).",
+    "css": "--imsda-navy-soft"
+   },
+   {
+    "name": "imsda-purple",
+    "usage": "Brand purple. Links and text buttons, field focus border, active club-portal tab underline, scan card. Purple text reads 10:1 on card and 8.5:1 on imsda-purple-soft.",
+    "css": "--imsda-purple"
+   },
+   {
+    "name": "imsda-purple-soft",
+    "usage": "Purple tint. Purple status chips (Draft, Waitlisted, Cancelled, Billed to church), calendar entry chips.",
+    "css": "--imsda-purple-soft"
+   },
+   {
+    "name": "imsda-gold",
+    "usage": "Brand gold. Primary button on the public home hero (navy text, 6.3:1), the staff rail's current edge, the staff tab underline, focus ring on navy surfaces. Never text on light grounds.",
+    "css": "--imsda-gold"
+   },
+   {
+    "name": "imsda-gold-soft",
+    "usage": "Gold tint. Gold status chips (amount due, waiting for approval) and warning notices, with gold-text or warning-text on it.",
+    "css": "--imsda-gold-soft"
+   },
+   {
+    "name": "home-green",
+    "usage": "Public home page only: the IMAdventist descriptor under the wordmark, section kickers and the green edges on place cards. 5.4:1 on card, 5.0:1 on paper.",
+    "css": "--home-green",
+    "file": "components/public-home-page.module.css"
+   },
+   {
+    "name": "focus-ring",
+    "usage": "Global :focus-visible outline, 3px with a 2px offset, on light surfaces.",
+    "css": "--focus-ring"
+   },
+   {
+    "name": "focus-ring-on-dark",
+    "usage": "Focus outline on navy surfaces: the staff rail, event and check-in heroes. Gold is 7.9:1 on navy-deep.",
+    "css": "--focus-ring-on-dark"
+   },
+   {
+    "name": "ink",
+    "usage": "Body text on paper, card and the soft tints.",
+    "css": "--ink"
+   },
+   {
+    "name": "muted",
+    "usage": "Secondary text and metadata: 5.85:1 on card, 5.43:1 on paper, 4.97:1 on the tinted panels (stylesheet comment).",
+    "css": "--muted"
+   },
+   {
+    "name": "line",
+    "usage": "Hairline borders and dividers on cards, tables, chips and the calendar grid. Decorative only; not a field edge.",
+    "css": "--line"
+   },
+   {
+    "name": "paper",
+    "usage": "Page background behind every workspace.",
+    "css": "--paper"
+   },
+   {
+    "name": "card",
+    "usage": "Card, panel, table and dialog background.",
+    "css": "--card"
+   },
+   {
+    "name": "field-border",
+    "usage": "Input, select and textarea border: 3.86:1 on card, 3.59:1 on paper (meets the 3:1 boundary rule).",
+    "css": "--field-border"
+   },
+   {
+    "name": "field-border-hover",
+    "usage": "Field border on hover.",
+    "css": "--field-border-hover"
+   },
+   {
+    "name": "field-bg",
+    "usage": "Field background.",
+    "css": "--field-bg"
+   },
+   {
+    "name": "field-focus",
+    "usage": "Field focus border and the 2px focus ring (2px offset, no halo).",
+    "css": "--field-focus"
+   },
+   {
+    "name": "green",
+    "usage": "Success text: Paid, Submitted, success notices. On green-soft it reads 5.0:1.",
+    "css": "--green"
+   },
+   {
+    "name": "green-soft",
+    "usage": "Success fill behind green text; the default inline notice.",
+    "css": "--green-soft"
+   },
+   {
+    "name": "coral",
+    "usage": "Error text and icon-only danger buttons. On coral-soft it reads 4.7:1.",
+    "css": "--coral"
+   },
+   {
+    "name": "coral-soft",
+    "usage": "Error fill: error notices, form errors, coral chips. Hard-coded as #fff1ef in the stylesheet.",
+    "css": "--coral-soft"
+   },
+   {
+    "name": "danger",
+    "usage": "Destructive actions in staff screens: danger outline buttons and the Remove item in actions menus.",
+    "css": "--danger"
+   },
+   {
+    "name": "danger-soft",
+    "usage": "Destructive hover and confirm fills.",
+    "css": "--danger-soft"
+   },
+   {
+    "name": "danger-line",
+    "usage": "Border of destructive panels.",
+    "css": "--danger-line"
+   },
+   {
+    "name": "gold-text",
+    "usage": "Gold chip text on imsda-gold-soft (amount due, waiting).",
+    "css": "--gold-text"
+   },
+   {
+    "name": "warning-text",
+    "usage": "Warning notice text on imsda-gold-soft.",
+    "value": "#6f5316"
+   },
+   {
+    "name": "warning-line",
+    "usage": "Warning notice border.",
+    "value": "#ddcd9e"
+   },
+   {
+    "name": "notice-line",
+    "usage": "Success inline-notice border.",
+    "value": "#b8d7ca"
+   },
+   {
+    "name": "error-line",
+    "usage": "Error inline-notice border.",
+    "value": "#e9c7c2"
+   },
+   {
+    "name": "secondary-bg",
+    "usage": "Secondary button fill.",
+    "css": "--secondary-bg"
+   },
+   {
+    "name": "table-head",
+    "usage": "Table header and calendar weekday row fill.",
+    "css": "--table-head"
+   },
+   {
+    "name": "table-row-line",
+    "usage": "Table row separator.",
+    "css": "--table-row-line"
+   },
+   {
+    "name": "hero-mid",
+    "usage": "Middle stop of the navy-to-purple hero gradient (event and check-in heroes).",
+    "value": "#07577d"
+   },
+   {
+    "name": "hero-text-soft",
+    "usage": "Secondary text on the navy hero gradient.",
+    "value": "#d5e5ed"
+   },
+   {
+    "name": "tabbar-text",
+    "usage": "Inactive labels in the staff phone tab bar.",
+    "value": "#566a75"
+   },
+   {
+    "name": "report-light",
+    "usage": "Monthly Records chart: Submitted, not reviewed (lighter navy step), with dark ink #00263a.",
+    "value": "#7fa6bd"
+   },
+   {
+    "name": "info-card-info-bg",
+    "usage": "Event info card, information tone: background.",
+    "css": "--info-card-info-bg"
+   },
+   {
+    "name": "info-card-info-edge",
+    "usage": "Event info card, information tone: 6px left edge and icon.",
+    "css": "--info-card-info-edge"
+   },
+   {
+    "name": "info-card-deadline-bg",
+    "usage": "Event info card, deadline tone: background.",
+    "css": "--info-card-deadline-bg"
+   },
+   {
+    "name": "info-card-deadline-edge",
+    "usage": "Event info card, deadline tone: edge and icon.",
+    "css": "--info-card-deadline-edge"
+   },
+   {
+    "name": "info-card-requirement-bg",
+    "usage": "Event info card, requirement tone: background.",
+    "css": "--info-card-requirement-bg"
+   },
+   {
+    "name": "info-card-requirement-edge",
+    "usage": "Event info card, requirement tone: edge and icon.",
+    "css": "--info-card-requirement-edge"
+   },
+   {
+    "name": "info-card-success-bg",
+    "usage": "Event info card, success tone: background.",
+    "css": "--info-card-success-bg"
+   },
+   {
+    "name": "info-card-success-edge",
+    "usage": "Event info card, success tone: edge and icon.",
+    "css": "--info-card-success-edge"
+   },
+   {
+    "name": "info-card-help-bg",
+    "usage": "Event info card, help tone: background.",
+    "css": "--info-card-help-bg"
+   },
+   {
+    "name": "info-card-help-edge",
+    "usage": "Event info card, help tone: edge and icon.",
+    "css": "--info-card-help-edge"
+   },
+   {
+    "name": "info-card-neutral-bg",
+    "usage": "Event info card, neutral tone: background.",
+    "css": "--info-card-neutral-bg"
+   },
+   {
+    "name": "info-card-neutral-edge",
+    "usage": "Event info card, neutral tone: edge.",
+    "css": "--info-card-neutral-edge"
+   },
+   {
+    "name": "info-card-ink",
+    "usage": "Text inside event info cards, on every info-card background.",
+    "css": "--info-card-ink"
+   },
+   {
+    "name": "block-bg",
+    "usage": "Public event page content block background.",
+    "css": "--block-bg"
+   },
+   {
+    "name": "block-ink",
+    "usage": "Public event block text on block-bg.",
+    "css": "--block-ink"
+   },
+   {
+    "name": "block-muted",
+    "usage": "Public event block secondary text on block-bg.",
+    "css": "--block-muted"
+   },
+   {
+    "name": "block-edge",
+    "usage": "Public event block border.",
+    "css": "--block-edge"
+   },
+   {
+    "name": "block-accent",
+    "usage": "Public event block headings and links.",
+    "css": "--block-accent"
+   },
+   {
+    "name": "block-soft",
+    "usage": "Public event block tinted fill.",
+    "css": "--block-soft"
+   },
+   {
+    "name": "cal-tone-1-fill",
+    "usage": "Calendar category tone 1: bar and chip fill.",
+    "css": "--cal-fill",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-1"
+   },
+   {
+    "name": "cal-tone-1-edge",
+    "usage": "Calendar category tone 1: 5px left edge and key swatch.",
+    "css": "--cal-edge",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-1"
+   },
+   {
+    "name": "cal-tone-1-ink",
+    "usage": "Calendar category tone 1: text on its fill.",
+    "css": "--cal-ink",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-1"
+   },
+   {
+    "name": "cal-tone-2-fill",
+    "usage": "Calendar category tone 2: bar and chip fill.",
+    "css": "--cal-fill",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-2"
+   },
+   {
+    "name": "cal-tone-2-edge",
+    "usage": "Calendar category tone 2: 5px left edge and key swatch.",
+    "css": "--cal-edge",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-2"
+   },
+   {
+    "name": "cal-tone-2-ink",
+    "usage": "Calendar category tone 2: text on its fill.",
+    "css": "--cal-ink",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-2"
+   },
+   {
+    "name": "cal-tone-3-fill",
+    "usage": "Calendar category tone 3: bar and chip fill.",
+    "css": "--cal-fill",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-3"
+   },
+   {
+    "name": "cal-tone-3-edge",
+    "usage": "Calendar category tone 3: 5px left edge and key swatch.",
+    "css": "--cal-edge",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-3"
+   },
+   {
+    "name": "cal-tone-3-ink",
+    "usage": "Calendar category tone 3: text on its fill.",
+    "css": "--cal-ink",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-3"
+   },
+   {
+    "name": "cal-tone-4-fill",
+    "usage": "Calendar category tone 4: bar and chip fill.",
+    "css": "--cal-fill",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-4"
+   },
+   {
+    "name": "cal-tone-4-edge",
+    "usage": "Calendar category tone 4: 5px left edge and key swatch.",
+    "css": "--cal-edge",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-4"
+   },
+   {
+    "name": "cal-tone-4-ink",
+    "usage": "Calendar category tone 4: text on its fill.",
+    "css": "--cal-ink",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-4"
+   },
+   {
+    "name": "cal-tone-5-fill",
+    "usage": "Calendar category tone 5: bar and chip fill.",
+    "css": "--cal-fill",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-5"
+   },
+   {
+    "name": "cal-tone-5-edge",
+    "usage": "Calendar category tone 5: 5px left edge and key swatch.",
+    "css": "--cal-edge",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-5"
+   },
+   {
+    "name": "cal-tone-5-ink",
+    "usage": "Calendar category tone 5: text on its fill.",
+    "css": "--cal-ink",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-5"
+   },
+   {
+    "name": "cal-tone-6-fill",
+    "usage": "Calendar category tone 6: bar and chip fill.",
+    "css": "--cal-fill",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-6"
+   },
+   {
+    "name": "cal-tone-6-edge",
+    "usage": "Calendar category tone 6: 5px left edge and key swatch.",
+    "css": "--cal-edge",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-6"
+   },
+   {
+    "name": "cal-tone-6-ink",
+    "usage": "Calendar category tone 6: text on its fill.",
+    "css": "--cal-ink",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-6"
+   },
+   {
+    "name": "cal-closure-fill",
+    "usage": "Calendar office-closure fill (hatched swatch).",
+    "css": "--cal-fill",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-closure"
+   },
+   {
+    "name": "cal-closure-edge",
+    "usage": "Calendar office-closure edge.",
+    "css": "--cal-edge",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-closure"
+   },
+   {
+    "name": "cal-closure-ink",
+    "usage": "Calendar office-closure text.",
+    "css": "--cal-ink",
+    "file": "app/globals.css",
+    "selector": ".calendar-tone-closure"
+   }
+  ]
+ },
+ "type": {
+  "fonts": [
+   {
+    "family": "Noto Sans",
+    "file": "fonts/NotoSans-Regular.ttf",
+    "weight": "400",
+    "style": "normal"
+   },
+   {
+    "family": "Noto Sans",
+    "file": "fonts/NotoSans-Bold.ttf",
+    "weight": "700",
+    "style": "normal"
+   },
+   {
+    "family": "AdventSansLogo",
+    "file": "fonts/AdventSans-Logo.otf",
+    "weight": "400",
+    "style": "normal"
+   }
+  ],
+  "families": {
+   "sans": "\"Noto Sans\", Arial, sans-serif",
+   "mono": "ui-monospace, SFMono-Regular, Menlo, monospace",
+   "logo": "AdventSansLogo, \"Noto Sans\", sans-serif"
+  },
+  "groups": [
+   {
+    "name": "Public pages",
+    "family": "sans",
+    "styles": [
+     {
+      "name": "public-title",
+      "fontSize": "1.5rem",
+      "lineHeight": 1.25,
+      "fontWeight": 800,
+      "usage": "Section titles on public pages (20-24px, #743).",
+      "sample": "Fall Camporee"
+     },
+     {
+      "name": "public-body",
+      "fontSize": "1rem",
+      "lineHeight": 1.5,
+      "fontWeight": 400,
+      "usage": "Public body text and inputs: 16px.",
+      "sample": "Registration closes October 20."
+     },
+     {
+      "name": "public-label",
+      "fontSize": "0.875rem",
+      "lineHeight": 1.4,
+      "fontWeight": 700,
+      "usage": "Public labels and help text: 14px.",
+      "sample": "Age on the event date"
+     }
+    ]
+   },
+   {
+    "name": "Staff and portal",
+    "family": "sans",
+    "styles": [
+     {
+      "name": "workspace-title",
+      "fontSize": "1.7rem",
+      "lineHeight": 1.2,
+      "fontWeight": 800,
+      "usage": "Workspace and club banner h1 (clamp 1.35-1.7rem).",
+      "sample": "Riverton Pathfinders"
+     },
+     {
+      "name": "heading-section",
+      "fontSize": "1.3rem",
+      "lineHeight": 1.3,
+      "fontWeight": 800,
+      "usage": "Section headings and dialog titles.",
+      "sample": "Monthly Records"
+     },
+     {
+      "name": "heading-sub",
+      "fontSize": "1.075rem",
+      "lineHeight": 1.3,
+      "fontWeight": 700,
+      "usage": "Sub-section headings.",
+      "sample": "Continue club work"
+     },
+     {
+      "name": "heading-group",
+      "fontSize": "1rem",
+      "lineHeight": 1.35,
+      "fontWeight": 700,
+      "usage": "Group headings inside a section.",
+      "sample": "Filled forms"
+     },
+     {
+      "name": "base-body",
+      "fontSize": "15px",
+      "lineHeight": 1.5,
+      "fontWeight": 400,
+      "usage": "The body element's base size before floors apply.",
+      "sample": "Draft saved."
+     },
+     {
+      "name": "admin-body",
+      "fontSize": "0.875rem",
+      "lineHeight": 1.5,
+      "fontWeight": 400,
+      "usage": "Staff body, inputs and the 14px floor for labels and headings.",
+      "sample": "6 people chosen"
+     },
+     {
+      "name": "label-upper",
+      "fontSize": "0.75rem",
+      "lineHeight": 1.3,
+      "fontWeight": 800,
+      "letterSpacing": "0.08em",
+      "usage": "Uppercase eyebrows and table headers (the 12px label floor).",
+      "sample": "CLUB YEAR 2026-27"
+     }
+    ]
+   },
+   {
+    "name": "Controls",
+    "family": "sans",
+    "styles": [
+     {
+      "name": "button",
+      "fontSize": "0.875rem",
+      "lineHeight": 1.25,
+      "fontWeight": 700,
+      "usage": "Button labels: at least 14px.",
+      "sample": "Add to roster"
+     },
+     {
+      "name": "button-cta",
+      "fontSize": "1rem",
+      "lineHeight": 1.25,
+      "fontWeight": 700,
+      "usage": "Primary action on public pages and phones (48px tall).",
+      "sample": "Submit registration"
+     },
+     {
+      "name": "badge",
+      "fontSize": "0.75rem",
+      "lineHeight": 1.2,
+      "fontWeight": 700,
+      "usage": "Status chips and count badges.",
+      "sample": "Waitlisted"
+     },
+     {
+      "name": "metric",
+      "fontSize": "1.75rem",
+      "lineHeight": 1,
+      "fontWeight": 800,
+      "usage": "Big numbers in metric cards, in imsda-navy.",
+      "sample": "128"
+     }
+    ]
+   },
+   {
+    "name": "Brand",
+    "family": "logo",
+    "styles": [
+     {
+      "name": "brand-wordmark",
+      "fontSize": "1.65rem",
+      "lineHeight": 1.1,
+      "fontWeight": 400,
+      "usage": "The IMAdventist wordmark beside the symbol in the public header, in imsda-navy. Nowhere else.",
+      "sample": "IMAdventist"
+     }
+    ]
+   }
+  ]
+ },
+ "typeScale": {
+  "note": "The app's type-scale custom properties. The floors are 0 in print and rise on screen (12px helper text, 14px body); the staff workspace raises them again.",
+  "tokens": [
+   {
+    "name": "type-floor",
+    "usage": "Smallest size for helper text, chips and captions: 0 in print, 12px (0.75rem) on screen. Declared as max(var(--type-floor, 0px), X). The staff workspace raises it to 14px.",
+    "css": "--type-floor"
+   },
+   {
+    "name": "type-body-floor",
+    "usage": "Smallest size for body text, inputs, labels and buttons: 0 in print, 14px (0.875rem) on screen.",
+    "css": "--type-body-floor"
+   },
+   {
+    "name": "text-helper-min",
+    "usage": "Smallest helper text size, 14px.",
+    "css": "--text-helper-min"
+   },
+   {
+    "name": "type-public-body",
+    "usage": "Public body text and inputs: 16px.",
+    "css": "--type-public-body"
+   },
+   {
+    "name": "type-public-label",
+    "usage": "Public labels and help text: 14px.",
+    "css": "--type-public-label"
+   },
+   {
+    "name": "type-public-title",
+    "usage": "Public section titles: 24px.",
+    "css": "--type-public-title"
+   },
+   {
+    "name": "type-admin-body",
+    "usage": "Staff workspace body text: 14px.",
+    "css": "--type-admin-body"
+   },
+   {
+    "name": "type-button",
+    "usage": "Button text: 14px.",
+    "css": "--type-button"
+   },
+   {
+    "name": "type-button-cta",
+    "usage": "Public or mobile primary action text: 16px.",
+    "css": "--type-button-cta"
+   },
+   {
+    "name": "text-badge",
+    "usage": "Badge and chip text: 12px.",
+    "css": "--text-badge"
+   },
+   {
+    "name": "heading-section",
+    "usage": "Section headings and dialog titles.",
+    "css": "--heading-section"
+   },
+   {
+    "name": "heading-sub",
+    "usage": "Sub-headings.",
+    "css": "--heading-sub"
+   },
+   {
+    "name": "heading-group",
+    "usage": "Group headings.",
+    "css": "--heading-group"
+   },
+   {
+    "name": "heading-gap",
+    "usage": "Space under a heading.",
+    "css": "--heading-gap"
+   },
+   {
+    "name": "heading-space-above",
+    "usage": "Space above a heading that follows content.",
+    "css": "--heading-space-above"
+   }
+  ]
+ },
+ "spacing": {
+  "note": "The app has no spacing scale; these are the values its layouts repeat.",
+  "tokens": [
+   {
+    "name": "gap-xs",
+    "usage": "Label to field, chip icon to text.",
+    "value": "6px"
+   },
+   {
+    "name": "gap-sm",
+    "usage": "Inside button groups and menu items.",
+    "value": "9px"
+   },
+   {
+    "name": "gap-form-grid",
+    "usage": "Between fields in a form grid.",
+    "value": "12px"
+   },
+   {
+    "name": "gap-form-stack",
+    "usage": "Between stacked form rows.",
+    "value": "15px"
+   },
+   {
+    "name": "gap-page",
+    "usage": "Between sections in .page-stack (28px above).",
+    "value": "18px"
+   },
+   {
+    "name": "pad-panel",
+    "usage": "Panel padding.",
+    "value": "21px"
+   },
+   {
+    "name": "pad-modal",
+    "usage": "Dialog padding and backdrop inset.",
+    "value": "22px"
+   },
+   {
+    "name": "content-width",
+    "usage": "Club masthead, banner and account content width (min with 100% - 32px).",
+    "value": "1180px"
+   },
+   {
+    "name": "workspace-width",
+    "usage": "Staff workspace max width.",
+    "value": "1420px"
+   },
+   {
+    "name": "sidebar-width",
+    "usage": "Staff sidebar; 76px when collapsed.",
+    "value": "260px"
+   },
+   {
+    "name": "touch-target",
+    "usage": "Minimum tap target at 600px and under (768px for floors).",
+    "css": "--touch-target"
+   },
+   {
+    "name": "touch-target-dense",
+    "usage": "Row actions, row links and compact selects inside a staff table or list row (.dense-rows), only with a mouse (pointer: fine) at 1024px and wider. Touch and screens under 1024px stay 44px (touch-target).",
+    "css": "--touch-target-dense"
+   },
+   {
+    "name": "target-desktop",
+    "usage": "Control height on desktop pointers.",
+    "css": "--target-desktop"
+   },
+   {
+    "name": "target-cta",
+    "usage": "Primary action height on phones.",
+    "css": "--target-cta"
+   }
+  ]
+ },
+ "radius": {
+  "tokens": [
+   {
+    "name": "radius-sm",
+    "usage": "Actions-menu items.",
+    "css": "--radius-sm"
+   },
+   {
+    "name": "radius-field",
+    "usage": "Fields and buttons (--field-radius).",
+    "css": "--field-radius"
+   },
+   {
+    "name": "radius-card",
+    "usage": "Notices, menus, home link cards.",
+    "css": "--radius-card"
+   },
+   {
+    "name": "radius-info",
+    "usage": "Event info cards and public blocks.",
+    "css": "--radius-info"
+   },
+   {
+    "name": "radius-pass",
+    "usage": "Printable passes, empty calendar.",
+    "value": "16px"
+   },
+   {
+    "name": "radius-calendar",
+    "usage": "Calendar month grid.",
+    "value": "18px"
+   },
+   {
+    "name": "radius-panel",
+    "usage": "Panels.",
+    "css": "--radius-panel"
+   },
+   {
+    "name": "radius-modal",
+    "usage": "Dialogs.",
+    "css": "--radius-modal"
+   },
+   {
+    "name": "radius-hero",
+    "usage": "Check-in hero.",
+    "value": "24px"
+   },
+   {
+    "name": "radius-element",
+    "usage": "Buttons, fields and small controls. Same as radius-field (#1771).",
+    "css": "--radius-element",
+    "resolve": true
+   },
+   {
+    "name": "radius-container",
+    "usage": "Cards and panels. Same as radius-card (#1771).",
+    "css": "--radius-container",
+    "resolve": true
+   },
+   {
+    "name": "radius-overlay",
+    "usage": "Dialogs, sheets and menus. Same as radius-modal (#1771).",
+    "css": "--radius-overlay",
+    "resolve": true
+   },
+   {
+    "name": "radius-pill",
+    "usage": "Status chips, count badges, progress track.",
+    "css": "--radius-pill"
+   }
+  ]
+ },
+ "shadow": {
+  "tokens": [
+   {
+    "name": "shadow",
+    "usage": "Heroes, scan card, menus.",
+    "css": "--shadow"
+   },
+   {
+    "name": "shadow-metric",
+    "usage": "Metric cards.",
+    "value": "0 8px 28px rgba(0, 59, 92, 0.045)"
+   },
+   {
+    "name": "shadow-chip",
+    "usage": "Status and count chips in headers.",
+    "value": "0 2px 8px rgba(0, 59, 92, 0.09)"
+   },
+   {
+    "name": "shadow-modal",
+    "usage": "Dialogs.",
+    "value": "0 28px 80px rgba(0, 25, 40, 0.3)"
+   },
+   {
+    "name": "shadow-tabbar",
+    "usage": "Staff phone tab bar.",
+    "value": "0 -8px 24px rgba(0, 59, 92, 0.07)"
+   }
+  ]
+ },
+ "breakpoint": {
+  "note": "Media-query widths the layouts switch at.",
+  "tokens": [
+   {
+    "name": "bp-phone",
+    "usage": "Tables become cards; 44px controls.",
+    "value": "600px"
+   },
+   {
+    "name": "bp-club-nav",
+    "usage": "Club nav and actions menu go phone layout.",
+    "value": "640px"
+   },
+   {
+    "name": "bp-tablet",
+    "usage": "Phone type floors and touch target.",
+    "value": "768px"
+   },
+   {
+    "name": "bp-sidebar",
+    "usage": "Staff sidebar hides; bottom tab bar shows.",
+    "value": "800px"
+   }
+  ]
+ },
+ "zIndex": {
+  "tokens": [
+   {
+    "name": "z-sidebar",
+    "usage": "Staff sidebar and actions-menu list.",
+    "value": "30"
+   },
+   {
+    "name": "z-tabbar",
+    "usage": "Staff phone tab bar.",
+    "value": "40"
+   },
+   {
+    "name": "z-modal",
+    "usage": "Dialog backdrop.",
+    "value": "100"
+   }
+  ]
+ },
+ "other": {
+  "tokens": [
+   {
+    "name": "cursor-busy",
+    "usage": "Cursor over a busy or disabled button (\"Processing…\", \"Saving…\").",
+    "css": "--cursor-busy"
+   },
+   {
+    "name": "target-touch",
+    "usage": "Touch target size on screen, 44px.",
+    "css": "--target-touch"
+   },
+   {
+    "name": "check-row-height",
+    "usage": "Height of a check-in list row on phones.",
+    "css": "--check-row-height"
+   },
+   {
+    "name": "calendar-bar-height",
+    "usage": "Height of the calendar sticky bar: 124px, 172px on narrow screens.",
+    "css": "--calendar-bar-height"
+   }
+  ]
+ },
+ "meta": {
+  "source": "repository",
+  "repo": "DurantTL/IMSDA-Events",
+  "paths": {
+   "tokens": [
+    "app/globals.css"
+   ],
+   "fonts": [
+    "docs/platform-documentation/2026-10-21/assets/",
+    "public/brand/AdventSans-Logo.otf"
+   ],
+   "assets": [
+    "public/pathfinder-logo-pin.png",
+    "public/brand/imadventist-symbol.png"
+   ],
+   "docs": [
+    "AGENTS.md",
+    "docs/RESPONSIVE.md",
+    "docs/NAVIGATION.md",
+    "docs/design/",
+    "docs/BRANDING-IMADVENTIST-INVENTORY.md"
+   ]
+  }
+ }
+}

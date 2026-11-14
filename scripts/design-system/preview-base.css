@@ -1,0 +1,13 @@
+/* Preview scaffolding only. These classes exist for the design system previews and are not app CSS:
+   .ds-stage is the padded area around a preview, .ds-row lays buttons or chips in a wrapping row,
+   .ds-caption is the small note under a preview. Everything else in this file comes from the app's own CSS. */
+.ds-stage { padding: 20px; display: grid; gap: 14px; }
+.ds-row { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+.ds-caption { margin: 0; color: var(--muted); font-size: 0.75rem; }
+
+/* A phone-width bottom bar shown inside a preview frame. The app only shows .mobile-nav below 800px, fixed to the bottom of
+   the screen (app/globals.css, @media (max-width: 800px)); these rules show the same bar inside a frame at any width. */
+.ds-phone-frame .mobile-nav { position: static; display: flex; min-height: 67px; border-top: 1px solid var(--line); background: var(--card); padding: 4px; box-shadow: var(--shadow-tabbar); }
+.ds-phone-frame .mobile-nav a { position: relative; display: flex; min-width: 0; min-height: 52px; flex: 1 1 0; padding: 4px 2px 2px; align-items: center; justify-content: center; flex-direction: column; gap: 3px; border-radius: 10px; color: #566a75; font-size: 0.75rem; font-weight: 700; line-height: 1.1; text-decoration: none; }
+.ds-phone-frame .mobile-nav a.active { background: rgba(0, 59, 92, 0.06); color: var(--imsda-navy); }
+.ds-phone-frame .mobile-nav a.active::before { content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 4px; border-radius: 0 0 4px 4px; background: var(--imsda-gold); }

@@ -81,6 +81,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Fails when docs/design-system/ is out of date with the code (#1773). No database needed.
+      - name: Check the design system is in sync
+        run: npm run design-system:check
       - run: npm run db:deploy
       # Fails when prisma/schema.prisma and the committed migration history
       # disagree (#513) — otherwise `prisma migrate dev` silently produces

@@ -1,0 +1,12 @@
+The one header at the top of a page's content: the title, an optional sentence, and the page's one main action. Staff, club portal, Area Coordinator and account pages all use it.
+
+- **Title once.** One `h1` that names the page. It is not repeated in an eyebrow, a card title or a hero below it. The card under the header starts with its content or a different heading.
+- **Same name everywhere.** The title is the same words as the tab, menu item or hub card that opened the page (tab "Monthly Records" opens a page titled "Monthly Records").
+- **Description:** at most one sentence in `--muted`, 14px on staff pages. Longer help goes to Help & learning. Leave 16px between the header and the first card.
+- **Main action:** the page's single `.primary-button`, on the right, in line with the title. Other actions are `.secondary-button` or go into an Actions menu; at most two buttons show beside the title. Below 640px the actions drop under the title, full width, main action first.
+- **Eyebrow:** optional, purple uppercase, and only when it adds something the title and tabs don't already say (a step number, a club year). Never the area name, the event name or the title again.
+- **Back link:** only on a detail page reached from a list ("‹ Back to club forms"), above the title, once. Pages opened from a tab have no back link.
+- **Inside an event** the event name lives in the crumb row of `StaffShell`; the page header does not repeat it and shows no "Event · name" chip.
+- **Repeated row actions** in the list below (Open, Review, Save on each row) are `.secondary-button` or `.text-button`, so the header's action stays the only filled button.
+
+> Approved by Caleb, Nov 9, 2026. Built in #1772: `components/page-header.tsx` is the one header, and the five page templates in `components/page-templates/` (list, detail, form, hub, step) put it over the existing shared parts. `/event-setup`, `/event-setup/from-template`, `/event-setup/copy`, `/archived-events`, `/select-event`, `/more/reports/printouts`, `/admin/club-supplies/conference-orders` and `/more/clubs/[organizationId]` use it. The older parts (`StaffPageHeader`, `AdminSectionHeader`, `AdminPageHeader`) now render through it in a title-less legacy mode where the staff shell still draws the title, so the other pages look as before; the remaining redesign page groups (#1572 and later) move their pages onto a template and drop the shell's title for them (list them in `components/page-header-routes.ts`). Rules D1 to D4 in `docs/SITE-RULES.md`.
