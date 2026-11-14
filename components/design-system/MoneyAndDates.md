@@ -1,0 +1,12 @@
+How amounts, balances and dates are written on screen. Each helper below is the one the app uses; screens never format these by hand.
+
+- **Amounts** come from whole cents through `formatCents` (`modules/payments/format-cents.ts`): US dollars with a thousands comma and two decimals, "$1,234.56"; a negative is "-$5.00"; zero is "$0.00" (and a negative zero is "-$0.00"). `wholeDollars` rounds to whole dollars for overview tiles, "$1,235". `grouping: false` is the plain form that cancellation and asset-return text uses, "$1234.56".
+- On a page, an amount goes through `Money`, which wraps it in a `translate="no"` span so a browser translator leaves it as written. Names, confirmation codes, emails and phone numbers get the same treatment (`ExactValue`). A label stays outside it: "Balance due" translates, "$45.00" does not.
+- A balance is written as a labelled pair, "Balance due $45.00" (check-in) or a "Total" tile and a "Balance" tile (a registration's details).
+- A money field is `.money-input`: a muted "$" in front of the number box, in one bordered 9px-radius field.
+- **Date ranges** (`formatDateRange`, `modules/calendar/domain.ts`) spell out the month: "December 5, 2026"; "December 5–7, 2026" (an en dash, no spaces) inside one month; "November 30 – December 2, 2026" across months; "Dec 30, 2026 – Jan 2, 2027" across years, where months shorten to three letters.
+- A weekday date (`formatWeekdayDate`) is "Monday, March 2, 2026".
+- Short ranges (`shortDateRange`, the home ribbon and list, which only reach six months ahead) leave the year out: "Oct 3", "Oct 3–5", "Oct 30 – Nov 2".
+- An event's dates are written differently by surface, each in the event's own time zone. The staff overview hero uses `Intl.DateTimeFormat` with `dateStyle: "long"` and `formatRange`: "October 9 – 11, 2026" (thin spaces around the en dash), "November 30 – December 2, 2026", and "July 14, 2027" for one day. Search results (`formatEventDates` in `destination-search-model.ts`) read "Jul 14, 2027" for one day and "Jul 14, 2027 to Jul 17, 2027" for several. The public registration page reads "October 9, 2026 – October 11, 2026", or "Dates to be announced" when a date is unreadable.
+- A stored moment (`dateTimeInZone`) reads "Jun 1, 2026, 3:05 PM CDT"; an empty value reads "Not recorded". A one-day event's hours (`eventTimeLabel`) read "9:00 AM – 5:00 PM CST" and a multi-day event shows dates only.
+- Sample data in screens, tests and these previews uses fictional names and obvious sample amounts.

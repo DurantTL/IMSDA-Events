@@ -1,0 +1,38 @@
+<!-- @dsCard group="Data" height=1000 -->
+<div class="ds-stage">
+  <div class="report-table-wrap"><table class="report-table">
+    <caption class="sr-only">How amounts are written</caption>
+    <thead><tr><th scope="col">Helper</th><th scope="col">Written as</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Amount, 123456 cents</th><td translate="no">$1,234.56</td></tr>
+      <tr><th scope="row">Negative, -500 cents</th><td translate="no">-$5.00</td></tr>
+      <tr><th scope="row">Whole dollars</th><td translate="no">$1,235</td></tr>
+      <tr><th scope="row">Plain, no comma</th><td translate="no">$1234.56</td></tr>
+    </tbody>
+  </table></div>
+  <div class="detail-grid">
+    <span><small>Total</small><strong translate="no">$120.00</strong></span>
+    <span><small>Paid</small><strong translate="no">$75.00</strong></span>
+    <span><small>Balance</small><strong translate="no">$45.00</strong></span>
+    <span><small>Status</small><strong class="status-word-value">Balance due</strong></span>
+  </div>
+  <p class="ds-caption">Amounts are never translated; the labels are. Sample amounts only.</p>
+  <label for="ds-price">Price</label>
+  <span class="money-input" style="max-width:180px"><b>$</b><input id="ds-price" inputmode="decimal" value="25.00"></span>
+  <div class="report-table-wrap"><table class="report-table">
+    <caption class="sr-only">How dates are written</caption>
+    <thead><tr><th scope="col">Helper</th><th scope="col">Written as</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">One day</th><td>December 5, 2026</td></tr>
+      <tr><th scope="row">Inside a month</th><td>December 5–7, 2026</td></tr>
+      <tr><th scope="row">Across months</th><td>November 30 – December 2, 2026</td></tr>
+      <tr><th scope="row">Across years</th><td>Dec 30, 2026 – Jan 2, 2027</td></tr>
+      <tr><th scope="row">Short, no year</th><td>Oct 3–5 · Oct 30 – Nov 2</td></tr>
+      <tr><th scope="row">Weekday date</th><td>Monday, March 2, 2026</td></tr>
+      <tr><th scope="row">Event dates, staff overview</th><td>October 9 – 11, 2026</td></tr>
+      <tr><th scope="row">Event dates, search</th><td>Jul 14, 2027 to Jul 17, 2027</td></tr>
+      <tr><th scope="row">Event dates, public registration</th><td>October 9, 2026 – October 11, 2026</td></tr>
+      <tr><th scope="row">Moment in a zone</th><td>Jun 1, 2026, 3:05 PM CDT</td></tr>
+    </tbody>
+  </table></div>
+</div>

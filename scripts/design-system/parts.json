@@ -423,7 +423,8 @@
      ],
      "scopes": [
       "report-table",
-      "report-table-wrap"
+      "report-table-wrap",
+      "coordinator-club-cell"
      ]
     },
     {
@@ -435,7 +436,9 @@
       "status",
       "state",
       "icon",
-      "year"
+      "year",
+      "action",
+      "open"
      ]
     },
     {
@@ -1053,6 +1056,244 @@
       "content-skeleton-grid",
       "content-skeleton-card",
       "content-skeleton-panel"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Panel",
+   "group": "Data",
+   "readme": "components/design-system/Panel.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "panel",
+      "section-heading",
+      "inline-heading",
+      "detail-grid",
+      "detail-stack",
+      "dashboard-grid",
+      "main-column",
+      "side-column",
+      "eyebrow",
+      "status-word-value"
+     ],
+     "scopes": [
+      "panel",
+      "section-heading",
+      "detail-grid",
+      "inline-heading"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "CardGrids",
+   "group": "Data",
+   "readme": "components/design-system/CardGrids.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "metric-grid",
+      "metric-card",
+      "finance-summary",
+      "finance-stat",
+      "action-grid",
+      "action-card",
+      "action-icon",
+      "action-arrow",
+      "panel",
+      "section-heading",
+      "eyebrow"
+     ],
+     "scopes": [
+      "metric-card",
+      "finance-stat",
+      "action-card",
+      "action-grid",
+      "panel",
+      "section-heading"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Hero",
+   "group": "Navigation",
+   "readme": "components/design-system/Hero.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "event-hero",
+      "checkin-hero",
+      "hero-copy",
+      "hero-capacity",
+      "hero-eyebrow",
+      "hero-meta",
+      "event-state",
+      "capacity-track"
+     ],
+     "scopes": [
+      "event-hero",
+      "checkin-hero",
+      "hero-capacity",
+      "capacity-track"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "ViewsStrip",
+   "group": "Navigation",
+   "readme": "components/staff-view-strip.design.md",
+   "css": [
+    {
+     "file": "components/staff-shell.module.css",
+     "classes": [
+      "views"
+     ],
+     "scopes": [
+      "views"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Menus",
+   "group": "Overlays",
+   "readme": "components/design-system/Menus.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "menu-anchor",
+      "avatar",
+      "header-popover",
+      "account-popover",
+      "account-system-link",
+      "account-switch-form",
+      "account-switch-button",
+      "team-more-menu",
+      "team-more-menu-list",
+      "calendar-subscribe-compact",
+      "calendar-subscribe-toggle",
+      "calendar-subscribe-popover",
+      "calendar-subscribe-options",
+      "calendar-subscribe-status"
+     ],
+     "scopes": [
+      "header-popover",
+      "account-popover",
+      "team-more-menu-list",
+      "calendar-subscribe-options",
+      "calendar-subscribe-popover",
+      "calendar-subscribe-compact"
+     ]
+    },
+    {
+     "file": "components/staff-account-menu.module.css",
+     "classes": [
+      "trigger",
+      "popover",
+      "head",
+      "close",
+      "identity",
+      "photo",
+      "photoLarge",
+      "workspaces",
+      "heading"
+     ],
+     "scopes": [
+      "head",
+      "workspaces",
+      "identity"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Avatar",
+   "group": "Data",
+   "readme": "components/design-system/Avatar.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "person-avatar",
+      "person-avatar-photo",
+      "person-list",
+      "person-row",
+      "linked-row",
+      "arrival-row",
+      "staff-person",
+      "meta-stack",
+      "panel"
+     ],
+     "scopes": [
+      "person-row",
+      "arrival-row",
+      "staff-person",
+      "meta-stack"
+     ]
+    },
+    {
+     "file": "components/profile-photo-card.module.css",
+     "classes": [
+      "card",
+      "row",
+      "photo",
+      "initials",
+      "actions",
+      "help"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "MoneyAndDates",
+   "group": "Data",
+   "readme": "components/design-system/MoneyAndDates.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "money-input",
+      "detail-grid",
+      "status-word-value"
+     ],
+     "scopes": [
+      "money-input",
+      "detail-grid"
      ]
     }
    ]

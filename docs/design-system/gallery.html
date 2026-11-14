@@ -216,10 +216,21 @@
   <p class="club-banner-year"><span>Current club year</span><strong>2026–2027</strong></p>
 </div></section>
 <div class="club-portal-nav__nav"><div class="club-portal-nav__line"><nav aria-label="Club" class="club-portal-nav__tabs"><ul class="club-portal-nav__list"><li><a class="club-portal-nav__link" href="#">Home</a></li><li><a class="club-portal-nav__link" href="#" aria-current="page">Roster</a></li><li><a class="club-portal-nav__link" href="#">Forms</a></li><li><a class="club-portal-nav__link" href="#">Club events</a></li><li><a class="club-portal-nav__link" href="#">Honors</a></li><li><a class="club-portal-nav__link" href="#">Class tracking</a></li><li><a class="club-portal-nav__link" href="#">Monthly Records</a></li><li><a class="club-portal-nav__link" href="#">Orders</a></li><li><a class="club-portal-nav__link" href="#">Health</a></li><li><a class="club-portal-nav__link" href="#">Club settings</a></li></ul></nav></div></div>
+</div></section><section class="g-card" id="Hero"><header class="g-meta"><h3>Hero</h3><p>The navy banner at the top of an event's overview: the event's state, name, dates and place, with a capacity card beside it.</p><a href="components/Hero/README.md">Usage rules</a></header><div class="g-frame" style="min-height:300px"><div class="ds-stage">
+  <section class="event-hero" style="margin:0">
+    <div class="hero-copy">
+      <span class="event-state">Registration open</span>
+      <h2>Fall Camporee 2026</h2>
+      <p class="hero-meta"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg> October 9 – 11, 2026<span aria-hidden="true">•</span> Camp Riverton</p>
+    </div>
+    <div class="hero-capacity" aria-label="Event capacity"><span>Capacity</span><strong>148 / 200</strong><div class="capacity-track"><span style="width:74%"></span></div></div>
+  </section>
+  <p class="ds-caption">The event overview hero. Under 800px wide the capacity card drops below the copy.</p>
+</div>
 </div></section><section class="g-card" id="NotificationBell"><header class="g-meta"><h3>NotificationBell</h3><p>The staff header's notification bell and the "Needs attention" panel it opens.</p><a href="components/NotificationBell/README.md">Usage rules</a></header><div class="g-frame" style="min-height:330px"><div class="ds-stage">
   <div class="menu-anchor" style="width:max-content">
     <button class="avatar attention-bell" type="button" aria-expanded="true" aria-label="Notifications, 3 items need attention"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span aria-hidden="true" class="count-badge attention-badge">3</span></button>
-    <div aria-label="Notifications" class="header-popover attention-popover" role="group" style="position:static;margin-top:8px">
+    <div aria-label="Notifications" class="header-popover attention-popover" role="group" style="position:static;margin-top:8px;width:auto;max-width:340px">
       <h2 class="attention-heading" tabindex="-1">Needs attention</h2>
       <section aria-label="Registrations" class="attention-group">
         <h3>Registrations</h3>
@@ -323,7 +334,64 @@
     <p class="ds-caption">Below 1024px every tab row is a menu line; the phone adds the bottom bar.</p>
   </div>
 </div>
-</div></section><h2 class="g-head">Data</h2><section class="g-card" id="EmptyState"><header class="g-meta"><h3>EmptyState</h3><p>What a list shows when it has nothing yet: an icon, a short heading and the next step.</p><a href="components/EmptyState/README.md">Usage rules</a></header><div class="g-frame" style="min-height:230px"><div class="ds-stage">
+</div></section><section class="g-card" id="ViewsStrip"><header class="g-meta"><h3>ViewsStrip</h3><p>The views inside one staff tab: a bordered strip of links with the current view filled navy. It is never a second row of tabs.</p><a href="components/ViewsStrip/README.md">Usage rules</a></header><div class="g-frame" style="min-height:230px"><div class="ds-stage">
+  <div class="staff-shell__views" role="group" aria-label="Money views" data-staff-views style="margin:0">
+    <a href="#" aria-current="page">Payments</a><a href="#">Balances due</a><a href="#">Promo codes</a><a href="#">Refunds</a>
+  </div>
+  <p class="ds-caption">The current view is filled navy.</p>
+  <div class="staff-shell__views" role="group" aria-label="Time period" data-staff-views style="margin:0">
+    <a href="#">Last 7 days</a><a href="#" aria-current="true">Last 30 days</a><a href="#">This year</a>
+  </div>
+  <p class="ds-caption">A strip that only changes a choice on the same page marks the current item with the soft fill.</p>
+</div>
+</div></section><h2 class="g-head">Data</h2><section class="g-card" id="Avatar"><header class="g-meta"><h3>Avatar</h3><p>The small square with a person's initials or photo, used beside a name in lists, and the larger round profile photo.</p><a href="components/Avatar/README.md">Usage rules</a></header><div class="g-frame" style="min-height:620px"><div class="ds-stage">
+  <div class="person-list" style="max-width:520px">
+    <a class="person-row linked-row" href="#"><span class="person-avatar purple">MR</span><span><strong>Morgan Reed</strong><small>AB12CD · 3 people · $45.00 due</small></span><span class="status-chip gold">Balance due</span></a>
+    <a class="person-row linked-row" href="#"><span class="person-avatar green">JP</span><span><strong>Jordan Park</strong><small>EF34GH · 1 person</small></span><span class="status-chip green">Paid</span></a>
+    <div class="arrival-row"><span class="person-avatar purple">AL</span><span class="meta-stack"><strong>Avery Lane</strong><small>JK56LM · pathfinder</small></span></div>
+  </div>
+  <p class="ds-caption">Initials, in three tones.</p>
+  <div class="ds-row">
+    <span class="person-avatar">MR</span>
+    <span class="person-avatar large">MR</span>
+    <span class="person-avatar gold">TB</span>
+    <span class="person-avatar"><img alt="" class="person-avatar-photo" height="38" width="38" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%23003b5c'/%3E%3Ccircle cx='20' cy='15' r='7' fill='%23f0b323'/%3E%3Cpath d='M6 40a14 14 0 0 1 28 0z' fill='%23f0b323'/%3E%3C/svg%3E"></span>
+  </div>
+  <p class="ds-caption">Default, large (45px), gold, and a photo (a drawn stand-in here).</p>
+  <section class="panel profile-photo-card__card" style="max-width:520px">
+    <h2>Profile photo</h2>
+    <div class="profile-photo-card__row">
+      <span aria-hidden="true" class="profile-photo-card__initials">MR</span>
+      <div class="profile-photo-card__actions"><button class="secondary-button" type="button">Add a profile photo</button></div>
+    </div>
+  </section>
+  <p class="ds-caption">The profile photo card with no photo yet: 96px initials.</p>
+</div>
+</div></section><section class="g-card" id="CardGrids"><header class="g-meta"><h3>CardGrids</h3><p>The small cards a staff page puts in a grid: summary tiles, quick-action cards and the finance summary.</p><a href="components/CardGrids/README.md">Usage rules</a></header><div class="g-frame" style="min-height:620px"><div class="ds-stage">
+  <section class="finance-summary" aria-label="Organization summary">
+    <article class="finance-stat"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/></svg></span><small>Active churches</small><strong>12</strong></article>
+    <article class="finance-stat warning"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg></span><small>Need review</small><strong>3</strong></article>
+    <article class="finance-stat muted"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></span><small>Linked records</small><strong>8</strong></article>
+    <article class="finance-stat"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/></svg></span><small>Active clubs</small><strong>27</strong></article>
+  </section>
+  <p class="ds-caption">Finance summary tiles: the icon square is green, gold (warning) or purple (muted).</p>
+  <section class="metric-grid" aria-label="Event metrics" style="margin-bottom:0">
+    <article class="metric-card"><strong>148</strong><p>People</p><small>Of 200 spaces</small></article>
+    <article class="metric-card accent-purple"><strong>6</strong><p>Waiting</p><small>Need approval</small></article>
+    <article class="metric-card accent-gold"><strong>$4,250</strong><p>Collected</p><small>Sample amount</small></article>
+    <article class="metric-card accent-green"><strong>92%</strong><p>Checked in</p><small>Sample figure</small></article>
+  </section>
+  <p class="ds-caption">The metric grid holds MetricCards: four across on wide screens, two on narrow ones.</p>
+  <section class="panel">
+    <div class="section-heading"><div><p class="eyebrow">Event operations</p><h2>Quick actions</h2></div></div>
+    <div class="action-grid">
+      <a class="action-card" href="#"><span class="action-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span><strong>Add a registration</strong><small>Enter one for a family</small><svg class="action-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+      <a class="action-card" href="#"><span class="action-icon purple"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></span><strong>Send a message</strong><small>Email registrants</small><svg class="action-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+      <a class="action-card" href="#"><span class="action-icon green"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg></span><strong>Open check-in</strong><small>Arrivals and badges</small><svg class="action-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+    </div>
+  </section>
+</div>
+</div></section><section class="g-card" id="EmptyState"><header class="g-meta"><h3>EmptyState</h3><p>What a list shows when it has nothing yet: an icon, a short heading and the next step.</p><a href="components/EmptyState/README.md">Usage rules</a></header><div class="g-frame" style="min-height:230px"><div class="ds-stage">
   <div class="panel empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><h3>No private links sent yet</h3><p>Links you send to members for a form show up here.</p><div style="margin-top:12px"><button class="primary-button">Send a private link</button></div></div>
 </div>
 </div></section><section class="g-card" id="ListFilters"><header class="g-meta"><h3>ListFilters</h3><p>The tools above a list: filters, the chips for filters that are on, and the bar that appears when rows can be selected.</p><a href="components/ListFilters/README.md">Usage rules</a></header><div class="g-frame" style="min-height:470px"><div class="ds-stage">
@@ -390,16 +458,82 @@
   <div class="metric-card accent-gold"><strong>Nov 10</strong><p>October report due</p><small>Draft saved</small></div>
   <div class="metric-card accent-green"><strong>2,150</strong><p>Points this year</p><small>Includes 1,500 registration</small></div>
 </div>
-</div></section><section class="g-card" id="MonthlyRecordsGrid"><header class="g-meta"><h3>MonthlyRecordsGrid</h3><p>The coordinator's Monthly Records month view: one row per club for the chosen month, then a strip of that club's whole year.</p><a href="components/MonthlyRecordsGrid/README.md">Usage rules</a></header><div class="g-frame" style="min-height:240px"><div class="ds-stage">
-  <div class="report-table-wrap coordinator-monthly-records__tableBlock"><table class="report-table coordinator-monthly-records__table">
-    <thead><tr><th scope="col">Club</th><th scope="col">November record</th><th scope="col">Year so far</th></tr></thead>
+</div></section><section class="g-card" id="MoneyAndDates"><header class="g-meta"><h3>MoneyAndDates</h3><p>How amounts, balances and dates are written on screen. Each helper below is the one the app uses; screens never format these by hand.</p><a href="components/MoneyAndDates/README.md">Usage rules</a></header><div class="g-frame" style="min-height:1000px"><div class="ds-stage">
+  <div class="report-table-wrap"><table class="report-table">
+    <caption class="sr-only">How amounts are written</caption>
+    <thead><tr><th scope="col">Helper</th><th scope="col">Written as</th></tr></thead>
     <tbody>
-      <tr><th scope="row" class="coordinator-monthly-records__club">Riverton Pathfinders</th><td class="coordinator-monthly-records__status"><span class="coordinator-monthly-records__state"><span aria-hidden="true" class="coordinator-monthly-records__icon">✓</span> Submitted</span></td><td class="coordinator-monthly-records__year"><span role="img" aria-label="Riverton Pathfinders, year at a glance" class="club-report-charts__strip"><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span></span></td></tr>
-      <tr><th scope="row" class="coordinator-monthly-records__club">Cedar Hollow Trailblazers</th><td class="coordinator-monthly-records__status"><span class="coordinator-monthly-records__state"><span aria-hidden="true" class="coordinator-monthly-records__icon">✕</span> Not submitted<small> (draft saved)</small></span></td><td class="coordinator-monthly-records__year"><span role="img" aria-label="Cedar Hollow Trailblazers, year at a glance" class="club-report-charts__strip"><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span></span></td></tr>
-      <tr><th scope="row" class="coordinator-monthly-records__club">Prairie Ridge Eagles</th><td class="coordinator-monthly-records__status"><span class="coordinator-monthly-records__state"><span aria-hidden="true" class="coordinator-monthly-records__icon">✕</span> Not submitted</span></td><td class="coordinator-monthly-records__year"><span role="img" aria-label="Prairie Ridge Eagles, year at a glance" class="club-report-charts__strip"><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span></span></td></tr>
+      <tr><th scope="row">Amount, 123456 cents</th><td translate="no">$1,234.56</td></tr>
+      <tr><th scope="row">Negative, -500 cents</th><td translate="no">-$5.00</td></tr>
+      <tr><th scope="row">Whole dollars</th><td translate="no">$1,235</td></tr>
+      <tr><th scope="row">Plain, no comma</th><td translate="no">$1234.56</td></tr>
     </tbody>
   </table></div>
-  <p class="ds-caption">Navy square: submitted · hatched: not submitted · pale: not due yet. Each square also carries a mark, so color is never the only cue. The note “(draft saved)” appears in the status cell only, never in the strip.</p>
+  <div class="detail-grid">
+    <span><small>Total</small><strong translate="no">$120.00</strong></span>
+    <span><small>Paid</small><strong translate="no">$75.00</strong></span>
+    <span><small>Balance</small><strong translate="no">$45.00</strong></span>
+    <span><small>Status</small><strong class="status-word-value">Balance due</strong></span>
+  </div>
+  <p class="ds-caption">Amounts are never translated; the labels are. Sample amounts only.</p>
+  <label for="ds-price">Price</label>
+  <span class="money-input" style="max-width:180px"><b>$</b><input id="ds-price" inputmode="decimal" value="25.00"></span>
+  <div class="report-table-wrap"><table class="report-table">
+    <caption class="sr-only">How dates are written</caption>
+    <thead><tr><th scope="col">Helper</th><th scope="col">Written as</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">One day</th><td>December 5, 2026</td></tr>
+      <tr><th scope="row">Inside a month</th><td>December 5–7, 2026</td></tr>
+      <tr><th scope="row">Across months</th><td>November 30 – December 2, 2026</td></tr>
+      <tr><th scope="row">Across years</th><td>Dec 30, 2026 – Jan 2, 2027</td></tr>
+      <tr><th scope="row">Short, no year</th><td>Oct 3–5 · Oct 30 – Nov 2</td></tr>
+      <tr><th scope="row">Weekday date</th><td>Monday, March 2, 2026</td></tr>
+      <tr><th scope="row">Event dates, staff overview</th><td>October 9 – 11, 2026</td></tr>
+      <tr><th scope="row">Event dates, search</th><td>Jul 14, 2027 to Jul 17, 2027</td></tr>
+      <tr><th scope="row">Event dates, public registration</th><td>October 9, 2026 – October 11, 2026</td></tr>
+      <tr><th scope="row">Moment in a zone</th><td>Jun 1, 2026, 3:05 PM CDT</td></tr>
+    </tbody>
+  </table></div>
+</div>
+</div></section><section class="g-card" id="MonthlyRecordsGrid"><header class="g-meta"><h3>MonthlyRecordsGrid</h3><p>The coordinator's Monthly Records month view: one row per club for the chosen month, then a strip of that club's whole year.</p><a href="components/MonthlyRecordsGrid/README.md">Usage rules</a></header><div class="g-frame" style="min-height:240px"><style>
+  /* The app wraps the year strip on phones (a rule on the strip itself, `.year > [role="img"]`, which bundle.css does not copy because it names no class). */
+  @media (max-width: 599px) { .coordinator-monthly-records__year > [role="img"] { display: flex; flex-wrap: wrap; max-width: 100%; } }
+</style>
+<div class="ds-stage">
+  <div class="report-table-wrap coordinator-monthly-records__tableBlock"><table class="report-table table-cards coordinator-monthly-records__table" role="table">
+    <caption class="sr-only">Clubs and their Nov record, club year 2026–2027</caption>
+    <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Club</th><th role="columnheader" scope="col">Nov record</th><th role="columnheader" scope="col">Year so far</th><th role="columnheader" scope="col"><span class="sr-only">Open</span></th></tr></thead>
+    <tbody role="rowgroup">
+      <tr role="row"><th role="rowheader" scope="row" class="coordinator-monthly-records__club">Riverton Pathfinders</th><td role="cell" data-label="Nov record" class="coordinator-monthly-records__status"><span class="coordinator-monthly-records__state"><span aria-hidden="true" class="coordinator-monthly-records__icon">✓</span> Submitted</span></td><td role="cell" data-label="Year so far" class="coordinator-monthly-records__year"><span role="img" aria-label="Riverton Pathfinders, year at a glance" class="club-report-charts__strip"><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span></span></td><td role="cell" class="coordinator-monthly-records__action"><a class="coordinator-monthly-records__open" href="#">Open record</a></td></tr>
+      <tr role="row"><th role="rowheader" scope="row" class="coordinator-monthly-records__club">Cedar Hollow Trailblazers</th><td role="cell" data-label="Nov record" class="coordinator-monthly-records__status"><span class="coordinator-monthly-records__state"><span aria-hidden="true" class="coordinator-monthly-records__icon">✕</span> Not submitted<small> (draft saved)</small></span></td><td role="cell" data-label="Year so far" class="coordinator-monthly-records__year"><span role="img" aria-label="Cedar Hollow Trailblazers, year at a glance" class="club-report-charts__strip"><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span></span></td><td role="cell" class="coordinator-monthly-records__action"><a class="coordinator-monthly-records__open" href="#">Open club</a></td></tr>
+      <tr role="row"><th role="rowheader" scope="row" class="coordinator-monthly-records__club">Prairie Ridge Eagles</th><td role="cell" data-label="Nov record" class="coordinator-monthly-records__status"><span class="coordinator-monthly-records__state"><span aria-hidden="true" class="coordinator-monthly-records__icon">✕</span> Not submitted</span></td><td role="cell" data-label="Year so far" class="coordinator-monthly-records__year"><span role="img" aria-label="Prairie Ridge Eagles, year at a glance" class="club-report-charts__strip"><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span></span></td><td role="cell" class="coordinator-monthly-records__action"><a class="coordinator-monthly-records__open" href="#">Open club</a></td></tr>
+    </tbody>
+  </table></div>
+  <p class="ds-caption">On a phone, or in any box narrower than 600px, each row becomes a card: the club name, then “Nov record: …”, “Year so far” above the strip, and the open link. Navy square: submitted · hatched: not submitted · pale: not due yet. Each square also carries a mark, so color is never the only cue. The note “(draft saved)” appears in the status cell only, never in the strip.</p>
+</div>
+</div></section><section class="g-card" id="Panel"><header class="g-meta"><h3>Panel</h3><p>The white card every staff page is built from, with its heading row, the detail grid for facts, and the two-column dashboard layout.</p><a href="components/Panel/README.md">Usage rules</a></header><div class="g-frame" style="min-height:560px"><div class="ds-stage">
+  <div class="dashboard-grid">
+    <div class="main-column">
+      <section class="panel">
+        <div class="section-heading"><div><p class="eyebrow">Registration</p><h2>Morgan Reed</h2></div><button class="secondary-button" type="button">Edit</button></div>
+        <div class="detail-stack">
+          <div class="detail-grid">
+            <span><small>Confirmation</small><strong translate="no">AB12CD</strong></span>
+            <span><small>Status</small><strong class="status-word-value">Balance due</strong></span>
+            <span><small>Total</small><strong translate="no">$120.00</strong></span>
+            <span><small>Balance</small><strong translate="no">$45.00</strong></span>
+          </div>
+        </div>
+      </section>
+    </div>
+    <aside class="side-column">
+      <section class="panel">
+        <div class="section-heading"><div><h2>Notes</h2></div><button class="text-button" type="button">Add note</button></div>
+        <p class="quiet-copy">Nothing to show yet.</p>
+      </section>
+    </aside>
+  </div>
+  <p class="ds-caption">Panel with its heading row, detail tiles, and the main and side columns. At 1120px and narrower the columns stack.</p>
 </div>
 </div></section><section class="g-card" id="ReportTable"><header class="g-meta"><h3>ReportTable</h3><p>The standard data table: bordered, rounded wrapper, uppercase muted headers and quiet row lines.</p><a href="components/ReportTable/README.md">Usage rules</a></header><div class="g-frame" style="min-height:300px"><div class="ds-stage">
   <div class="report-table-wrap"><table class="report-table">
@@ -424,6 +558,48 @@
     <div class="form-actions"><button class="secondary-button">Keep on roster</button><button class="primary-button lifecycle-danger-button">Remove permanently</button></div>
   </div>
 </div>
+</div>
+</div></section><section class="g-card" id="Menus"><header class="g-meta"><h3>Menus</h3><p>The small floating panels that open from a button: the staff account popover, a row's "More" menu and the calendar's "Add to my calendar" list. <code>ActionsMenu</code> and <code>Dialog</code> have their own parts; the staff shell's menu line sheet is described in <code>StaffShell</code>.</p><a href="components/Menus/README.md">Usage rules</a></header><div class="g-frame" style="min-height:1220px"><div class="ds-stage">
+  <div class="menu-anchor" style="width:max-content">
+    <button class="avatar staff-account-menu__trigger" type="button" aria-expanded="true" aria-controls="staff-account-menu" aria-label="Staff account"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.7a7 7 0 0 1 10 0"/></svg></button>
+    <div aria-labelledby="ds-account-title" class="header-popover account-popover staff-account-menu__popover" id="staff-account-menu" role="dialog" style="position:static;margin-top:8px">
+      <div class="staff-account-menu__head"><h2 id="ds-account-title">Your account</h2><button class="secondary-button staff-account-menu__close" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg><span>Close</span></button></div>
+      <strong>Morgan Reed</strong><p>morgan.reed@example.org</p>
+      <small>Database-backed staff session</small>
+      <a class="account-system-link" href="#">Edit profile</a>
+      <a class="account-system-link" href="#">Add a profile photo</a>
+      <div role="group" aria-label="Switch workspace" class="staff-account-menu__workspaces">
+        <small class="staff-account-menu__heading">Switch workspace</small>
+        <a class="account-system-link" href="#" aria-current="true">Event staff</a>
+        <a class="account-system-link" href="#">Club director</a>
+      </div>
+      <a class="account-system-link" href="#">Preview attendee experience</a>
+    </div>
+  </div>
+  <p class="ds-caption">The staff account popover: a sticky title and Close, then 44px links. The current workspace has the gold edge.</p>
+  <div class="team-more-menu" style="flex-direction:column;align-items:flex-start;gap:6px">
+    <button class="secondary-button" type="button" aria-haspopup="menu" aria-expanded="true" aria-label="More actions for Morgan Reed">More</button>
+    <ul class="team-more-menu-list" role="menu" aria-label="More actions for Morgan Reed" style="position:static">
+      <li role="none"><button type="button" role="menuitem">Resend invitation</button></li>
+      <li role="none"><button type="button" role="menuitem">Change access</button></li>
+      <li role="none"><button type="button" role="menuitem" class="danger">Remove from team</button></li>
+    </ul>
+  </div>
+  <p class="ds-caption">A row's More menu. The destructive item is last and red.</p>
+  <div class="calendar-subscribe-compact" style="width:min(340px,100%)">
+    <button class="primary-button calendar-subscribe-toggle" type="button" aria-expanded="true" aria-controls="ds-calendar-options">Add to my calendar</button>
+    <div class="calendar-subscribe-popover" style="position:static;margin-top:6px;width:100%">
+      <ul class="calendar-subscribe-options" id="ds-calendar-options">
+        <li><a href="#">Google Calendar</a></li>
+        <li><a href="#">Outlook.com</a></li>
+        <li><a href="#">Outlook (work or school)</a></li>
+        <li><a href="#">Apple Calendar</a></li>
+        <li><a href="#">ICS link</a></li>
+        <li><button type="button">Copy link</button></li>
+      </ul>
+    </div>
+  </div>
+  <p class="ds-caption">The calendar list, shown below its button.</p>
 </div>
 </div></section><h2 class="g-head">Tool mockups</h2><section class="g-card" id="CalendarMonth"><header class="g-meta"><h3>CalendarMonth</h3><p>Mockup of the month calendar: a ruled grid with toned event chips and a key.</p><a href="components/CalendarMonth/README.md">Usage rules</a></header><div class="g-frame" style="min-height:630px"><div class="ds-stage"><div class="calendar-month"><div class="calendar-weekdays"><div class="calendar-weekday">Sun</div><div class="calendar-weekday">Mon</div><div class="calendar-weekday">Tue</div><div class="calendar-weekday">Wed</div><div class="calendar-weekday">Thu</div><div class="calendar-weekday">Fri</div><div class="calendar-weekday">Sat</div></div>
 <div class="calendar-week"><div class="calendar-day is-outside"></div><div class="calendar-day is-outside"></div><div class="calendar-day is-outside"></div><div class="calendar-day is-outside"></div><div class="calendar-day"><a class="calendar-day-link" href="#"><span class="calendar-day-number">1</span></a></div><div class="calendar-day"><a class="calendar-day-link" href="#"><span class="calendar-day-number">2</span></a></div><div class="calendar-day"><a class="calendar-day-link" href="#"><span class="calendar-day-number">3</span></a></div><a class="calendar-bar calendar-tone-1" href="#" style="grid-column: 7 / span 1; grid-row: 2"><span class="calendar-bar-title">Pathfinder Bible Experience</span></a></div>
