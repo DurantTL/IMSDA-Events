@@ -492,3 +492,39 @@ export function buildSeminarPreferencesBlock(attendees: readonly SeminarAttendee
     .filter((block): block is string => block !== null)
     .join("\n\n");
 }
+
+export type MerchandiseReceiptBlockInput = {
+  receiptNumber: string;
+  /** The day the receipt was made, already formatted for the reader. */
+  dateText: string;
+  lines: ReadonlyArray<{ productName: string; variantLabel: string; quantity: number; lineTotalCents: number }>;
+  feeCents: number;
+  taxCents: number;
+  totalCents: number;
+  /** "Cash", "Check #123", "Card (Square), ref …" or "Comped — no charge" (`merchandisePaymentMethodLine`). */
+  methodLine: string;
+  /** A comped order: the total is $0.00 and the items are shown at their value. */
+  comped?: boolean;
+};
+
+/**
+ * The merchandise receipt section (#148): each line from the order's own snapshots, any fee or tax, the total, and how
+ * it was settled. It describes the merchandise order only; registration charges are never part of it. Names, sizes and
+ * the method line (a check number or card reference staff typed) are escaped; the receipt number and date are ours.
+ */
+export function buildMerchandiseReceiptBlock(input: MerchandiseReceiptBlockInput) {
+  const lines = ["### Your merchandise order", ""];
+  for (const line of input.lines) {
+    lines.push(`- ${line.quantity} × ${escapeMarkdown(line.productName)} (${escapeMarkdown(line.variantLabel)}): ${formatMessageMoney(line.lineTotalCents)}`);
+  }
+  // A comp charges nothing, so it lists no fee or tax lines that could read as a charge.
+  if (!input.comped && input.feeCents > 0) lines.push(`- Processing fee: ${formatMessageMoney(input.feeCents)}`);
+  if (!input.comped && input.taxCents > 0) lines.push(`- Tax: ${formatMessageMoney(input.taxCents)}`);
+  lines.push(input.comped
+    ? `- **Total:** $0.00 (comped; items valued at ${formatMessageMoney(input.totalCents)})`
+    : `- **Total:** ${formatMessageMoney(input.totalCents)}`, "", "### Receipt", "");
+  lines.push(`- **Receipt number:** ${input.receiptNumber}`);
+  lines.push(`- **Date:** ${input.dateText}`);
+  lines.push(`- **Payment:** ${escapeMarkdown(input.methodLine)}`);
+  return lines.join("\n");
+}

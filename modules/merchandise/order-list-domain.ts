@@ -1,4 +1,5 @@
 import { merchandiseOrderStatusWords, type MerchandiseOrderStatusValue } from "@/modules/merchandise/domain";
+import { merchandisePaymentMethodLine, type MerchandiseOrderActionValue } from "@/modules/merchandise/order-actions-domain";
 
 export type StaffMerchandiseOrder = {
   id: string;
@@ -10,7 +11,14 @@ export type StaffMerchandiseOrder = {
   /** False when the order's registration was cancelled: it stays listed but is not counted in the totals. */
   registrationActive: boolean;
   totalCents: number;
+  /** Set when staff marked the order paid or comped it (#148). */
+  receiptNumber: string | null;
+  /** "Cash", "Check #123", "Card (Square), ref …" or "Comped — no charge"; null while unpaid. */
+  paymentLine: string | null;
+  paidAt: string | null;
   lines: Array<{ productName: string; variantLabel: string; quantity: number; lineTotalCents: number }>;
+  /** Staff actions, oldest first: who, when, what and the reason they gave. */
+  history: Array<{ id: string; action: MerchandiseOrderActionValue | null; fromStatus: MerchandiseOrderStatusValue; toStatus: MerchandiseOrderStatusValue; actorName: string; createdAt: string; reason: string | null }>;
 };
 
 export type MerchandiseTotalsRow = { productName: string; variantLabel: string; quantity: number };
@@ -45,7 +53,12 @@ export function staffOrderFromRecord(order: {
   purchaserSnapshot: unknown;
   registrationId: string | null;
   registration: { status: string } | null;
+  receiptNumber?: string | null;
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
+  paidAt?: Date | null;
   lines: Array<{ productNameSnapshot: string; variantLabelSnapshot: string; quantity: number; lineTotalCents: number }>;
+  statusChanges?: Array<{ id: string; action: MerchandiseOrderActionValue | null; fromStatus: MerchandiseOrderStatusValue; toStatus: MerchandiseOrderStatusValue; reason: string | null; createdAt: Date; actor: { displayName: string } | null }>;
 }): StaffMerchandiseOrder {
   return {
     id: order.id,
@@ -59,6 +72,10 @@ export function staffOrderFromRecord(order: {
     // A cancelled registration's order does not count.
     registrationActive: order.registrationId === null ? order.registration === null : order.registration !== null && order.registration.status !== "CANCELLED",
     totalCents: order.totalCents,
+    receiptNumber: order.receiptNumber ?? null,
+    paymentLine: merchandisePaymentMethodLine({ status: order.status, method: order.paymentMethod ?? null, reference: order.paymentReference ?? null }),
+    paidAt: order.paidAt?.toISOString() ?? null,
+    history: (order.statusChanges ?? []).map((change) => ({ id: change.id, action: change.action, fromStatus: change.fromStatus, toStatus: change.toStatus, actorName: change.actor?.displayName ?? "Staff", createdAt: change.createdAt.toISOString(), reason: change.reason })),
     lines: order.lines.map((line) => ({ productName: line.productNameSnapshot, variantLabel: line.variantLabelSnapshot, quantity: line.quantity, lineTotalCents: line.lineTotalCents })),
   };
 }

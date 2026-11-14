@@ -5,6 +5,7 @@ import { serverSort, sortRows } from "@/lib/list-sort";
 import { MERCHANDISE_ORDERS_SORT_COLUMNS } from "@/lib/staff-sort-columns";
 import { MerchandiseOrdersPanel } from "@/components/merchandise-orders-panel";
 import { canViewMerchandiseOrders, listMerchandiseOrders } from "@/modules/merchandise/order-list";
+import { merchandiseOrderActionPermissions } from "@/modules/merchandise/order-actions-domain";
 import { MerchandiseAdminWorkspace } from "@/components/merchandise-admin-workspace";
 import { PageHeader } from "@/components/page-header";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -52,7 +53,7 @@ export default async function MerchandisePage({
   return (
     <>
       <MerchandiseAdminWorkspace canApproveSales={canApproveSales} eventId={event.id} />
-      {orderList && <MerchandiseOrdersPanel pageHref={pageHref} slice={slice} sorting={sorting} totals={orderList.totals} />}
+      {orderList && <MerchandiseOrdersPanel eventId={event.id} permissions={merchandiseOrderActionPermissions(permissions)} pageHref={pageHref} slice={slice} sorting={sorting} totals={orderList.totals} />}
     </>
   );
 }

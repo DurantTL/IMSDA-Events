@@ -4,6 +4,9 @@
  * PENDING order linked to the registration (no fee, no tax, not in the registration total), a replayed submission
  * returns the same order, a sold-out size refuses the whole submission, a waitlisted registration orders nothing, two
  * registrations racing for the last tracked item leave exactly one order, and the staff list is scoped to its event.
+ * Staff actions (#148): mark paid (cash, check, Square reference), comp and cancel, sequential receipt numbers that
+ * stay unique under a race, a retry that changes nothing twice, one winner for two clicks at once, a paid order that
+ * cannot be cancelled, a comped order that counts for pickup, and an order id from another event.
  * Synthetic data only.
  */
 import { loadEnvConfig } from "@next/env";
@@ -16,6 +19,8 @@ import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { getPublicRegistrationExperience, PublicRegistrationError, submitPublicRegistration } from "@/modules/forms/public-repository";
 import type { PublicRegistrationInput } from "@/modules/forms/public-domain";
 import { listMerchandiseOrders } from "@/modules/merchandise/order-list";
+import { applyMerchandiseOrderAction, MerchandiseOrderActionError } from "@/modules/merchandise/order-actions";
+import { merchandiseOrderActionSchema } from "@/modules/merchandise/order-actions-domain";
 
 loadEnvConfig(process.cwd());
 assertLocalDatabase(process.env, "run this verification");
@@ -171,6 +176,57 @@ async function main() {
   assert(list.orders.length === 2 && list.orders.every((o) => o.confirmationCode), "the staff list shows this event's orders");
   assert(list.totals.every((row) => row.variantLabel !== "Medium"), "a cancelled registration's order is left out of the totals");
   assert((await listMerchandiseOrders(waitEvent.eventId)).orders.length === 0, "another event's list is separate");
+
+  // Staff actions (#148).
+  const act = (eventId: string, orderId: string, body: Record<string, unknown>) => applyMerchandiseOrderAction(eventId, orderId, userId, merchandiseOrderActionSchema.parse({ clientRequestId: randomUUID(), ...body }));
+  const staffOrder = (eventId: string, tag: string, variantId: string, quantity = 1) => prisma.merchandiseOrder.create({ data: {
+    eventId, clientRequestId: `staff:${P}:${tag}`, requestFingerprint: tag, purchaserSnapshot: { name: `Staff ${tag}` }, status: "PENDING", subtotalCents: 3000 * quantity, totalCents: 3000 * quantity,
+    lines: { create: [{ eventId, productId: `${eventId}_p1`, productNameSnapshot: "Camp Shirt", variantId, variantLabelSnapshot: "Large", unitPriceCentsSnapshot: 3000, quantity, taxTreatmentSnapshot: "TAXABLE", feePolicySnapshot: "PASSED_TO_BUYER", lineTotalCents: 3000 * quantity }] },
+  } });
+  await prisma.registration.update({ where: { id: registration.id }, data: { status: "CONFIRMED" } });
+  const payKey = randomUUID();
+  const paid = await act(main.eventId, order.id, { action: "MARK_PAID", method: "CHECK", reference: "1042", clientRequestId: payKey });
+  assert(paid.order.status === "PAID" && paid.order.receiptNumber === "M-0001" && paid.order.paymentReference === "1042", "mark paid records the check and the first receipt number");
+  const paidRow = await prisma.merchandiseOrder.findUniqueOrThrow({ where: { id: order.id } });
+  assert(paidRow.paidAt !== null && paidRow.paymentMethod === "CHECK", "mark paid stores the method and time");
+  const receipts = await prisma.messageOutbox.findMany({ where: { registrationId: registration.id, templateKey: "MERCHANDISE_RECEIPT" } });
+  assert(receipts.length === 1 && receipts[0]!.bodyTextSnapshot.includes("M-0001") && !receipts[0]!.bodyTextSnapshot.toLowerCase().includes("balance"), "one receipt email is queued, with no registration balance");
+  const retried = await act(main.eventId, order.id, { action: "MARK_PAID", method: "CHECK", reference: "1042", clientRequestId: payKey });
+  assert(retried.replayed && await prisma.merchandiseOrderStatusChange.count({ where: { orderId: order.id } }) === 1, "a retry with the same id changes nothing twice");
+  assert(await prisma.messageOutbox.count({ where: { registrationId: registration.id, templateKey: "MERCHANDISE_RECEIPT" } }) === 1, "a retry queues no second email");
+  assert(await prisma.auditLog.count({ where: { eventId: main.eventId, entityId: order.id, action: "MERCHANDISE_ORDER_MARKED_PAID" } }) === 1, "one audit entry is written");
+  const conflict = await caught(act(main.eventId, order.id, { action: "COMP", reason: "Same id, other action", clientRequestId: payKey }));
+  assert(conflict instanceof MerchandiseOrderActionError && conflict.code === "IDEMPOTENCY_CONFLICT", "the same id for another action is a conflict");
+  const noRefund = await caught(act(main.eventId, order.id, { action: "CANCEL", reason: "Changed their mind" }));
+  assert(noRefund instanceof MerchandiseOrderActionError && noRefund.code === "PAID_ORDER_NEEDS_REFUND" && noRefund.status === 409, "a paid order cannot be cancelled here");
+  assert(await prisma.merchandiseOrder.findUniqueOrThrow({ where: { id: order.id } }).then((row) => row.status) === "PAID", "the refused cancel leaves the order paid");
+
+  const [racerA, racerB] = await Promise.all([staffOrder(main.eventId, "a", main.variants.large), staffOrder(main.eventId, "b", main.variants.large)]);
+  const numbered = await Promise.all([act(main.eventId, racerA.id, { action: "MARK_PAID", method: "CASH" }), act(main.eventId, racerB.id, { action: "COMP", reason: "Volunteer shirt" })]);
+  assert(new Set(numbered.map((row) => row.order.receiptNumber)).size === 2 && numbered.every((row) => /^M-000[23]$/.test(row.order.receiptNumber ?? "")), "two receipts at once get different sequential numbers");
+
+  const doubleClick = await staffOrder(main.eventId, "c", main.variants.large);
+  const clicks = await Promise.all([1, 2].map((n) => caught(act(main.eventId, doubleClick.id, { action: "MARK_PAID", method: "CARD_REFERENCE", reference: `SQ-${n}` }))));
+  assert(clicks.filter((result) => result === null).length === 1 && clicks.filter((result) => result instanceof MerchandiseOrderActionError).length === 1, "two staff clicking at once change the order once");
+  assert(await prisma.merchandiseOrderStatusChange.count({ where: { orderId: doubleClick.id } }) === 1, "only the winner writes a status change");
+  assert(await prisma.merchandiseOrder.findUniqueOrThrow({ where: { id: doubleClick.id } }).then((row) => row.paymentMethod === "CARD_REFERENCE" && /^SQ-[12]$/.test(row.paymentReference ?? "")), "a Square card payment is recorded as a reference only");
+
+  const compedOrder = await staffOrder(main.eventId, "d", main.variants.cap);
+  await act(main.eventId, compedOrder.id, { action: "COMP", reason: "Speaker gift" });
+  assert((await listMerchandiseOrders(main.eventId)).totals.some((row) => row.variantLabel === "One size" && row.quantity >= 1), "a comped order counts for pickup");
+  const noFinance = await caught(act(main.eventId, compedOrder.id, { action: "CANCEL", reason: "Gift withdrawn" }));
+  assert(noFinance instanceof MerchandiseOrderActionError && noFinance.code === "FINANCE_REQUIRED", "cancelling a comped order needs finance access");
+  assert(await prisma.merchandiseOrder.findUniqueOrThrow({ where: { id: compedOrder.id } }).then((row) => row.status) === "COMPED", "the refused cancel leaves the order comped");
+  await applyMerchandiseOrderAction(main.eventId, compedOrder.id, userId, merchandiseOrderActionSchema.parse({ clientRequestId: randomUUID(), action: "CANCEL", reason: "Gift withdrawn" }), new Date(), true);
+  assert(await prisma.merchandiseOrder.findUniqueOrThrow({ where: { id: compedOrder.id } }).then((row) => row.status) === "CANCELLED", "a comped order can be cancelled");
+
+  const wrongEvent = await caught(act(waitEvent.eventId, racerA.id, { action: "CANCEL", reason: "Wrong event" }));
+  assert(wrongEvent instanceof MerchandiseOrderActionError && wrongEvent.status === 404, "an order id from another event is not found");
+
+  await prisma.event.update({ where: { id: main.eventId }, data: { lifecycleState: "CLOSED" } });
+  const closed = await caught(act(main.eventId, racerA.id, { action: "COMP", reason: "Too late" }));
+  assert((closed as { code?: string } | null)?.code === "EVENT_CLOSED", "a closed event takes no merchandise payment or comp");
+  await prisma.event.update({ where: { id: main.eventId }, data: { lifecycleState: "PUBLISHED" } });
 
   console.log("Registration merchandise verification passed.");
 }

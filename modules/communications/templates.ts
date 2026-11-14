@@ -15,6 +15,7 @@ export const MESSAGE_TEMPLATE_KEYS = [
   "REGISTRATION_CONTACT_UPDATED",
   "REGISTRATION_UPDATED",
   "PAYMENT_RECEIPT",
+  "MERCHANDISE_RECEIPT",
   "REFUND_NOTICE",
   "BALANCE_REMINDER",
   "REGISTRATION_TRANSFERRED_NEW_CONTACT",
@@ -85,6 +86,7 @@ export const MESSAGE_TEMPLATE_TOKEN_KEYS = [
   "checkin_qr_image",
   "checkin_qr_images",
   "club_assignments_block",
+  "merchandise_receipt_block",
   "request_status",
   "request_status_detail",
 ] as const;
@@ -112,6 +114,7 @@ export const OPTIONAL_MESSAGE_TEMPLATE_TOKENS: ReadonlySet<MessageTemplateToken>
   "checkin_qr_image",
   "checkin_qr_images",
   "seminar_preferences",
+  "merchandise_receipt_block",
 ]);
 
 /**
@@ -149,6 +152,7 @@ export const MARKDOWN_MESSAGE_TEMPLATE_TOKENS: ReadonlySet<MessageTemplateToken>
   "announcement_body",
   "seminar_preferences",
   "club_assignments_block",
+  "merchandise_receipt_block",
 ]);
 
 /**
@@ -167,7 +171,7 @@ const PLAIN_TEXT_FROM_ESCAPED_TOKENS: ReadonlySet<MessageTemplateToken> = new Se
  * policy, the organization and billing-contact names). The text part drops the escapes
  * and nothing else, so existing wording is unchanged.
  */
-const UNESCAPE_ONLY_TOKENS: ReadonlySet<MessageTemplateToken> = new Set(["payment_status_block"]);
+const UNESCAPE_ONLY_TOKENS: ReadonlySet<MessageTemplateToken> = new Set(["payment_status_block", "merchandise_receipt_block"]);
 
 export type MessageTemplateContext = Partial<
   Record<MessageTemplateToken, string | null | undefined>
@@ -195,6 +199,7 @@ export const DEFAULT_MESSAGE_TEMPLATE_NAMES: Readonly<Record<MessageTemplateKey,
   REGISTRATION_CONTACT_UPDATED: "Registration contact updated",
   REGISTRATION_UPDATED: "Registration updated",
   PAYMENT_RECEIPT: "Payment receipt",
+  MERCHANDISE_RECEIPT: "Merchandise receipt",
   REFUND_NOTICE: "Refund notification",
   BALANCE_REMINDER: "Balance reminder",
   REGISTRATION_TRANSFERRED_NEW_CONTACT: "Transfer notice for new contact",
@@ -238,6 +243,8 @@ export const DEFAULT_MESSAGE_TEMPLATE_DESCRIPTIONS: Readonly<
     "Confirms an attendee-visible registration change without including submitted answer values.",
   PAYMENT_RECEIPT:
     "Sent once when a Square payment first reaches a successful state.",
+  MERCHANDISE_RECEIPT:
+    "Sent when staff mark a merchandise order paid or comp it. Lists the items and total, never registration charges.",
   REFUND_NOTICE:
     "Sent when a manual or Square refund first reaches a successful state.",
   BALANCE_REMINDER:
@@ -287,6 +294,8 @@ export const DEFAULT_MESSAGE_TEMPLATE_SUBJECTS: Readonly<
   REGISTRATION_UPDATED: "Registration updated: {{event_name}}",
   PAYMENT_RECEIPT:
     "Payment received: {{event_name}} ({{confirmation_code}})",
+  MERCHANDISE_RECEIPT:
+    "Merchandise receipt: {{event_name}} ({{confirmation_code}})",
   REFUND_NOTICE:
     "Refund recorded: {{event_name}} ({{confirmation_code}})",
   BALANCE_REMINDER:
@@ -574,6 +583,21 @@ export const DEFAULT_MESSAGE_TEMPLATE_BODIES: Readonly<Record<MessageTemplateKey
     "{{payment_status_block}}",
     "",
     "**[Review your registration and payment history]({{portal_url}})**",
+    "",
+    "---",
+    "",
+    "Questions? Contact {{contact_email}}.",
+  ].join("\n"),
+  MERCHANDISE_RECEIPT: [
+    "# Merchandise receipt for {{event_name}}",
+    "",
+    "Hello {{recipient_name}},",
+    "",
+    "Here is your receipt for the merchandise ordered with registration **{{confirmation_code}}**.",
+    "",
+    "{{merchandise_receipt_block}}",
+    "",
+    "**[Review your registration]({{portal_url}})**",
     "",
     "---",
     "",
@@ -952,6 +976,11 @@ export const MESSAGE_TEMPLATE_TOKEN_OPTIONS: readonly {
     description: "The club's staff-set campsite, duty, and activity, as a short list. Only what staff set is shown.",
   },
   {
+    key: "merchandise_receipt_block",
+    label: "Merchandise receipt block",
+    description: "The items, fee, tax and total of one merchandise order, with its receipt number, date and how it was paid. Never includes registration charges.",
+  },
+  {
     key: "request_status",
     label: "Cancellation request status",
     description: "The status of a cancellation request, such as Under review or Approved. Never the reason, an amount or a staff note.",
@@ -1081,6 +1110,18 @@ export const SAMPLE_MESSAGE_TEMPLATE_CONTEXT: Readonly<
     "- **Campsite:** Field C, site 12 — near the east restrooms",
     "- **Duty:** Flag raising / lowering — Friday morning",
     "- **Activity:** Lead singing around campfire at your campsite",
+  ].join("\n"),
+  merchandise_receipt_block: [
+    "### Your merchandise order",
+    "",
+    "- 2 × Camp T-shirt (Adult M): $40.00",
+    "- **Total:** $40.00",
+    "",
+    "### Receipt",
+    "",
+    "- **Receipt number:** M-0001",
+    "- **Date:** October 9, 2026",
+    "- **Payment:** Cash",
   ].join("\n"),
   request_status: "Under review",
   request_status_detail: "The event team is reviewing your request. Nothing has been cancelled, refunded or changed yet.",
