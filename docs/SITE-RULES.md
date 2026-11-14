@@ -27,7 +27,10 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
   manages the registration and asks to cancel it, and event staff (as stamped
   synthetic users) create an event from a template, publish it, test the form,
   work the attendee list, check people in and schedule an email, at the same two
-  widths. System administrator journeys are round 3.
+  widths. System administrator journeys are round 3. The visual check is
+  `npm run test:visual` (`scripts/verify-visual.ts`, the CI check "Visual check",
+  `docs/VISUAL-CHECK.md`): about 40 key pages at 1280 and 390 px compared with
+  saved pictures.
 - **Rule IDs** (G1, S1, …) are what a review report names when it lists the
   rules it checked.
 
@@ -196,3 +199,4 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | C4 | A fixed bar containing a `<button>` counts as an action bar and must not cover text. Use a link trigger when that isn't intended. | `tests/page-checks-guard-1440.test.ts` | mobile layout audit | AGENTS.md |
 | C5 | New feature styles go in a CSS module next to the component; new CSS in `app/globals.css` goes before the `/* Registration form builder editor shell (#1132)` marker, and no `:hover` rule after the `/* Form settings tab` (#1139) marker. | `tests/page-checks-guard-1440.test.ts` | none (code rule) | AGENTS.md |
 | C6 | `.field-help` has a negative top margin, so new layouts override it (for example `margin: 4px 0 0`). | `tests/page-checks-guard-1440.test.ts` | mobile layout audit (text overlap) | AGENTS.md |
+| C7 | A change that alters how a key page looks changes its saved picture on purpose. The visual check opens about 40 key pages at 1280 and 390 px on the seeded database with a fixed clock and compares each with a saved picture; more than a small pixel tolerance fails. The PR that changes a look updates the baselines and the reviewer looks at the pictures (`docs/VISUAL-CHECK.md`). Reports without blocking until one week of green runs on `main` (#1774). | `tests/visual-check-1774.test.ts` | `npm run test:visual` (`scripts/verify-visual.ts`, the CI check "Visual check") | #1774; Caleb, Nov 9 |

@@ -1,0 +1,128 @@
+name: Visual check
+
+# Picture comparison of about 40 key pages at 1280 and 390 px (#1774, docs/VISUAL-CHECK.md).
+#
+# This is not a required check yet. It becomes required only after one week of green runs on main (#1774);
+# until then it reports without blocking, and the pull request says so. It is not continue-on-error: a red
+# run is shown as red, it is just not in the branch protection list.
+#
+# When it runs:
+#  - a pull request that touches app/, components/, any CSS, the saved pictures or the check itself;
+#  - a push to main with the same paths, so main has a history of green runs;
+#  - by hand. Tick "update" to write new baselines instead of comparing: the run uploads them as the
+#    `visual-baselines` artifact, to be committed into tests/visual/baselines. A failed comparison uploads the
+#    before, after and difference pictures as `visual-diffs`.
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "components/**"
+      - "**/*.css"
+      - "tests/visual/**"
+      - "scripts/verify-visual.ts"
+      - "scripts/visual/**"
+      - "scripts/support/visual-fixture.ts"
+      - "scripts/support/fixed-clock.cjs"
+      - ".github/workflows/visual-check.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "components/**"
+      - "**/*.css"
+      - "tests/visual/**"
+      - "scripts/verify-visual.ts"
+      - "scripts/visual/**"
+      - "scripts/support/visual-fixture.ts"
+      - "scripts/support/fixed-clock.cjs"
+      - ".github/workflows/visual-check.yml"
+  workflow_dispatch:
+    inputs:
+      update:
+        description: "Write new baselines (uploaded as visual-baselines) instead of comparing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: visual-check-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Needs a browser and a package that is deliberately not a dependency (playwright-core), like mobile-layout.yml:
+  # the runner's Google Chrome is driven, and `--no-save` keeps the lockfile untouched.
+  visual-check:
+    name: Visual check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: imsda_events
+          POSTGRES_USER: imsda
+          POSTGRES_PASSWORD: imsda_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U imsda -d imsda_events"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
+      # The fixed clock is on for the seed, the syncs, the build, the app and the script, so every one of them
+      # believes it is the same moment. `next build` needs the large heap (see mobile-layout.yml).
+      VISUAL_FIXED_NOW: 2026-09-10T15:00:00Z
+      NODE_OPTIONS: --max-old-space-size=10240 --require ./scripts/support/fixed-clock.cjs
+      VISUAL_OUT_DIR: ${{ github.workspace }}/visual-out
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:deploy
+      - run: npm run db:seed
+      - run: npm run club-forms:sync
+      - run: npm run lodging:sync
+      - run: npm run form-templates:sync
+      - run: npm run event-content:sync
+      - uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: visual-next-cache-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            visual-next-cache-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+      - run: npm run build
+      - run: npm i --no-save playwright-core@1.56.1
+      - name: Compare the pages with the saved pictures
+        # Fictitious CI-only values for production mode. Keep this block identical to the one in ci.yml ("verify").
+        env:
+          MANAGE_LINK_DERIVATION_SECRET: ci-only-manage-link-derivation-secret-0000000
+          ATTENDEE_PASS_SIGNING_SECRET: ci-only-attendee-pass-signing-secret-000000
+          RATE_LIMIT_HASH_SECRET: ci-only-rate-limit-hash-secret-0000000000
+          OUTBOX_SWEEP_TOKEN: ci-only-outbox-sweep-token-000000000000
+          SECRET_ENCRYPTION_KEY: ci-only-secret-encryption-key-00000000000
+          ACCOUNT_EMAIL_SENDER_ADDRESS: events@ci.example.test
+          RESEND_API_KEY: ci-placeholder-never-sent
+          VISUAL_BROWSER: /usr/bin/google-chrome
+        run: npm run test:visual -- ${{ github.event_name == 'workflow_dispatch' && inputs.update && '--update' || '' }}
+      - name: Keep the new baselines
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.update }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines
+          path: tests/visual/baselines
+          retention-days: 14
+      - name: Keep the before, after and difference pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diffs
+          path: ${{ github.workspace }}/visual-out
+          if-no-files-found: ignore
+          retention-days: 14
