@@ -43,7 +43,7 @@ the "Compare the pages with the saved pictures" step sets in `.github/workflows/
 `MANAGE_LINK_DERIVATION_SECRET`, `ATTENDEE_PASS_SIGNING_SECRET`, `RATE_LIMIT_HASH_SECRET`, `OUTBOX_SWEEP_TOKEN`,
 `SECRET_ENCRYPTION_KEY`, `ACCOUNT_EMAIL_SENDER_ADDRESS` and `RESEND_API_KEY`.
 
-It starts the built app itself on port 3100 (set `VISUAL_BASE_URL` to use one that is already running with the same clock).
+It starts the built app itself on port 3100 (set `VISUAL_BASE_URL` to use one that is already running with the same clock: `VISUAL_FIXED_NOW`, the preload and `VISUAL_CLOCK_FROZEN=1`).
 `npm run test:visual -- --only=club,area` runs the pages whose name contains one of those words.
 The browser version is written to `report.json` and the job summary, so a runner image update is easy to spot.
 A failure writes `<name>@<width>-before.png`, `-after.png` and `-diff.png` and `report.json` to `VISUAL_OUT_DIR`
