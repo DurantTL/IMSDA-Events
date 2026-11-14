@@ -39,7 +39,11 @@ async function postHandler(request: Request, context: Context) {
     const body = parseStaffSubmitBody(JSON.parse(text));
     const canOverride = effectivePermissions(access.user, access.membership).includes("OVERRIDE_REGISTRATION_RULES");
     try {
-      const confirmation = await submitStaffDraft(eventId, draftId, { userId: access.user.id, canOverride }, body);
+      const result = await submitStaffDraft(eventId, draftId, { userId: access.user.id, canOverride }, body) as Record<string, unknown>;
+      // Never the registrant's private link (it reaches them by email), whatever the routine returned.
+      const { managePath: _managePath, manageLinkExpiresAt: _manageLinkExpiresAt, ...confirmation } = result;
+      void _managePath;
+      void _manageLinkExpiresAt;
       return Response.json({ confirmation }, { status: 201, headers });
     } catch (error) {
       if (error instanceof PublicRegistrationError) return registrationErrorResponse(error);

@@ -51,6 +51,7 @@ import {
   hasEventEnded,
   registrationClosedMessage,
   decideEventCapacity,
+  remainingEventCapacity,
   type CapacityDecision,
   type EventRegistrationPhase,
 } from "@/modules/events/lifecycle";
@@ -80,7 +81,7 @@ import { matchLegacyAttendeeTypeAnswer } from "@/modules/attendee-types/legacy-a
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { recordRegistrationDeclarations } from "@/modules/guardian-authority/repository";
 import { AcknowledgmentError, loadAcknowledgmentDisplayContent, recordSubmissionAcknowledgments } from "@/modules/acknowledgments/repository";
-import { acknowledgmentFields, normalizePaperLocation } from "@/modules/acknowledgments/domain";
+import { acknowledgmentFields, normalizePaperLocation, planAcknowledgments } from "@/modules/acknowledgments/domain";
 import { signatureFields } from "@/modules/signatures/fields";
 import { recordSubmissionSignatures } from "@/modules/signatures/repository";
 import type { AcknowledgmentDisplay } from "@/modules/acknowledgments/domain";
@@ -996,19 +997,21 @@ async function createPublicRegistrationTransaction(
     staffDraftId = draft.id;
     staffDraft = { source: draft.source, handOffMessageId: draft.handOffMessageId };
   }
-  // Paper evidence records where the paper is kept; any other source records none (and refuses one).
+  // Paper evidence records where the paper is kept. Any other source records none and refuses one here; a paper source's
+  // location is checked once the acknowledgments are known (it is needed only when one is recorded).
   const staffAcknowledgmentChannel = staffDraft ? (staffDraft.source === "PAPER" ? "PAPER" as const : "STAFF_ENTERED" as const) : null;
-  const staffPaperLocation = staff && staffAcknowledgmentChannel ? normalizePaperLocation(staffAcknowledgmentChannel, staff.paperLocation) : null;
-  if (staffPaperLocation && !staffPaperLocation.ok) {
-    throw new PublicRegistrationError("INVALID_SUBMISSION", staffPaperLocation.message, [{
-      kind: "validation",
-      code: "INVALID_RESPONSE",
-      fieldId: null,
-      key: "paperLocation",
-      path: "paperLocation",
-      attendeeIndex: null,
-      message: staffPaperLocation.message,
-    }]);
+  const paperLocationError = (message: string) => new PublicRegistrationError("INVALID_SUBMISSION", message, [{
+    kind: "validation",
+    code: "INVALID_RESPONSE",
+    fieldId: null,
+    key: "paperLocation",
+    path: "paperLocation",
+    attendeeIndex: null,
+    message,
+  }]);
+  if (staff && staffAcknowledgmentChannel === "STAFF_ENTERED") {
+    const stray = normalizePaperLocation("STAFF_ENTERED", staff.paperLocation);
+    if (!stray.ok) throw paperLocationError(stray.message);
   }
   // Overrides go past only the rules in OVERRIDABLE_RULES, only on a staff submit, only with the permission and a reason.
   const overrideHonored = Boolean(staff?.override && staff.overrideAllowed);
@@ -1202,7 +1205,8 @@ async function createPublicRegistrationTransaction(
     if (overrideHonored) {
       noteOverride("EVENT_FULL");
     } else {
-      const remaining = admission.remainingSpots ?? 0;
+      // From the capacity itself, so the count is real whether or not a phase rule was overridden first.
+      const remaining = remainingEventCapacity(lifecycle.capacity, occupied) ?? 0;
       throw new PublicRegistrationError(
         "EVENT_FULL",
         `Only ${remaining} attendee spot${remaining === 1 ? "" : "s"} remain for this event, and its waitlist is not enabled.`,
@@ -1302,6 +1306,21 @@ async function createPublicRegistrationTransaction(
       capacityIssue ? "One of your selections just became full. Review the highlighted choice and submit again." : "Review the highlighted fields and submit again.",
       prepared.issues
     );
+  }
+
+  // A paper source names where the paper is kept only when an acknowledgment is recorded from it (a visible, ticked one);
+  // otherwise the location is optional and ignored.
+  let staffPaperEvidenceLocation: string | null = null;
+  if (staff && staffAcknowledgmentChannel === "PAPER") {
+    const willRecord = planAcknowledgments(definition, {
+      registrationResponses: prepared.registrationResponses,
+      attendees: prepared.attendees.map((attendee) => ({ clientId: attendee.clientId, responses: attendee.responses })),
+    }).length > 0;
+    if (willRecord) {
+      const location = normalizePaperLocation("PAPER", staff.paperLocation);
+      if (!location.ok) throw paperLocationError(location.message);
+      staffPaperEvidenceLocation = location.value;
+    }
   }
 
   // "Responsible adult" for each minor (#131): decided from the submitted ages, never from the browser. Club and
@@ -1649,6 +1668,8 @@ async function createPublicRegistrationTransaction(
       eventId: form.eventId,
       registrationId: registration.id,
       actorPersonId: accountHolder.id,
+      // Staff typed these in for the registrant: the staff user is recorded beside the registrant (the source stays the form's).
+      ...(staff ? { recordedByUserId: staff.actorUserId } : {}),
       declarations: responsibleAdultPlan.declarations.map((declaration) => ({
         minorPersonId: personByClientId.get(declaration.minorKey)!,
         adultPersonId: declaration.adultKey ? personByClientId.get(declaration.adultKey)! : null,
@@ -1681,7 +1702,7 @@ async function createPublicRegistrationTransaction(
       ...(staff && staffAcknowledgmentChannel
         ? {
             channel: staffAcknowledgmentChannel,
-            ...(staffAcknowledgmentChannel === "PAPER" && staffPaperLocation?.ok ? { paperLocation: staffPaperLocation.value } : {}),
+            ...(staffAcknowledgmentChannel === "PAPER" ? { paperLocation: staffPaperEvidenceLocation } : {}),
             recordedByUserId: staff.actorUserId,
           }
         : { channel: "ONLINE" as const, recordedByUserId: null }),

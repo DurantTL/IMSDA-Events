@@ -109,9 +109,28 @@ const consentDefinition = registrationFormDefinitionSchema.parse({
   }],
 });
 
+const rosterDefinition = registrationFormDefinitionSchema.parse({
+  title: "Staff roster check", description: "Temporary fictitious form.", confirmationMessage: "Received.",
+  attendeeRoster: { enabled: true, minAttendees: 1, maxAttendees: 5, attendeeLabel: "Attendee", addButtonLabel: "Add another attendee" },
+  sections: [
+    { id: `${P}_roster_contact`, title: "Contact", description: "", fields: [
+      field("r_cfirst", "primary_contact_first_name", "First name", "TEXT", "REGISTRATION", { required: true }),
+      field("r_clast", "primary_contact_last_name", "Last name", "TEXT", "REGISTRATION", { required: true }),
+      field("r_email", "email", "Email", "EMAIL", "REGISTRATION", { required: true }),
+    ] },
+    { id: `${P}_roster_people`, title: "People", description: "", fields: [
+      field("r_afirst", "first_name", "First name", "TEXT", "ATTENDEE", { required: true }),
+      field("r_alast", "last_name", "Last name", "TEXT", "ATTENDEE", { required: true }),
+      field("r_age", "attendee_age", "Age", "NUMBER", "ATTENDEE"),
+      field("r_ack", "att_ack", "Attendee acknowledgment", "ACKNOWLEDGMENT", "ATTENDEE", { acknowledgment: { source: "TEXT", text: ACK_TEXT } }),
+      field("r_fee", "registration_fee", "Registration fee", "CALCULATED", "ATTENDEE", { priceCents: 2_500 }),
+    ] },
+  ],
+});
+
 const dateOffset = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 
-async function makeEvent(name: string, extra: Record<string, unknown> = {}, forms: Array<"consent" | "plain"> = ["consent"]) {
+async function makeEvent(name: string, extra: Record<string, unknown> = {}, forms: Array<"consent" | "plain" | "roster"> = ["consent"]) {
   const id = `${P}_ev_${name}`;
   const eventSlug = `${P}-ev-${name}`;
   const day = 86_400_000;
@@ -122,7 +141,7 @@ async function makeEvent(name: string, extra: Record<string, unknown> = {}, form
     await prisma.registrationForm.create({
       data: {
         id: `${id}_${kind}`, eventId: id, createdByUserId: staffUserId, name: `Staff submit ${kind}`, slug: `${eventSlug}-${kind}`, status: RegistrationFormStatus.PUBLISHED,
-        versions: { create: { id: `${id}_${kind}_v`, createdByUserId: staffUserId, versionNumber: 1, status: RegistrationFormStatus.PUBLISHED, publishedAt: new Date(), definition: kind === "consent" ? consentDefinition : definition } },
+        versions: { create: { id: `${id}_${kind}_v`, createdByUserId: staffUserId, versionNumber: 1, status: RegistrationFormStatus.PUBLISHED, publishedAt: new Date(), definition: kind === "consent" ? consentDefinition : kind === "roster" ? rosterDefinition : definition } },
       },
     });
   }
@@ -130,7 +149,7 @@ async function makeEvent(name: string, extra: Record<string, unknown> = {}, form
 }
 
 type Ev = { id: string; slug: string };
-async function staffDraft(ev: Ev, source: "PHONE" | "PAPER" | "WALK_IN", name: string, kind: "consent" | "plain" = "consent") {
+async function staffDraft(ev: Ev, source: "PHONE" | "PAPER" | "WALK_IN", name: string, kind: "consent" | "plain" | "roster" = "consent") {
   const created = await createStaffDraft(ev.id, staffUserId, { formId: `${ev.id}_${kind}`, source, responses: answers(name) });
   return created.id;
 }
@@ -246,7 +265,7 @@ async function staffSubmitChecks() {
   assert(finishOpen.kind === "READY" && finishOpen.overrideRule === null, "an open event shows the form with no rule");
   const finishClosedDraft = await staffDraft(closed, "PHONE", "FinishClosed");
   const finishDenied = await getStaffFinishView(closed.id, finishClosedDraft, false);
-  assert(finishDenied.kind === "MESSAGE" && /closed for this event\. Someone with Registration overrides can send it\./.test(finishDenied.message), "closed without the permission is a message only");
+  assert(finishDenied.kind === "MESSAGE" && /closed for this event\. Someone with Registration overrides can send it\. Ask a system administrator\./.test(finishDenied.message), "closed without the permission is a message only");
   const finishAllowed = await getStaffFinishView(closed.id, finishClosedDraft, true);
   assert(finishAllowed.kind === "READY" && finishAllowed.overrideRule === "Registration is closed for this event.", "closed with the permission shows the form and names the rule");
   assert(finishAllowed.kind === "READY" && !finishAllowed.experience.form.definition.sections.some((section) => section.fields.some((candidate) => candidate.options.includes("Credit / debit card"))), "the finish form leaves off the card choice");
@@ -297,6 +316,53 @@ async function staffSubmitChecks() {
   assert(finishEnded.kind === "MESSAGE" && /ended or been closed out/.test(finishEnded.message), "an ended event is a message only, even with the permission");
   assert(endedRefusal?.code === "REGISTRATION_CLOSED" && (endedRefusal as { overridable?: boolean }).overridable === false, "an ended event is never overridable");
   assert(await prisma.registration.count({ where: { eventId: ended.id } }) === 0, "nothing was written for an ended event");
+
+
+  // --- The registrant's private link is never part of what staff are shown.
+  const viaRoutineEvent = await makeEvent("viamodule");
+  const viaRoutineDraft = await staffDraft(viaRoutineEvent, "PHONE", "ViaModule");
+  const viaRoutine = await submitStaffDraft(viaRoutineEvent.id, viaRoutineDraft, { userId: staffUserId, canOverride: false }, { input: { ...staffInput(viaRoutineEvent, "ViaModule"), idempotencyKey: randomUUID() }, paperLocation: null, override: null });
+  assert(viaRoutine.confirmationCode && !("managePath" in viaRoutine) && !("manageLinkExpiresAt" in viaRoutine) && !JSON.stringify(viaRoutine).includes("/manage"), "the staff submit result carries no private registration link");
+  const viaRoutineRegistration = await prisma.registration.findFirstOrThrow({ where: { eventId: viaRoutineEvent.id, confirmationCode: viaRoutine.confirmationCode } });
+  assert(await prisma.registrationAccessToken.count({ where: { registrationId: viaRoutineRegistration.id } }) > 0, "the registrant still has their link");
+
+  // --- A paper source needs its location only when an acknowledgment is recorded from it.
+  const paperPlain = await makeEvent("paperplain", {}, ["plain"]);
+  const plainInput = (name: string) => ({ versionId: `${paperPlain.id}_plain_v`, idempotencyKey: randomUUID(), responses: { ...answers(name), birth_date: "2010-01-01" } });
+  const noAckDraft = await staffDraft(paperPlain, "PAPER", "NoAck", "plain");
+  const noAckSent = await submitPublicRegistration(paperPlain.slug, `${paperPlain.slug}-plain`, plainInput("NoAck"), undefined, undefined, undefined, staffContext(noAckDraft));
+  assert(noAckSent.confirmationCode, "a paper source with no acknowledgment needs no location");
+  const ignoredDraft = await staffDraft(paperPlain, "PAPER", "Ignored", "plain");
+  const ignoredSent = await submitPublicRegistration(paperPlain.slug, `${paperPlain.slug}-plain`, plainInput("Ignored"), undefined, undefined, undefined, staffContext(ignoredDraft, { paperLocation: "Binder Z" }));
+  const ignoredRegistration = await prisma.registration.findFirstOrThrow({ where: { eventId: paperPlain.id, confirmationCode: ignoredSent.confirmationCode } });
+  assert(await prisma.acknowledgmentEvidence.count({ where: { registrationId: ignoredRegistration.id } }) === 0, "a location given with nothing acknowledged is ignored");
+  const phonePlainDraft = await staffDraft(paperPlain, "PHONE", "PhonePlain", "plain");
+  const phonePlain = await rejection(submitPublicRegistration(paperPlain.slug, `${paperPlain.slug}-plain`, plainInput("PhonePlain"), undefined, undefined, undefined, staffContext(phonePlainDraft, { paperLocation: "Binder Z" })));
+  assert(phonePlain?.code === "INVALID_SUBMISSION" && phonePlain.issues?.some((issue) => issue.key === "paperLocation"), "a location is still refused for a phone source");
+
+  // --- A minor on a staff-entered roster registration: the responsible adult and the acknowledgment show staff entered them.
+  const roster = await makeEvent("roster", { capacity: 3 }, ["roster"]);
+  const rosterSlug = `${roster.slug}-roster`;
+  const rosterInput = (people: Array<{ id: string; first: string; age: number; ack?: boolean }>, adults?: Record<string, string>, contact = "RosterDan") => ({
+    versionId: `${roster.id}_roster_v`, idempotencyKey: randomUUID(),
+    responses: { primary_contact_first_name: `Sdc${contact}`, primary_contact_last_name: "Sample", email: `${P}-${contact.toLowerCase()}@example.test` },
+    attendees: people.map((person) => ({ clientId: person.id, responses: { first_name: person.first, last_name: "Sample", attendee_age: String(person.age), ...(person.ack ? { att_ack: true } : {}) } })),
+    ...(adults ? { responsibleAdults: adults } : {}),
+  });
+  const rosterDraft = await staffDraft(roster, "PHONE", "RosterDan", "roster");
+  const rosterSent = await submitPublicRegistration(roster.slug, rosterSlug, rosterInput([{ id: "adult", first: "SdcRosterDan", age: 40 }, { id: "minor", first: "SdcRosterSam", age: 9, ack: true }], { minor: "adult" }), undefined, undefined, undefined, staffContext(rosterDraft));
+  const rosterRegistration = await prisma.registration.findFirstOrThrow({ where: { eventId: roster.id, confirmationCode: rosterSent.confirmationCode } });
+  const authority = await prisma.guardianAuthority.findFirstOrThrow({ where: { registrationId: rosterRegistration.id, state: "ACTIVE" } });
+  assert(authority.source === "REGISTRATION_FORM" && authority.actorUserId === staffUserId && authority.actorPersonId === rosterRegistration.accountHolderPersonId, "the responsible adult records the staff user beside the registrant, with the form's source");
+  const minorEvidence = await prisma.acknowledgmentEvidence.findMany({ where: { registrationId: rosterRegistration.id, subjectMinorStatus: "MINOR" } });
+  assert(minorEvidence.length === 1 && minorEvidence[0]!.channel === "STAFF_ENTERED" && minorEvidence[0]!.recordedByUserId === staffUserId && minorEvidence[0]!.guardianAuthorityId === authority.id, "the minor's acknowledgment is staff-entered, by the staff user, under the declared authority");
+  const declared = await prisma.auditLog.findMany({ where: { entityId: authority.id, action: "GUARDIAN_AUTHORITY_DECLARED" } });
+  assert(declared.length === 1 && declared[0]!.actorUserId === staffUserId, "the declaration's audit row names the staff user");
+
+  // --- The full-event message uses the real remaining count (one seat left, two people asked for).
+  const twoDraft = await staffDraft(roster, "PHONE", "RosterTwo", "roster");
+  const twoRefusal = await rejection(submitPublicRegistration(roster.slug, rosterSlug, rosterInput([{ id: "p1", first: "SdcRosterOne", age: 30 }, { id: "p2", first: "SdcRosterTwo", age: 31 }], undefined, "RosterTwo"), undefined, undefined, undefined, staffContext(twoDraft)));
+  assert(twoRefusal?.code === "EVENT_FULL" && /Only 1 attendee spot remain/.test(twoRefusal.message ?? ""), `the message uses the real remaining count (got ${String(twoRefusal?.message)})`);
 
   // --- The last seat: a staff submit and a public submit at once. Exactly one gets in; the other is told the event is full.
   const race = await makeEvent("race", { capacity: 1 }, ["plain"]);

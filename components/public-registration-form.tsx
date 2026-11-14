@@ -3329,7 +3329,7 @@ export function PublicRegistrationForm({
     // The staff endpoint is signed-in and has no security check (#1510), like a club's own endpoint.
     if (!club && !staffSubmit && !securityCheckRef.current?.require(group?.submitLabel ?? (joiningWaitlist ? "Join waitlist" : "Submit registration"))) return;
     if (staffSubmit) {
-      const fieldError = staffSubmitFieldErrors(staffSubmit, staffPaperLocation, staffOverrideRule, staffOverrideReason);
+      const fieldError = staffSubmitFieldErrors(staffOverrideRule, staffOverrideReason);
       setStaffFieldError(fieldError);
       if (fieldError.paperLocation || fieldError.reason) {
         setError(fieldError.paperLocation ?? fieldError.reason ?? "");
@@ -3427,6 +3427,8 @@ export function PublicRegistrationForm({
         });
         if (priceChanges.length > 0) setMerchandisePriceUpdates((current) => ({ ...current, ...Object.fromEntries(priceChanges) }));
         setServerIssues(nextIssues);
+        const paperLocationIssue = staffSubmit ? nextIssues.find((issue) => issue.key === "paperLocation") : undefined;
+        if (paperLocationIssue) setStaffFieldError((current) => ({ ...current, paperLocation: paperLocationIssue.message }));
         // A rule changed while the page was open (#1510): someone with the override permission is offered the reason box; anyone
         // else is told who can send it.
         let failureMessage = result.message ?? "We could not complete the registration. Review the form and try again.";
@@ -3522,6 +3524,8 @@ export function PublicRegistrationForm({
   if (confirmation) {
     const waitlisted = confirmation.registrationStatus === "WAITLISTED";
     const ConfirmationShell = staffSubmit ? "div" : "main";
+    // The staff page already has its own h1, so the confirmation heading is a second-level one there.
+    const ConfirmationHeading = staffSubmit ? "h2" : "h1";
     // A team registered through the general link (#931): free, so no pricing date or fee band; the team and club are named.
     const teamConfirmation = isTeamConfirmation(group);
     const enteredClub = resolveResponsibleOrganization(rosterEnabled ? registrationResponses : responses) ?? "";
@@ -3539,7 +3543,7 @@ export function PublicRegistrationForm({
           <article className="public-registration-confirmation">
             <span className={`public-registration-confirmation-icon${waitlisted ? " is-waitlist" : ""}`}>{waitlisted ? <Clock3 size={34} aria-hidden="true" /> : <CheckCircle2 size={34} aria-hidden="true" />}</span>
             <p className="public-registration-eyebrow">{waitlisted ? "Waitlist request received" : "Registration received"}</p>
-            <h1 ref={focusConfirmationHeading} tabIndex={-1}>{staffSubmit ? (waitlisted ? "Added to the waitlist" : "Registration sent") : waitlisted ? "You’re on the waitlist" : "Thank you for registering"}</h1>
+            <ConfirmationHeading ref={focusConfirmationHeading} tabIndex={-1}>{staffSubmit ? (waitlisted ? "Added to the waitlist" : "Registration sent") : waitlisted ? "You’re on the waitlist" : "Thank you for registering"}</ConfirmationHeading>
             <p className="public-registration-confirmation-message">{confirmation.message}</p>
             <div className="public-registration-code">
               <small>{waitlisted ? "Waitlist reference" : "Confirmation code"}</small>
@@ -3552,7 +3556,9 @@ export function PublicRegistrationForm({
                   {confirmationEmailHeadline(confirmation.notificationStatus)}
                 </strong>
                 <small>
-                  {confirmation.paymentCollected
+                  {staffSubmit
+                    ? "The registrant gets the confirmation and their private link by email."
+                    : confirmation.paymentCollected
                     ? "Your payment is recorded. Keep this confirmation code and private registration link."
                     : confirmation.cardSelected
                       ? `Your registration is saved, but the card is not charged yet. Continue through the private registration link below to complete secure Square checkout.${(confirmation.deferredCardFeeCents ?? 0) > 0 ? ` A card processing fee of ${formatCents(confirmation.deferredCardFeeCents ?? 0)} is added when you pay online by card.` : ""}`
@@ -3830,7 +3836,7 @@ export function PublicRegistrationForm({
                 tabIndex={-1}
               >
                 {joiningWaitlist && currentStep.isReview
-                  ? "Review your waitlist request"
+                  ? (staffSubmit ? "Review the waitlist request" : "Review your waitlist request")
                   : currentStep.title}
               </h2>
               <p>{currentStep.description}</p>
@@ -3919,7 +3925,7 @@ export function PublicRegistrationForm({
 
           {currentStep.isReview && (<>
             <section className="public-registration-submit-card">
-              <div><ShieldCheck size={21} aria-hidden="true" /><span><strong>Server-verified registration</strong><small>Pricing and remaining capacity are checked again when you submit.</small></span></div>
+              <div><ShieldCheck size={21} aria-hidden="true" /><span><strong>Server-verified registration</strong><small>{staffSubmit ? "Pricing and remaining capacity are checked again when you send it." : "Pricing and remaining capacity are checked again when you submit."}</small></span></div>
               {cardSelected && !joiningWaitlist && !deferredOrganizationBilling && <p>Submitting saves the registration first. Your private registration page will then offer secure Square checkout when online payments are configured.</p>}
               {!club && !staffSubmit && <SecurityCheck config={securityCheck} action={securityCheckAction} handleRef={securityCheckRef} />}
               <SubmitButton
@@ -3937,7 +3943,7 @@ export function PublicRegistrationForm({
 
         <aside className="public-registration-summary" aria-label="Order summary">
           <p className="public-registration-eyebrow">Order summary</p>
-          <h2>{joiningWaitlist ? "Your waitlist request" : "Your registration"}</h2>
+          <h2>{staffSubmit ? (joiningWaitlist ? "This waitlist request" : "This registration") : joiningWaitlist ? "Your waitlist request" : "Your registration"}</h2>
           {group?.locationName && (
             <p className="public-registration-summary-roster">
               <MapPin size={15} aria-hidden="true" /> <span translate="no">{group.locationName}</span>

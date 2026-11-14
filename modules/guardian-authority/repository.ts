@@ -273,6 +273,11 @@ export async function recordRegistrationDeclarations(
     eventId: string;
     registrationId: string;
     actorPersonId: string | null;
+    /**
+     * The staff user who typed the declaration in for the registrant (a staff-entered registration). Kept in `actorUserId`
+     * beside `actorPersonId`; the source stays the form's, so the registrant's lock rules are unchanged.
+     */
+    recordedByUserId?: string | null;
     declarations: readonly DeclarationInput[];
     /** How it was declared; a manage-link declaration also names the access grant it was made through. */
     source?: Exclude<GuardianAuthoritySourceName, "STAFF">;
@@ -379,10 +384,12 @@ export async function recordRegistrationDeclarations(
         source,
         accessTokenId: source === "MANAGE_LINK" ? input.accessTokenId ?? null : null,
         actorPersonId: input.actorPersonId,
+        actorUserId: input.recordedByUserId ?? null,
       },
     });
     await writeAuditLog({
       eventId: input.eventId,
+      ...(input.recordedByUserId ? { actorUserId: input.recordedByUserId } : {}),
       action: "GUARDIAN_AUTHORITY_DECLARED",
       entityType: "GuardianAuthority",
       entityId: id,

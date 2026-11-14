@@ -71,7 +71,7 @@ describe("the staff finish form", () => {
 
   it("asks for where the paper form is kept only for a paper source, with the policy help text", () => {
     const paper = render(staffSubmit());
-    expect(paper).toContain("Where the paper form is kept");
+    expect(paper).toContain("Where the paper form is kept (needed when an acknowledgment is ticked)");
     expect(paper).toContain("Never write what the paper says.");
     expect(render(staffSubmit({ source: "PHONE", sourceLabel: "Phone" }))).not.toContain("Where the paper form is kept");
   });
@@ -84,6 +84,14 @@ describe("the staff finish form", () => {
     expect(render(staffSubmit({ canOverride: false, overrideRule: "Registration is closed for this event." }))).not.toContain("Reason for going past this rule");
   });
 
+  it("speaks to the staff member, not the registrant, and uses a second-level heading for nothing yet sent", () => {
+    const html = render(staffSubmit());
+    expect(html).toContain("This registration");
+    expect(html).toContain("when you send it");
+    expect(html).not.toContain("Your registration</h2>");
+    expect(html).not.toContain("when you submit");
+  });
+
   it("has no security check, browser draft notice or account offer", () => {
     const html = render(staffSubmit());
     expect(html).not.toMatch(/Security check|cf-turnstile/i);
@@ -94,6 +102,7 @@ describe("the staff finish form", () => {
 describe("what a staff submit sends", () => {
   it("adds the trimmed paper location for a paper source and none otherwise", () => {
     expect(staffSubmitExtras({ source: "PAPER" }, "  Binder A  ", null, "")).toEqual({ paperLocation: "Binder A" });
+    expect(staffSubmitExtras({ source: "PAPER" }, "  ", null, "")).toEqual({});
     expect(staffSubmitExtras({ source: "PHONE" }, "Binder A", null, "")).toEqual({});
   });
 
@@ -102,12 +111,11 @@ describe("what a staff submit sends", () => {
     expect(staffSubmitExtras({ source: "WALK_IN" }, "", null, "A reason nobody asked for.")).toEqual({});
   });
 
-  it("refuses a missing paper location and a reason outside 10 to 500 characters before sending", () => {
-    const config = { source: "PAPER" as const, paperLocationHelp: "Where it is kept." };
-    expect(staffSubmitFieldErrors(config, " ", null, "")).toEqual({ paperLocation: "Where it is kept." });
-    expect(staffSubmitFieldErrors(config, "Binder", "Closed.", "short").reason).toMatch(/10 to 500/);
-    expect(staffSubmitFieldErrors(config, "Binder", "Closed.", "x".repeat(501)).reason).toMatch(/10 to 500/);
-    expect(staffSubmitFieldErrors(config, "Binder", "Closed.", "A good enough reason.")).toEqual({});
+  it("refuses a reason outside 10 to 500 characters before sending, and never blocks on the paper location", () => {
+    expect(staffSubmitFieldErrors(null, "")).toEqual({});
+    expect(staffSubmitFieldErrors("Closed.", "short").reason).toMatch(/10 to 500/);
+    expect(staffSubmitFieldErrors("Closed.", "x".repeat(501)).reason).toMatch(/10 to 500/);
+    expect(staffSubmitFieldErrors("Closed.", "A good enough reason.")).toEqual({});
   });
 });
 

@@ -20,20 +20,22 @@ export type StaffSubmitConfig = {
 
 export const OVERRIDE_REASON_MIN = 10;
 export const OVERRIDE_REASON_MAX = 500;
-export const OVERRIDE_NEEDS_PERMISSION = "Someone with Registration overrides can send it.";
+export const OVERRIDE_NEEDS_PERMISSION = "Someone with Registration overrides can send it. Ask a system administrator.";
 
 /** What the staff submit adds to the registration body (#1510): the paper location for a paper source, and the override with its trimmed reason. */
 export function staffSubmitExtras(config: Pick<StaffSubmitConfig, "source">, paperLocation: string, overrideRule: string | null, reason: string) {
   return {
-    ...(config.source === "PAPER" ? { paperLocation: paperLocation.trim() } : {}),
+    ...(config.source === "PAPER" && paperLocation.trim() ? { paperLocation: paperLocation.trim() } : {}),
     ...(overrideRule ? { override: { reason: reason.trim() } } : {}),
   };
 }
 
-/** The two staff-only fields, checked before anything is sent: a paper source needs its location, an override needs a reason of 10 to 500 characters. */
-export function staffSubmitFieldErrors(config: Pick<StaffSubmitConfig, "source" | "paperLocationHelp">, paperLocation: string, overrideRule: string | null, reason: string) {
+/**
+ * The staff-only fields, checked before anything is sent: an override needs a reason of 10 to 500 characters. The paper location is
+ * needed only when an acknowledgment is recorded from the paper, which the server decides and says if it is missing.
+ */
+export function staffSubmitFieldErrors(overrideRule: string | null, reason: string) {
   const errors: { paperLocation?: string; reason?: string } = {};
-  if (config.source === "PAPER" && paperLocation.trim().length === 0) errors.paperLocation = config.paperLocationHelp;
   const length = reason.trim().length;
   if (overrideRule && (length < OVERRIDE_REASON_MIN || length > OVERRIDE_REASON_MAX)) {
     errors.reason = `Give a reason of ${OVERRIDE_REASON_MIN} to ${OVERRIDE_REASON_MAX} characters.`;
@@ -69,14 +71,12 @@ export function StaffSubmitPanel({
       </p>
       {config.source === "PAPER" ? (
         <label className={styles.field}>
-          <span>Where the paper form is kept <span aria-hidden="true">*</span></span>
+          <span>Where the paper form is kept (needed when an acknowledgment is ticked)</span>
           <input
             type="text"
             name="paperLocation"
             value={paperLocation}
             maxLength={200}
-            required
-            aria-required="true"
             aria-invalid={Boolean(fieldError.paperLocation)}
             aria-describedby="staff-paper-location-help"
             onChange={(event) => onPaperLocation(event.target.value)}

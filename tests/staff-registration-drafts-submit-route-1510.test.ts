@@ -67,6 +67,15 @@ describe("POST staff-registration-drafts/[draftId]/submit", () => {
     expect(mocks.submit).toHaveBeenCalledWith("event-1", "draft-1", { userId: "staff-1", canOverride: false }, expect.objectContaining({ paperLocation: "Binder A", override: null }));
   });
 
+  it("never returns the registrant's private registration link to staff", async () => {
+    mocks.submit.mockResolvedValue({ confirmationCode: "REG-SYNTHETIC", managePath: "/manage/synthetic-token", manageLinkExpiresAt: "2027-01-01T00:00:00.000Z" });
+    const response = await submit.POST(post(valid), params);
+    const text = await response.text();
+    expect(response.status).toBe(201);
+    expect(text).toContain("REG-SYNTHETIC");
+    expect(text).not.toMatch(/managePath|manageLinkExpiresAt|synthetic-token/);
+  });
+
   it("refuses an override without OVERRIDE_REGISTRATION_RULES (403 with a plain message) and writes nothing", async () => {
     mocks.submit.mockImplementation(async (_e: string, _d: string, actor: { canOverride: boolean }, body: { override: unknown }) => {
       if (body.override && !actor.canOverride) {

@@ -249,8 +249,8 @@ export function StaffRegistrationDrafts({
       <section className={styles.panel} aria-labelledby="staff-draft-start">
         <h2 id="staff-draft-start">Start a registration</h2>
         <p className={styles.note}>
-          Enter what you know for {eventName}. Nothing is registered and nothing is charged. When you are ready, send the registrant a private link
-          so they can check their answers, add the rest and submit it themselves.
+          Enter what you know for {eventName}. Nothing is registered and nothing is charged until it is sent. When you are ready, send the registrant a private link
+          so they can check their answers, add the rest and submit it themselves, or finish it yourself.
         </p>
         {forms.length === 0 ? (
           <p className={styles.note}>This event has no published form to start from.</p>
@@ -426,7 +426,7 @@ function CheckView({ result }: { result: CheckResult }) {
       <div className={styles.result} role="status">
         <h3>Can&rsquo;t be registered right now</h3>
         <p className={styles.note}>{result.message}</p>
-        {result.overridable && <p className={styles.note}>Someone with Registration overrides can send this past the rule.</p>}
+        {result.overridable && <p className={styles.note}>Someone with Registration overrides can send this past the rule. Ask a system administrator.</p>}
       </div>
     );
   }

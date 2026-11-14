@@ -495,13 +495,18 @@ export async function submitStaffDraft(
     select: { form: { select: { slug: true } }, event: { select: { slug: true } } },
   });
   if (!row) throw new StaffDraftError("DRAFT_NOT_FOUND", "That draft could not be found.");
-  return submitPublicRegistration(row.event.slug, row.form.slug, body.input, now, undefined, undefined, {
+  const confirmation = await submitPublicRegistration(row.event.slug, row.form.slug, body.input, now, undefined, undefined, {
     draftId,
     actorUserId: actor.userId,
     paperLocation: body.paperLocation,
     override: body.override,
     overrideAllowed: actor.canOverride,
   });
+  // The registrant's private registration link goes to the registrant by email only: it is never part of what staff are shown.
+  const { managePath: _managePath, manageLinkExpiresAt: _manageLinkExpiresAt, ...forStaff } = confirmation;
+  void _managePath;
+  void _manageLinkExpiresAt;
+  return forStaff;
 }
 
 export type StaffFinishView =
@@ -551,7 +556,7 @@ export async function getStaffFinishView(eventId: string, draftId: string, canOv
       : experience.lifecycle.capacityDecision === "FULL"
         ? "This event is full and has no waitlist."
         : null;
-  if (overrideRule && !canOverride) return { kind: "MESSAGE", message: `${overrideRule} Someone with Registration overrides can send it.` };
+  if (overrideRule && !canOverride) return { kind: "MESSAGE", message: `${overrideRule} Someone with Registration overrides can send it. Ask a system administrator.` };
   // Staff never choose card payment for the registrant: the online choices are left off, as the server also refuses them.
   const definition = definitionWithoutCardOption(experience.form.definition);
   return {

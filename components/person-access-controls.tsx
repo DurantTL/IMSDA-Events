@@ -15,7 +15,7 @@ import {
   HAND_LINK_REASON_LABELS,
   type HandLinkReasonCode,
 } from "@/modules/account-merge/hand-link-reasons";
-import { eventRoles, type EventRole } from "@/modules/access/permissions";
+import { eventRoles, rolePermissions, type EventRole } from "@/modules/access/permissions";
 import { roleLabel } from "@/modules/access/role-display";
 import { RoleDetails } from "@/components/role-details";
 import { systemRoleText } from "@/modules/access/role-descriptions";
@@ -299,6 +299,7 @@ export function EventMembershipControls({ membership, targetIsSystemAdministrato
             type="button"
           >
             {membership.healthInformation ? "Remove health information" : "Give health information"}
+            <span className="sr-only"> for {membership.eventName}</span>
           </button>
           {membership.active ? (
             <button
@@ -309,9 +310,10 @@ export function EventMembershipControls({ membership, targetIsSystemAdministrato
               type="button"
             >
               {membership.finalizeInvoices ? "Remove finalize invoices" : "Give finalize invoices"}
+              <span className="sr-only"> for {membership.eventName}</span>
             </button>
           ) : null}
-          {membership.active ? (
+          {membership.active && (membership.registrationOverride || (rolePermissions[membership.role as EventRole] ?? []).includes("MANAGE_REGISTRATION")) ? (
             <button
               aria-pressed={membership.registrationOverride}
               className="secondary-button"
@@ -320,6 +322,7 @@ export function EventMembershipControls({ membership, targetIsSystemAdministrato
               type="button"
             >
               {membership.registrationOverride ? "Remove registration overrides" : "Give registration overrides"}
+              <span className="sr-only"> for {membership.eventName}</span>
             </button>
           ) : null}
         </div>
