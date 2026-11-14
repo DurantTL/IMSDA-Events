@@ -47,16 +47,16 @@ beforeEach(() => {
 });
 
 describe("Baptism follow-up is an optional, off-by-default event module (#1680)", () => {
-  it("applies to club events, is never in a creation default, and is not an Area Coordinator switch", () => {
-    expect(eventModuleDefinition("baptism-follow-up")).toMatchObject({ title: "Baptism follow-up", appliesTo: "club-audience", offByDefault: true, alwaysOn: false, routes: ["/more/baptism-follow-up"] });
+  it("applies to club events, is never in a creation default, and is a scoped switch (staff and an Area Coordinator)", () => {
+    expect(eventModuleDefinition("baptism-follow-up")).toMatchObject({ title: "Baptism follow-up", appliesTo: "club-audience", offByDefault: true, alwaysOn: false, routes: ["/more/baptism-follow-up", "/account/area-clubs/events"] });
     expect(defaultModuleKeys("CLUB")).not.toContain("baptism-follow-up");
     expect(defaultModuleKeys("GENERAL")).not.toContain("baptism-follow-up");
     expect(creationModuleKeys("CLUB")).not.toContain("baptism-follow-up");
     expect(creationModuleKeys("CLUB", [])).not.toContain("baptism-follow-up");
-    expect(scopedToggleModuleKeys).not.toContain("baptism-follow-up");
+    expect(scopedToggleModuleKeys).toContain("baptism-follow-up");
   });
 
-  it("is turned on only by the existing system administrator module service, and the migration writes no module row", () => {
+  it("the first migration writes no module row", () => {
     const migration = readFileSync("prisma/migrations/20270141100000_baptism_follow_up/migration.sql", "utf8").replace(/^--.*$/gm, "");
     expect(migration).not.toContain('"EventModule"');
     expect(migration).not.toMatch(/^\s*(INSERT|UPDATE|DELETE|DROP)\b/im);
@@ -106,28 +106,28 @@ describe("who may set the event lead addresses (#1680)", () => {
 describe("saving the event lead addresses (#1680)", () => {
   it("is refused while the module is off, or for an event that is not a club event", async () => {
     mocks.moduleFindUnique.mockResolvedValue(null);
-    await expect(saveBaptismLeadEmails({ userId: "u" }, "event-1", "lead@example.test")).rejects.toMatchObject({ code: "MODULE_OFF" });
+    await expect(saveBaptismLeadEmails({ kind: "staff", userId: "u" }, "event-1", "lead@example.test")).rejects.toMatchObject({ code: "MODULE_OFF" });
     mocks.moduleFindUnique.mockResolvedValue({ id: "m1" });
     mocks.eventFindFirst.mockResolvedValue(null);
-    await expect(saveBaptismLeadEmails({ userId: "u" }, "event-1", "lead@example.test")).rejects.toBeInstanceOf(BaptismFollowUpError);
+    await expect(saveBaptismLeadEmails({ kind: "staff", userId: "u" }, "event-1", "lead@example.test")).rejects.toBeInstanceOf(BaptismFollowUpError);
   });
 
   it("audits a change with counts and the addresses added and removed, and a repeat changes and audits nothing", async () => {
-    await saveBaptismLeadEmails({ userId: "u" }, "event-1", "lead@example.test");
+    await saveBaptismLeadEmails({ kind: "staff", userId: "u" }, "event-1", "lead@example.test");
     expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
     const entry = mocks.writeAuditLog.mock.calls[0]![0] as { metadata: unknown };
     expect(entry.metadata).toEqual({ eventId: "event-1", previousCount: 0, newCount: 1, addedEmails: ["lead@example.test"], removedEmails: [] });
     mocks.writeAuditLog.mockClear();
     mocks.settingUpsert.mockClear();
     mocks.settingFindUnique.mockResolvedValue({ leadEmails: ["lead@example.test"] });
-    await saveBaptismLeadEmails({ userId: "u" }, "event-1", "lead@example.test");
+    await saveBaptismLeadEmails({ kind: "staff", userId: "u" }, "event-1", "lead@example.test");
     expect(mocks.settingUpsert).not.toHaveBeenCalled();
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
   it("clears the lead addresses with an empty list", async () => {
     mocks.settingFindUnique.mockResolvedValue({ leadEmails: ["lead@example.test"] });
-    await expect(saveBaptismLeadEmails({ userId: "u" }, "event-1", "")).resolves.toEqual({ leadEmails: [] });
+    await expect(saveBaptismLeadEmails({ kind: "staff", userId: "u" }, "event-1", "")).resolves.toEqual({ leadEmails: [] });
     expect((mocks.writeAuditLog.mock.calls[0]![0] as { metadata: unknown }).metadata).toMatchObject({ addedEmails: [], removedEmails: ["lead@example.test"] });
     expect(mocks.settingUpsert).toHaveBeenCalledWith(expect.objectContaining({ update: { leadEmails: [] } }));
   });

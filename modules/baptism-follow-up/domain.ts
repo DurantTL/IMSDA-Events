@@ -117,3 +117,29 @@ export function baptismNoticeContent(input: { names: readonly string[]; clubName
     ].join("\n"),
   };
 }
+
+/** The longest note staff keep with a name. */
+export const BAPTISM_NOTE_MAX_LENGTH = 500;
+export const BAPTISM_NOTE_TOO_LONG_MESSAGE = `Keep the note to ${BAPTISM_NOTE_MAX_LENGTH} characters or fewer.`;
+
+export type FollowUpNoteResult = { ok: true; note: string | null } | { ok: false; message: string };
+
+/** The note as kept: trimmed, empty means no note, and at most 500 characters (counted after trimming). The message never repeats the note. */
+export function parseFollowUpNote(raw: string): FollowUpNoteResult {
+  const note = raw.trim();
+  if (note.length > BAPTISM_NOTE_MAX_LENGTH) return { ok: false, message: BAPTISM_NOTE_TOO_LONG_MESSAGE };
+  return { ok: true, note: note === "" ? null : note };
+}
+
+/**
+ * One name's followed-up status and note. Each part is optional, at least one must be sent. The note's length is judged by
+ * `parseFollowUpNote` (so the message is friendly); the schema's own cap only refuses an absurd request body.
+ */
+export const followUpInputSchema = z.strictObject({
+  followedUp: z.boolean().optional(),
+  note: z.string().max(5000).optional(),
+}).refine((input) => input.followedUp !== undefined || input.note !== undefined, { message: "Choose what to change." });
+
+export type FollowUpInput = z.infer<typeof followUpInputSchema>;
+
+export const baptismSwitchInputSchema = z.strictObject({ enabled: z.boolean() });

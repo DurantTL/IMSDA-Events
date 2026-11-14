@@ -177,6 +177,7 @@ director. The club pages under `/account/area/[organizationId]` are view only.
 | `/account/area-clubs/events/[eventId]/debrief` | Area Coordinators | Club events: Event debrief | Event debrief |
 | `/account/area-clubs/events/[eventId]/budget` | Area Coordinators | Club events: Budget sheet | Event budget sheet |
 | `/account/area-clubs/events/[eventId]/staffing` | Area Coordinators | Club events: Event staffing | Event staffing |
+| `/account/area-clubs/events/[eventId]/baptism-follow-up` | Area Coordinators | Club events: Baptism follow-up | Baptism follow-up |
 | `/account/area-clubs/events/[eventId]/report` | Area Coordinators | A button on Club events | Attendee report for an event |
 | `/account/area-clubs/kitchen/[eventId]` | Area Coordinators | Club events: Kitchen report | Kitchen counts for an event (`docs/MEALS.md`) |
 | `/account/area-clubs/team-permissions` | Area Coordinators | Coordinator tabs: Team approvals | Team approval rules |
