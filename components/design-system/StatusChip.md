@@ -1,0 +1,19 @@
+Pill labels that state a record's status in a real word, plus the navy count badge. One status word has one color everywhere.
+
+- Text is always the status word; color never carries meaning alone.
+- **The status table (Nov 9, 2026).** Every page uses this mapping; a new status word is added here before it is built.
+
+| Tone | Means | Status words |
+| --- | --- | --- |
+| `green` | Done, nothing more to do | Confirmed, Registered, Submitted, Approved, Sent, Checked in, Paid in full, Active |
+| `gold` | In progress, waiting on someone | Draft, Pending payment, Balance due, Waitlisted, Waiting for approval, Not sent, Not verified |
+| `coral` | Needs attention now | Overdue, Expired, Declined, Bounced, Failed, Missing |
+| `purple` | Informational, no action | Invited, Billed to church, View only |
+| `neutral` | Not started, or closed | Not registered, Not submitted, Not due yet, Cancelled, Revoked, Archived |
+
+- **Status and money are two chips.** The first chip is the registration's status word, colored from the table. Money is a second chip beside it (Paid in full, Balance due, Billed to church). A Confirmed registration that still owes money shows green **Confirmed** and gold **Balance due**; the status chip never turns gold because of the balance.
+- **On navy** (card headers, banners, heroes): chips keep their filled tone, so green, gold, coral and purple look the same as on white. The `neutral` chip takes a new `on-dark` modifier (to build with the table): white text with a 1px white border at 55% opacity. Never grey text on navy.
+- Chip text is 12px in the club and account portals and 14px in staff workspaces (the type floors).
+- `.count-badge` shows a number with its noun ("24 members").
+
+> Approved by Caleb, Nov 9, 2026 (from a whole-system review). Not built yet: today the app shows Waitlisted and Cancelled in purple, Confirmed in gold when a balance is due, and a grey "Pending payment" chip on navy account cards; treat those as defects.

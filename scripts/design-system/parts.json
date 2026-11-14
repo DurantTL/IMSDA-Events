@@ -1,0 +1,834 @@
+{
+ "groups": [
+  "Brand",
+  "Actions",
+  "Forms",
+  "Feedback",
+  "Navigation",
+  "Data",
+  "Overlays",
+  "Tool mockups"
+ ],
+ "parts": [
+  {
+   "name": "Base",
+   "preview": false,
+   "css": [
+    {
+     "file": "node_modules/tailwindcss/preflight.css",
+     "all": true
+    },
+    {
+     "file": "app/globals.css",
+     "selectors": [
+      "*",
+      "html",
+      "body",
+      "textarea",
+      "button:focus-visible",
+      ".sr-only",
+      ":is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark) :is(button, a, input, select, textarea, summary, [tabindex]):focus-visible"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Logo",
+   "group": "Brand",
+   "readme": "components/brand-link.design.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "public-registration-brand",
+      "public-event-brand-link",
+      "club-masthead-brand"
+     ],
+     "scopes": [
+      "public-registration-brand"
+     ]
+    },
+    {
+     "file": "components/brand-link.module.css",
+     "classes": [
+      "link",
+      "symbol"
+     ]
+    },
+    {
+     "file": "components/public-home-page.module.css",
+     "classes": [
+      "page",
+      "public-registration-brand"
+     ],
+     "scopes": [
+      "public-registration-brand"
+     ]
+    },
+    {
+     "file": "components/staff-shell.module.css",
+     "classes": [
+      "topbar",
+      "brand",
+      "brandText"
+     ],
+     "scopes": [
+      "brandText"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "ActionsMenu",
+   "group": "Actions",
+   "readme": "components/actions-menu.design.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "actions-menu",
+      "actions-menu-danger",
+      "actions-menu-divider",
+      "actions-menu-list",
+      "actions-menu-trigger"
+     ],
+     "scopes": [
+      "actions-menu",
+      "actions-menu-list"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Button",
+   "group": "Actions",
+   "readme": "components/design-system/Button.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Field",
+   "group": "Forms",
+   "readme": "components/design-system/Field.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "form-stack",
+      "form-grid",
+      "two-column",
+      "field-help",
+      "form-error",
+      "checkbox-label",
+      "search-field"
+     ],
+     "scopes": [
+      "form-stack",
+      "search-field"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "InfoCard",
+   "group": "Feedback",
+   "readme": "components/event-info-cards.design.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "event-info-card",
+      "event-info-card-tone"
+     ],
+     "scopes": [
+      "event-info-card"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Notice",
+   "group": "Feedback",
+   "readme": "components/design-system/Notice.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "inline-notice"
+     ],
+     "scopes": [
+      "inline-notice"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "StatusChip",
+   "group": "Feedback",
+   "readme": "components/design-system/StatusChip.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "status-chip",
+      "count-badge"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "AccountNav",
+   "group": "Navigation",
+   "readme": "components/account-section-nav.design.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "account-nav",
+      "account-nav-group-label"
+     ],
+     "scopes": [
+      "account-nav"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "ClubPortalNav",
+   "group": "Navigation",
+   "readme": "components/club-portal-nav.design.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "club-masthead",
+      "club-masthead-inner",
+      "club-masthead-brand",
+      "club-masthead-identity",
+      "club-banner",
+      "club-banner-inner",
+      "club-banner-identity",
+      "club-banner-year"
+     ],
+     "scopes": [
+      "club-masthead-brand",
+      "club-banner"
+     ]
+    },
+    {
+     "file": "components/brand-link.module.css",
+     "classes": [
+      "link",
+      "symbol"
+     ]
+    },
+    {
+     "file": "components/club-portal-masthead-view.module.css",
+     "classes": [
+      "account",
+      "action",
+      "label"
+     ]
+    },
+    {
+     "file": "components/club-portal-nav.module.css",
+     "classes": [
+      "nav",
+      "line",
+      "tabs",
+      "list",
+      "link"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "PageHeader",
+   "group": "Navigation",
+   "readme": "components/page-header.design.md",
+   "css": [
+    {
+     "file": "components/page-header.module.css",
+     "classes": [
+      "header",
+      "row",
+      "text",
+      "eyebrow",
+      "title",
+      "description",
+      "actions"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "eyebrow",
+      "back-link"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "PhoneHeader",
+   "group": "Navigation",
+   "readme": "components/design-system/PhoneHeader.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "status-chip",
+      "mobile-nav"
+     ],
+     "scopes": [
+      "mobile-nav"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "StaffShell",
+   "group": "Navigation",
+   "readme": "components/app-shell.design.md",
+   "css": [
+    {
+     "file": "components/staff-shell.module.css",
+     "classes": [
+      "page",
+      "rail",
+      "railItem",
+      "eventBar",
+      "eventName",
+      "tabline",
+      "tabs",
+      "menuline",
+      "current",
+      "menuButton",
+      "views"
+     ],
+     "scopes": [
+      "rail",
+      "tabs",
+      "views",
+      "eventBar"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "mobile-nav"
+     ],
+     "scopes": [
+      "mobile-nav"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "EmptyState",
+   "group": "Data",
+   "readme": "components/empty-state.design.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "empty-state",
+      "panel"
+     ],
+     "scopes": [
+      "empty-state"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "MetricCard",
+   "group": "Data",
+   "readme": "components/design-system/MetricCard.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "metric-card"
+     ],
+     "scopes": [
+      "metric-card"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "MonthlyRecordsGrid",
+   "group": "Data",
+   "readme": "components/coordinator-monthly-records.design.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "report-table",
+      "report-table-wrap"
+     ],
+     "scopes": [
+      "report-table",
+      "report-table-wrap"
+     ]
+    },
+    {
+     "file": "components/coordinator-monthly-records.module.css",
+     "classes": [
+      "tableBlock",
+      "table",
+      "club",
+      "status",
+      "state",
+      "icon",
+      "year"
+     ]
+    },
+    {
+     "file": "components/club-report-charts.module.css",
+     "classes": [
+      "strip",
+      "stripCell",
+      "seriesDark",
+      "seriesHatch",
+      "seriesPale"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "ReportTable",
+   "group": "Data",
+   "readme": "components/design-system/ReportTable.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "report-table",
+      "report-table-wrap"
+     ],
+     "scopes": [
+      "report-table",
+      "report-table-wrap"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "status-chip"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Dialog",
+   "group": "Overlays",
+   "readme": "components/confirm-dialog.design.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "modal-backdrop",
+      "modal-card",
+      "modal-head",
+      "confirm-copy",
+      "form-actions",
+      "lifecycle-danger-button"
+     ],
+     "scopes": [
+      "modal-card",
+      "modal-head"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "CalendarMonth",
+   "group": "Tool mockups",
+   "readme": "components/design-system/CalendarMonth.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "calendar-month",
+      "calendar-week",
+      "calendar-weekdays",
+      "calendar-weekday",
+      "calendar-day",
+      "calendar-day-number",
+      "calendar-day-link",
+      "calendar-bar",
+      "calendar-bar-title",
+      "calendar-bar-dates",
+      "calendar-bar-edge",
+      "calendar-bar-edge-end",
+      "calendar-swatch",
+      "calendar-key",
+      "calendar-key-item",
+      "calendar-tone-1",
+      "calendar-tone-2",
+      "calendar-tone-3",
+      "calendar-tone-4",
+      "calendar-tone-5",
+      "calendar-tone-6",
+      "calendar-tone-event",
+      "calendar-tone-closure"
+     ],
+     "scopes": [
+      "calendar-month",
+      "calendar-day",
+      "calendar-week",
+      "calendar-key"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "CheckIn",
+   "group": "Tool mockups",
+   "readme": "components/check-in-workspace.design.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "checkin-hero",
+      "checkin-tallies",
+      "scan-card",
+      "search-field"
+     ],
+     "scopes": [
+      "checkin-hero",
+      "scan-card",
+      "checkin-tallies",
+      "search-field"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "ClubHome",
+   "group": "Tool mockups",
+   "readme": "components/club-home.design.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "club-masthead",
+      "club-masthead-inner",
+      "club-masthead-brand",
+      "club-masthead-identity",
+      "club-banner",
+      "club-banner-inner",
+      "club-banner-identity",
+      "club-banner-year"
+     ],
+     "scopes": [
+      "club-masthead-brand",
+      "club-banner"
+     ]
+    },
+    {
+     "file": "components/brand-link.module.css",
+     "classes": [
+      "link",
+      "symbol"
+     ]
+    },
+    {
+     "file": "components/club-portal-masthead-view.module.css",
+     "classes": [
+      "account",
+      "action",
+      "label"
+     ]
+    },
+    {
+     "file": "components/club-portal-nav.module.css",
+     "classes": [
+      "nav",
+      "line",
+      "tabs",
+      "list",
+      "link"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "metric-card",
+      "accent-gold",
+      "accent-purple",
+      "accent-green",
+      "panel",
+      "eyebrow",
+      "inline-notice",
+      "status-chip"
+     ],
+     "scopes": [
+      "metric-card",
+      "inline-notice",
+      "panel"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "PublicHome",
+   "group": "Tool mockups",
+   "readme": "components/public-home-page.design.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "public-registration-page",
+      "public-registration-header",
+      "public-registration-header-inner",
+      "public-registration-brand",
+      "public-event-brand-link",
+      "public-header-links",
+      "public-registration-hero",
+      "season-band",
+      "season-band-text",
+      "season-band-line",
+      "public-registration-eyebrow",
+      "calendar-layout"
+     ],
+     "scopes": [
+      "public-registration-brand",
+      "public-registration-hero",
+      "season-band"
+     ]
+    },
+    {
+     "file": "components/brand-link.module.css",
+     "classes": [
+      "link",
+      "symbol"
+     ]
+    },
+    {
+     "file": "components/public-home-page.module.css",
+     "classes": [
+      "page",
+      "hero",
+      "heroActions",
+      "primaryNav",
+      "kicker",
+      "sectionHeading",
+      "public-registration-header",
+      "public-registration-header-inner",
+      "public-registration-brand",
+      "public-registration-hero",
+      "season-band-text",
+      "season-band-line",
+      "calendar-layout",
+      "primary-button"
+     ],
+     "scopes": [
+      "public-registration-brand",
+      "public-registration-hero",
+      "heroActions",
+      "primaryNav",
+      "sectionHeading",
+      "hero"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "RegistrationProgress",
+   "group": "Tool mockups",
+   "readme": "components/public-registration-form.design.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "public-registration-progress",
+      "public-registration-progress-heading",
+      "public-registration-progress-track",
+      "eyebrow",
+      "panel",
+      "form-stack",
+      "form-actions",
+      "checkbox-label"
+     ],
+     "scopes": [
+      "public-registration-progress",
+      "public-registration-progress-track",
+      "public-registration-progress-heading",
+      "form-stack",
+      "panel"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "RosterTool",
+   "group": "Tool mockups",
+   "readme": "components/club-roster-workspace.design.md",
+   "css": [
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "club-masthead",
+      "club-masthead-inner",
+      "club-masthead-brand",
+      "club-masthead-identity",
+      "club-banner",
+      "club-banner-inner",
+      "club-banner-identity",
+      "club-banner-year"
+     ],
+     "scopes": [
+      "club-masthead-brand",
+      "club-banner"
+     ]
+    },
+    {
+     "file": "components/brand-link.module.css",
+     "classes": [
+      "link",
+      "symbol"
+     ]
+    },
+    {
+     "file": "components/club-portal-masthead-view.module.css",
+     "classes": [
+      "account",
+      "action",
+      "label"
+     ]
+    },
+    {
+     "file": "components/club-portal-nav.module.css",
+     "classes": [
+      "nav",
+      "line",
+      "tabs",
+      "list",
+      "link"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "search-field",
+      "checkbox-label",
+      "report-table",
+      "report-table-wrap",
+      "status-chip",
+      "count-badge"
+     ],
+     "scopes": [
+      "search-field",
+      "report-table",
+      "report-table-wrap"
+     ]
+    },
+    {
+     "file": "app/globals.css",
+     "classes": [
+      "primary-button",
+      "secondary-button",
+      "text-button",
+      "danger-outline-button"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Cover",
+   "css": []
+  }
+ ]
+}
