@@ -8,6 +8,7 @@ import { enqueueMerchandiseReceiptMessage } from "@/modules/communications/trans
 import { assertEventOpenForMoney } from "@/modules/events/money-lock";
 import { merchandiseOrderStatusWords, type MerchandiseOrderStatusValue } from "@/modules/merchandise/domain";
 import {
+  COMPED_CANCEL_FINANCE_MESSAGE,
   formatReceiptNumber,
   merchandisePaymentMethodLine,
   planMerchandiseOrderTransition,
@@ -27,10 +28,10 @@ import {
  * same submission retried). A retry with the same `clientRequestId` returns the stored result and writes nothing new.
  */
 
-export type MerchandiseOrderActionErrorCode = "ORDER_NOT_FOUND" | "ORDER_NOT_ACTIONABLE" | "PAID_ORDER_NEEDS_REFUND" | "IDEMPOTENCY_CONFLICT";
+export type MerchandiseOrderActionErrorCode = "FINANCE_REQUIRED" | "ORDER_NOT_FOUND" | "ORDER_NOT_ACTIONABLE" | "PAID_ORDER_NEEDS_REFUND" | "IDEMPOTENCY_CONFLICT";
 
 export class MerchandiseOrderActionError extends Error {
-  constructor(public readonly code: MerchandiseOrderActionErrorCode, message: string, public readonly status: 404 | 409) {
+  constructor(public readonly code: MerchandiseOrderActionErrorCode, message: string, public readonly status: 403 | 404 | 409) {
     super(message);
     this.name = "MerchandiseOrderActionError";
   }
@@ -100,6 +101,8 @@ export async function applyMerchandiseOrderAction(
   actorUserId: string,
   input: MerchandiseOrderActionInput,
   now: Date = new Date(),
+  /** Whether the actor has finance access. Cancelling a comped order needs it; the route passes the real answer. */
+  canManageFinance = false,
 ): Promise<MerchandiseOrderActionResult> {
   return getPrisma().$transaction(async (tx) => {
     // Scoped to the event: an order id from another event is the same as no order.
@@ -109,6 +112,7 @@ export async function applyMerchandiseOrderAction(
     const replay = await findReplay(tx, orderId, input);
     if (replay) return toResult(order, true);
 
+    if (input.action === "CANCEL" && order.status === "COMPED" && !canManageFinance) throw new MerchandiseOrderActionError("FINANCE_REQUIRED", COMPED_CANCEL_FINANCE_MESSAGE, 403);
     await assertEventOpenForMoney(tx, eventId, "staff");
 
     const plan = planMerchandiseOrderTransition(input.action, order.status);
@@ -192,7 +196,7 @@ async function queueReceipt(
       receiptNumber: input.receiptNumber,
       dateText: new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone: event?.timezone || "UTC" }).format(input.now),
       lines: lines.map((line) => ({ productName: line.productNameSnapshot, variantLabel: line.variantLabelSnapshot, quantity: line.quantity, lineTotalCents: line.lineTotalCents })),
-      feeCents: input.order.feeCents, taxCents: input.order.taxCents, totalCents: input.order.totalCents, methodLine,
+      feeCents: input.order.feeCents, taxCents: input.order.taxCents, totalCents: input.order.totalCents, methodLine, comped: input.updated.status === "COMPED",
     }),
   });
 }

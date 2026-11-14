@@ -18,6 +18,7 @@ import { POST } from "@/app/api/events/[eventId]/merchandise/orders/[orderId]/ac
 import { applyMerchandiseOrderAction, MerchandiseOrderActionError } from "@/modules/merchandise/order-actions";
 import {
   availableMerchandiseOrderActions,
+  merchandiseOrderActionAllowed,
   merchandiseOrderActionPermissions,
   merchandiseOrderActionSchema,
   merchandisePaymentMethodLine,
@@ -91,6 +92,14 @@ describe("transition rules", () => {
     expect(availableMerchandiseOrderActions("PENDING")).toEqual(["MARK_PAID", "COMP", "CANCEL"]);
     expect(availableMerchandiseOrderActions("COMPED")).toEqual(["CANCEL"]);
     expect(availableMerchandiseOrderActions("PAID")).toEqual([]);
+  });
+
+  it("hides Cancel on a comped order from staff without finance access", () => {
+    const registration = merchandiseOrderActionPermissions(["CONFIGURE_EVENT", "MANAGE_REGISTRATION"]);
+    const finance = merchandiseOrderActionPermissions(["CONFIGURE_EVENT", "MANAGE_FINANCE"]);
+    expect(merchandiseOrderActionAllowed("CANCEL", "PENDING", registration)).toBe(true);
+    expect(merchandiseOrderActionAllowed("CANCEL", "COMPED", registration)).toBe(false);
+    expect(merchandiseOrderActionAllowed("CANCEL", "COMPED", finance)).toBe(true);
   });
 
   it("maps button visibility from permissions", () => {
@@ -191,12 +200,27 @@ describe("applyMerchandiseOrderAction", () => {
   it("cancels a pending or comped order without a receipt number or email", async () => {
     for (const status of ["PENDING", "COMPED"]) {
       const tx = makeDb({ order: { status, receiptNumber: status === "COMPED" ? "M-0001" : null } });
-      const result = await applyMerchandiseOrderAction(eventId, orderId, "usr_1", cancel(), now);
+      const result = await applyMerchandiseOrderAction(eventId, orderId, "usr_1", cancel(), now, true);
       expect(result.order.status).toBe("CANCELLED");
       expect(tx.merchandiseOrder.updateMany).toHaveBeenCalledWith({ where: { id: orderId, eventId, status }, data: { status: "CANCELLED" } });
       expect(tx.merchandiseOrderStatusChange.create.mock.calls[0][0].data).toMatchObject({ action: "CANCEL", reason: "Ordered by mistake" });
     }
     expect(mocks.enqueueReceipt).not.toHaveBeenCalled();
+  });
+
+  it("needs finance access to cancel a comped order, but not a pending one", async () => {
+    const tx = makeDb({ order: { status: "COMPED", receiptNumber: "M-0001" } });
+    await expect(applyMerchandiseOrderAction(eventId, orderId, "usr_1", cancel(), now, false)).rejects.toMatchObject({ code: "FINANCE_REQUIRED", status: 403 });
+    expect(tx.merchandiseOrder.updateMany).not.toHaveBeenCalled();
+    makeDb({ order: { status: "PENDING" } });
+    await expect(applyMerchandiseOrderAction(eventId, orderId, "usr_1", cancel(), now, false)).resolves.toMatchObject({ order: { status: "CANCELLED" } });
+  });
+
+  it("words a refusal without a raw status", async () => {
+    makeDb({ order: { status: "CANCELLED" } });
+    const error = await applyMerchandiseOrderAction(eventId, orderId, "usr_1", markPaid(), now).catch((caught) => caught);
+    expect(error.message).toContain('"Cancelled"');
+    expect(error.message).not.toContain("cancelled,");
   });
 
   it("refuses to cancel a paid order with a 409 and changes nothing", async () => {
@@ -309,6 +333,15 @@ describe("POST route permissions", () => {
     expect((await post(bodies.CANCEL)).status).toBe(201);
     expect((await post(bodies.MARK_PAID)).status).toBe(403);
     expect((await post(bodies.COMP)).status).toBe(403);
+  });
+
+  it("lets only finance staff cancel a comped order", async () => {
+    makeDb({ order: { status: "COMPED" } });
+    mocks.findActiveMembership.mockResolvedValue(membership("REGISTRATION_MANAGER", ["CONFIGURE_EVENT"]));
+    expect((await post(bodies.CANCEL)).status).toBe(403);
+    makeDb({ order: { status: "COMPED" } });
+    mocks.findActiveMembership.mockResolvedValue(membership("FINANCE_MANAGER", ["CONFIGURE_EVENT"]));
+    expect((await post(bodies.CANCEL)).status).toBe(201);
   });
 
   it("refuses staff without configuration access, and read-only staff, for every action", async () => {

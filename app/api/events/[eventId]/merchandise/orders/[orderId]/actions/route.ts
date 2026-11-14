@@ -14,7 +14,7 @@ type Context = { params: Promise<{ eventId: string; orderId: string }> };
 
 /**
  * Staff actions on one merchandise order (#148): mark paid (cash, check or a Square card payment taken elsewhere),
- * comp, cancel. Never calls Square and never moves money. Viewing orders needs configuration plus registration or
+ * comp, cancel. Cancelling a comped order also needs finance access. Never calls Square and never moves money. Viewing orders needs configuration plus registration or
  * finance access; Mark paid and Comp also need finance access; Cancel needs only the viewing access.
  */
 async function postHandler(request: Request, context: Context) {
@@ -26,7 +26,11 @@ async function postHandler(request: Request, context: Context) {
     const access = await requireMerchandiseOrderAccess(session, eventId);
     const input = merchandiseOrderActionSchema.parse(await request.json());
     if (input.action !== "CANCEL") await requirePermission(session, eventId, "MANAGE_FINANCE", findActiveMembership);
-    const result = await applyMerchandiseOrderAction(eventId, orderId, access.user.id, input);
+    const canManageFinance = await requirePermission(session, eventId, "MANAGE_FINANCE", findActiveMembership).then(() => true, (error) => {
+      if (error instanceof AccessDeniedError) return false;
+      throw error;
+    });
+    const result = await applyMerchandiseOrderAction(eventId, orderId, access.user.id, input, new Date(), canManageFinance);
     return Response.json(result, { status: result.replayed ? 200 : 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return Response.json({ error: "INVALID_ORDER_ACTION", message: error.issues[0]?.message ?? "Check the form and try again.", issues: error.issues }, { status: 400 });

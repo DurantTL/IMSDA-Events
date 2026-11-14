@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { MerchandiseOrderStatusValue } from "@/modules/merchandise/domain";
+import { merchandiseOrderStatusWords, type MerchandiseOrderStatusValue } from "@/modules/merchandise/domain";
 
 /**
  * Staff actions on a merchandise order (#148): mark paid, comp, cancel. Pure rules only; the transaction that applies
@@ -56,7 +56,7 @@ export function planMerchandiseOrderTransition(action: MerchandiseOrderActionVal
   | { ok: false; code: MerchandiseOrderActionRefusalCode; message: string } {
   if (ALLOWED_FROM[action].includes(from)) return { ok: true, to: NEXT_STATUS[action] };
   if (action === "CANCEL" && (from === "PAID" || from === "REFUNDED")) return { ok: false, code: "PAID_ORDER_NEEDS_REFUND", message: PAID_ORDER_CANCEL_MESSAGE };
-  return { ok: false, code: "ORDER_NOT_ACTIONABLE", message: `This order is already ${from.toLowerCase()}, so that can't be done. Reload the page to see its current state.` };
+  return { ok: false, code: "ORDER_NOT_ACTIONABLE", message: `This order is already marked "${merchandiseOrderStatusWords[from]}", so that can't be done. Reload the page to see its current state.` };
 }
 
 /** Which action buttons a staff member sees. The server checks again; this only decides what to show. */
@@ -66,6 +66,15 @@ export function merchandiseOrderActionPermissions(permissions: ReadonlyArray<str
   return { canMarkPaid: finance, canComp: finance, canCancel: canView };
 }
 export type MerchandiseOrderActionPermissions = ReturnType<typeof merchandiseOrderActionPermissions>;
+
+export const COMPED_CANCEL_FINANCE_MESSAGE = "Cancelling a comped order needs finance access. Ask a finance administrator.";
+
+/** Cancelling a comped order undoes a finance decision, so it needs finance access; cancelling an unpaid one does not. */
+export function merchandiseOrderActionAllowed(action: MerchandiseOrderActionValue, status: MerchandiseOrderStatusValue, permissions: MerchandiseOrderActionPermissions) {
+  if (action === "MARK_PAID") return permissions.canMarkPaid;
+  if (action === "COMP") return permissions.canComp;
+  return status === "COMPED" ? permissions.canMarkPaid : permissions.canCancel;
+}
 
 /** Which actions can still be taken on an order in this status, ignoring who is asking. */
 export function availableMerchandiseOrderActions(status: MerchandiseOrderStatusValue): MerchandiseOrderActionValue[] {

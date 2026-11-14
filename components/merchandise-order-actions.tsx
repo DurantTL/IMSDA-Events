@@ -8,6 +8,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { formatMerchandiseMoney, merchandiseEndpoint } from "@/components/merchandise-admin-ui";
 import {
   availableMerchandiseOrderActions,
+  merchandiseOrderActionAllowed,
   MERCHANDISE_RECORDED_METHOD_LABELS,
   type MerchandiseOrderActionPermissions,
   type MerchandiseOrderActionValue,
@@ -38,8 +39,7 @@ export function MerchandiseOrderActions({ eventId, orderId, purchaserName, statu
   const [error, setError] = useState("");
   // One id per opened form, kept for a retry of the same submission so a second tap cannot apply it twice.
   const requestId = useRef("");
-  const allowed = { MARK_PAID: permissions.canMarkPaid, COMP: permissions.canComp, CANCEL: permissions.canCancel };
-  const actions = availableMerchandiseOrderActions(status).filter((action) => allowed[action]);
+  const actions = availableMerchandiseOrderActions(status).filter((action) => merchandiseOrderActionAllowed(action, status, permissions));
   if (actions.length === 0) return <span className={styles.note}>No actions</span>;
 
   function openForm(action: MerchandiseOrderActionValue) {

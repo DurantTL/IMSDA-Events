@@ -12,8 +12,8 @@ const lines = [
   { productName: "Water Bottle", variantLabel: "One size", quantity: 1, lineTotalCents: 1200 },
 ];
 
-function render(methodLine: string, extra: { feeCents?: number; taxCents?: number } = {}) {
-  const block = buildMerchandiseReceiptBlock({ receiptNumber: "M-0012", dateText: "March 2, 2027", lines, feeCents: extra.feeCents ?? 0, taxCents: extra.taxCents ?? 0, totalCents: 5200 + (extra.feeCents ?? 0) + (extra.taxCents ?? 0), methodLine });
+function render(methodLine: string, extra: { feeCents?: number; taxCents?: number; comped?: boolean } = {}) {
+  const block = buildMerchandiseReceiptBlock({ receiptNumber: "M-0012", dateText: "March 2, 2027", lines, feeCents: extra.feeCents ?? 0, taxCents: extra.taxCents ?? 0, totalCents: 5200 + (extra.feeCents ?? 0) + (extra.taxCents ?? 0), methodLine, comped: extra.comped });
   const template = DEFAULT_MESSAGE_TEMPLATES.MERCHANDISE_RECEIPT;
   return renderMessageTemplate(
     { subject: template.subject, preheader: null, body: template.body },
@@ -54,9 +54,14 @@ describe("merchandise receipt template (#148)", () => {
     expect(render("Check #1042").body).toContain("Check #1042");
     expect(render("Check #1042").bodyHtml).toContain("Check #1042");
     expect(render("Card (Square), ref SQ-RCPT-77").body).toContain("Card (Square), ref SQ-RCPT-77");
-    const comped = render("Comped — no charge");
+    const comped = render("Comped — no charge", { comped: true });
     expect(comped.body).toContain("Comped — no charge");
     expect(comped.bodyHtml).toContain("Comped — no charge");
+    for (const text of [comped.body, comped.bodyHtml]) {
+      expect(text).toContain("$0.00");
+      expect(text).toContain("comped; items valued at $52.00");
+    }
+    expect(comped.body).not.toContain("Total:** $52.00");
   });
 
   it("shows fee and tax only when nonzero", () => {

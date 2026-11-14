@@ -503,6 +503,8 @@ export type MerchandiseReceiptBlockInput = {
   totalCents: number;
   /** "Cash", "Check #123", "Card (Square), ref …" or "Comped — no charge" (`merchandisePaymentMethodLine`). */
   methodLine: string;
+  /** A comped order: the total is $0.00 and the items are shown at their value. */
+  comped?: boolean;
 };
 
 /**
@@ -517,7 +519,9 @@ export function buildMerchandiseReceiptBlock(input: MerchandiseReceiptBlockInput
   }
   if (input.feeCents > 0) lines.push(`- Processing fee: ${formatMessageMoney(input.feeCents)}`);
   if (input.taxCents > 0) lines.push(`- Tax: ${formatMessageMoney(input.taxCents)}`);
-  lines.push(`- **Total:** ${formatMessageMoney(input.totalCents)}`, "", "### Receipt", "");
+  lines.push(input.comped
+    ? `- **Total:** $0.00 (comped; items valued at ${formatMessageMoney(input.totalCents)})`
+    : `- **Total:** ${formatMessageMoney(input.totalCents)}`, "", "### Receipt", "");
   lines.push(`- **Receipt number:** ${input.receiptNumber}`);
   lines.push(`- **Date:** ${input.dateText}`);
   lines.push(`- **Payment:** ${escapeMarkdown(input.methodLine)}`);

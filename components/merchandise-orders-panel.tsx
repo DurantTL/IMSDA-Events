@@ -61,7 +61,7 @@ export function MerchandiseOrdersPanel({ eventId, permissions, slice, totals, so
                     <td {...cardCell("Registration")}>{order.confirmationCode ? <CodeValue code={order.confirmationCode} /> : "None"}</td>
                     <td {...cardCell("Items")}><ul className={styles.items}>{order.lines.map((line, index) => <li key={index}>{line.quantity} × {line.productName} {line.variantLabel}</li>)}</ul></td>
                     <td {...cardCell("Total")}><Money cents={order.totalCents} /></td>
-                    <td {...cardCell("Status")}>{order.statusWord}{order.status === "COMPED" && <small className={styles.note}> · Comped</small>}{!order.registrationActive && <small className={styles.note}> · Registration cancelled</small>}
+                    <td {...cardCell("Status")}>{order.statusWord}{order.status === "COMPED" && <small className={styles.note}> · No charge</small>}{!order.registrationActive && <small className={styles.note}> · Registration cancelled</small>}
                       {(order.receiptNumber || order.paymentLine) && <span className={styles.facts}>{order.receiptNumber && <span>Receipt {order.receiptNumber}</span>}{order.paymentLine && <span>{order.paymentLine}</span>}</span>}
                       {order.history.length > 0 && (
                         <details className={styles.history}>
