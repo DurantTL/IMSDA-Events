@@ -89,16 +89,87 @@
   </form>
   <label class="search-field" style="max-width:560px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Find a person by name</span><input placeholder="Find a person by name"></label>
 </div>
-</div></section><h2 class="g-head">Feedback</h2><section class="g-card" id="InfoCard"><header class="g-meta"><h3>InfoCard</h3><p>Event info cards for public event pages: a toned left edge, an uppercase tone label, a heading and short text.</p><a href="components/InfoCard/README.md">Usage rules</a></header><div class="g-frame" style="min-height:420px"><div class="ds-stage" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+</div></section><section class="g-card" id="FormControls"><header class="g-meta"><h3>FormControls</h3><p>The remaining form controls and how errors and unsaved changes show: select, checkbox, radio cards, date and file, inline errors and the error summary.</p><a href="components/FormControls/README.md">Usage rules</a></header><div class="g-frame" style="min-height:860px"><div class="ds-stage">
+  <div class="form-error-summary" role="alert" tabindex="-1" style="max-width:560px">
+    <strong><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> 2 things to fix before saving</strong>
+    <ul><li><a href="#birth">Birth date: enter a date like 4/17/2014.</a></li><li><a href="#phone">Phone must be a 10-digit number.</a></li></ul>
+  </div>
+  <form class="form-stack" style="max-width:560px" onsubmit="return false">
+    <label class="birth-date-field">Birth date
+      <input id="birth" aria-invalid="true" aria-describedby="birth-parsed birth-error" inputmode="numeric" placeholder="M/D/YYYY" value="4/17/14x">
+      <span class="field-help birth-date-parsed" id="birth-parsed">Enter a date like 4/17/2014 or 04172014.</span>
+      <small class="field-error-message" id="birth-error"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg><span>Enter a date like 4/17/2014.</span></small>
+    </label>
+    <label>Member type<select><option>Pathfinder</option><option>Staff</option></select></label>
+    <fieldset class="radio-card-group">
+      <legend>Who pays?</legend>
+      <div class="radio-card-group-options">
+        <label class="radio-card"><input type="radio" name="pays" checked><span>The club<small>One invoice for the whole club.</small></span></label>
+        <label class="radio-card"><input type="radio" name="pays"><span>Each family<small>Families pay at registration.</small></span></label>
+      </div>
+    </fieldset>
+    <label class="checkbox-label"><input type="checkbox" checked> Show inactive people</label>
+    <div>
+      <label class="secondary-button file-button" for="roster-file">Choose a roster file<input class="sr-only" id="roster-file" type="file"></label>
+      <p class="disabled-hint">CSV files only, up to 2 MB.</p>
+    </div>
+    <label class="file-drop selected"><input type="file"><span><strong>riverton-roster.csv</strong><small>18 people found</small></span></label>
+  </form>
+</div>
+</div></section><section class="g-card" id="SearchField"><header class="g-meta"><h3>SearchField</h3><p>The search box: an icon, an input and a clear button, used by every list and the staff header (rules S1 to S5).</p><a href="components/SearchField/README.md">Usage rules</a></header><div class="g-frame" style="min-height:250px"><div class="ds-stage">
+  <label class="search-field" style="max-width:560px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Find a person by name</span><input type="search" placeholder="Find a person by name"></label>
+  <div class="search-field" style="max-width:560px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input type="search" aria-label="Find a person by name" value="Morgan"><button class="search-field-clear" aria-label="Clear search" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+  <p class="quiet-copy" role="status">1 of 40 registrations shown.</p>
+  <p class="ds-caption">Empty shows everything; typing narrows it as you type. The clear button appears only while there is text.</p>
+</div>
+</div></section><h2 class="g-head">Feedback</h2><section class="g-card" id="Banners"><header class="g-meta"><h3>Banners</h3><p>Banners that tell people which mode they are in: acting as another role, view only, and site notices.</p><a href="components/Banners/README.md">Usage rules</a></header><div class="g-frame" style="min-height:520px"><div class="ds-stage">
+  <div class="inline-notice act-as-banner" role="status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M6 21v-1a6 6 0 0 1 12 0v1"/></svg><span>Acting as director of Riverton Pathfinders until 4:30 PM CST.</span><a class="secondary-button" href="#">Open the club portal</a><button class="secondary-button" type="button">Stop acting</button></div>
+  <section aria-label="Cedar Hollow Trailblazers, view only" class="club-banner" style="border-radius:12px;overflow:hidden">
+    <div class="club-banner-inner">
+      <div class="club-banner-identity"><h1>Cedar Hollow Trailblazers</h1><p>Area Coordinator · view only</p></div>
+      <p class="club-banner-year"><span>Current club year</span><strong>2026–2027</strong></p>
+    </div>
+  </section>
+  <p class="inline-notice" role="status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> View only. You see what the club's director sees, with ages instead of birth dates. The club's director maintains the roster and settings, so ask the director for any change.</p>
+  <section aria-label="Site notices" class="site-notices-view__site-notices"><ul>
+    <li class="site-notices-view__site-notice site-notices-view__site-notice-info"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><p><strong>Notice: </strong>Registration for Camp Meeting opens Monday. <a class="site-notices-view__site-notice-link" href="#">See the schedule</a></p></li>
+    <li class="site-notices-view__site-notice site-notices-view__site-notice-urgent"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><p><strong>Urgent: </strong>The office closes early on Friday.</p></li>
+    <li class="site-notices-view__site-notice site-notices-view__site-notice-emergency"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12v.01"/><circle cx="12" cy="12" r="6"/></svg><p><strong>Emergency: </strong>The Saturday gathering moved to the north gym.</p></li>
+  </ul></section>
+</div>
+</div></section><section class="g-card" id="InfoCard"><header class="g-meta"><h3>InfoCard</h3><p>Event info cards for public event pages: a toned left edge, an uppercase tone label, a heading and short text.</p><a href="components/InfoCard/README.md">Usage rules</a></header><div class="g-frame" style="min-height:420px"><div class="ds-stage" style="grid-template-columns:repeat(2,minmax(0,1fr))">
   <article class="event-info-card is-deadline"><p class="event-info-card-tone">Deadline</p><h2>Registration closes October 1</h2><p>Late registrations go to the waitlist.</p></article>
   <article class="event-info-card is-requirement"><p class="event-info-card-tone">Requirement</p><h2>Health form for every camper</h2><p>Directors can fill it in or send a private link.</p></article>
   <article class="event-info-card is-info"><p class="event-info-card-tone">Good to know</p><h2>Check-in opens Friday at 2 p.m.</h2><p>Bring the club packet or the QR code.</p></article>
   <article class="event-info-card is-help"><p class="event-info-card-tone">Need help?</p><h2>Contact the conference office</h2><p>Include the club and event name.</p></article>
 </div>
+</div></section><section class="g-card" id="LoadingState"><header class="g-meta"><h3>LoadingState</h3><p>What a page shows while it loads, and while a list or button waits.</p><a href="components/LoadingState/README.md">Usage rules</a></header><div class="g-frame" style="min-height:470px"><style>
+  /* The app styles this label inside .app-shell; the preview repeats it. */
+  .workspace-loading-label { margin: 0; color: var(--muted); font-weight: 600; }
+</style>
+<div class="ds-stage">
+  <div aria-busy="true" class="content-skeleton" role="status">
+    <p class="workspace-loading-label">Loading the page…</p>
+    <div aria-hidden="true" class="content-skeleton-bar content-skeleton-title"></div>
+    <div aria-hidden="true" class="content-skeleton-bar content-skeleton-line"></div>
+    <div aria-hidden="true" class="content-skeleton-grid">
+      <div class="content-skeleton-bar content-skeleton-card"></div>
+      <div class="content-skeleton-bar content-skeleton-card"></div>
+      <div class="content-skeleton-bar content-skeleton-card"></div>
+    </div>
+    <div aria-hidden="true" class="content-skeleton-bar content-skeleton-panel"></div>
+  </div>
+</div>
 </div></section><section class="g-card" id="Notice"><header class="g-meta"><h3>Notice</h3><p>Inline notices that confirm a save, warn before a deadline or report an error, placed at the top of the panel they concern.</p><a href="components/Notice/README.md">Usage rules</a></header><div class="g-frame" style="min-height:230px"><div class="ds-stage">
   <p class="inline-notice">Saved. Morgan Reed is on the 2026–2027 roster.</p>
   <p class="inline-notice warning">The October report is due November 10. <a href="#">Open report</a></p>
   <p class="inline-notice error">That link has expired. Send a new private link.</p>
+</div>
+</div></section><section class="g-card" id="SaveStatus"><header class="g-meta"><h3>SaveStatus</h3><p>The one place a form says it is saving, saved or not saved (rules B5 and B10).</p><a href="components/SaveStatus/README.md">Usage rules</a></header><div class="g-frame" style="min-height:330px"><div class="ds-stage">
+  <div class="form-actions" style="justify-content:flex-start"><button class="primary-button" type="button" disabled aria-busy="true"><svg class="submit-button-spinner is-spinning" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Saving…</button></div>
+  <div class="inline-notice form-message__message" role="status">Saved. Morgan Reed is on the 2026–2027 roster. <button class="form-message__undo" type="button">Undo</button></div>
+  <div class="inline-notice error form-message__message" role="alert">Not saved: enter a birth date to finish this person's details.</div>
+  <p class="ds-caption">Settings pages show the same words in a status line: Saving… · Saved · Unsaved changes · Not saved · Not saved: changed by someone else.</p>
 </div>
 </div></section><section class="g-card" id="StatusChip"><header class="g-meta"><h3>StatusChip</h3><p>Pill labels that state a record's status in a real word, plus the navy count badge. One status word has one color everywhere.</p><a href="components/StatusChip/README.md">Usage rules</a></header><div class="g-frame" style="min-height:330px"><style>
   .chip-on-navy { background: var(--imsda-navy); border-radius: 14px; padding: 14px 16px; }
@@ -145,6 +216,22 @@
   <p class="club-banner-year"><span>Current club year</span><strong>2026–2027</strong></p>
 </div></section>
 <div class="club-portal-nav__nav"><div class="club-portal-nav__line"><nav aria-label="Club" class="club-portal-nav__tabs"><ul class="club-portal-nav__list"><li><a class="club-portal-nav__link" href="#">Home</a></li><li><a class="club-portal-nav__link" href="#" aria-current="page">Roster</a></li><li><a class="club-portal-nav__link" href="#">Forms</a></li><li><a class="club-portal-nav__link" href="#">Club events</a></li><li><a class="club-portal-nav__link" href="#">Honors</a></li><li><a class="club-portal-nav__link" href="#">Class tracking</a></li><li><a class="club-portal-nav__link" href="#">Monthly Records</a></li><li><a class="club-portal-nav__link" href="#">Orders</a></li><li><a class="club-portal-nav__link" href="#">Health</a></li><li><a class="club-portal-nav__link" href="#">Club settings</a></li></ul></nav></div></div>
+</div></section><section class="g-card" id="NotificationBell"><header class="g-meta"><h3>NotificationBell</h3><p>The staff header's notification bell and the "Needs attention" panel it opens.</p><a href="components/NotificationBell/README.md">Usage rules</a></header><div class="g-frame" style="min-height:330px"><div class="ds-stage">
+  <div class="menu-anchor" style="width:max-content">
+    <button class="avatar attention-bell" type="button" aria-expanded="true" aria-label="Notifications, 3 items need attention"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span aria-hidden="true" class="count-badge attention-badge">3</span></button>
+    <div aria-label="Notifications" class="header-popover attention-popover" role="group" style="position:static;margin-top:8px">
+      <h2 class="attention-heading" tabindex="-1">Needs attention</h2>
+      <section aria-label="Registrations" class="attention-group">
+        <h3>Registrations</h3>
+        <ul>
+          <li><a class="attention-item" href="#"><strong>2</strong><span>registrations waiting for approval</span></a></li>
+          <li><a class="attention-item" href="#"><strong>1</strong><span>cancellation request to review</span></a></li>
+        </ul>
+      </section>
+      <p class="attention-note">Some checks could not be read, so this list may be incomplete.</p>
+    </div>
+  </div>
+</div>
 </div></section><section class="g-card" id="PageHeader"><header class="g-meta"><h3>PageHeader</h3><p>The one header at the top of a page's content: the title, an optional sentence, and the page's one main action. Staff, club portal, Area Coordinator and account pages all use it.</p><a href="components/PageHeader/README.md">Usage rules</a></header><div class="g-frame" style="min-height:420px"><style>
   /* A phone-width frame. The app drops the actions under the title below 640px (a viewport media query);
      these rules show that layout inside a frame at any width. */
@@ -239,22 +326,80 @@
 </div></section><h2 class="g-head">Data</h2><section class="g-card" id="EmptyState"><header class="g-meta"><h3>EmptyState</h3><p>What a list shows when it has nothing yet: an icon, a short heading and the next step.</p><a href="components/EmptyState/README.md">Usage rules</a></header><div class="g-frame" style="min-height:230px"><div class="ds-stage">
   <div class="panel empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><h3>No private links sent yet</h3><p>Links you send to members for a form show up here.</p><div style="margin-top:12px"><button class="primary-button">Send a private link</button></div></div>
 </div>
+</div></section><section class="g-card" id="ListFilters"><header class="g-meta"><h3>ListFilters</h3><p>The tools above a list: filters, the chips for filters that are on, and the bar that appears when rows can be selected.</p><a href="components/ListFilters/README.md">Usage rules</a></header><div class="g-frame" style="min-height:470px"><div class="ds-stage">
+  <form class="filter-bar" onsubmit="return false">
+    <label>Status<select><option>Pending approval</option><option>Confirmed</option></select></label>
+    <label>Club<select><option>Riverton Pathfinders</option><option>Cedar Hollow Trailblazers</option></select></label>
+    <div class="filter-bar-actions"><button class="primary-button" type="submit">Apply</button><a class="secondary-button" href="#">Clear filters</a></div>
+  </form>
+  <div class="people-directory__activeBar">
+    <ul class="people-directory__activeList" aria-label="Active filters">
+      <li class="people-directory__activeChip"><span>Status: Pending approval</span><a class="people-directory__remove" aria-label="Remove Status: Pending approval" href="#"><span aria-hidden="true">&times;</span></a></li>
+      <li class="people-directory__activeChip"><span>Club: Riverton Pathfinders</span><a class="people-directory__remove" aria-label="Remove Club: Riverton Pathfinders" href="#"><span aria-hidden="true">&times;</span></a></li>
+    </ul>
+    <a class="people-directory__clearAll" href="#">Clear filters</a>
+  </div>
+  <div class="panel selection-bar">
+    <span role="status">Tick registrations to email them, or use Select all.</span>
+    <div class="selection-bar-actions"><button class="text-button" type="button">Select all 24 shown</button></div>
+  </div>
+  <div class="panel selection-bar">
+    <span role="status"><strong>3</strong> selected</span>
+    <div class="selection-bar-actions">
+      <button class="text-button" type="button">Select all 24 shown</button>
+      <button class="text-button" type="button">Clear selection</button>
+      <button class="secondary-button outline-action" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> Email selected</button>
+    </div>
+  </div>
+</div>
+</div></section><section class="g-card" id="ListTools"><header class="g-meta"><h3>ListTools</h3><p>The shared list parts: sortable column headers, the "Showing 1–25 of 140" pager, and tables that become cards on a phone.</p><a href="components/ListTools/README.md">Usage rules</a></header><div class="g-frame" style="min-height:640px"><div class="ds-stage">
+  <p class="sort-order-note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg><span>Sorted by club name, A to Z.</span></p>
+  <div class="report-table-wrap"><table class="report-table table-cards" role="table">
+    <caption class="sr-only">Clubs and their headcount</caption>
+    <thead role="rowgroup"><tr role="row">
+      <th aria-sort="ascending" role="columnheader" scope="col"><a class="table-sort-button" href="#">Club <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></a></th>
+      <th aria-sort="none" role="columnheader" scope="col"><a class="table-sort-button" href="#">Church <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg></a></th>
+      <th aria-sort="none" role="columnheader" scope="col"><a class="table-sort-button" href="#">Headcount <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg></a></th>
+      <th role="columnheader" scope="col"><span class="sr-only">Open</span></th>
+    </tr></thead>
+    <tbody role="rowgroup">
+      <tr role="row"><th role="rowheader" scope="row">Cedar Hollow Trailblazers</th><td role="cell" data-label="Church">Cedar Hollow</td><td role="cell" data-label="Headcount">11</td><td role="cell"><a class="text-button" href="#">Open club</a></td></tr>
+      <tr role="row"><th role="rowheader" scope="row">Riverton Pathfinders</th><td role="cell" data-label="Church">Riverton</td><td role="cell" data-label="Headcount">18</td><td role="cell"><a class="text-button" href="#">Open club</a></td></tr>
+    </tbody>
+  </table></div>
+  <nav class="list-pager" aria-label="Clubs pages">
+    <span class="quiet-copy" role="status">Showing 1–25 of 140 clubs</span>
+    <span class="list-pager-buttons"><span aria-disabled="true" class="secondary-button">Previous</span><span class="quiet-copy">Page 1 of 6</span><a class="secondary-button" href="#">Next</a></span>
+  </nav>
+  <p class="ds-caption">On a phone, or in any box narrower than the table needs, each row becomes a card. The sortable headers stay as a “Sort by” row.</p>
+  <div class="report-table-wrap" style="width:340px;max-width:100%"><table class="report-table table-cards" role="table">
+    <caption class="sr-only">Clubs and their headcount</caption>
+    <thead role="rowgroup"><tr role="row">
+      <th aria-sort="ascending" role="columnheader" scope="col"><a class="table-sort-button" href="#">Club <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></a></th>
+      <th aria-sort="none" role="columnheader" scope="col"><a class="table-sort-button" href="#">Church <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg></a></th>
+      <th role="columnheader" scope="col"><span class="sr-only">Open</span></th>
+    </tr></thead>
+    <tbody role="rowgroup">
+      <tr role="row"><th role="rowheader" scope="row">Riverton Pathfinders</th><td role="cell" data-label="Church">Riverton</td><td role="cell"><a class="text-button" href="#">Open club</a></td></tr>
+    </tbody>
+  </table></div>
+</div>
 </div></section><section class="g-card" id="MetricCard"><header class="g-meta"><h3>MetricCard</h3><p>A summary number with its label and a one-line note, marked by a colored left rule.</p><a href="components/MetricCard/README.md">Usage rules</a></header><div class="g-frame" style="min-height:220px"><div class="ds-stage" style="grid-template-columns:repeat(4,minmax(0,1fr))">
   <div class="metric-card"><strong>24</strong><p>Active members</p><small>2026–2027 roster</small></div>
   <div class="metric-card accent-purple"><strong>3</strong><p>Details needed</p><small>Missing birth dates</small></div>
   <div class="metric-card accent-gold"><strong>Nov 10</strong><p>October report due</p><small>Draft saved</small></div>
   <div class="metric-card accent-green"><strong>2,150</strong><p>Points this year</p><small>Includes 1,500 registration</small></div>
 </div>
-</div></section><section class="g-card" id="MonthlyRecordsGrid"><header class="g-meta"><h3>MonthlyRecordsGrid</h3><p>The coordinator's Monthly Records grid: one row per club, one cell per month, each cell stating its state in words.</p><a href="components/MonthlyRecordsGrid/README.md">Usage rules</a></header><div class="g-frame" style="min-height:240px"><div class="ds-stage">
+</div></section><section class="g-card" id="MonthlyRecordsGrid"><header class="g-meta"><h3>MonthlyRecordsGrid</h3><p>The coordinator's Monthly Records month view: one row per club for the chosen month, then a strip of that club's whole year.</p><a href="components/MonthlyRecordsGrid/README.md">Usage rules</a></header><div class="g-frame" style="min-height:240px"><div class="ds-stage">
   <div class="report-table-wrap coordinator-monthly-records__tableBlock"><table class="report-table coordinator-monthly-records__table">
     <thead><tr><th scope="col">Club</th><th scope="col">November record</th><th scope="col">Year so far</th></tr></thead>
     <tbody>
       <tr><th scope="row" class="coordinator-monthly-records__club">Riverton Pathfinders</th><td class="coordinator-monthly-records__status"><span class="coordinator-monthly-records__state"><span aria-hidden="true" class="coordinator-monthly-records__icon">✓</span> Submitted</span></td><td class="coordinator-monthly-records__year"><span role="img" aria-label="Riverton Pathfinders, year at a glance" class="club-report-charts__strip"><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span></span></td></tr>
-      <tr><th scope="row" class="coordinator-monthly-records__club">Cedar Hollow Trailblazers</th><td class="coordinator-monthly-records__status"><span class="coordinator-monthly-records__state"><span aria-hidden="true" class="coordinator-monthly-records__icon">✕</span> Not submitted</span></td><td class="coordinator-monthly-records__year"><span role="img" aria-label="Cedar Hollow Trailblazers, year at a glance" class="club-report-charts__strip"><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span></span></td></tr>
+      <tr><th scope="row" class="coordinator-monthly-records__club">Cedar Hollow Trailblazers</th><td class="coordinator-monthly-records__status"><span class="coordinator-monthly-records__state"><span aria-hidden="true" class="coordinator-monthly-records__icon">✕</span> Not submitted<small> (draft saved)</small></span></td><td class="coordinator-monthly-records__year"><span role="img" aria-label="Cedar Hollow Trailblazers, year at a glance" class="club-report-charts__strip"><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span></span></td></tr>
       <tr><th scope="row" class="coordinator-monthly-records__club">Prairie Ridge Eagles</th><td class="coordinator-monthly-records__status"><span class="coordinator-monthly-records__state"><span aria-hidden="true" class="coordinator-monthly-records__icon">✕</span> Not submitted</span></td><td class="coordinator-monthly-records__year"><span role="img" aria-label="Prairie Ridge Eagles, year at a glance" class="club-report-charts__strip"><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesHatch">✕</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesDark">✓</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span><span aria-hidden="true" class="club-report-charts__stripCell club-report-charts__seriesPale">○</span></span></td></tr>
     </tbody>
   </table></div>
-  <p class="ds-caption">Navy square: submitted · hatched: not submitted · pale: not due yet. Each square also carries a mark, so color is never the only cue.</p>
+  <p class="ds-caption">Navy square: submitted · hatched: not submitted · pale: not due yet. Each square also carries a mark, so color is never the only cue. The note “(draft saved)” appears in the status cell only, never in the strip.</p>
 </div>
 </div></section><section class="g-card" id="ReportTable"><header class="g-meta"><h3>ReportTable</h3><p>The standard data table: bordered, rounded wrapper, uppercase muted headers and quiet row lines.</p><a href="components/ReportTable/README.md">Usage rules</a></header><div class="g-frame" style="min-height:300px"><div class="ds-stage">
   <div class="report-table-wrap"><table class="report-table">

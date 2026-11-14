@@ -1,0 +1,7 @@
+The search box: an icon, an input and a clear button, used by every list and the staff header (rules S1 to S5).
+
+- `.search-field` is the bordered box (`--field-border`, 44px minimum, `--field-radius`) holding a 16px search icon and a borderless input. Keep a visible or `sr-only` label.
+- The box works empty: focusing it or searching with nothing typed shows the full list, and typing narrows the list as you type, with no Enter needed and focus kept.
+- `.search-field-clear` is the one clear button, `aria-label="Clear search"`: a 44px tap area with a 16px "×", drawn only while there is text. It returns focus to the input.
+- Inside a `.search-field` the browser's own clear "×" on `type="search"` is hidden so there is only one.
+- A result count is announced politely beside the list ("12 of 40 registrations shown.").

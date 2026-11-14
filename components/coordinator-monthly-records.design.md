@@ -1,5 +1,5 @@
-The coordinator's Monthly Records grid: one row per club, one cell per month, each cell stating its state in words.
+The coordinator's Monthly Records month view: one row per club for the chosen month, then a strip of that club's whole year.
 
-- `submitted`: solid `--imsda-navy`, white text; "(late)" in small type when it came in after the 10th.
-- `not-submitted`: a gray hatch so it reads without color; "(draft saved)" when the director has started.
-- `not-due`: `--imsda-navy-soft` for months not yet due.
+- The status cell says the month's state in words, with a mark: "✓ Submitted", "✕ Not submitted" or "○ Not due yet". A small note follows in brackets when it applies: "(late)" after Submitted for a record that came in after the 10th, and "(draft saved)" after Not submitted when the director has started the record. Nothing is shown for the plain states.
+- "Year so far" is a strip of 12 squares, one per month, each with the same mark and no words on screen (its name is read out: "Cedar Hollow Trailblazers, year at a glance: Aug Submitted, ..."). Submitted is solid `--imsda-navy` with white text, not submitted is a gray hatch, not due is `--imsda-navy-soft`, so color is never the only cue. The strip has no "(late)" or "(draft saved)" notes.
+- The last cell is "Open record" for a submitted month (opens that record, view only) or "Open club" for any other row. On a phone each row becomes a card.
