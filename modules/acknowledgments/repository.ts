@@ -521,8 +521,13 @@ export type SubmissionAcknowledgmentInput = {
   attendees: ReadonlyArray<{ clientId: string; attendeeId: string; personId: string; responses: Record<string, unknown> }>;
   /** The submitter: the account holder person. */
   actedByPersonId: string;
-  /** ONLINE for the registrant's own submission; STAFF_ENTERED when staff submitted it for them. */
-  channel: Exclude<AcknowledgmentChannel, "PAPER">;
+  /**
+   * ONLINE for the registrant's own submission; STAFF_ENTERED when staff entered it for them by phone or at the door;
+   * PAPER (with `paperLocation`) when staff keyed in a paper form (#1510).
+   */
+  channel: AcknowledgmentChannel;
+  /** Where a PAPER form lives; required for PAPER and refused for every other channel. Never what it says. */
+  paperLocation?: string | null;
   recordedByUserId: string | null;
   /** The submission's idempotency key: a retried submission derives the same evidence keys. */
   submissionKey: string;
@@ -575,6 +580,7 @@ export async function recordSubmissionAcknowledgments(tx: Prisma.TransactionClie
         channel: input.channel,
         recordedByUserId: input.recordedByUserId,
         acknowledgedAt: input.acknowledgedAt,
+        ...(input.paperLocation !== undefined ? { paperLocation: input.paperLocation } : {}),
         idempotencyKey: submissionEvidenceKey(input.submissionKey, item.field.id, item.attendeeClientId),
         requestMetadata: input.requestMetadata,
       });

@@ -12,7 +12,7 @@ import { evaluateEventRegistrationPhase } from "@/modules/events/lifecycle";
 import { isFieldVisible, registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { publicRegistrationInputSchema } from "@/modules/forms/public-domain";
-import { checkPublicRegistration, PublicRegistrationError, type PublicRegistrationCheck } from "@/modules/forms/public-repository";
+import { checkPublicRegistration, PublicRegistrationError, submitPublicRegistration, type PublicRegistrationCheck } from "@/modules/forms/public-repository";
 import { StaffDraftError } from "@/modules/staff-registration-drafts/errors";
 import {
   sanitizeStaffDraftResponses,
@@ -29,7 +29,7 @@ import {
   STAFF_DRAFT_LINK_TEMPLATE_KEY,
   staffDraftLinkEmailContent,
 } from "@/modules/staff-registration-drafts/link-email";
-import type { CreateStaffDraftInput, UpdateStaffDraftInput } from "@/modules/staff-registration-drafts/schemas";
+import type { CreateStaffDraftInput, StaffSubmitBody, UpdateStaffDraftInput } from "@/modules/staff-registration-drafts/schemas";
 
 type Client = Prisma.TransactionClient;
 
@@ -286,7 +286,8 @@ export type StaffDraftCheckResult =
   /** An estimate: answers only the registrant gives (a birth date, a payment choice) can change the price. `registrantFills` names the required ones. */
   | { ok: true; check: PublicRegistrationCheck; registrantFills: string[] }
   | { ok: false; kind: "NEEDS_ANSWERS"; message: string; lines: StaffDraftCheckLines; /** A roster form is priced only once the registrant adds the people. */ rosterPending: boolean }
-  | { ok: false; kind: "UNAVAILABLE"; message: string };
+  /** `overridable`: a rule someone with the registration override permission can go past with a reason; `code` names it (#1510). */
+  | { ok: false; kind: "UNAVAILABLE"; message: string; code: string; overridable: boolean };
 
 /**
  * Runs the public form's own submit on the draft and keeps nothing: validation, price windows, promo codes, capacity and
@@ -322,7 +323,7 @@ export async function checkStaffDraft(eventId: string, draftId: string, actorUse
     if (!(error instanceof PublicRegistrationError)) throw error;
     outcome = error.code === "INVALID_SUBMISSION" || error.code === "CAPACITY_REACHED"
       ? { ok: false, kind: "NEEDS_ANSWERS", message: error.message, lines: withRegistrantFills(staffDraftCheckLines(error.issues, pinned), registrantFills), rosterPending: roster }
-      : { ok: false, kind: "UNAVAILABLE", message: error.message };
+      : { ok: false, kind: "UNAVAILABLE", message: error.message, code: error.code, overridable: error.overridable };
   }
   await auditDraft(prisma, {
     eventId,
@@ -336,7 +337,7 @@ export async function checkStaffDraft(eventId: string, draftId: string, actorUse
         ? { registrationStatus: outcome.check.registrationStatus }
         : outcome.kind === "NEEDS_ANSWERS"
           ? { needsCount: outcome.lines.staffNeeds.length, registrantCount: outcome.lines.registrantFills.length }
-          : {}),
+          : { code: outcome.code, overridable: outcome.overridable }),
     },
   });
   return outcome;
@@ -464,4 +465,37 @@ export async function resolveStaffDraftLink(token: string, now = new Date()) {
 /** The saved answers kept only for questions the form asks now (and may hold), for prefilling the public form. */
 export function prefillFromStaffDraft(definition: RegistrationFormDefinition, responses: Record<string, unknown>) {
   return sanitizeStaffDraftResponses(definition, responses);
+}
+
+/**
+ * Staff finish a phone, paper or walk-in registration themselves (#1510). It runs the public submit's own transaction
+ * (validation, pricing, capacity, acknowledgments, confirmation email) with the draft locked, so a repeat with the same key
+ * returns the first confirmation and another key on a sent draft is refused. Acknowledgments are recorded as paper or
+ * staff-entered, never online; typed signatures are not recorded; nothing is charged or marked received.
+ *
+ * `canOverride` is the caller's OVERRIDE_REGISTRATION_RULES check. An override sent without it is refused here too, and
+ * nothing is written. The draft's source comes from the stored draft, never from the request.
+ */
+export async function submitStaffDraft(
+  eventId: string,
+  draftId: string,
+  actor: { userId: string; canOverride: boolean },
+  body: StaffSubmitBody,
+  now = new Date(),
+) {
+  if (body.override && !actor.canOverride) {
+    throw new StaffDraftError("OVERRIDE_NOT_ALLOWED", "You don't have permission to override registration rules. Ask a system administrator.");
+  }
+  const row = await getPrisma().staffRegistrationDraft.findFirst({
+    where: { id: draftId, eventId },
+    select: { form: { select: { slug: true } }, event: { select: { slug: true } } },
+  });
+  if (!row) throw new StaffDraftError("DRAFT_NOT_FOUND", "That draft could not be found.");
+  return submitPublicRegistration(row.event.slug, row.form.slug, body.input, now, undefined, undefined, {
+    draftId,
+    actorUserId: actor.userId,
+    paperLocation: body.paperLocation,
+    override: body.override,
+    overrideAllowed: actor.canOverride,
+  });
 }

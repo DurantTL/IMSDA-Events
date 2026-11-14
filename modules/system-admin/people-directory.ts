@@ -201,6 +201,7 @@ export type PersonEventRow = {
   active: boolean;
   healthInformation: boolean;
   finalizeInvoices: boolean;
+  registrationOverride: boolean;
 };
 
 export type PersonClubRow = {
@@ -384,6 +385,7 @@ export async function getPersonDetail(
         active: membership.status === "ACTIVE",
         healthInformation: membership.permissions.includes("VIEW_HEALTH_INFORMATION"),
         finalizeInvoices: membership.permissions.includes("FINALIZE_INVOICES"),
+        registrationOverride: membership.permissions.includes("OVERRIDE_REGISTRATION_RULES"),
       }))
       : full ? [] : null,
     clubs: account

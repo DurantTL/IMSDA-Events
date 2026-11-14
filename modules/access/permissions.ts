@@ -31,6 +31,12 @@ export const eventPermissions = [
    * the Kitchen staff role and Event Admin.
    */
   "MANAGE_KITCHEN_COUNTS",
+  /**
+   * Sending a phone, paper or walk-in registration past a closed or full event, with a reason (#1510). Granted one
+   * membership at a time by a system administrator and held by no role, EVENT_ADMIN included. System administrators
+   * have it through `effectivePermissions`. Using it also needs MANAGE_REGISTRATION.
+   */
+  "OVERRIDE_REGISTRATION_RULES",
 ] as const;
 
 export type EventPermission = (typeof eventPermissions)[number];
@@ -48,8 +54,8 @@ export const eventRoles = [
 export type EventRole = (typeof eventRoles)[number];
 
 export const rolePermissions: Record<EventRole, readonly EventPermission[]> = {
-  // Everything except the permissions no role carries: health information (#658) and finalizing invoices (#167).
-  EVENT_ADMIN: eventPermissions.filter((permission) => permission !== "VIEW_HEALTH_INFORMATION" && permission !== "FINALIZE_INVOICES"),
+  // Everything except the permissions no role carries: health information (#658), finalizing invoices (#167) and registration overrides (#1510).
+  EVENT_ADMIN: eventPermissions.filter((permission) => permission !== "VIEW_HEALTH_INFORMATION" && permission !== "FINALIZE_INVOICES" && permission !== "OVERRIDE_REGISTRATION_RULES"),
   REGISTRATION_MANAGER: ["VIEW_EVENT", "MANAGE_REGISTRATION", "MANAGE_FORMS", "VIEW_REPORTS", "VIEW_SENSITIVE_DATA"],
   FINANCE_MANAGER: ["VIEW_EVENT", "MANAGE_FINANCE", "VIEW_REPORTS", "VIEW_SENSITIVE_DATA"],
   COMMUNICATIONS_MANAGER: ["VIEW_EVENT", "MANAGE_COMMUNICATIONS"],

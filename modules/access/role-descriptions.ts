@@ -141,7 +141,7 @@ export const eventRoleText: Record<EventRole, RoleText> = {
 };
 
 /** Access given one person at a time on one event. No role includes these. */
-export type EventExtraKey = "VIEW_HEALTH_INFORMATION" | "FINALIZE_INVOICES";
+export type EventExtraKey = "VIEW_HEALTH_INFORMATION" | "FINALIZE_INVOICES" | "OVERRIDE_REGISTRATION_RULES";
 
 export const eventExtraText: Record<EventExtraKey, RoleText> = {
   VIEW_HEALTH_INFORMATION: {
@@ -155,6 +155,15 @@ export const eventExtraText: Record<EventExtraKey, RoleText> = {
     summary: "Lets one person finalize invoices, which gives each its number and commits the conference to the amount.",
     can: ["Finalize the event's invoice drafts."],
     cannot: ["Come with any role, Event administrator and Finance manager included: a system administrator gives it to one person at a time."],
+  },
+  OVERRIDE_REGISTRATION_RULES: {
+    name: "Registration overrides",
+    summary: "Lets one person send a phone, paper or walk-in registration past a closed or full event, with a reason.",
+    can: ["Finish a staff-entered registration for an event that is not open yet, is closed, or is full, giving a reason that is recorded."],
+    cannot: [
+      "Change a price, or go past a choice limit, lodging or an event that has ended.",
+      "Come with any role, Event administrator included: a system administrator gives it to one person at a time.",
+    ],
   },
 };
 
