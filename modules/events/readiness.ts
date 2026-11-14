@@ -104,7 +104,7 @@ function isPublicWebUrl(value: string | null | undefined) {
 }
 
 /** The attendee-types link: the event's attendee configuration page. */
-function attendeeTypesHref(id: string | null | undefined) {
+export function attendeeTypesHref(id: string | null | undefined) {
   return id ? `/more/attendee-configuration?event=${encodeURIComponent(id)}` : undefined;
 }
 

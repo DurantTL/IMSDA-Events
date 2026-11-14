@@ -22,7 +22,7 @@ export function attendeePriceCents(
 
 /**
  * What one person currently owes for themselves (#1509): their priced lines plus every adjustment line, and reversal,
- * that names them. Null when there is no per-person price to start from.
+ * that names them, except meal and item lines (the caller leaves those out of the sum it passes). Null when there is no per-person price to start from.
  */
 export function attendeeShareCentsFrom(
   registration: Parameters<typeof attendeePriceCents>[0],

@@ -106,7 +106,7 @@ function record(value: unknown): Record<string, unknown> {
 
 /**
  * One person's current share of what the registration owes: their priced lines plus every adjustment line (and
- * reversal) that names them. Null when the registration has no per-person pricing for them.
+ * reversal) that names them, except meal and item lines. Null when the registration has no per-person pricing for them.
  */
 async function attendeeShareCents(
   tx: Client,
@@ -129,7 +129,7 @@ async function attendeeShareCents(
 async function appendPriceOverrideLedgerEntry(
   tx: Client,
   input: {
-    eventId: string; registrationId: string; actorUserId: string; adjustmentId: string; reason: string;
+    eventId: string; registrationId: string; actorUserId: string; adjustmentId: string;
     attendeeIndex: number; previousPriceCents: number; newPriceCents: number;
   },
 ) {
@@ -421,7 +421,7 @@ export async function createRegistrationAdjustment(
     }, tx);
     if (priceOverride && attendee) {
       await appendPriceOverrideLedgerEntry(tx, {
-        eventId, registrationId, actorUserId, adjustmentId: adjustment.id, reason: input.reason,
+        eventId, registrationId, actorUserId, adjustmentId: adjustment.id,
         attendeeIndex, ...priceOverride,
       });
       await writeAuditLog({
@@ -596,7 +596,7 @@ export async function reverseRegistrationAdjustment(
       // Without a per-person price on file (an override can only be written with one) the share is the line alone.
       const previousPriceCents = shareBeforeReversal ?? original.amountCents;
       await appendPriceOverrideLedgerEntry(tx, {
-        eventId, registrationId, actorUserId, adjustmentId: reversal.id, reason,
+        eventId, registrationId, actorUserId, adjustmentId: reversal.id,
         attendeeIndex: overrideAttendeeIndex, previousPriceCents, newPriceCents: previousPriceCents + changeCents,
       });
     }
