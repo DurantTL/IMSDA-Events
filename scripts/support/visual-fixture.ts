@@ -156,22 +156,26 @@ const quote = (identifier: string) => `"${identifier.replace(/"/g, '""')}"`;
  * date of the run. Returns how many rows it moved and which columns it could not change.
  */
 export async function normalizeTimestamps(prisma: PrismaClient) {
-  const columns = await prisma.$queryRawUnsafe<Array<{ table_name: string; column_name: string }>>(`
-    SELECT c.table_name, c.column_name
+  const columns = await prisma.$queryRawUnsafe<Array<{ table_schema: string; table_name: string; column_name: string; data_type: string }>>(`
+    SELECT c.table_schema, c.table_name, c.column_name, c.data_type
     FROM information_schema.columns c
     JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name
-    WHERE c.table_schema = 'public' AND t.table_type = 'BASE TABLE'
-      AND c.data_type LIKE 'timestamp%'
+    WHERE c.table_schema = current_schema() AND t.table_type = 'BASE TABLE'
+      AND c.table_name <> '_prisma_migrations'
+      AND c.data_type IN ('timestamp without time zone', 'timestamp with time zone')
       AND (c.column_default ILIKE '%CURRENT_TIMESTAMP%' OR c.column_default ILIKE '%now()%' OR c.column_name = 'updatedAt')
     ORDER BY c.table_name, c.column_name`);
-  const fixed = VISUAL_FIXED_NOW.replace("T", " ").replace(/Z$/, "");
+  // The fixed time as a UTC instant. A plain timestamp holds UTC wall-clock time (Prisma writes UTC); a timestamptz is compared
+  // and set as an instant, so the session's time zone never matters.
+  const fixed = new Date(VISUAL_FIXED_NOW).toISOString();
   let moved = 0;
   const skipped: string[] = [];
   for (const column of columns) {
-    const table = quote(column.table_name);
+    const table = `${quote(column.table_schema)}.${quote(column.table_name)}`;
     const name = quote(column.column_name);
+    const value = column.data_type === "timestamp with time zone" ? "$1::timestamptz" : "($1::timestamptz AT TIME ZONE 'UTC')";
     try {
-      moved += await prisma.$executeRawUnsafe(`UPDATE ${table} SET ${name} = $1::timestamp WHERE ${name} > $1::timestamp`, fixed);
+      moved += await prisma.$executeRawUnsafe(`UPDATE ${table} SET ${name} = ${value} WHERE ${name} > ${value}`, fixed);
     } catch {
       skipped.push(`${column.table_name}.${column.column_name}`);
     }

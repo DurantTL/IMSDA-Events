@@ -13,7 +13,9 @@ not replace them.
 ## Why two runs give the same pictures
 
 - **Fixed clock.** Every part of the run believes it is 2026-09-10 15:00 UTC (`VISUAL_FIXED_NOW`): the seed, the build, the
-  app, the script (`scripts/support/fixed-clock.cjs`) and the browser. Time still moves forward, so timers work.
+  app, the script (`scripts/support/fixed-clock.cjs`) and the browser. For the seed, build and script, time still moves forward,
+  so timers work; the app server the script starts has a frozen clock (`VISUAL_CLOCK_FROZEN=1`), so "minutes ago" text cannot
+  drift with the length of a run.
 - **Database times.** A database default (`now()`) ignores that clock, so the script moves every such time back to the fixed
   time after it writes its few synthetic rows (`scripts/support/visual-fixture.ts`). This **rewrites times on the database it
   runs against**: use a freshly seeded throwaway local database. It refuses anything that is not local and seeded.
@@ -22,18 +24,28 @@ not replace them.
 
 ## Run it locally
 
+Use a fresh local database. The fixed clock is set for each command (an absolute path, so it also works from other folders),
+never for `npm ci` or `npm i`.
+
 ```
 export VISUAL_FIXED_NOW=2026-09-10T15:00:00Z
-export NODE_OPTIONS="--require ./scripts/support/fixed-clock.cjs"
-npm run db:deploy && npm run db:seed          # a fresh local database, with the same two settings
-npm run club-forms:sync && npm run lodging:sync && npm run form-templates:sync && npm run event-content:sync
-npm run build
+export CLOCK="--require $PWD/scripts/support/fixed-clock.cjs"
+NODE_OPTIONS="$CLOCK" npm run db:deploy
+NODE_OPTIONS="$CLOCK" npm run db:seed
+for sync in club-forms lodging form-templates event-content; do NODE_OPTIONS="$CLOCK" npm run $sync:sync; done
+NODE_OPTIONS="--max-old-space-size=8192 $CLOCK" npm run build
 npm i --no-save playwright-core@1.56.1
-VISUAL_BROWSER=/usr/bin/google-chrome npm run test:visual
+NODE_OPTIONS="$CLOCK" VISUAL_BROWSER=/usr/bin/google-chrome npm run test:visual
 ```
+
+`next start` refuses to start in production mode without these fictitious values, so export them too (they are the same ones
+the "Compare the pages with the saved pictures" step sets in `.github/workflows/visual-check.yml`; copy them from there):
+`MANAGE_LINK_DERIVATION_SECRET`, `ATTENDEE_PASS_SIGNING_SECRET`, `RATE_LIMIT_HASH_SECRET`, `OUTBOX_SWEEP_TOKEN`,
+`SECRET_ENCRYPTION_KEY`, `ACCOUNT_EMAIL_SENDER_ADDRESS` and `RESEND_API_KEY`.
 
 It starts the built app itself on port 3100 (set `VISUAL_BASE_URL` to use one that is already running with the same clock).
 `npm run test:visual -- --only=club,area` runs the pages whose name contains one of those words.
+The browser version is written to `report.json` and the job summary, so a runner image update is easy to spot.
 A failure writes `<name>@<width>-before.png`, `-after.png` and `-diff.png` and `report.json` to `VISUAL_OUT_DIR`
 (default: a temp folder), and a table to the job summary in CI.
 

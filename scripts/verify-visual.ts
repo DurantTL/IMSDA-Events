@@ -97,7 +97,7 @@ async function startApp(): Promise<ChildProcess> {
   const nodeOptions = [process.env.NODE_OPTIONS ?? "", process.env.NODE_OPTIONS?.includes("fixed-clock.cjs") ? "" : preload].join(" ").trim();
   const nextBin = path.join(process.cwd(), "node_modules", "next", "dist", "bin", "next");
   const child = spawn(process.execPath, [nextBin, "start", "-p", String(port)], {
-    env: { ...process.env, VISUAL_FIXED_NOW, NODE_OPTIONS: nodeOptions, PORT: String(port) },
+    env: { ...process.env, VISUAL_FIXED_NOW, VISUAL_CLOCK_FROZEN: "1", NODE_OPTIONS: nodeOptions, PORT: String(port) },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let log = "";
@@ -262,6 +262,23 @@ async function main() {
   let browser: Browser;
   let app: ChildProcess | undefined;
   let shotsStarted = 0;
+  let browserVersion = "unknown";
+  let cleaned = false;
+  const cleanup = async () => {
+    if (cleaned) return;
+    cleaned = true;
+    await browser?.close().catch(() => undefined);
+    app?.kill();
+    const { revokeDatabaseSession } = await import("../modules/access/session-store");
+    const { revokeAttendeeSession } = await import("../modules/attendee-accounts/session-store");
+    for (const token of tokens.staff) await revokeDatabaseSession(token).catch(() => undefined);
+    for (const token of tokens.attendee) await revokeAttendeeSession(token).catch(() => undefined);
+    await prisma.$disconnect().catch(() => undefined);
+  };
+  // Ctrl-C or a stopped job: revoke the sessions, stop the app, and exit with an error.
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => { void cleanup().finally(() => process.exit(signal === "SIGINT" ? 130 : 143)); });
+  }
   try {
     await assertSeededDatabase(prisma);
     const { seedVisualFixture, normalizeTimestamps } = await import("./support/visual-fixture");
@@ -281,6 +298,8 @@ async function main() {
       executablePath: process.env.VISUAL_BROWSER || undefined,
       args: ["--no-sandbox", "--disable-dev-shm-usage", "--force-color-profile=srgb", "--font-render-hinting=none"],
     });
+    browserVersion = await browser.version();
+    console.log(`Browser ${browserVersion}.`);
     console.log(`Visual check of ${specs.length} pages at ${visualWidths.join(" and ")} px${update ? " (updating the baselines)" : ""}; pictures in ${outDir}`);
     shotsStarted = Date.now();
     for (const width of visualWidths) {
@@ -315,23 +334,17 @@ async function main() {
       }
     }
   } finally {
-    await browser?.close().catch(() => undefined);
-    app?.kill();
-    const { revokeDatabaseSession } = await import("../modules/access/session-store");
-    const { revokeAttendeeSession } = await import("../modules/attendee-accounts/session-store");
-    for (const token of tokens.staff) await revokeDatabaseSession(token).catch(() => undefined);
-    for (const token of tokens.attendee) await revokeAttendeeSession(token).catch(() => undefined);
-    await prisma.$disconnect();
+    await cleanup();
   }
   const seconds = Math.round((Date.now() - shotsStarted) / 1000);
 
   if (update) removeObsoleteBaselines();
   const bad = outcomes.filter((outcome) => outcome.status === "failed" || outcome.status === "different" || outcome.status === "new");
-  writeFileSync(path.join(outDir, "report.json"), JSON.stringify({ fixedNow: VISUAL_FIXED_NOW, widths: visualWidths, seconds, outcomes }, null, 2));
+  writeFileSync(path.join(outDir, "report.json"), JSON.stringify({ fixedNow: VISUAL_FIXED_NOW, browser: browserVersion, widths: visualWidths, seconds, outcomes }, null, 2));
   const summary = process.env.GITHUB_STEP_SUMMARY;
   if (summary && !update) {
     const rows = bad.map((outcome) => `| ${outcome.name} | ${outcome.width} | ${outcome.status} | ${outcome.detail.replace(/\|/g, "\\|")} |`);
-    appendFileSync(summary, `### Visual check\n\n${bad.length === 0 ? `All ${outcomes.length} pictures match their baselines.` : `${bad.length} of ${outcomes.length} pictures need a look. The before, after and difference pictures are in the \`visual-diffs\` artifact.\n\n| Page | Width | Result | Detail |\n| --- | --- | --- | --- |\n${rows.join("\n")}`}\n`);
+    appendFileSync(summary, `### Visual check\n\nBrowser: ${browserVersion}\n\n${bad.length === 0 ? `All ${outcomes.length} pictures match their baselines.` : `${bad.length} of ${outcomes.length} pictures need a look. The before, after and difference pictures are in the \`visual-diffs\` artifact.\n\n| Page | Width | Result | Detail |\n| --- | --- | --- | --- |\n${rows.join("\n")}`}\n`);
   }
   console.log(`\n${outcomes.length} pictures in ${seconds} s.`);
   if (update) {

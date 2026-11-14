@@ -25,6 +25,7 @@ const NOT_IN_CI = new Set([
   "test:keep-place", // browser-translation.yml (#1557)
   "test:privacy-browsers", // browser-privacy.yml (#1445)
   "test:walkthroughs", // help-walkthroughs.yml (#1482)
+  "test:visual", // visual-check.yml (#1774)
   "test:club-form-roster-add", // not in ci.yml before the shards (#1233)
   "test:custom-message", // not in ci.yml before the shards (#1233)
 ]);

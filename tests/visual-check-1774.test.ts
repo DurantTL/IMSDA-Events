@@ -115,6 +115,14 @@ describe("the fixed clock preload", () => {
     expect(JSON.parse(result.stdout)).toEqual([Date.UTC(2026, 3, 1), "function", "function", Date.parse("2026-01-01T00:00:00Z"), true]);
   });
 
+  it("stands still with VISUAL_CLOCK_FROZEN=1, and moves without it", () => {
+    const code = "const a = Date.now(); setTimeout(() => console.log(JSON.stringify([a === Date.now(), new Date().toISOString()])), 40);";
+    const frozen = JSON.parse(run(code, { VISUAL_FIXED_NOW, VISUAL_CLOCK_FROZEN: "1" }).stdout);
+    expect(frozen).toEqual([true, "2026-09-10T15:00:00.000Z"]);
+    const moving = JSON.parse(run(code, { VISUAL_FIXED_NOW, VISUAL_CLOCK_FROZEN: "" }).stdout);
+    expect(moving[0]).toBe(false);
+  });
+
   it("does nothing without VISUAL_FIXED_NOW", () => {
     const result = run("console.log(typeof globalThis.__visualFixedClock)");
     expect(result.stdout.trim()).toBe("undefined");
@@ -135,7 +143,14 @@ describe("the visual check workflow", () => {
 
   it("sets the fixed clock for the whole job, caches the build, uploads the pictures and is not optional yet by flag", () => {
     expect(workflow).toContain(`VISUAL_FIXED_NOW: ${VISUAL_FIXED_NOW}`);
-    expect(workflow).toMatch(/NODE_OPTIONS: --max-old-space-size=10240 --require \.\/scripts\/support\/fixed-clock\.cjs/);
+    // The job-level NODE_OPTIONS must not preload the clock: `npm ci` and `npm i` run install scripts from their own folders.
+    expect(workflow).toMatch(/^ {6}NODE_OPTIONS: --max-old-space-size=10240$/m);
+    expect(workflow).toContain("--require ${{ github.workspace }}/scripts/support/fixed-clock.cjs");
+    expect(workflow).not.toMatch(/--require \.\//);
+    for (const command of ["db:deploy", "db:seed", "club-forms:sync", "lodging:sync", "form-templates:sync", "event-content:sync", "run build"]) {
+      expect(workflow, command).toMatch(new RegExp(`run: npm run ${command.replace("run ", "")}\\n\\s+env:\\n\\s+NODE_OPTIONS: \\$\\{\\{ env\\.FIXED_CLOCK_OPTIONS \\}\\}`));
+    }
+    expect(workflow).not.toMatch(/run: npm (ci|i --no-save[^\n]*)\n\s+env:/);
     expect(workflow).toContain(".next/cache");
     expect(workflow).toContain("name: visual-diffs");
     expect(workflow).toContain("name: visual-baselines");

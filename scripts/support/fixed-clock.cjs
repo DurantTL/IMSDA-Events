@@ -5,6 +5,7 @@
  * process of a visual run (seed, syncs, the app server and the screenshot script) starts at the same moment,
  * so "today", "upcoming", the club year and every date the pages show are the same on every run.
  *
+ * With VISUAL_CLOCK_FROZEN=1 the clock does not move at all (only the app server the script starts uses this).
  * Without VISUAL_FIXED_NOW this file does nothing. It never runs in the deployed app: only the visual check sets it.
  */
 "use strict";
@@ -15,7 +16,10 @@ if (fixed && !globalThis.__visualFixedClock) {
   if (Number.isNaN(start)) throw new Error(`VISUAL_FIXED_NOW is not a date: ${fixed}`);
   const RealDate = Date;
   const realStart = RealDate.now();
-  const now = () => start + (RealDate.now() - realStart);
+  // VISUAL_CLOCK_FROZEN=1 stops the clock at the start time (used only for the app server, so "x minutes ago" text cannot
+  // drift with the length of a run); otherwise it advances with the real clock.
+  const frozen = process.env.VISUAL_CLOCK_FROZEN === "1";
+  const now = () => (frozen ? start : start + (RealDate.now() - realStart));
   class FixedDate extends RealDate {
     constructor(...args) {
       if (args.length === 0) super(now());
