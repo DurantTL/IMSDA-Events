@@ -1,0 +1,6 @@
+Banners that tell people which mode they are in: acting as another role, view only, and site notices.
+
+- Acting as: `.inline-notice.act-as-banner` (a `role="status"` line) with a person icon, "Acting as director of Riverton Pathfinders until 4:30 PM CST.", a link to the portal as `.secondary-button` and a "Stop acting" button. A system administrator sees it on every page while acting. `act-as-banner-shell` fits beside the staff sidebar and `act-as-banner-account` the 1180px account column.
+- View only (Area Coordinator): the navy `.club-banner` carries "Area Coordinator · view only" under the club name, and an `.inline-notice` with an eye icon says "View only. You see what the club's director sees..." and who to ask for a change. The banner says "view only, except the TLT directory" for the TLT director.
+- Site notices: a full-width strip per notice, set by staff, in three levels, each with an icon and a bold level word: Notice (navy tint), Urgent (gold, thick amber left edge) and Emergency (red tint, thick red left edge, semibold). An optional link is underlined at 44px tall.
+- One sentence where possible; say what the viewer can or cannot do next.

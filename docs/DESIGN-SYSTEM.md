@@ -1,7 +1,7 @@
 # Design system
 
 `docs/design-system/` is the IMAdventist (Events & Club Ministry) visual language: color, type,
-spacing, radius and shadow tokens, 23 components with usage rules, and static mockups of the
+spacing, radius and shadow tokens, 31 components with usage rules, and static mockups of the
 public home, club Home, Roster, event registration, month calendar and check-in screens.
 
 The tokens, the component CSS, the usage rules and the gallery are **generated from the code**

@@ -1,0 +1,6 @@
+What a page shows while it loads, and while a list or button waits.
+
+- The staff workspace's `loading.tsx` puts a `.content-skeleton` in the content area while a page streams in, so the sidebar and header stay on screen: a title bar, a line, three cards and a panel as shimmering gray `.content-skeleton-bar` blocks. It is a `role="status"` region marked `aria-busy`, with a visible "Loading the page…" label.
+- A filter form that updates in place is marked `aria-busy` and dims to 75% with a progress cursor; the list does not jump.
+- Buttons that wait show "Saving…" or "Submitting…" with a spinner (see `SaveStatus`).
+- The shimmer stops for people who ask for reduced motion.
