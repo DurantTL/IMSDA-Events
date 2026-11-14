@@ -48,6 +48,8 @@ naming its sources (`tokens.json` carries it in `meta.generated`).
   comes along when a kept rule uses it.
 - `app/globals.css` rules come out in source order, so the cascade matches the app. CSS module rules follow, with each
   class prefixed by its file name (`brand-link__symbol`) because the app's own names are hashed; `:global(...)` is unwrapped.
+- The Tailwind reset is read from `node_modules/tailwindcss/preflight.css`, so a Tailwind upgrade makes
+  `npm run design-system:check` fail until someone runs the sync.
 - The file starts with `scripts/design-system/preview-base.css`: the few classes only previews use (`ds-stage`,
   `ds-row`, `ds-caption`, the phone-frame bottom bar). They are not app CSS.
 
