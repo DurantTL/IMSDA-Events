@@ -13,6 +13,7 @@
     "components/message-body-editor.tsx": "The email editor's Heading 1 button writes h1 into the message body, not into the page.",
     "components/public-club-forms-view.tsx": "A public-site component the staff preview pages reuse.",
     "components/public-home-page.tsx": "A public-site component the staff preview pages reuse.",
+    "components/public-registration-form.tsx": "The public registration form's own page h1s (event name, confirmation). The staff finish page (#1510) renders it with staffSubmit, which skips the hero and uses an h2 for the confirmation, so the staff shell's h1 is the only one.",
     "components/team-form-sheet.tsx": "The printed team form sheet draws its own h1; it is a print layout.",
     "modules/communications/email-layout.ts": "Builds email HTML, which has its own h1 inside the message."
   }
