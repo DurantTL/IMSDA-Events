@@ -1,5 +1,6 @@
 import {
   calculateFormTotal,
+  calculateRosterTotal,
   registrationFormDefinitionSchema,
   type RegistrationFormDefinition,
 } from "@/modules/forms/definition";
@@ -27,7 +28,8 @@ export type PricingCalculationName =
   | "deposit"
   | "deposit capped at balance"
   | "card surcharge"
-  | "three price windows";
+  | "three price windows"
+  | "attendee type prices";
 
 export type PricingExpected = Record<PricingCalculationName, number>;
 
@@ -42,6 +44,7 @@ export const PRICING_EXPECTED: PricingExpected = {
   "deposit capped at balance": 3_000,
   "card surcharge": 405,
   "three price windows": 15_000,
+  "attendee type prices": 17_500,
 };
 
 function fixtureDefinition(): RegistrationFormDefinition {
@@ -91,6 +94,32 @@ function windowsFixtureDefinition(): RegistrationFormDefinition {
   });
 }
 
+/**
+ * A per-person $50.00 fee with a Child price of $25.00, which from 2026-11-01 becomes Adult $70.00 and Child $30.00
+ * (#1509). One Adult and one Child: before the window 5,000 + 2,500, after it 7,000 + 3,000.
+ */
+function attendeeTypeFixtureDefinition(): RegistrationFormDefinition {
+  return registrationFormDefinitionSchema.parse({
+    title: "Attendee type prices self-test",
+    description: "",
+    confirmationMessage: "Done",
+    sections: [{
+      id: "s_main",
+      title: "Main",
+      description: "",
+      fields: [
+        { id: "f_type", key: "attendee_type", label: "Attendee type", helpText: "", type: "RADIO", scope: "ATTENDEE", required: true, options: ["ADULT", "CHILD"], optionSource: "ATTENDEE_TYPES" },
+        {
+          id: "f_fee", key: "fee", label: "Fee", helpText: "", type: "CALCULATED", scope: "ATTENDEE", required: false, options: [],
+          priceCents: 5000,
+          attendeeTypePricesCents: { CHILD: 2500 },
+          latePricing: { startsOn: "2026-11-01", label: "Late pricing", attendeeTypePricesCents: { ADULT: 7000, CHILD: 3000 } },
+        },
+      ],
+    }],
+  });
+}
+
 const RESPONSES = { package: "Deluxe", shirts: 3, payment_method: "Card" };
 const EARLY_DATE = "2026-10-01";
 const LATE_DATE = "2026-11-02";
@@ -104,7 +133,11 @@ function computeActual(): PricingExpected {
   const deposit = { amountCents: 5000, optionValue: "Deposit" };
   const windows = windowsFixtureDefinition();
   const windowTotals = ["2026-10-01", "2026-10-20", "2026-11-20"].map((date) => calculateFormTotal(windows, {}, date).totalCents);
+  const byType = attendeeTypeFixtureDefinition();
+  const people = [{ attendee_type: "ADULT" }, { attendee_type: "CHILD" }];
+  const typeTotals = ["2026-10-01", "2026-11-02"].map((date) => calculateRosterTotal(byType, {}, people, date).totalCents);
   return {
+    "attendee type prices": typeTotals.reduce((sum, cents) => sum + cents, 0),
     "three price windows": windowTotals.reduce((sum, cents) => sum + cents, 0),
     "early-bird total": early.totalCents,
     "late price total": late.totalCents,

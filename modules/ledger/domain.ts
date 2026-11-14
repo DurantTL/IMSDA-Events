@@ -8,7 +8,7 @@
 export const ledgerEntryKinds = ["CHARGE", "DISCOUNT", "CREDIT"] as const;
 export type LedgerEntryKind = (typeof ledgerEntryKinds)[number];
 
-export const ledgerSourceTypes = ["REGISTRATION_SUBMISSION", "AMENDMENT", "PROMO_REDEMPTION"] as const;
+export const ledgerSourceTypes = ["REGISTRATION_SUBMISSION", "AMENDMENT", "PROMO_REDEMPTION", "STAFF_PRICE_OVERRIDE"] as const;
 export type LedgerSourceType = (typeof ledgerSourceTypes)[number];
 
 export type LedgerOrigin = "LIVE" | "BACKFILL";

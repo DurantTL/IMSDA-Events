@@ -1,0 +1,48 @@
+.editor {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  background: var(--surface, #fff);
+  padding: 10px;
+}
+
+.help {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 500;
+  line-height: 1.4;
+  text-transform: none;
+}
+
+.typeRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  padding: 8px 10px 10px;
+}
+
+.typeRow legend {
+  overflow-wrap: anywhere;
+  padding: 0 4px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+}
+
+.typeRow label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.typeRow input {
+  min-height: 44px;
+}

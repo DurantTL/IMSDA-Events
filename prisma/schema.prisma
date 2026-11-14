@@ -4416,6 +4416,8 @@ enum RegistrationAdjustmentKind {
   MEAL
   /// A charge posted for a lost or damaged issued item, or its waiver (#214). Never reversed by hand: waive it from the issued-asset closeout.
   ASSET
+  /// Staff set one person's price on a registration (#1509): the line is the change (new price minus that person's current share), with the reason. Reversed like any adjustment.
+  PRICE_OVERRIDE
 }
 
 model Payment {
@@ -12054,6 +12056,8 @@ enum RegistrationLedgerSourceType {
   REGISTRATION_SUBMISSION
   AMENDMENT
   PROMO_REDEMPTION
+  /// A staff price override for one person (#1509); the source id is the adjustment line (or its reversal).
+  STAFF_PRICE_OVERRIDE
 }
 
 enum RegistrationLedgerOrigin {

@@ -20,8 +20,8 @@ export const ZERO_PER_PERSON_NOTICE = `No cost to you. ${CHURCH_BILLED_NOTICE}`;
 export const NO_COST_NOTICE = "No cost.";
 
 /** Whether any field of the form carries a price (a regular price, a choice price or late pricing). */
-export function formHasPrices(definition: { sections: ReadonlyArray<{ fields: ReadonlyArray<{ priceCents?: number; choicePricesCents?: unknown; latePricing?: unknown; pricingWindows?: unknown }> }> }): boolean {
-  return definition.sections.some((section) => section.fields.some((field) => field.priceCents !== undefined || field.choicePricesCents !== undefined || Boolean(field.latePricing) || Boolean(field.pricingWindows)));
+export function formHasPrices(definition: { sections: ReadonlyArray<{ fields: ReadonlyArray<{ priceCents?: number; choicePricesCents?: unknown; attendeeTypePricesCents?: unknown; latePricing?: unknown; pricingWindows?: unknown }> }> }): boolean {
+  return definition.sections.some((section) => section.fields.some((field) => field.priceCents !== undefined || field.choicePricesCents !== undefined || field.attendeeTypePricesCents !== undefined || Boolean(field.latePricing) || Boolean(field.pricingWindows)));
 }
 
 /** The price notice for an event with no prices at all: "No cost." instead of "billed to your church". Other prices are left as they are. */

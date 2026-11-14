@@ -18,6 +18,7 @@ const kindWords: Record<string, string> = {
   CORRECTION: "Correction",
   MEAL: "Meal",
   ASSET: "Keys and items charge",
+  PRICE_OVERRIDE: "Price override",
 };
 
 export type AdjustmentRow = {
