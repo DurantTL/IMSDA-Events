@@ -226,6 +226,7 @@ const templateLabels: Record<string, string> = {
   REGISTRATION_CANCELLED: "Registration cancelled",
   REGISTRATION_CONTACT_UPDATED: "Contact updated",
   PAYMENT_RECEIPT: "Payment receipt",
+  MERCHANDISE_RECEIPT: "Merchandise receipt",
   BALANCE_REMINDER: "Balance reminder",
   REGISTRATION_TRANSFERRED_NEW_CONTACT: "Transfer · new contact",
   REGISTRATION_TRANSFERRED_PRIOR_CONTACT: "Transfer · prior contact",

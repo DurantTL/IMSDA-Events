@@ -9,12 +9,12 @@ import {
 } from "@/modules/merchandise/registration-order-domain";
 import type { PublicMerchandiseOffer, RegistrationMerchandiseSummary, RequestedMerchandiseLine } from "@/modules/merchandise/registration-order-schema";
 
-const countedStatuses = ["PENDING", "PAID"] as const;
+const countedStatuses = ["PENDING", "PAID", "COMPED"] as const;
 
 /** An order holds stock while it has no registration link (a staff order) or its registration is not cancelled. */
 const activeRegistrationOrder = [{ registrationId: null }, { registration: { status: { not: "CANCELLED" as const } } }];
 
-/** Units on PENDING or PAID orders, by variant id. */
+/** Units on PENDING, PAID or COMPED orders, by variant id. */
 async function soldByVariant(client: Prisma.TransactionClient, variantIds: string[]) {
   const sold = new Map<string, number>();
   if (variantIds.length === 0) return sold;

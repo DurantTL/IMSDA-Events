@@ -51,7 +51,7 @@ describe("recordRegistrationMerchandiseOrder", () => {
     const tx = makeTx(4);
     await expect(recordRegistrationMerchandiseOrder(tx as never, input)).rejects.toBeInstanceOf(RegistrationMerchandiseError);
     expect(tx.merchandiseOrderLine.groupBy).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ order: {
-      status: { in: ["PENDING", "PAID"] },
+      status: { in: ["PENDING", "PAID", "COMPED"] },
       OR: [{ registrationId: null }, { registration: { status: { not: "CANCELLED" } } }],
     } }) }));
     expect(tx.merchandiseOrder.create).not.toHaveBeenCalled();
