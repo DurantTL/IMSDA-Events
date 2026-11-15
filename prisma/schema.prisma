@@ -987,6 +987,8 @@ model User {
   authoredStaffNotes             StaffNote[]                      @relation("StaffNoteAuthor")
   audienceSnapshots              EventAudienceSnapshot[]          @relation("EventAudienceSnapshotCreatedBy")
   bulkActionRuns                 BulkActionRun[]                  @relation("BulkActionRunActor")
+  bulkMessagesQueued             BulkMessageApproval[]            @relation("BulkMessageApprovalQueuedBy")
+  bulkMessagesDecided            BulkMessageApproval[]            @relation("BulkMessageApprovalDecidedBy")
   scheduledEmailsCreated         ScheduledEmailBatch[]            @relation("ScheduledEmailCreatedBy")
   scheduledEmailsActivated       ScheduledEmailBatch[]            @relation("ScheduledEmailActivatedBy")
   authoredStaffNoteRevisions     StaffNoteRevision[]              @relation("StaffNoteRevisionAuthor")
@@ -2297,6 +2299,7 @@ model Event {
   notes                               StaffNote[]
   audienceSnapshots                   EventAudienceSnapshot[]
   bulkActionRuns                      BulkActionRun[]
+  bulkMessageApprovals                BulkMessageApproval[]
   scheduledEmailBatches               ScheduledEmailBatch[]
   registrationTagAssignments          RegistrationTagAssignment[]
   attendeeTagAssignments              AttendeeTagAssignment[]
@@ -2785,6 +2788,8 @@ enum BulkActionKey {
   APPLY_TAG
   REMOVE_TAG
   EXPORT_FIELDS
+  QUEUE_MESSAGE
+  REQUEST_INFORMATION
 }
 
 enum BulkActionScopeKind {
@@ -2844,12 +2849,53 @@ model BulkActionRun {
   obsoleteCount  Int                 @default(0)
   exportRowCount Int?
 
-  event    Event                      @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  actor    User                       @relation("BulkActionRunActor", fields: [actorUserId], references: [id], onDelete: Restrict)
-  outcomes BulkActionRecordOutcome[]
+  event           Event                     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  actor           User                      @relation("BulkActionRunActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  outcomes        BulkActionRecordOutcome[]
+  messageApproval BulkMessageApproval?
 
   @@unique([eventId, idempotencyKey])
   @@index([eventId, previewedAt])
+}
+
+/// PENDING_APPROVAL: queued by a confirmed bulk run, nothing sent. SENDING: someone with communications access approved it and the
+/// send is being written. SENT: written to the outbox through the reviewed selected-registration send. DECLINED: never sent.
+enum BulkMessageApprovalStatus {
+  PENDING_APPROVAL
+  SENDING
+  SENT
+  DECLINED
+}
+
+/// A message a confirmed bulk run queued for approval (#182). Confirming a run never sends and never writes the message outbox;
+/// it creates one of these. A person with MANAGE_COMMUNICATIONS approves it later, after a fresh review, and only then is the
+/// message written (with `id` as the selected-audience batch id, so a second approval never sends twice). It stores the template
+/// key, the staff-written title and body, and the registration ids queued. It never stores an address or a name.
+/// `sendResult` is counts only.
+model BulkMessageApproval {
+  id                String                    @id
+  eventId           String
+  runId             String                    @unique
+  action            BulkActionKey
+  templateKey       String
+  announcementTitle String?
+  announcementBody  String?
+  registrationIds   Json
+  queuedCount       Int
+  status            BulkMessageApprovalStatus @default(PENDING_APPROVAL)
+  queuedByUserId    String
+  decidedByUserId   String?
+  decidedAt         DateTime?
+  sendResult        Json?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  event     Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  run       BulkActionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  queuedBy  User          @relation("BulkMessageApprovalQueuedBy", fields: [queuedByUserId], references: [id], onDelete: Restrict)
+  decidedBy User?         @relation("BulkMessageApprovalDecidedBy", fields: [decidedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([eventId, status])
 }
 
 /// What happened to one registration in one bulk action run. `reason` is a short code, never free text or personal data.

@@ -40,6 +40,7 @@ const unsortedTables: Record<string, string> = {
   "components/event-health-sheet.tsx": "print sheet",
   "components/check-in-book.tsx": "print sheet",
   "components/bulk-actions-panel.tsx": "set order: the not-completed list by confirmation code, and the last 10 bulk actions newest first (a fixed short list)",
+  "components/bulk-message-approvals.tsx": "short fixed list: messages waiting for approval, oldest first, and the last 10 decided",
   "components/kitchen-counts-table.tsx": "short fixed list: kitchen meal counts in meal order",
   "components/kitchen-meals-served.tsx": "short fixed list: kitchen meals served in meal order",
   "components/kitchen-report-view.tsx": "short fixed list: kitchen report in meal order",

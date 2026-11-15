@@ -18,8 +18,8 @@ import {
 
 // #182: the pure rules of the bulk-action framework. Synthetic data only.
 describe("action allowlist", () => {
-  it("has exactly three actions and no generic field update", () => {
-    expect([...BULK_ACTION_KEYS]).toEqual(["APPLY_TAG", "REMOVE_TAG", "EXPORT_FIELDS"]);
+  it("has exactly the five reviewed actions and no generic field update", () => {
+    expect([...BULK_ACTION_KEYS]).toEqual(["APPLY_TAG", "REMOVE_TAG", "EXPORT_FIELDS", "QUEUE_MESSAGE", "REQUEST_INFORMATION"]);
     expect(Object.keys(BULK_ACTION_CATALOG).sort()).toEqual([...BULK_ACTION_KEYS].sort());
   });
 

@@ -1,5 +1,7 @@
 import { z } from "zod";
 import type { EventPermission } from "@/modules/access/permissions";
+import { SELECTED_AUDIENCE_MAX_REGISTRATIONS } from "@/modules/communications/selected-audience-limit";
+import { selectedAudienceTemplateKeys, type SelectedAudienceTemplateKey } from "@/modules/communications/selected-audience-templates";
 import {
   DOMAIN_PERMISSIONS,
   parseOperationsSearchParams,
@@ -14,7 +16,7 @@ import {
  * Nothing in this file touches the database.
  */
 
-export const BULK_ACTION_KEYS = ["APPLY_TAG", "REMOVE_TAG", "EXPORT_FIELDS"] as const;
+export const BULK_ACTION_KEYS = ["APPLY_TAG", "REMOVE_TAG", "EXPORT_FIELDS", "QUEUE_MESSAGE", "REQUEST_INFORMATION"] as const;
 export type BulkActionKey = (typeof BULK_ACTION_KEYS)[number];
 
 /** Registrations are the unit of every action in this slice. */
@@ -23,6 +25,11 @@ export const BULK_RECORD_UNIT = "registrations";
 /** More than this is refused as too broad. It is never truncated to fit. */
 export const TAG_ACTION_MAX_RECORDS = 500;
 export const EXPORT_ACTION_MAX_RECORDS = 5000;
+/** The same cap as one reviewed selected-registration send. */
+export const MESSAGE_ACTION_MAX_RECORDS = SELECTED_AUDIENCE_MAX_REGISTRATIONS;
+/** Title and body limits match the selected-registration announcement. */
+export const MESSAGE_TITLE_MAX = 120;
+export const MESSAGE_BODY_MAX = 4000;
 
 /** A preview is good for this long. After that the person previews again. */
 export const PREVIEW_TTL_MINUTES = 30;
@@ -46,7 +53,8 @@ export type BulkActionErrorCode =
   | "EXPIRED"
   | "ALREADY_CONFIRMED"
   | "IN_PROGRESS"
-  | "KEY_IN_USE";
+  | "KEY_IN_USE"
+  | "ALREADY_DECIDED";
 
 /** A refusal with a message a person can act on. Never carries personal data. */
 export class BulkActionError extends Error {
@@ -67,6 +75,13 @@ export const REASON_LABELS = {
   WRITE_FAILED: "The change could not be saved.",
   NOT_CHANGED: "Nothing was changed for this one.",
   INTERRUPTED: "The action stopped before this one. Check it before trying again.",
+  NOT_A_REGISTRATION: "It is not a registration on this event.",
+  NOT_ELIGIBLE_STATUS: "It is not submitted or confirmed.",
+  NO_BALANCE_DUE: "No balance is due.",
+  NO_VALID_EMAIL: "It has no valid contact email.",
+  ORGANIZATION_BILLED: "The event bills the responsible organization, not the attendee.",
+  OPTED_OUT: "The contact opted out of announcements.",
+  NOT_QUEUED: "The message could not be queued for it.",
 } as const;
 export type BulkReasonCode = keyof typeof REASON_LABELS;
 
@@ -86,7 +101,7 @@ const RESTRICTED_GUIDES: ReadonlyArray<readonly [RegExp, string]> = [
   [/payment|price|pricing|capacity|total|balance|discount|fee|charge|invoice/, "Payment, price and capacity changes are made on the Finance and Event setup pages."],
 ];
 
-const GENERIC_GUIDE = "Bulk actions can apply a tag, remove a tag or export approved fields. For anything else, use the page that is built for it.";
+const GENERIC_GUIDE = "Bulk actions can apply a tag, remove a tag, export approved fields, or queue a message or an information request for approval. For anything else, use the page that is built for it.";
 
 /** The action a request names, or a refusal that names the page to use. Never throws for an unknown key; it refuses. */
 export function parseBulkActionKey(raw: unknown): { ok: true; key: BulkActionKey } | { ok: false; message: string } {
@@ -137,7 +152,59 @@ export const BULK_ACTION_CATALOG: Record<BulkActionKey, BulkActionCatalogEntry> 
     effect: "Creates a CSV file with the fields you chose. The file is made once, when you confirm, and is not kept. To export again, preview again.",
     createsFile: true,
   },
+  QUEUE_MESSAGE: {
+    key: "QUEUE_MESSAGE",
+    label: "Queue a message for approval",
+    permissions: ["MANAGE_COMMUNICATIONS"],
+    maxRecords: MESSAGE_ACTION_MAX_RECORDS,
+    effect: "Nothing is sent now. The message waits for approval under Messages waiting for approval. It goes out only when someone with communications access approves it after a fresh review.",
+    createsFile: false,
+  },
+  REQUEST_INFORMATION: {
+    key: "REQUEST_INFORMATION",
+    label: "Request missing information",
+    permissions: ["MANAGE_COMMUNICATIONS"],
+    maxRecords: MESSAGE_ACTION_MAX_RECORDS,
+    effect: "Nothing is sent now. The message waits for approval under Messages waiting for approval. It goes out only when someone with communications access approves it after a fresh review. It is sent as an event announcement with each person's private registration link, so people who opted out of announcements are skipped.",
+    createsFile: false,
+  },
 };
+
+export function isMessageAction(key: BulkActionKey) {
+  return key === "QUEUE_MESSAGE" || key === "REQUEST_INFORMATION";
+}
+
+/** What "completed" means for this action. A message that is queued is not a message that is sent. */
+export function completedLabel(key: BulkActionKey) {
+  return isMessageAction(key) ? "Queued for approval" : OUTCOME_LABELS.COMPLETED;
+}
+
+/** The label for an outcome in this action's summary. */
+export function outcomeLabelFor(key: BulkActionKey, outcome: BulkActionOutcomeKey) {
+  return outcome === "COMPLETED" ? completedLabel(key) : OUTCOME_LABELS[outcome];
+}
+
+/** The selected-registration send reasons, as short bulk reason codes. No personal data. */
+const MESSAGE_SKIP_REASONS: Record<string, BulkReasonCode> = {
+  NOT_FOUND: "NOT_A_REGISTRATION",
+  INACTIVE_REGISTRATION: "NOT_ELIGIBLE_STATUS",
+  NO_BALANCE_DUE: "NO_BALANCE_DUE",
+  INVALID_CONTACT_EMAIL: "NO_VALID_EMAIL",
+  ORGANIZATION_BILLED: "ORGANIZATION_BILLED",
+  ANNOUNCEMENT_OPTED_OUT_EVENT: "OPTED_OUT",
+  ANNOUNCEMENT_OPTED_OUT_ALL: "OPTED_OUT",
+};
+
+export function messageSkipReason(code: string): BulkReasonCode {
+  return MESSAGE_SKIP_REASONS[code] ?? "NOT_QUEUED";
+}
+
+/** The template a message action sends with. A request for information always uses the announcement. */
+export function messageTemplateKey(params: BulkActionParams): SelectedAudienceTemplateKey | null {
+  if (params.action === "QUEUE_MESSAGE") return params.templateKey;
+  if (params.action === "REQUEST_INFORMATION") return "EVENT_ANNOUNCEMENT";
+  return null;
+}
 
 export function isTagAction(key: BulkActionKey) {
   return key === "APPLY_TAG" || key === "REMOVE_TAG";
@@ -186,12 +253,29 @@ export function exportFieldSpec(key: string) {
 const tagParamsSchema = z.strictObject({ tagId: z.string().trim().min(1).max(100) });
 const exportParamsSchema = z.strictObject({ fields: z.array(z.enum(EXPORT_FIELD_KEYS)).min(1).max(EXPORT_FIELDS.length) });
 
+// Title and body are required for an announcement and must be empty (or left out) for any other template.
+const queueMessageParamsSchema = z.strictObject({
+  templateKey: z.enum(selectedAudienceTemplateKeys),
+  announcementTitle: z.string().trim().max(MESSAGE_TITLE_MAX).optional(),
+  announcementBody: z.string().trim().max(MESSAGE_BODY_MAX).optional(),
+});
+const requestInformationParamsSchema = z.strictObject({
+  title: z.string().trim().min(1).max(MESSAGE_TITLE_MAX),
+  details: z.string().trim().min(1).max(MESSAGE_BODY_MAX),
+});
+
 export type BulkActionParams =
   | { action: "APPLY_TAG" | "REMOVE_TAG"; tagId: string }
-  | { action: "EXPORT_FIELDS"; fields: ExportFieldKey[] };
+  | { action: "EXPORT_FIELDS"; fields: ExportFieldKey[] }
+  | { action: "QUEUE_MESSAGE"; templateKey: SelectedAudienceTemplateKey; announcementTitle: string; announcementBody: string }
+  | { action: "REQUEST_INFORMATION"; title: string; details: string };
 
-/** What is stored on the run: the tag id, or the field keys in the order the file will have them. */
-export type StoredParams = { tagId: string } | { fields: ExportFieldKey[] };
+/** What is stored on the run: the tag id, the field keys in the order the file will have them, or the message. */
+export type StoredParams =
+  | { tagId: string }
+  | { fields: ExportFieldKey[] }
+  | { templateKey: SelectedAudienceTemplateKey; announcementTitle: string; announcementBody: string }
+  | { title: string; details: string };
 
 function invalid(message: string): never {
   throw new BulkActionError("INVALID_REQUEST", message);
@@ -204,6 +288,25 @@ export function parseBulkParams(action: BulkActionKey, raw: unknown): BulkAction
     if (!parsed.success) invalid("Choose a tag.");
     return { action: action as "APPLY_TAG" | "REMOVE_TAG", tagId: parsed.data.tagId };
   }
+  if (action === "QUEUE_MESSAGE") {
+    const parsed = queueMessageParamsSchema.safeParse(raw);
+    if (!parsed.success) invalid("Choose which message to queue.");
+    const { templateKey } = parsed.data;
+    const title = parsed.data.announcementTitle ?? "";
+    const body = parsed.data.announcementBody ?? "";
+    if (templateKey === "EVENT_ANNOUNCEMENT") {
+      if (!title) invalid("An announcement needs a title.");
+      if (!body) invalid("An announcement needs a message.");
+    } else if (title || body) {
+      invalid("Only an announcement has a title and message of its own. Choose the announcement, or clear them.");
+    }
+    return { action, templateKey, announcementTitle: title, announcementBody: body };
+  }
+  if (action === "REQUEST_INFORMATION") {
+    const parsed = requestInformationParamsSchema.safeParse(raw);
+    if (!parsed.success) invalid("Give the request a title and say what is missing.");
+    return { action, title: parsed.data.title, details: parsed.data.details };
+  }
   const parsed = exportParamsSchema.safeParse(raw);
   if (!parsed.success) invalid("Choose at least one of the approved fields to export.");
   const fields = [...new Set(parsed.data.fields)];
@@ -211,7 +314,19 @@ export function parseBulkParams(action: BulkActionKey, raw: unknown): BulkAction
 }
 
 export function storedParams(params: BulkActionParams): StoredParams {
-  return params.action === "EXPORT_FIELDS" ? { fields: params.fields } : { tagId: params.tagId };
+  switch (params.action) {
+    case "EXPORT_FIELDS": return { fields: params.fields };
+    case "QUEUE_MESSAGE": return { templateKey: params.templateKey, announcementTitle: params.announcementTitle, announcementBody: params.announcementBody };
+    case "REQUEST_INFORMATION": return { title: params.title, details: params.details };
+    default: return { tagId: params.tagId };
+  }
+}
+
+/** The parameters as the audit trail keeps them: keys and counts, never the text staff wrote for the message. */
+export function auditParams(stored: StoredParams): Record<string, unknown> {
+  if ("announcementBody" in stored) return { templateKey: stored.templateKey };
+  if ("details" in stored) return { templateKey: "EVENT_ANNOUNCEMENT" };
+  return stored;
 }
 
 export function paramsFromStored(action: BulkActionKey, stored: unknown): BulkActionParams {
@@ -242,6 +357,7 @@ function permissionName(permission: EventPermission) {
     case "VIEW_REPORTS": return "downloading reports";
     case "VIEW_SENSITIVE_DATA": return "viewing registration records";
     case "MANAGE_FINANCE": return "finance";
+    case "MANAGE_COMMUNICATIONS": return "sending messages";
     default: return permission.toLowerCase().replaceAll("_", " ");
   }
 }
