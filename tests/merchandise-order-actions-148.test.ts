@@ -203,7 +203,7 @@ describe("applyMerchandiseOrderAction", () => {
   it("cancels a pending or comped order without a receipt number or email", async () => {
     for (const status of ["PENDING", "COMPED"]) {
       const tx = makeDb({ order: { status, receiptNumber: status === "COMPED" ? "M-0001" : null } });
-      const result = await applyMerchandiseOrderAction(eventId, orderId, "usr_1", cancel(), now, true);
+      const result = await applyMerchandiseOrderAction(eventId, orderId, "usr_1", cancel(), now);
       expect(result.order.status).toBe("CANCELLED");
       expect(tx.merchandiseOrder.updateMany).toHaveBeenCalledWith({ where: { id: orderId, eventId, status }, data: { status: "CANCELLED" } });
       expect(tx.merchandiseOrderStatusChange.create.mock.calls[0][0].data).toMatchObject({ action: "CANCEL", reason: "Ordered by mistake" });
