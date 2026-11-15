@@ -1,3 +1,4 @@
+import { HealthRecordLockedError } from "@/modules/health-records/locked-error";
 import { ExactValue } from "@/components/exact-value";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -11,7 +12,7 @@ import { BREAK_GLASS_REQUIRED_MESSAGE } from "@/modules/health-records/break-gla
 import { canStartBreakGlassInline, rosterMemberPersonId } from "@/modules/health-records/break-glass-form";
 import { HealthRecordLocked } from "@/components/health-record-locked";
 import { DataKeyUnavailableError } from "@/lib/secret-box";
-import { HealthRecordError, HealthRecordLockedError } from "@/modules/health-records/errors";
+import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { viewHealthRecord } from "@/modules/health-records/repository";
 

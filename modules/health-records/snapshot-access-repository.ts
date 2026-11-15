@@ -169,7 +169,8 @@ export type SealedSnapshotView = {
 /**
  * Opens a person's sealed copies. Needs a system administrator with an
  * unexpired break-glass grant for that person. The view is audited (ids and
- * counts) before any value is decrypted; a refusal is audited too.
+ * counts) before any value is decrypted; a refusal is audited too. A locked refusal (the personal-data key is not loaded)
+ * is neither a view nor an access refusal: it writes nothing, records no break-glass use and shows no value (#1652).
  */
 export async function viewSealedSnapshots(viewer: HealthViewer, personId: string, now = new Date()): Promise<{ grantId: string; snapshots: SealedSnapshotView[] }> {
   const admin = await requireSystemAdmin(viewer, "VIEW_SEALED_COPIES", personId);

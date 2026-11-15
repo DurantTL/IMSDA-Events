@@ -6,7 +6,7 @@ const dependencies = vi.hoisted(() => ({ getServerEnv: vi.fn() }));
 vi.mock("@/lib/env", () => ({ getServerEnv: dependencies.getServerEnv }));
 vi.mock("@/lib/logger", () => ({ logInfo: vi.fn(), logWarn: vi.fn() }));
 
-import { resetDataKeyringForTests, setDataKeyStateForTests } from "@/lib/data-key/keyring";
+import { ensureDataKeyLoaded, resetDataKeyringForTests, setDataKeySourceForTests, setDataKeyStateForTests } from "@/lib/data-key/keyring";
 import {
   DataKeyUnavailableError,
   SecretBoxError,
@@ -155,6 +155,41 @@ describe("with a separate data key", () => {
     expect(() => openData(old, purpose)).not.toThrow(DataKeyUnavailableError);
     expect(isSealedDataLocked(old)).toBe(false);
     expect(isDataKeyUnavailable()).toBe(false);
+  });
+
+  it("reloads once when a value needs the previous key that failed to load, and not again inside the retry window", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-15T12:00:00Z"));
+    try {
+      ready(1);
+      const old = sealData("2010-04-02", purpose);
+      let loads = 0;
+      setDataKeySourceForTests({
+        load: async () => {
+          loads += 1;
+          return { current: { version: 2, ikm: ikm2 }, previousProblem: "access-denied" as const };
+        },
+      });
+      await ensureDataKeyLoaded();
+      expect(loads).toBe(1);
+
+      // Inside the window: nothing is loaded again, however often a value asks.
+      expect(isSealedDataLocked(old)).toBe(true);
+      expect(() => openData(old, purpose)).toThrow(DataKeyUnavailableError);
+      await Promise.resolve();
+      expect(loads).toBe(1);
+
+      // After the window: one reload, shared by the calls that follow it.
+      vi.setSystemTime(new Date("2026-11-15T12:00:31Z"));
+      expect(isSealedDataLocked(old)).toBe(true);
+      expect(() => openData(old, purpose)).toThrow(DataKeyUnavailableError);
+      await ensureDataKeyLoaded();
+      expect(loads).toBe(2);
+      expect(isSealedDataLocked(old)).toBe(true);
+      expect(loads).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("decides locked without decrypting: not separate, loading, unavailable, previous loaded", () => {

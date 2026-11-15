@@ -8,7 +8,7 @@ One key (`SECRET_ENCRYPTION_KEY`, `lib/secret-box.ts`) protected two different k
 
 - **Sign-in secrets:** staff and attendee authenticator secrets, one-time sign-in, confirmation, step-up and recovery codes,
   and Security check fallback codes. These must always be available, or nobody can sign in.
-- **Personal data:** health records and health snapshots, club roster and background-check birth dates, sensitive club form
+- **Personal data:** health records and health snapshots, club roster and Sterling Volunteers list birth dates, sensitive club form
   answers, and imported calendar feed addresses.
 
 Decisions: the sign-in key always unlocks automatically from a protected key file on the server (November 7). The

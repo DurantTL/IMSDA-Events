@@ -37,10 +37,10 @@ export default async function ClubYearEndReportPage({ params }: { params: Promis
   // The pre-filled counts need the roster's birth dates: while the personal-data key is unavailable the report is not shown
   // with numbers that would look right and not be (#1652).
   const loaded = await getYearEndView(organizationId, year, now).catch((error: unknown) => {
-    if (error instanceof DataKeyUnavailableError) return null;
+    if (error instanceof DataKeyUnavailableError) return "LOCKED" as const;
     throw error;
   });
-  if (!loaded) {
+  if (loaded === "LOCKED") {
     return (
       <>
         <BackLink href={backHref}>Back to Monthly Records</BackLink>

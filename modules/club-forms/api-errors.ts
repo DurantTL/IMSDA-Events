@@ -70,7 +70,7 @@ export function clubFormApiError(error: unknown, action: string) {
   }
   if (error instanceof DataKeyUnavailableError) {
     // Expected while the key is down, and the keyring already logs it once: no error line per request.
-    logWarn(`${action}: protected answers are locked (the personal-data key is unavailable)`);
+    logWarn(`${action}: locked, the personal-data key is unavailable`);
     return Response.json(
       { error: "DATA_KEY_UNAVAILABLE", message: "This can't be saved or shown right now because protected answers are locked. Please try again in a few minutes." },
       { status: 503, headers: { "Retry-After": "60" } },

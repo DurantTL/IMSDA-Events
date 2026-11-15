@@ -1,3 +1,4 @@
+import { HealthRecordLockedError } from "@/modules/health-records/locked-error";
 import { HealthRecordLocked } from "@/components/health-record-locked";
 import { DataKeyUnavailableError } from "@/lib/secret-box";
 import { ExactValue } from "@/components/exact-value";
@@ -14,7 +15,7 @@ import { getRosterAccessStateForPage, RosterAccessError } from "@/modules/club-r
 import { requireHealthViewerForClub } from "@/modules/health-records/access";
 import { BREAK_GLASS_REQUIRED_MESSAGE } from "@/modules/health-records/break-glass";
 import { canStartBreakGlassInline, rosterMemberPersonId } from "@/modules/health-records/break-glass-form";
-import { HealthRecordError, HealthRecordLockedError } from "@/modules/health-records/errors";
+import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { listHealthRecordLinks, viewHealthEntryStatus, viewHealthRecord } from "@/modules/health-records/repository";
 import { clubAccessClosed } from "@/components/club-access-closed";

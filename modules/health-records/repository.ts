@@ -1,3 +1,5 @@
+import { formatPersonName } from "@/lib/person-name";
+import { HealthRecordLockedError } from "@/modules/health-records/locked-error";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -37,7 +39,7 @@ import {
   type HealthRecordStatus,
   type HealthViewer,
 } from "@/modules/health-records/domain";
-import { HEALTH_LINK_UNAVAILABLE_MESSAGE, HEALTH_MEMBER_NOT_FOUND_MESSAGE, HealthRecordError, HealthRecordLockedError } from "@/modules/health-records/errors";
+import { HEALTH_LINK_UNAVAILABLE_MESSAGE, HEALTH_MEMBER_NOT_FOUND_MESSAGE, HealthRecordError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled, requireHealthRecordsEnabled } from "@/modules/health-records/flag";
 import { HEALTH_RECORD_LINK_TEMPLATE_KEY, healthRecordLinkEmailContent } from "@/modules/health-records/link-email";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
@@ -258,7 +260,7 @@ export async function viewHealthRecord(
   // is whether every field's key is loaded: a record that cannot be opened because the personal-data key is unavailable
   // shows nothing, so it records no view and uses no break-glass grant (#1652).
   if (record && record.fields.some((field) => isHealthFieldKey(field.fieldKey) && isSealedDataLocked(field.sealedValue))) {
-    throw new HealthRecordLockedError(`${member.person?.firstName ?? ""} ${member.person?.lastName ?? ""}`.trim(), member.organization.name);
+    throw new HealthRecordLockedError(formatPersonName({ firstName: member.person?.firstName, lastName: member.person?.lastName }), member.organization.name);
   }
   const viewAudit = {
     // No top-level eventId: that column feeds the event staff audit log, which must not list these views. The event is in the metadata.

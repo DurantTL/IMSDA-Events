@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetDataKeyringForTests, setDataKeyStateForTests } from "@/lib/data-key/keyring";
 import { DataKeyUnavailableError } from "@/lib/secret-box";
-import { HealthRecordLockedError } from "@/modules/health-records/errors";
+import { HealthRecordLockedError } from "@/modules/health-records/locked-error";
 import { hashOpaqueToken } from "@/modules/access/tokens";
 import { healthMarkers, syntheticRecord } from "./health-records-fixtures";
 

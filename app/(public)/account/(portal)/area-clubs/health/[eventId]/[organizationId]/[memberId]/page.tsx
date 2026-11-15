@@ -1,3 +1,4 @@
+import { HealthRecordLockedError } from "@/modules/health-records/locked-error";
 import { HealthRecordLocked } from "@/components/health-record-locked";
 import { DataKeyUnavailableError } from "@/lib/secret-box";
 import { ExactValue } from "@/components/exact-value";
@@ -7,7 +8,7 @@ import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowl
 import { HealthRecordView, HealthStatusChip } from "@/components/health-record-view";
 import { HealthStepUp } from "@/components/health-step-up";
 import { attendeeUnlockMethods, requireAreaCoordinatorHealthViewer } from "@/modules/health-records/access";
-import { HealthRecordError, HealthRecordLockedError } from "@/modules/health-records/errors";
+import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { viewHealthRecord } from "@/modules/health-records/repository";
 
