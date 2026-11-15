@@ -19,6 +19,7 @@ import {
 } from "@/modules/attendee-accounts/profile-service";
 import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { getAutoEventInfoCards } from "@/modules/event-info-cards/repository";
+import { isArchivedPublicEventSlug } from "@/modules/events/public-repository";
 import { getPublicRegistrationExperience } from "@/modules/forms/public-repository";
 import { clubEventEntryRedirect } from "@/modules/general-link-registrations/repository";
 import { RegistrationThemeScope } from "@/components/registration-theme-scope";
@@ -58,7 +59,11 @@ export default async function PublicRegistrationPage({
 }: PublicRegistrationPageProps) {
   const { eventSlug, formSlug } = await params;
   const experience = await getPublicRegistrationExperience(eventSlug, formSlug);
-  if (!experience) notFound();
+  if (!experience) {
+    // An archived published event's form goes to the events list with a notice (#1514); anything else is not found.
+    if (await isArchivedPublicEventSlug(eventSlug)) redirect("/events?ended=1");
+    notFound();
+  }
   // A club event takes teams through the portal or the general link, never this individual form (#931).
   const clubEntry = await clubEventEntryRedirect(eventSlug);
   if (clubEntry) redirect(clubEntry);

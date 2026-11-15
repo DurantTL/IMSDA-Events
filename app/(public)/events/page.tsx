@@ -134,7 +134,7 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
       ]} />
       <NoResultSearchBeacon term={noResultTerm} />
       <SiteNoticesView notices={activeNotices(hubContent, today)} />
-      {ended && <p className={styles.endedNotice} role="status">That event has ended and is no longer open for registration. Here are the events open now.</p>}
+      {ended && <p className={styles.endedNotice} role="status">That event is no longer open for registration. Here are the events open now.</p>}
 
       <section className="public-registration-hero calendar-hero public-home-banner">
         <div>

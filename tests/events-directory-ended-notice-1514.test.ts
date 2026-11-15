@@ -27,14 +27,14 @@ beforeEach(() => {
 describe("events list ended notice (#1514)", () => {
   it("shows a status notice for ?ended=1 without treating it as a filter", async () => {
     const html = await render({ ended: "1" });
-    expect(html).toContain("That event has ended and is no longer open for registration.");
-    expect(html).toMatch(/role="status"[^>]*>That event has ended/);
+    expect(html).toContain("That event is no longer open for registration.");
+    expect(html).toMatch(/role="status"[^>]*>That event is no longer/);
     expect(html).not.toContain("No events match these filters");
     expect(html).not.toContain('name="ended"');
   });
   it("shows no notice otherwise, and never echoes other values", async () => {
-    expect(await render({})).not.toContain("has ended");
-    expect(await render({ ended: "yes" })).not.toContain("has ended");
+    expect(await render({})).not.toContain("no longer open");
+    expect(await render({ ended: "yes" })).not.toContain("no longer open");
     expect(await render({ ended: "1", q: "" })).not.toContain("Clear filters");
   });
 });

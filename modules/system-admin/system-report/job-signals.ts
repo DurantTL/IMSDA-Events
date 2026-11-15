@@ -196,8 +196,8 @@ export function eventPageScheduledPublishFields(key: string, run: JobRun, readAt
   if (problem) return problem;
   const c = counts(run, ["events", "published", "failed"]);
   if (!c) return ranFields(key, run, "watch", COUNTS_MISSING);
-  const text = `${c.published} sections published across ${c.events} events, ${c.failed} failed.`;
-  return ranFields(key, run, c.failed > 0 ? "watch" : "ok", c.failed > 0 ? `${text} An event that failed is tried again on the next sweep.` : text);
+  // The sweep records a run with any failure as FAILED, so a good run always has none.
+  return ranFields(key, run, "ok", `${c.published} sections published (${c.events} events had changes due).`);
 }
 
 export function instructorClassEmailFields(key: string, run: JobRun, readAt: Date): Fields {

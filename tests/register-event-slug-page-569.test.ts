@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ getPublicEventLanding: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getPublicEventLanding: vi.fn(), isArchivedPublicEventSlug: vi.fn().mockResolvedValue(false) }));
 vi.mock("@/modules/events/public-repository", () => mocks);
 vi.mock("next/navigation", () => ({
   redirect: (path: string) => {
@@ -12,7 +12,10 @@ vi.mock("next/navigation", () => ({
 import RegisterEventPage, { metadata } from "@/app/(public)/register/[eventSlug]/page";
 
 describe("/register/[eventSlug] (#569)", () => {
-  beforeEach(() => mocks.getPublicEventLanding.mockReset());
+  beforeEach(() => {
+    mocks.getPublicEventLanding.mockReset();
+    mocks.isArchivedPublicEventSlug.mockReset().mockResolvedValue(false);
+  });
 
   it("redirects a real event slug to its public event page", async () => {
     mocks.getPublicEventLanding.mockResolvedValue({ event: { slug: "womens-retreat" } });
