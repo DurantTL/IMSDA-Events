@@ -162,6 +162,7 @@ export function CheckInStationScreen({
   const [stopError, setStopError] = useState("");
   const [stopped, setStopped] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const leavingHeading = useRef<HTMLHeadingElement>(null);
   const router = useRouter();
   const checkInHref = `/check-in?event=${encodeURIComponent(eventId)}`;
   const [unsyncedNames, setUnsyncedNames] = useState<string[]>([]);
@@ -231,6 +232,11 @@ export function CheckInStationScreen({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [stationId]);
+
+  // Focus lands on the heading so the change of screen is announced.
+  useEffect(() => {
+    if (leaving) leavingHeading.current?.focus();
+  }, [leaving]);
 
   useEffect(() => {
     if (!focusTarget) return;
@@ -603,8 +609,11 @@ export function CheckInStationScreen({
     return (
       <main className={styles.cisShell}>
         <section className={styles.cisCard}>
-          <h1>Check-in station</h1>
+          <h1 ref={leavingHeading} tabIndex={-1}>Check-in station</h1>
           <p role="status">Station stopped. Going back to Check-in...</p>
+          <p className={styles.cisActions}>
+            <Link href={checkInHref} className={`secondary-button ${styles.large}`}>Go to Check-in</Link>
+          </p>
         </section>
       </main>
     );
@@ -904,7 +913,7 @@ export function CheckInStationScreen({
         open={stopping}
         title="Stop this station?"
       >
-        <p>This device goes back to the Check-in tab. A staff member needs to sign in to start it again.</p>
+        <p>This device goes back to the Check-in tab.</p>
         {waiting > 0 && <p><strong>{stationStopQueueWarning(waiting)}</strong></p>}
       </ConfirmDialog>
     </main>
