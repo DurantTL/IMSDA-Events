@@ -1,7 +1,8 @@
 -- Registration themes (#283, slice 2, round A): an optional event logo and banner image on a registration look. ADDITIVE ONLY:
 -- two nullable columns on "RegistrationThemeVersion" (foreign keys to "EventAsset" that clear when the file is deleted), their
 -- indexes, and a replacement of the version guard function so a published look's logo and banner can only be cleared, never
--- swapped. Applying it in production is a human step (back up first).
+-- swapped. Round B adds one nullable column on "MessageOutbox" (the look an email was rendered with, cleared if that version is
+-- ever removed) and its index. Applying it in production is a human step (back up first).
 
 -- AlterTable
 ALTER TABLE "RegistrationThemeVersion" ADD COLUMN "logoAssetId" TEXT,
@@ -54,3 +55,12 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- AlterTable: the registration look a message's email layout was rendered with (#283). Null means the platform layout.
+ALTER TABLE "MessageOutbox" ADD COLUMN "registrationThemeVersionId" TEXT;
+
+-- CreateIndex
+CREATE INDEX "MessageOutbox_registrationThemeVersionId_idx" ON "MessageOutbox"("registrationThemeVersionId");
+
+-- AddForeignKey
+ALTER TABLE "MessageOutbox" ADD CONSTRAINT "MessageOutbox_registrationThemeVersionId_fkey" FOREIGN KEY ("registrationThemeVersionId") REFERENCES "RegistrationThemeVersion"("id") ON DELETE SET NULL ON UPDATE CASCADE;

@@ -208,6 +208,10 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
             Platform default → this event&apos;s published look. Used on the registration form, the embedded form, the confirmation,
             the finish-registration link and the form builder preview.
           </p>
+          <p>
+            The published look (its colors, and its logo or the event name) is also used in this event&apos;s emails. Email already
+            sent keeps the look it was sent with.
+          </p>
         </div>
       </div>
 

@@ -16,6 +16,7 @@
 
 import type { MessageTemplateKey } from "@prisma/client";
 import { BRAND_CALENDAR_LABEL, BRAND_EMAIL_SYMBOL_PATH } from "@/lib/brand";
+import { EMAIL_LOOK_HEX, type EmailLook } from "@/modules/registration-themes/email-look";
 import { escapeHtml, renderEmailBodyHtml, renderPreheaderHtml } from "@/modules/communications/email-html";
 import {
   DEFAULT_EMAIL_LAYOUT_SETTINGS,
@@ -346,32 +347,43 @@ export const EMAIL_PALETTE = {
 const L = EMAIL_PALETTE.light;
 const D = EMAIL_PALETTE.dark;
 
-/** Dark colors for the clients that honor `prefers-color-scheme`. `!important` beats the inline light colors. */
-const DARK_MODE_CSS = [
-  ":root{color-scheme:light dark;supported-color-schemes:light dark;}",
-  "@media (prefers-color-scheme: dark){",
-  `.em-bg{background:${D.bg}!important;}`,
-  `.em-card{background:${D.card}!important;border-color:${D.line}!important;}`,
-  `.em-bar{background:${D.bar}!important;}`,
-  `.em-bar-name{color:${D.barInk}!important;}`,
-  `.em-bar-sub{color:${D.barSub}!important;}`,
-  `.em-muted{color:${D.muted}!important;}`,
-  `.em-ink{color:${D.ink}!important;}`,
-  `.em-link{color:${D.link}!important;}`,
-  `.em-body p,.em-body li,.em-body span{color:${D.ink}!important;}`,
-  `.em-body h1,.em-body h2,.em-body h3{color:${D.head}!important;}`,
-  `.em-body a{color:${D.link}!important;}`,
-  `.em-body code{background:${D.codeBg}!important;color:${D.ink}!important;}`,
-  `.em-body hr{border-top-color:${D.line}!important;}`,
-  `.em-body td[bgcolor]{background:${D.btnBg}!important;}`,
-  `.em-body a.em-btn-a{color:${D.btnInk}!important;}`,
-  `.em-btn{background:${D.btnBg}!important;}`,
-  `.em-code{background:${D.codeBg}!important;border-color:${D.codeLine}!important;}`,
-  `.em-code-ink{color:${D.codeInk}!important;}`,
-  `.em-note{background:${D.noteBg}!important;border-color:${D.noteLine}!important;}`,
-  `.em-note-title{color:${D.head}!important;}`,
-  "}",
-].join("\n");
+/**
+ * Dark colors for the clients that honor `prefers-color-scheme`. `!important` beats the inline light colors. An event's look
+ * (`themed`) keeps its own bar and button backgrounds (its main color already passes white-text contrast), so those rules,
+ * and the bar's two text colors that were chosen for the navy bar, are left out; everything else is the same.
+ */
+function darkModeCss(themed: boolean) {
+  return [
+    ":root{color-scheme:light dark;supported-color-schemes:light dark;}",
+    "@media (prefers-color-scheme: dark){",
+    `.em-bg{background:${D.bg}!important;}`,
+    `.em-card{background:${D.card}!important;border-color:${D.line}!important;}`,
+    ...(themed ? [] : [
+      `.em-bar{background:${D.bar}!important;}`,
+      `.em-bar-name{color:${D.barInk}!important;}`,
+      `.em-bar-sub{color:${D.barSub}!important;}`,
+    ]),
+    `.em-muted{color:${D.muted}!important;}`,
+    `.em-ink{color:${D.ink}!important;}`,
+    `.em-link{color:${D.link}!important;}`,
+    `.em-body p,.em-body li,.em-body span{color:${D.ink}!important;}`,
+    `.em-body h1,.em-body h2,.em-body h3{color:${D.head}!important;}`,
+    `.em-body a{color:${D.link}!important;}`,
+    `.em-body code{background:${D.codeBg}!important;color:${D.ink}!important;}`,
+    `.em-body hr{border-top-color:${D.line}!important;}`,
+    ...(themed ? [] : [`.em-body td[bgcolor]{background:${D.btnBg}!important;}`]),
+    `.em-body a.em-btn-a{color:${D.btnInk}!important;}`,
+    ...(themed ? [] : [`.em-btn{background:${D.btnBg}!important;}`]),
+    `.em-code{background:${D.codeBg}!important;border-color:${D.codeLine}!important;}`,
+    `.em-code-ink{color:${D.codeInk}!important;}`,
+    `.em-note{background:${D.noteBg}!important;border-color:${D.noteLine}!important;}`,
+    `.em-note-title{color:${D.head}!important;}`,
+    "}",
+  ].join("\n");
+}
+
+const DARK_MODE_CSS = darkModeCss(false);
+const THEMED_DARK_MODE_CSS = darkModeCss(true);
 
 const BODY_PARAGRAPH_STYLE = `margin:0 0 14px;font-size:15px;line-height:1.6;color:#22333b;`;
 
@@ -398,6 +410,31 @@ function restyleRenderedButtons(bodyHtml: string) {
   ));
 }
 
+/**
+ * An event's look, accepted only when both colors are exactly `#rrggbb`, and its logo only when it is an http(s) address
+ * with no characters that could leave an attribute. Anything else is dropped here, so a bad value gives the platform layout.
+ */
+function validEventLook(look: EmailLook | null | undefined): EmailLook | null {
+  if (!look || !EMAIL_LOOK_HEX.test(look.primary) || !EMAIL_LOOK_HEX.test(look.accent)) return null;
+  const eventName = oneLine(look.eventName ?? "");
+  if (!eventName) return null;
+  const logo = look.logo && /^https?:\/\/[^\s<>"'\\]+$/i.test(look.logo.src) && oneLine(look.logo.alt ?? "")
+    ? { src: look.logo.src, alt: oneLine(look.logo.alt) }
+    : undefined;
+  return { primary: look.primary, accent: look.accent, eventName, ...(logo ? { logo } : {}) };
+}
+
+/**
+ * Gives the buttons and links the layout and the body renderers wrote the event's main color. Only the exact strings those
+ * writers produce are replaced; the replacement is a validated hex color.
+ */
+function applyLookToBody(bodyHtml: string, primary: string) {
+  return bodyHtml
+    .replaceAll(`bgcolor="${L.btnBg}" class="em-btn" style="background:${L.btnBg};`, `bgcolor="${primary}" class="em-btn" style="background:${primary};`)
+    .replaceAll(`class="em-link" style="color:${L.link};word-break:break-all;"`, `class="em-link" style="color:${primary};word-break:break-all;"`)
+    .replaceAll("color:#0f6f8c;text-decoration:underline;", `color:${primary};text-decoration:underline;`);
+}
+
 export type EmailLayoutInput = {
   /** Shown in the client's tab and read by screen readers. */
   title: string;
@@ -419,6 +456,12 @@ export type EmailLayoutInput = {
   unsubscribeUrl?: string | null;
   /** The site's public calendar, as an absolute address (`${APP_BASE_URL}/calendar`, #1496). The header mark and name link to it. Only a web address is used. */
   calendarUrl?: string | null;
+  /**
+   * The event's registration look (#283): its main color on the header bar and the buttons and links, its accent under the
+   * header, and its logo or event name in place of the header name. Absent, or with a value that is not a plain `#rrggbb`,
+   * the platform layout is written exactly as before.
+   */
+  eventLook?: EmailLook | null;
 };
 
 function oneLine(value: string) {
@@ -433,6 +476,10 @@ function footerParagraph(text: string, last = false) {
 export function renderEmailLayoutDocument(input: EmailLayoutInput) {
   const title = escapeHtml(input.title.trim());
   const headerName = oneLine(input.headerName ?? "") || DEFAULT_EMAIL_LAYOUT_SETTINGS.headerName;
+  const look = validEventLook(input.eventLook);
+  const barColor = look?.primary ?? L.bar;
+  const barBorder = look?.accent ?? L.gold;
+  const linkColor = look?.primary ?? L.link;
   const whyLine = input.whyLine === undefined || input.whyLine === null ? GENERIC_WHY : oneLine(input.whyLine);
   const helpLine = input.helpLine === undefined
     ? emailHelpLine({ email: DEFAULT_EMAIL_LAYOUT_SETTINGS.helpEmail, phone: DEFAULT_EMAIL_LAYOUT_SETTINGS.helpPhone })
@@ -451,13 +498,14 @@ export function renderEmailLayoutDocument(input: EmailLayoutInput) {
   // The approved symbol is served from the same site as the calendar link; without that address there is no absolute image URL, so only the name shows.
   const symbolUrl = calendar ? `${new URL(calendar.replace(/&amp;/g, "&")).origin}${BRAND_EMAIL_SYMBOL_PATH}` : null;
   const preheaderHtml = renderPreheaderHtml(input.preheader);
-  const bodyHtml = restyleRenderedButtons(input.bodyHtml ?? renderEmailBodyHtml(input.body ?? ""));
+  const restyledBody = restyleRenderedButtons(input.bodyHtml ?? renderEmailBodyHtml(input.body ?? ""));
+  const bodyHtml = look ? applyLookToBody(restyledBody, look.primary) : restyledBody;
   const footerLines = [
     `<p class="em-muted" style="margin:0 0 6px;">Sent by <b class="em-ink" style="color:${L.ink};">${escapeHtml(headerName)}</b> for the ${escapeHtml(EMAIL_SENDER_ORGANIZATION)}.</p>`,
     ...(whyLine ? [footerParagraph(whyLine)] : []),
     ...(helpLine ? [footerParagraph(helpLine, !unsubscribe && !input.footer?.trim())] : []),
     ...(unsubscribe
-      ? [`<p class="em-muted" style="margin:6px 0 0;"><a href="${escapeHtml(unsubscribe)}" class="em-link" style="color:${L.link};text-decoration:underline;">Unsubscribe or change your email preferences</a></p>`]
+      ? [`<p class="em-muted" style="margin:6px 0 0;"><a href="${escapeHtml(unsubscribe)}" class="em-link" style="color:${linkColor};text-decoration:underline;">Unsubscribe or change your email preferences</a></p>`]
       : []),
     ...(input.footer?.trim() ? [`<p class="em-muted" style="margin:6px 0 0;">${escapeHtml(oneLine(input.footer))}</p>`] : []),
   ];
@@ -470,20 +518,22 @@ export function renderEmailLayoutDocument(input: EmailLayoutInput) {
     '<meta name="color-scheme" content="light dark" />',
     '<meta name="supported-color-schemes" content="light dark" />',
     `<title>${title}</title>`,
-    `<style>${DARK_MODE_CSS}</style>`,
+    `<style>${look ? THEMED_DARK_MODE_CSS : DARK_MODE_CSS}</style>`,
     "</head>",
     `<body class="em-bg" style="margin:0;padding:0;background:${L.bg};-webkit-font-smoothing:antialiased;">`,
     ...(preheaderHtml ? [preheaderHtml] : []),
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${L.bg}" class="em-bg" style="background:${L.bg};">`,
     '<tr><td align="center" style="padding:28px 12px 36px;">',
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">',
-    `<tr><td bgcolor="${L.bar}" class="em-bar" style="background:${L.bar};border-radius:12px 12px 0 0;border-bottom:4px solid ${L.gold};padding:16px 24px;">`,
+    `<tr><td bgcolor="${barColor}" class="em-bar" style="background:${barColor};border-radius:12px 12px 0 0;border-bottom:4px solid ${barBorder};padding:16px 24px;">`,
     '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>',
-    ...(symbolUrl ? [`<td width="34" height="34" valign="middle" style="width:34px;height:34px;">${brandLink(`<img src="${symbolUrl}" width="34" height="34" alt="" style="display:block;width:34px;height:34px;border:0;" />`, L.barInk, BRAND_CALENDAR_LABEL)}</td>`] : []),
-    `<td style="padding-left:${symbolUrl ? 12 : 0}px;font-family:${FONT};">`,
+    ...(symbolUrl && !look?.logo ? [`<td width="34" height="34" valign="middle" style="width:34px;height:34px;">${brandLink(`<img src="${symbolUrl}" width="34" height="34" alt="" style="display:block;width:34px;height:34px;border:0;" />`, L.barInk, BRAND_CALENDAR_LABEL)}</td>`] : []),
+    `<td style="padding-left:${symbolUrl && !look?.logo ? 12 : 0}px;font-family:${FONT};">`,
     ...(calendar ? [`<a href="${calendar}" style="color:${L.barInk};color:inherit;text-decoration:none;display:block;">`] : []),
-    `<div class="em-bar-name" style="font-size:18px;line-height:20px;font-weight:bold;color:${L.barInk};">${escapeHtml(headerName)}</div>`,
-    `<div class="em-bar-sub" style="font-size:12px;line-height:16px;color:${L.barSub};">${escapeHtml(EMAIL_HEADER_SUBLINE)}</div>`,
+    ...(look?.logo
+      ? [`<img src="${escapeHtml(look.logo.src)}" height="48" alt="${escapeHtml(look.logo.alt)}" style="display:block;height:48px;width:auto;max-width:520px;border:0;margin:0 0 6px;" />`]
+      : [`<div class="em-bar-name" style="font-size:18px;line-height:20px;font-weight:bold;color:${L.barInk};">${escapeHtml(look ? look.eventName : headerName)}</div>`]),
+    `<div class="em-bar-sub" style="font-size:12px;line-height:16px;color:${look ? L.barInk : L.barSub};">${escapeHtml(EMAIL_HEADER_SUBLINE)}</div>`,
     ...(calendar ? ["</a>"] : []),
     "</td></tr></table>",
     "</td></tr>",

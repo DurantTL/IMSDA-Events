@@ -83,6 +83,8 @@ import {
   type DeliveryFileLink,
   type EmailPartDependencies,
 } from "@/modules/communications/email-attachments";
+import type { EmailLook } from "@/modules/registration-themes/email-look";
+import { defaultEmailLookSource, type EmailLookSource } from "@/modules/registration-themes/email-look-repository";
 import { readMessageFileBytes } from "@/modules/communications/message-files";
 import {
   announcementOptOutSkipMessage,
@@ -153,6 +155,11 @@ export type ExternalEmailDeliveryDependencies = {
   prepareBodyText?: (input: EmailBodyPreparationInput) => Promise<PreparedEmailBody>;
   /** The header names and footer help contact (#1443). The default reads Platform settings once per run. */
   emailLayoutSettings?: EmailLayoutSettings;
+  /**
+   * Where an event's registration look comes from for the email layout (#283). Undefined reads the database when the run
+   * uses the real database client and uses no look when a test supplies its own `prisma`; null turns the look off.
+   */
+  emailLookSource?: EmailLookSource | null;
   /** How stored files and pass images are read for embedding (#824); the defaults read private storage and render in-process. */
   emailParts?: Partial<EmailPartDependencies>;
 };
@@ -197,6 +204,8 @@ type ClaimedMessage = {
   files?: DeliveryFileLink[];
   /** Only to tell a club registration (which gets the club header, #1443) from any other registration. */
   registration?: { clubRegistration?: { id: string } | null } | null;
+  /** The registration look this message's layout was first rendered with (#283); null until the first attempt stamps it. */
+  registrationThemeVersionId?: string | null;
   attemptCount: number;
   lockToken: string;
   startedAt: Date;
@@ -399,6 +408,43 @@ function resolveEmailPartDependencies(
       }
     }),
   };
+}
+
+/**
+ * The event look the message's email layout uses (#283). The look is the one published when the message was first
+ * attempted: that version's id is written to the row once (only while it is still empty and this worker still holds the
+ * lock) and every retry reads it back, so a look published later never restyles a message already attempted. Messages
+ * with no event, an event with no published look, or any failure in between use the platform layout; this never throws,
+ * so a look problem cannot fail or delay a send.
+ */
+async function resolveMessageEmailLook(
+  prisma: DeliveryPrisma,
+  message: ClaimedMessage,
+  source: EmailLookSource | null,
+  appOrigin: string | null,
+): Promise<EmailLook | null> {
+  if (!source || message.eventId === null) return null;
+  try {
+    let versionId = message.registrationThemeVersionId ?? null;
+    if (!versionId) {
+      const published = await source.findPublishedVersionId(message.eventId);
+      if (!published) return null;
+      const stamped = await prisma.messageOutbox.updateMany({
+        where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken, registrationThemeVersionId: null },
+        data: { registrationThemeVersionId: published },
+      });
+      // Not stamped (the lock moved on): the platform layout, never an unrecorded look.
+      if (stamped.count !== 1) return null;
+      versionId = published;
+    }
+    return await source.loadLook(versionId, appOrigin);
+  } catch (error) {
+    logWarn("The event's email look could not be read; the message uses the platform layout.", {
+      messageId: message.id,
+      reason: error instanceof Error ? error.message : "unknown",
+    });
+    return null;
+  }
 }
 
 /** The code a message ends with when the backup service (Resend) has reached its own sending limit (#1444). */
@@ -1029,6 +1075,7 @@ async function claimNextMessage(
               file: { select: { id: true, filename: true, contentType: true, sizeBytes: true, sha256: true, storageKey: true } },
             },
           },
+          registrationThemeVersionId: true,
           attemptCount: true,
         },
       });
@@ -1374,6 +1421,9 @@ async function runDeliveryLoop(
         : null),
   };
   const fileCache = new BoundedFileCache();
+  const emailLookSource = dependencies.emailLookSource === undefined
+    ? (dependencies.prisma ? null : defaultEmailLookSource)
+    : dependencies.emailLookSource;
   // The From address of event email is always the platform's central sender (#1043), even for a message queued
   // before the change under an event's own address. Account email (no event) keeps its own sender.
   const centralFromEmail = scope.eventId !== null && prisma.platformSettings
@@ -1549,6 +1599,7 @@ async function runDeliveryLoop(
         layout,
         { separator: !unsubscribe },
       );
+      const eventLook = await resolveMessageEmailLook(prisma, message, emailLookSource, partDependencies.appOrigin());
       const emailInput: EmailDeliveryInput = {
         fromName: message.senderNameSnapshot,
         fromEmail: centralFromEmail ?? message.senderEmailSnapshot ?? "",
@@ -1576,6 +1627,7 @@ async function runDeliveryLoop(
           // The header wordmark links to the public calendar (#1496), on the site's own address. Through the
           // injectable `appOrigin` (null when the address is unavailable, so the header simply has no link).
           calendarUrl: calendarUrlFor(partDependencies.appOrigin()),
+          eventLook,
         }),
         attachments: message.attachment || parts.attachments.length > 0
           ? [

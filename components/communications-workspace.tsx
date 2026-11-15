@@ -2040,6 +2040,8 @@ export function CommunicationsWorkspace({
                     preheader: preview.preheader,
                     bodyHtml: withPreviewImages(preview.bodyHtml),
                     ...emailPreviewLayout(emailLayoutSettings, selectedTemplate.key, messaging.settings.replyToEmail, "recipient@example.org"),
+                    // The event's published look, as delivery will use it for a message first attempted now (#283).
+                    eventLook: messaging.currentEmailLook ?? null,
                   })}
                 />
                 <div className="message-preview-attachments">
@@ -2284,6 +2286,8 @@ export function CommunicationsWorkspace({
                           // long after the safe render already decided they were not.
                           bodyHtml: withPreviewImages(withPreviewLinks(selectedMessage.bodyHtml)),
                           ...emailPreviewLayout(emailLayoutSettings, selectedMessage.templateKey, selectedMessage.replyToEmail ?? null, selectedMessage.recipientEmail, selectedMessage.clubLinked),
+                          // The look stamped on this message when it was first attempted; none stamped means the platform layout (#283).
+                          eventLook: selectedMessage.emailLook ?? null,
                         })}
                       />
                     ) : (
@@ -2298,6 +2302,8 @@ export function CommunicationsWorkspace({
                           preheader: selectedMessage.preheader ? withPreviewLinks(selectedMessage.preheader) : null,
                           bodyHtml: plainTextToEmailBodyHtml(withPreviewLinks(selectedMessage.bodyText), { buttonOrigins: PREVIEW_ORIGINS }),
                           ...emailPreviewLayout(emailLayoutSettings, selectedMessage.templateKey, selectedMessage.replyToEmail ?? null, selectedMessage.recipientEmail, selectedMessage.clubLinked),
+                          // The look stamped on this message when it was first attempted; none stamped means the platform layout (#283).
+                          eventLook: selectedMessage.emailLook ?? null,
                         })}
                       />
                     )}
