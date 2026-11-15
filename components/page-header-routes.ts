@@ -64,6 +64,13 @@ export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
   { pattern: "/admin/settings" },
   { pattern: "/admin/system-report" },
   { pattern: "/people/attendees" },
+  { pattern: "/people/responsible-adults" },
+  { pattern: "/people/duplicates" },
+  { pattern: "/people/directory-review" },
+  { pattern: "/people/pending-teams" },
+  { pattern: "/people/staff-invitations" },
+  { pattern: "/people/staff-invitations/approvals" },
+  { pattern: "/imports" },
   { pattern: "/more/attendee-configuration" },
 ];
 

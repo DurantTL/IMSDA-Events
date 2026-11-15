@@ -5,6 +5,7 @@ import { AccessRestricted } from "@/components/access-restricted";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listDirectoryReviewEntries } from "@/modules/forms/directory-review";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 
 export const metadata: Metadata = { title: "Directory review" };
 
@@ -27,17 +28,10 @@ export default async function DirectoryReviewPage({ searchParams }: { searchPara
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Registration integrity</p>
-          <h2>Directory review</h2>
-          <p>
-            Clubs and churches a director couldn&rsquo;t find in the live directory for {event.name}, so they picked
-            &ldquo;Not listed&rdquo; and typed the name instead. Nothing here was blocked from registering — this is
-            only to help you add the organization or fix a typo.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Directory review"
+        description={<>Clubs and churches typed in as &ldquo;Not listed&rdquo; for {event.name} because they were not in the directory; nothing was blocked from registering.</>}
+      />
       {entries.length === 0 ? (
         <EmptyState className="panel empty-state" hint="Nothing to do here. New answers that are not in the directory will be listed as people register." icon={<ShieldCheck aria-hidden="true" size={24} />} title="Nothing to review">Every club and church answer for this event matched the live directory.</EmptyState>
       ) : (

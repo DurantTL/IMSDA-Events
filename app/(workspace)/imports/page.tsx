@@ -16,9 +16,6 @@ export default async function ImportsPage({ searchParams }: { searchParams: Prom
   }
   const [runs, reconciliation] = await Promise.all([listImportRuns(event.id), getImportReconciliation(event.id)]);
   return (
-    <>
-      <StaffContextualHelp guideId="import-with-preview" event={requested} />
-      <ImportWorkspace key={event.id} eventId={event.id} eventName={event.name} initialRuns={runs} initialReconciliation={reconciliation} />
-    </>
+    <ImportWorkspace key={event.id} eventId={event.id} eventName={event.name} initialRuns={runs} initialReconciliation={reconciliation} help={<StaffContextualHelp guideId="import-with-preview" event={requested} />} />
   );
 }

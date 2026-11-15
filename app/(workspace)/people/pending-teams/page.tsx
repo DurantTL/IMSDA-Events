@@ -6,6 +6,7 @@ import { listClubSponsorChoices } from "@/modules/organizations/repository";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listAttachableClubs, listPendingTeams, resolvedTeamCounts } from "@/modules/general-link-registrations/repository";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 
 export const metadata: Metadata = { title: "Teams waiting for a club" };
 
@@ -32,21 +33,15 @@ export default async function PendingTeamsPage({ searchParams }: { searchParams:
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Registration integrity</p>
-          <h2>Teams waiting for a club</h2>
-          <p>
-            These teams registered through the general link for {event.name}, but the director&rsquo;s email did not match the club
-            they picked. Check the members and contact, then confirm the club, choose another, add a club that is not in the directory, or reject the team.
-          </p>
-          <p className="field-help">
-            Until then a team is in no registration, invoice or check-in list. Handle these names as you would a club roster; a
-            team nobody resolves has its names removed 30 days after the event ends.
-          </p>
-          <p className="field-help">{counts.attached} attached through the link · {counts.rejected} rejected</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Teams waiting for a club"
+        description={<>Teams that registered through the general link for {event.name} but whose director&rsquo;s email did not match the club they picked.</>}
+      />
+      <p className="quiet-copy">
+        Check the members and contact, then confirm the club, choose another, add a club that is not in the directory, or reject the team. Until then a team is in no registration, invoice or check-in list. Handle these names as you would a club roster; a
+        team nobody resolves has its names removed 30 days after the event ends.
+      </p>
+      <p className="quiet-copy">{counts.attached} attached through the link · {counts.rejected} rejected</p>
       {teams.length === 0 ? (
         <EmptyState className="panel empty-state" hint="Nothing to do here. Teams that register through the link without a club will be listed for you to attach." icon={<ShieldCheck aria-hidden="true" size={24} />} title="Nothing waiting">Every team registered through the link is attached to a club.</EmptyState>
       ) : (

@@ -7,6 +7,7 @@ import { resolveEventContext } from "@/modules/events/selection";
 import { parseInvitationQuery } from "@/modules/staff-invitations/list-query";
 import { listInvitations } from "@/modules/staff-invitations/repository";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
+import { PageHeader } from "@/components/page-header";
 
 export const metadata: Metadata = { title: "Staff invitations" };
 
@@ -37,21 +38,16 @@ export default async function StaffInvitationsPage({ searchParams }: { searchPar
   const list = await listInvitations(event.id, query);
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Registration</p>
-          <h2>Staff, pastor and volunteer invitations</h2>
-          <p>
-            Each person you invite gets one personal link for {event.name}. It lets them register themselves and their immediate family
-            (a spouse, and children or dependants up to age 18) at no charge. Registrations wait for your approval, which you give in one
-            batch when you assign housing. A person always sends the invitation emails: importing a file never emails anyone. Links open
-            once the event is published and stop working when it ends.
-          </p>
-        </div>
-        <div className="page-intro-actions">
-          <Link className="primary-button" href={`/people/staff-invitations/approvals?event=${encodeURIComponent(event.id)}`}>Waiting for approval</Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Staff invitations"
+        description={<>Each person you invite gets one personal link for {event.name} to register themselves and their immediate family at no charge.</>}
+        primary={<Link className="primary-button" href={`/people/staff-invitations/approvals?event=${encodeURIComponent(event.id)}`}>Waiting for approval</Link>}
+      />
+      <p className="quiet-copy">
+        Family means a spouse, and children or dependants up to age 18. Registrations wait for your approval, which you give in one
+        batch when you assign housing. A person always sends the invitation emails: importing a file never emails anyone. Links open
+        once the event is published and stop working when it ends.
+      </p>
       <StaffInvitationImport eventId={event.id} />
       <StaffInvitationList
         canSend={permissions.includes("MANAGE_COMMUNICATIONS")}
