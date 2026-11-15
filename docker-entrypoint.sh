@@ -33,7 +33,7 @@ if [ "$(id -u)" != "0" ]; then
       preflight_fail "The uploads folder ${uploads_dir} holds files this container's user (uid $(id -u)) cannot use, for example ${blocked}. Hand the uploads volume to uid $(id -u)."
     fi
   fi
-  for key_variable in SECRET_ENCRYPTION_KEY_FILE SECRET_ENCRYPTION_PREVIOUS_KEY_FILE; do
+  for key_variable in SECRET_ENCRYPTION_KEY_FILE SECRET_ENCRYPTION_PREVIOUS_KEY_FILE AZURE_CLIENT_SECRET_FILE; do
     eval "key_file=\${${key_variable}:-}"
     if [ -n "$key_file" ] && [ -e "$key_file" ] && [ ! -r "$key_file" ]; then
       preflight_fail "The key file named by ${key_variable} is not readable by this container's user (uid $(id -u)). Change the file's owner on the server to uid $(id -u); keep its mode 0400."
