@@ -99,7 +99,8 @@ describe("email layout with an event look", () => {
       ...input,
       eventLook: { ...look, logo: { src: "https://events.example.test/a/b?w=640", alt: 'Camp "<b>" & friends' } },
     });
-    expect(html).toContain('<img src="https://events.example.test/a/b?w=640" height="48" alt="Camp &quot;&lt;b&gt;&quot; &amp; friends" style="display:block;height:48px;width:auto;max-width:520px;border:0;');
+    // On a white tile, so a dark logo stays readable on any main color; the tile has no dark-mode rule, so it stays light.
+    expect(html).toContain('<td bgcolor="#ffffff" style="background:#ffffff;border-radius:8px;padding:6px 10px;"><img src="https://events.example.test/a/b?w=640" height="48" alt="Camp &quot;&lt;b&gt;&quot; &amp; friends" style="display:block;height:48px;width:auto;max-width:480px;border:0;');
     expect(html).not.toContain('class="em-bar-name"');
     expect(html).toContain("em-bar-sub");
     expect(html).toContain('href="https://events.example.test/calendar"');

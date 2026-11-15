@@ -531,7 +531,7 @@ export function renderEmailLayoutDocument(input: EmailLayoutInput) {
     `<td style="padding-left:${symbolUrl && !look?.logo ? 12 : 0}px;font-family:${FONT};">`,
     ...(calendar ? [`<a href="${calendar}" style="color:${L.barInk};color:inherit;text-decoration:none;display:block;">`] : []),
     ...(look?.logo
-      ? [`<img src="${escapeHtml(look.logo.src)}" height="48" alt="${escapeHtml(look.logo.alt)}" style="display:block;height:48px;width:auto;max-width:520px;border:0;margin:0 0 6px;" />`]
+      ? [`<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px;"><tr><td bgcolor="#ffffff" style="background:#ffffff;border-radius:8px;padding:6px 10px;"><img src="${escapeHtml(look.logo.src)}" height="48" alt="${escapeHtml(look.logo.alt)}" style="display:block;height:48px;width:auto;max-width:480px;border:0;" /></td></tr></table>`]
       : [`<div class="em-bar-name" style="font-size:18px;line-height:20px;font-weight:bold;color:${L.barInk};">${escapeHtml(look ? look.eventName : headerName)}</div>`]),
     `<div class="em-bar-sub" style="font-size:12px;line-height:16px;color:${look ? L.barInk : L.barSub};">${escapeHtml(EMAIL_HEADER_SUBLINE)}</div>`,
     ...(calendar ? ["</a>"] : []),
