@@ -30,7 +30,7 @@ vi.mock("@/modules/access/authorization", async (importOriginal) => {
   return { ...actual, requirePermission: mocks.requirePermission };
 });
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: vi.fn(async () => ({ user: { id: "user_one" } })) }));
-vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn() }));
+vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn(), isClubAudienceEvent: async (id: string) => (await mocks.eventFindUnique({ where: { id } }))?.audience === "CLUB" }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: mocks.resolveEventContext }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: mocks.listRegistrations }));
 vi.mock("@/modules/meals/scanner-import-repository", () => ({
@@ -106,6 +106,8 @@ describe("kitchen report: Area Coordinator path", () => {
     const html = renderToStaticMarkup(await AreaPage(params));
     expect(html).toContain("Synthetic Camporee");
     expect(html).toContain("Peanut allergy");
+    // A club event: the report says it counts submitted registrations too (#2017).
+    expect(html).toContain("Submitted and confirmed registrations.");
     expect(html).not.toMatch(/SYNTH-|Surname|Family|example\.test/);
     const response = await areaCsv(request, params);
     expect(response.status).toBe(200);

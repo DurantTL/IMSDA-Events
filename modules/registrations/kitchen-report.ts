@@ -1,6 +1,6 @@
 import {
   ATTENDEE_LISTING_BOM,
-  DEFAULT_LISTING_STATUSES,
+  defaultListingStatuses,
   NO_DIETARY_NEEDS,
   buildAttendeeListingRows,
   mealTotals,
@@ -17,18 +17,30 @@ import { toCsv } from "@/modules/reporting/csv";
  * keys, same no-needs set, same once-per-registration rule for registration-wide
  * answers) and then keeps ONLY counts and answer text. No name, confirmation
  * code, contact detail, church or club is copied into the result, and an answer
- * carries no link back to a person. Confirmed registrations only.
+ * carries no link back to a person. Confirmed registrations only, or on a club
+ * event Submitted and Confirmed (#2017): club registrations are billed to the
+ * church and stay Submitted, the same rule as the Attendee list.
  */
 
-export const KITCHEN_REPORT_STATUSES = DEFAULT_LISTING_STATUSES;
+/** The registration statuses the report counts on this kind of event. */
+export function kitchenReportStatuses(clubEvent: boolean) {
+  return defaultListingStatuses(clubEvent);
+}
+
+/** The opening words of the report's description, naming what it counts. */
+export function kitchenReportScopeText(report: Pick<KitchenReport, "includesSubmitted">) {
+  return report.includesSubmitted ? "Submitted and confirmed registrations." : "Confirmed registrations only.";
+}
 
 export type KitchenReport = {
   meals: Array<{ value: string; label: string; count: number }>;
   needs: Array<{ answer: string; count: number }>;
   /** People with at least one dietary need. */
   peopleWithNeeds: number;
-  /** People counted (confirmed attendees). */
+  /** People counted (confirmed attendees, and submitted ones on a club event). */
   totalPeople: number;
+  /** Whether Submitted registrations are counted too (a club event, #2017). */
+  includesSubmitted: boolean;
   /**
    * How many of them registered through a personal staff, pastor or volunteer invitation (#804): their meals are covered by
    * the conference, and none of them chose a meal ticket. A count per group, groups with nobody left out; no names.
@@ -46,8 +58,9 @@ export function normalizeNeed(answer: string): string {
   return answer.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-export function buildKitchenReport(registrations: readonly RegistrationRecord[], conferenceMealServices: readonly StaffMealServiceCount[] = []): KitchenReport {
-  const confirmed = registrations.filter((registration) => KITCHEN_REPORT_STATUSES.includes(registration.status as never));
+export function buildKitchenReport(registrations: readonly RegistrationRecord[], conferenceMealServices: readonly StaffMealServiceCount[] = [], options: { clubEvent?: boolean } = {}): KitchenReport {
+  const statuses = kitchenReportStatuses(Boolean(options.clubEvent));
+  const confirmed = registrations.filter((registration) => statuses.includes(registration.status as never));
   // Full answer text is needed to count it; it is reduced to anonymous counts below and never returned per row.
   const rows = buildAttendeeListingRows(confirmed, { showDietaryDetails: true });
   const groups = new Map<string, { count: number; wordings: Map<string, number> }>();
@@ -83,6 +96,7 @@ export function buildKitchenReport(registrations: readonly RegistrationRecord[],
     needs,
     peopleWithNeeds,
     totalPeople: rows.length,
+    includesSubmitted: statuses.includes("SUBMITTED"),
     conferenceCovered,
     conferenceMealServices: [...conferenceMealServices],
   };

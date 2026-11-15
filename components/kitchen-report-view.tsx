@@ -3,7 +3,7 @@ import { Download } from "lucide-react";
 import { cardCell } from "@/components/table-card-labels";
 import { PrintReportButton } from "@/components/print-report-button";
 import styles from "./meals-kitchen.module.css";
-import type { KitchenReport } from "@/modules/registrations/kitchen-report";
+import { kitchenReportScopeText, type KitchenReport } from "@/modules/registrations/kitchen-report";
 
 /** The kitchen report (#787): counts and answers as typed, no names. Shared by the staff and Area Coordinator pages. */
 export function KitchenReportView({ eventName, report, csvHref, showHeader = true }: { eventName: string; report: KitchenReport; csvHref: string; /** False on the staff page, which draws the shared page header (#1579) with this sentence and the two actions. The Area Coordinator page keeps its own. */ showHeader?: boolean }) {
@@ -15,7 +15,7 @@ export function KitchenReportView({ eventName, report, csvHref, showHeader = tru
           <p className="eyebrow" translate="no">{eventName}</p>
           <h2>Kitchen report</h2>
           <p>
-            Confirmed registrations only. {report.totalPeople} {report.totalPeople === 1 ? "person" : "people"} counted, {report.peopleWithNeeds} with a dietary need.
+            {kitchenReportScopeText(report)} {report.totalPeople} {report.totalPeople === 1 ? "person" : "people"} counted, {report.peopleWithNeeds} with a dietary need.
             Answers are shown as typed and are not linked to anyone.
           </p>
         </div>
@@ -26,7 +26,7 @@ export function KitchenReportView({ eventName, report, csvHref, showHeader = tru
             <p className="eyebrow" translate="no">{eventName}</p>
             <h2>Kitchen report</h2>
             <p>
-              Confirmed registrations only. {report.totalPeople} {report.totalPeople === 1 ? "person" : "people"} counted, {report.peopleWithNeeds} with a dietary need.
+              {kitchenReportScopeText(report)} {report.totalPeople} {report.totalPeople === 1 ? "person" : "people"} counted, {report.peopleWithNeeds} with a dietary need.
               Answers are shown as typed and are not linked to anyone.
             </p>
           </div>

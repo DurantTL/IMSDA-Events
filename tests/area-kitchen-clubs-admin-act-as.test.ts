@@ -35,7 +35,10 @@ describe("area kitchen report for a staff Area Coordinator act-as", () => {
     mocks.currentStaffActingContext.mockResolvedValue({ role: "AREA_COORDINATOR", organizationId: null, viaClubsAdministrator: true });
     const result = await loadAreaKitchenReport("event-1");
     expect(result?.eventName).toBe("Test Camporee");
-    expect(Object.keys(result!.report).sort()).toEqual(["conferenceCovered", "conferenceMealServices", "meals", "needs", "peopleWithNeeds", "totalPeople"]);
+    // A club event counts Submitted club registrations too: they are billed to the church (#2017).
+    expect(mocks.listRegistrations).toHaveBeenCalledWith("event-1", { statuses: ["CONFIRMED", "SUBMITTED"] });
+    expect(result!.report.includesSubmitted).toBe(true);
+    expect(Object.keys(result!.report).sort()).toEqual(["conferenceCovered", "conferenceMealServices", "includesSubmitted", "meals", "needs", "peopleWithNeeds", "totalPeople"]);
   });
 
   it("stays closed with no act-as, and for a club-director act-as", async () => {
