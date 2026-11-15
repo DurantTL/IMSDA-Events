@@ -415,6 +415,13 @@ export async function findEventAssetForStaff(eventId: string, assetId: string) {
  * is what unpublishing is for. The logo and banner of a published or archived
  * registration look (#283) are reachable the same way; a draft look's are not.
  */
+function themeVersionAccess(eventSlug: string) {
+  return {
+    event: { slug: eventSlug },
+    OR: [{ status: "PUBLISHED" as const }, { status: "ARCHIVED" as const, messages: { some: {} } }],
+  };
+}
+
 export async function findPublishedEventAsset(eventSlug: string, assetId: string) {
   return getPrisma().eventAsset.findFirst({
     where: {
@@ -433,10 +440,10 @@ export async function findPublishedEventAsset(eventSlug: string, assetId: string
             },
           },
         },
-        // The logo or banner of a published registration look (#283), and of an archived one so an email sent under an
-        // older look keeps its picture. A draft look never makes a file public.
-        { themeLogoVersions: { some: { status: { in: ["PUBLISHED", "ARCHIVED"] }, event: { slug: eventSlug } } } },
-        { themeHeroVersions: { some: { status: { in: ["PUBLISHED", "ARCHIVED"] }, event: { slug: eventSlug } } } },
+        // The logo or banner of the published registration look (#283), and of an archived look only while an email sent
+        // with it still exists (kept so that email still shows its logo). A draft look never makes a file public.
+        { themeLogoVersions: { some: themeVersionAccess(eventSlug) } },
+        { themeHeroVersions: { some: themeVersionAccess(eventSlug) } },
       ],
     },
     select: { displayName: true, contentType: true, storageKey: true },

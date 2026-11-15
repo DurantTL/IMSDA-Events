@@ -1,6 +1,7 @@
 /**
  * The checks for the event logo and banner on a registration look (#283). Pure apart from the injected readers, so tests
- * need no files. An image must be an upload of the same event, a PNG, JPEG or WebP (never a PDF; SVG is never an allowed
+ * need no files. Client-safe: the staff panel imports the limits from here, so nothing in this file may load sharp or Node
+ * modules (the sharp reader is in assets-server.ts). An image must be an upload of the same event, a PNG, JPEG or WebP (never a PDF; SVG is never an allowed
  * upload at all), small enough to load quickly on a phone, and big enough to look sharp.
  */
 
@@ -23,19 +24,6 @@ export function isThemeImageType(contentType: string) {
 
 const megabytes = (bytes: number) => `${Math.floor(bytes / (1024 * 1024))} MB`;
 
-/** Reads dimensions with sharp, turning a sideways photo (EXIF orientation 5 to 8) the right way up. Null when unreadable. */
-export const readImageDimensionsWithSharp: ImageDimensionReader = async (bytes) => {
-  try {
-    const sharp = (await import("sharp")).default;
-    const meta = await sharp(bytes).metadata();
-    if (!meta.width || !meta.height) return null;
-    const sideways = (meta.orientation ?? 1) >= 5;
-    return sideways ? { width: meta.height, height: meta.width } : { width: meta.width, height: meta.height };
-  } catch {
-    return null;
-  }
-};
-
 /**
  * The plain-language reason an upload can't be the logo or banner, or null when it can. The cheap checks (event, type, size)
  * run before the bytes are read.
@@ -45,7 +33,7 @@ export async function themeImageProblem(
   asset: ThemeImageAsset | null,
   eventId: string,
   readBytes: () => Promise<Uint8Array>,
-  readDimensions: ImageDimensionReader = readImageDimensionsWithSharp,
+  readDimensions: ImageDimensionReader,
 ): Promise<string | null> {
   const limits = THEME_IMAGE_LIMITS[kind];
   // The same words for a missing file and another event's file, so a request can't probe what other events hold.
@@ -89,4 +77,18 @@ export function reconcileImageAlt<T extends ThemeImageAltTokens>(
     delete next.heroFocus;
   }
   return { tokens: next, problem };
+}
+
+/**
+ * The tokens after the logo or banner is changed: its description goes (it belonged to the old picture, and the panel clears
+ * the typed box with it), and choosing no banner drops the focus too. Other tokens are untouched.
+ */
+export function tokensAfterImagePick<T extends ThemeImageAltTokens>(tokens: T, kind: ThemeImageKind, assetId: string | null): T {
+  const next = { ...tokens };
+  if (kind === "logo") delete next.logoAlt;
+  else {
+    delete next.heroAlt;
+    if (!assetId) delete next.heroFocus;
+  }
+  return next;
 }

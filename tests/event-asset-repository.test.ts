@@ -354,7 +354,7 @@ describe("findPublishedEventAsset", () => {
     expect(sectionBranch).toBeDefined();
   });
 
-  it("serves the logo or banner of a published or archived registration look of that event, never a draft one (#283)", async () => {
+  it("serves a published look's logo or banner, and an archived look's only while a sent message references it, never a draft (#283)", async () => {
     const findFirst = vi.fn().mockResolvedValue(null);
     dependencies.getPrisma.mockReturnValue({ eventAsset: { findFirst } });
     await findPublishedEventAsset("event-a", "asset_1");
@@ -362,7 +362,10 @@ describe("findPublishedEventAsset", () => {
     expect(query.where.event).toEqual({ slug: "event-a", isPublished: true, archivedAt: null });
     for (const key of ["themeLogoVersions", "themeHeroVersions"]) {
       const branch = query.where.OR.find((clause) => key in clause)!;
-      expect(branch[key]!.some).toEqual({ status: { in: ["PUBLISHED", "ARCHIVED"] }, event: { slug: "event-a" } });
+      expect(branch[key]!.some).toEqual({
+        event: { slug: "event-a" },
+        OR: [{ status: "PUBLISHED" }, { status: "ARCHIVED", messages: { some: {} } }],
+      });
     }
   });
 

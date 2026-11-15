@@ -16,11 +16,13 @@ vi.mock("@/modules/events/asset-image-variants", () => ({
 import { GET } from "@/app/api/public/events/[eventSlug]/assets/[assetId]/route";
 
 type LookStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
-type Stored = { id: string; event: { slug: string; isPublished: boolean; archivedAt: Date | null }; logoOf: { status: LookStatus; slug: string }[]; heroOf: { status: LookStatus; slug: string }[] };
-type Clause = Record<string, { some: { status?: { in: string[] }; event?: { slug: string } } }>;
+type Look = { status: LookStatus; slug: string; sent?: boolean };
+type Stored = { id: string; event: { slug: string; isPublished: boolean; archivedAt: Date | null }; logoOf: Look[]; heroOf: Look[] };
+type Access = { event: { slug: string }; OR: ({ status: LookStatus; messages?: unknown })[] };
+type Clause = Record<string, { some: Access }>;
 
 function database(assets: Stored[]) {
-  const matches = (list: Stored["logoOf"], some: Clause[string]["some"]) => list.some((look) => (!some.status || some.status.in.includes(look.status)) && (!some.event || some.event.slug === look.slug));
+  const matches = (list: Look[], some: Access) => list.some((look) => look.slug === some.event.slug && some.OR.some((arm) => arm.status === look.status && (!arm.messages || look.sent === true)));
   mocks.getPrisma.mockReturnValue({
     eventAsset: {
       findFirst: vi.fn(async ({ where }: { where: { id: string; event: { slug: string; isPublished: boolean; archivedAt: null }; OR: Clause[] } }) => {
@@ -42,7 +44,8 @@ describe("public file access for a registration look's logo and banner", () => {
   it.each([
     ["logo of the published look", { logoOf: [{ status: "PUBLISHED" as const, slug: "synthetic-camp" }], heroOf: [] }],
     ["banner of the published look", { logoOf: [], heroOf: [{ status: "PUBLISHED" as const, slug: "synthetic-camp" }] }],
-    ["logo of an archived look (emails already sent keep their logo)", { logoOf: [{ status: "ARCHIVED" as const, slug: "synthetic-camp" }], heroOf: [] }],
+    ["logo of an archived look that a sent message used", { logoOf: [{ status: "ARCHIVED" as const, slug: "synthetic-camp", sent: true }], heroOf: [] }],
+    ["banner of an archived look that a sent message used", { logoOf: [], heroOf: [{ status: "ARCHIVED" as const, slug: "synthetic-camp", sent: true }] }],
   ])("serves the %s", async (_name, look) => {
     database([{ id: "asset-1", event: live, ...look }]);
     const response = await get("synthetic-camp", "asset-1");
@@ -50,16 +53,17 @@ describe("public file access for a registration look's logo and banner", () => {
     await expect(response.text()).resolves.toBe("bytes of picture.png");
   });
 
-  it("answers the same 404 for a draft look, an unused upload, another event's page and an unpublished or archived event", async () => {
+  it("answers the same 404 for a draft look, an archived look no message used, an unused upload, another event's page and an unpublished or archived event", async () => {
     database([
       { id: "draft", event: live, logoOf: [{ status: "DRAFT", slug: "synthetic-camp" }], heroOf: [] },
+      { id: "archived-unsent", event: live, logoOf: [{ status: "ARCHIVED", slug: "synthetic-camp" }], heroOf: [] },
       { id: "unused", event: live, logoOf: [], heroOf: [] },
       { id: "elsewhere", event: live, logoOf: [{ status: "PUBLISHED", slug: "other-camp" }], heroOf: [] },
       { id: "unpublished", event: { ...live, slug: "hidden-camp", isPublished: false }, logoOf: [{ status: "PUBLISHED", slug: "hidden-camp" }], heroOf: [] },
       { id: "archived-event", event: { ...live, slug: "old-camp", archivedAt: new Date("2026-01-01T00:00:00Z") }, logoOf: [{ status: "PUBLISHED", slug: "old-camp" }], heroOf: [] },
     ]);
     const answers = await Promise.all([
-      get("synthetic-camp", "draft"), get("synthetic-camp", "unused"), get("synthetic-camp", "elsewhere"), get("synthetic-camp", "missing"),
+      get("synthetic-camp", "draft"), get("synthetic-camp", "archived-unsent"), get("synthetic-camp", "unused"), get("synthetic-camp", "elsewhere"), get("synthetic-camp", "missing"),
       get("hidden-camp", "unpublished"), get("old-camp", "archived-event"),
     ]);
     for (const response of answers) {

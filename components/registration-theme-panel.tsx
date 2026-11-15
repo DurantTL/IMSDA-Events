@@ -17,7 +17,7 @@ import {
   type ThemeHeroFocus,
   type ThemeColorKey,
 } from "@/modules/registration-themes/tokens";
-import { THEME_IMAGE_LIMITS } from "@/modules/registration-themes/assets";
+import { THEME_IMAGE_LIMITS, tokensAfterImagePick } from "@/modules/registration-themes/assets";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { useConfirm } from "@/components/use-confirm";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -123,12 +123,9 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
   function pickImage(kind: "logo" | "hero", assetId: string | null) {
     setIds((current) => (kind === "logo" ? { ...current, logoAssetId: assetId } : { ...current, heroAssetId: assetId }));
     // A description belongs to one picture: choosing none drops it, and a new picture starts with an empty one.
-    setTokens((current) => {
-      const next = { ...current };
-      if (kind === "logo") delete next.logoAlt;
-      else { delete next.heroAlt; if (!assetId) delete next.heroFocus; }
-      return next;
-    });
+    setTokens((current) => tokensAfterImagePick(current, kind, assetId));
+    // The typed box goes with the saved value, so it never shows a description the tokens no longer hold.
+    setAltText((current) => ({ ...current, [kind]: "" }));
   }
   function setAlt(kind: "logo" | "hero", value: string) {
     const key = kind === "logo" ? "logoAlt" : "heroAlt";

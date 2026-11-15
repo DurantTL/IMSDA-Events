@@ -1,7 +1,8 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { reconcileImageAlt, themeImageProblem, THEME_IMAGE_LIMITS } from "@/modules/registration-themes/assets";
+import { reconcileImageAlt, themeImageProblem, tokensAfterImagePick, THEME_IMAGE_LIMITS } from "@/modules/registration-themes/assets";
 import { registrationThemeStyle, resolveRegistrationBranding, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
 import { PLATFORM_DEFAULT_THEME, isPlatformDefaultTheme, registrationThemeTokensSchema } from "@/modules/registration-themes/tokens";
 import { RegistrationBannerStrip, RegistrationBrandingProvider, RegistrationLogoTile } from "@/components/registration-branding";
@@ -139,5 +140,41 @@ describe("rendering the logo and banner", () => {
 
   it("builds no images when there is no branding", () => {
     expect(publicRegistrationBrandingImages({}, "synthetic-camp")).toBeUndefined();
+  });
+});
+
+describe("changing a picture clears its description", () => {
+  it("drops the description of the old picture (and the banner focus with no banner), leaving other tokens", () => {
+    const set = { ...good, logoAlt: "Old logo", heroAlt: "Old banner", heroFocus: "top" as const };
+    expect(tokensAfterImagePick(set, "logo", "other")).toEqual({ ...good, heroAlt: "Old banner", heroFocus: "top" });
+    expect(tokensAfterImagePick(set, "hero", "other")).toEqual({ ...good, logoAlt: "Old logo", heroFocus: "top" });
+    expect(tokensAfterImagePick(set, "hero", null)).toEqual({ ...good, logoAlt: "Old logo" });
+  });
+
+  it("is what the panel uses and clears its typed box in the same step", () => {
+    const panel = readFileSync("components/registration-theme-panel.tsx", "utf8");
+    expect(panel).toContain("tokensAfterImagePick(current, kind, assetId)");
+    expect(panel).toMatch(/setAltText\(\(current\) => \(\{ \.\.\.current, \[kind\]: "" \}\)\)/);
+  });
+});
+
+describe("client bundles stay free of sharp", () => {
+  const read = (path: string) => readFileSync(path, "utf8");
+  it("keeps the client-safe checks module and the staff panel's local imports free of sharp and Node modules", () => {
+    const imports = (file: string) => read(file).split("\n").filter((line) => /^\s*(import|export) .* from |import\(/.test(line)).join("\n");
+    expect(imports("modules/registration-themes/assets.ts")).toBe("");
+    expect(read("modules/registration-themes/assets.ts")).not.toMatch(/import\(|require\(/);
+    expect(imports("components/registration-theme-panel.tsx")).not.toMatch(/sharp|assets-server|node:|registration-themes\/repository"$/m);
+    expect(imports("components/registration-theme-panel.tsx")).not.toMatch(/^import (?!type)[^\n]*registration-themes\/repository"/m);
+    // The sharp reader exists only in the server-only module.
+    expect(read("modules/registration-themes/assets-server.ts")).toContain('import "server-only"');
+  });
+
+  it("lets no client component import the server-only reader or sharp", () => {
+    const client = ["components/registration-theme-panel.tsx", "components/registration-branding.tsx", "components/public-registration-form.tsx"];
+    for (const file of client) {
+      expect(read(file).startsWith('"use client"')).toBe(true);
+      expect(read(file)).not.toMatch(/from "sharp"|import\("sharp"\)|from "[^"]*assets-server"/);
+    }
   });
 });

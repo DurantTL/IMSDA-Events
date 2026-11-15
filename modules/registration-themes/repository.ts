@@ -3,6 +3,7 @@ import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { assetInlineUrl } from "@/modules/events/asset-repository";
 import { readAsset } from "@/modules/events/asset-storage";
+import { readImageDimensionsWithSharp } from "./assets-server";
 import { reconcileImageAlt, themeImageProblem, THEME_IMAGE_TYPES, type ThemeImageKind } from "./assets";
 import { checkThemeContrast, describeContrastFailures, type ThemeContrastReport } from "./contrast";
 import { registrationThemeTokensSchema, normalizeThemeTokens, type RegistrationThemeTokens } from "./tokens";
@@ -151,7 +152,7 @@ async function checkedThemeImages(client: AssetReader, eventId: string, tokens: 
   for (const [kind, id] of [["logo", ids.logoAssetId], ["hero", ids.heroAssetId]] as [ThemeImageKind, string | null][]) {
     if (!id) continue;
     const asset = found.find((entry) => entry.id === id) ?? null;
-    const problem = await themeImageProblem(kind, asset, eventId, () => readAsset(asset!.storageKey));
+    const problem = await themeImageProblem(kind, asset, eventId, () => readAsset(asset!.storageKey), readImageDimensionsWithSharp);
     if (problem) throw new RegistrationThemeError("INVALID_ASSET", problem);
   }
   const reconciled = reconcileImageAlt(tokens, ids);
