@@ -653,6 +653,12 @@ Before #1263 every deploy stopped the app, ran migrations and template syncs,
 then started it: about a minute in which nginx showed a 502 page and a form
 submitted in that window failed. Now:
 
+0. **A copy of the database is taken first (#1790).** Right after the images
+   are pulled, `deploy.sh` runs `pre-deploy-backup.sh` in the backup image of
+   the same commit, with `/home/u_events/.xcloud/.env.backup`. If the copy
+   fails, the deploy stops and nothing is changed. Naming, storage, the
+   14-day clean-up and how to restore are in docs/BACKUPS.md,
+   "Pre-deploy copies".
 1. **The old version keeps serving** while a one-off container of the new
    image runs migrations and syncs (`IMSDA_PREP_ONLY=1`). From then on the old
    code runs on the new schema, so **every migration must be additive**: new
@@ -743,6 +749,21 @@ is a separate PR for #1263.
 
    Without it, the only gap is the few seconds while `app` restarts in step 3
    above.
+
+**Before installing a `deploy.sh` with the pre-deploy copy (#1790)**, make
+sure `/home/u_events/.xcloud/.env.backup` exists and works (docs/BACKUPS.md,
+"One-time human steps", step 2). Test it once by hand, without deploying:
+
+```bash
+SHA="$(git -C /var/www/events.imsda.org rev-parse HEAD)"
+docker run --rm --network postgresql_9kgaw_239292_xcloud-network \
+  --env-file /home/u_events/.xcloud/.env.backup -v imsda_events_backups:/backups \
+  --entrypoint sh ghcr.io/duranttl/imsda-events-backup:main \
+  /usr/local/bin/pre-deploy-backup.sh "$SHA"
+```
+
+It should end with `complete: imsda-predeploy-...pgdump`. Without that file every
+deploy stops with "No database copy was taken".
 
 Install or update (as `root`, from a checkout of `main`):
 
@@ -1064,6 +1085,11 @@ What it does, in order:
 3. Runs the app's own production environment check **inside the new image**
    with the same env files and key mount. A missing or conflicting variable is
    listed by name and the deploy stops with the current site still running.
+   Then takes a copy of the database with `pre-deploy-backup.sh` in the
+   matching backup image (docs/BACKUPS.md, "Pre-deploy copies", #1790), because
+   the new container migrates as soon as it starts. If the copy fails, or
+   `/home/u_events/.xcloud/.env.backup` is missing, it stops with the current
+   site still running.
 4. Keeps the running app as `<name>-old` (removing the previous `-old` first),
    starts the new container with the same port, networks, uploads volume and
    restart policy, and waits up to 15 minutes for `/api/health` to report the
@@ -1420,6 +1446,10 @@ latest run failed), or `never` (nothing has reported since this was added).
 answering 200. The System command center shows the same signal.
 
 #### Uptime monitor
+
+The outside site-down checker (UptimeRobot every 5 minutes against the home
+page and the public `/api/health`, emailing the communication director and the
+IT lead) is set up as described in `docs/MONITORING.md` (#1789).
 
 `/api/health` has two answers (#1400):
 

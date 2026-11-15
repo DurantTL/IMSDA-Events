@@ -409,6 +409,127 @@ Delete `/root/restore` afterwards; it holds personal data.
 Encrypted fields in the restored data can only be read with the original
 `SECRET_ENCRYPTION_KEY` (below).
 
+## Pre-deploy copies (#1790)
+
+Every deploy now takes a copy of the database **before any migration runs**.
+If the copy fails, the deploy stops and the live version keeps running. It is
+the quickest way back if a release or its database change goes wrong.
+
+**Where it runs.** `deploy/xcloud/deploy.sh` (`imsda-deploy`, used by the
+night timer) and `scripts/manual-deploy.sh` both run
+`scripts/backup/pre-deploy-backup.sh` in the backup image of the commit being
+deployed (`ghcr.io/duranttl/imsda-events-backup:<sha>`), right after the images
+are pulled and before the preparation container or the new app can migrate.
+It uses the same env file (`/home/u_events/.xcloud/.env.backup`), database
+network and `imsda_events_backups` volume as the nightly helper, so that file
+must exist before the new deploy script is installed (see "One-time human
+steps" above, step 2). Without it the deploy stops with "No database copy was
+taken".
+
+**Name.** `imsda-predeploy-<UTC date>T<UTC time>Z-<first 12 characters of the
+commit>.pgdump`, for example `imsda-predeploy-20261116T060512Z-1a2b3c4d5e6f.pgdump`.
+The ending is `.pgdump`, not `.dump`, on purpose: the nightly pruning, the
+weekly rehearsal and the System report's R2 check all look for `*.dump`, so a
+pre-deploy copy never counts as the newest nightly backup.
+
+**Protection.** The same as the nightly dumps:
+
+- written to `/backups/pre-deploy/` in the `imsda_events_backups` volume
+  (owner-only file, root-only volume), after `pg_restore --list` has read it
+  back and it is at least 1 KB;
+- then copied to the same R2 bucket with the same bucket-scoped token
+  (`offsite-r2.sh`), under `<R2_PREFIX>/pre-deploy/` (default
+  `imsda-events/pre-deploy/`). The backup image requires the off-site copy
+  (`BACKUP_REQUIRE_OFFSITE=true`), so a failed upload also stops the deploy.
+- The encryption key is never in it, as for every backup (below).
+
+**How long they are kept.** 14 days (Caleb, November 15, 2026). Each run
+deletes older pre-deploy copies, locally and in R2 (by the date in the name),
+but always keeps the newest 3 however old, like the nightly dumps. Change the
+number with `PREDEPLOY_RETENTION_DAYS` in `.env.backup`. If the R2 clean-up
+fails, the deploy carries on and the log says "could not prune old pre-deploy
+copies in R2"; remove those by hand with `aws s3 rm` (same command shape as in
+"Restoring from R2"). Each copy is about the size of a nightly dump, so the
+local volume holds roughly 14 extra dumps when deploys happen every night.
+
+**Logs.** `journalctl -u imsda-autodeploy.service | grep pre-deploy-backup`
+shows each copy's name and size, or why it failed. No credential is printed.
+
+**In an emergency only.** If the copy cannot be made (for example R2 is down)
+and a fix must go out anyway, a person can run
+`IMSDA_PREDEPLOY_BACKUP=skip imsda-deploy` (or the same before
+`sh scripts/manual-deploy.sh <sha>`). The deploy then says loudly that no copy
+was taken. The timer never sets it. A deploy that stopped on a failed copy marks
+that commit in `/var/lib/imsda/failed-sha`, so the timer does not retry it every
+two minutes; after fixing the cause, run `imsda-deploy` by hand.
+
+**Deploying a commit from before #1790 by hand.** Its backup image has no
+`pre-deploy-backup.sh`. Use the current one:
+`IMSDA_BACKUP_IMAGE=ghcr.io/duranttl/imsda-events-backup:main imsda-deploy`.
+
+### Restoring from a pre-deploy copy
+
+Restoring over production is a human decision. Use it when a deploy's
+database change has to be undone; anything registered or paid after the copy
+was taken is lost from the database, so check the time in the name against
+recent activity first (Square still holds the payments).
+
+1. Find the copy taken just before the bad deploy:
+
+   ```bash
+   docker run --rm -v imsda_events_backups:/backups alpine ls -l /backups/pre-deploy/
+   ```
+
+   If the local file is gone, fetch it from R2 with the "Restoring from R2"
+   commands below, using the folder `${R2_PREFIX:-imsda-events}/pre-deploy/`,
+   into `/root/restore`.
+
+2. Stop the night timer, so it does not deploy the bad commit again, then
+   stop the app and the sweeper:
+
+   ```bash
+   systemctl stop imsda-autodeploy.timer
+   docker stop <app container> imsda-outbox-sweeper
+   ```
+
+3. Restore (for a drill, create a scratch database and change `--dbname`):
+
+   ```bash
+   docker run --rm --env-file /home/u_events/.xcloud/.env.backup \
+     --network postgresql_9kgaw_239292_xcloud-network \
+     -v imsda_events_backups:/backups:ro --entrypoint sh \
+     ghcr.io/duranttl/imsda-events-backup:main -c \
+     'pg_restore --dbname="$PGDATABASE" --clean --if-exists --no-owner --no-privileges /backups/pre-deploy/imsda-predeploy-<stamp>-<sha>.pgdump'
+   ```
+
+   (From R2, mount `-v /root/restore:/restore:ro` and use the `/restore/...`
+   path instead.)
+
+4. Start the version that ran on that database, which the deploy kept as
+   `imsda-events:previous`, without re-running the preparation:
+
+   ```bash
+   docker tag imsda-events:previous imsda-events:live
+   IMSDA_SKIP_DB_PREP=1 docker compose -f /home/u_events/239298/docker-compose.yml up -d --no-deps app
+   docker start imsda-outbox-sweeper
+   ```
+
+5. Check `/api/health` and a few recent registrations, and write down what was
+   restored and why. Turn the timer back on
+   (`systemctl start imsda-autodeploy.timer`) only once a fixed commit is on
+   `main`.
+
+Uploaded files are not part of this copy; they are not changed by a
+migration, so they normally need no restore.
+
+### Record of the first real run
+
+The step has to be run once on a real deploy. After the first night deploy
+with the new script, the person who checked it writes the date and the copy's
+name here:
+
+- First pre-deploy copy on production: _not yet run_
+
 ## The encryption key is backed up separately
 
 `SECRET_ENCRYPTION_KEY` is **not** included in these backups, is **never**

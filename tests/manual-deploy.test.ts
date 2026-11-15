@@ -23,6 +23,7 @@ case "$1" in
     esac ;;
   run)
     case "$*" in
+      *pre-deploy-backup.sh*) exit "\${FAKE_BACKUP_EXIT:-0}" ;;
       *"--entrypoint grep"*) exit "\${FAKE_PROBE_EXIT:-0}" ;;
       *IMSDA_PREFLIGHT_ONLY=1*) exit "\${FAKE_USER_CHECK_EXIT:-0}" ;;
       *"--rm"*) exit "\${FAKE_PREFLIGHT_EXIT:-0}" ;;
@@ -54,6 +55,7 @@ function setup(envFile: string, keyFile?: string) {
   mkdirSync(runtime);
   mkdirSync(bin);
   writeFileSync(path.join(runtime, ".env"), envFile);
+  writeFileSync(path.join(runtime, ".env.backup"), "PGHOST=db\n");
   const keyPath = path.join(dir, "key");
   if (keyFile !== undefined) writeFileSync(keyPath, keyFile);
   for (const [name, body] of [["docker", fakeDocker], ["curl", fakeCurl], ["sleep", "#!/bin/sh\n"]]) {
@@ -75,6 +77,7 @@ function setup(envFile: string, keyFile?: string) {
         IMSDA_APP_CONTAINER: app,
         IMSDA_KEY_FILE: keyPath,
         IMSDA_HEALTH_TIMEOUT: "0",
+        IMSDA_SKIP_BACKUP: "1",
         FAKE_DOCKER_LOG: log,
         FAKE_EXISTING: app,
         FAKE_RUNNING: "true",
@@ -85,7 +88,7 @@ function setup(envFile: string, keyFile?: string) {
     });
     return { ...result, calls: readFileSync(log, "utf8") };
   };
-  return { run };
+  return { run, runtime };
 }
 
 const envWithKey = "DATABASE_URL=postgresql://u:p@db/app\nSECRET_ENCRYPTION_KEY=x\n";
@@ -287,5 +290,50 @@ describe("manual-deploy.sh", () => {
     expect(result.stderr).toContain("rolled back");
     expect(result.calls).toContain(`rename ${app}-old ${app}`);
     expect(result.calls).toMatch(new RegExp(`^start ${app}$`, "m"));
+  });
+
+  // #1790: the new container migrates when it starts, so the copy comes first.
+  describe("pre-deploy database copy", () => {
+    it("copies the database with the same commit's backup image before stopping the live app", () => {
+      const { run } = setup(envWithoutKey, "k");
+      const { status, calls } = run([sha]);
+      expect(status).toBe(0);
+      const lines = calls.split("\n");
+      const backup = lines.findIndex((line) => line.startsWith("run --rm") && line.includes("pre-deploy-backup.sh"));
+      const stop = lines.findIndex((line) => line.startsWith(`stop ${app}`));
+      expect(lines).toContain(`pull ghcr.io/duranttl/imsda-events-backup:${sha}`);
+      expect(backup).toBeGreaterThan(-1);
+      expect(stop).toBeGreaterThan(backup);
+      expect(lines[backup]).toContain("--network postgresql_9kgaw_239292_xcloud-network");
+      expect(lines[backup]).toContain("-v imsda_events_backups:/backups");
+      expect(lines[backup]).toContain(`/usr/local/bin/pre-deploy-backup.sh ${sha}`);
+    });
+
+    it("leaves the running app alone when the copy fails", () => {
+      const { run } = setup(envWithoutKey, "k");
+      const { status, calls, stderr } = run([sha], { FAKE_BACKUP_EXIT: "1" });
+      expect(status).not.toBe(0);
+      expect(stderr).toContain("the database copy failed");
+      expect(calls).not.toContain(`stop ${app}`);
+      expect(calls).not.toContain("run -d");
+    });
+
+    it("leaves the running app alone when the backup env file is missing", () => {
+      const { run, runtime } = setup(envWithoutKey, "k");
+      rmSync(path.join(runtime, ".env.backup"));
+      const { status, calls, stderr } = run([sha]);
+      expect(status).not.toBe(0);
+      expect(stderr).toContain("no database copy was taken");
+      expect(calls).not.toContain("pre-deploy-backup.sh");
+      expect(calls).not.toContain(`stop ${app}`);
+    });
+
+    it("skips the copy only when a person sets IMSDA_PREDEPLOY_BACKUP=skip, and says so", () => {
+      const { run } = setup(envWithoutKey, "k");
+      const { status, calls, stdout } = run([sha], { IMSDA_PREDEPLOY_BACKUP: "skip" });
+      expect(status).toBe(0);
+      expect(stdout).toContain("no database copy was taken");
+      expect(calls).not.toContain("pre-deploy-backup.sh");
+    });
   });
 });

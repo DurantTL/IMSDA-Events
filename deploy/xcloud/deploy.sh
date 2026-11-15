@@ -22,17 +22,26 @@ COMPOSE="${XCLOUD_COMPOSE_FILE:-/home/u_events/239298/docker-compose.yml}"
 SHA="$(git -c safe.directory="$SITE" -C "$SITE" rev-parse HEAD)"
 IMAGE="${IMSDA_IMAGE_REPO:-ghcr.io/duranttl/imsda-events}:$SHA"
 WAIT_SECONDS="${IMSDA_IMAGE_WAIT_SECONDS:-1200}"
+# Database copy before any migration (#1790, docs/BACKUPS.md, "Pre-deploy
+# copies"). It runs in the backup image of the same commit, with the nightly
+# backup's env file, network and volume.
+BACKUP_IMAGE="${IMSDA_BACKUP_IMAGE:-${IMSDA_IMAGE_REPO:-ghcr.io/duranttl/imsda-events}-backup:$SHA}"
+BACKUP_ENV_FILE="${IMSDA_BACKUP_ENV_FILE:-/home/u_events/.xcloud/.env.backup}"
+PG_NETWORK="${IMSDA_PG_NETWORK:-postgresql_9kgaw_239292_xcloud-network}"
+BACKUPS_VOLUME="${IMSDA_BACKUPS_VOLUME:-imsda_events_backups}"
+PREDEPLOY_TIMEOUT="${IMSDA_PREDEPLOY_BACKUP_TIMEOUT_SECONDS:-1800}"
 
 grep -q 'imsda-events:live' "$COMPOSE" || {
   echo "[deploy] $COMPOSE is not the IMSDA version (xCloud regenerated it?). Copy deploy/xcloud/docker-compose.yml over it first." >&2
   exit 1
 }
 
-# GitHub publishes the image about 10 minutes after a merge.
+# GitHub publishes the image (and the backup image next to it) about 10
+# minutes after the build starts.
 WAITED=0
-until docker pull --quiet "$IMAGE"; do
+until docker pull --quiet "$IMAGE" && docker pull --quiet "$BACKUP_IMAGE"; do
   if [ "$WAITED" -ge "$WAIT_SECONDS" ]; then
-    echo "[deploy] $IMAGE was not published; check the Docker image workflow on GitHub. Nothing was changed." >&2
+    echo "[deploy] $IMAGE or $BACKUP_IMAGE was not published; check the Docker image workflow on GitHub. Nothing was changed." >&2
     exit 1
   fi
   echo "[deploy] Waiting for $IMAGE ..."
@@ -97,12 +106,30 @@ move_live_tag() {
   docker tag "$IMAGE" imsda-events:live
 }
 
+# A copy of the database before anything can migrate it (#1790). If it fails,
+# nothing is changed. IMSDA_PREDEPLOY_BACKUP=skip is a human's decision for an
+# emergency only (docs/BACKUPS.md); the timer never sets it.
+pre_deploy_backup() {
+  if [ "${IMSDA_PREDEPLOY_BACKUP:-}" = skip ]; then
+    echo "[deploy] WARNING: IMSDA_PREDEPLOY_BACKUP=skip, so no database copy was taken before $SHA." >&2
+    return 0
+  fi
+  [ -r "$BACKUP_ENV_FILE" ] \
+    || fail "No database copy was taken: $BACKUP_ENV_FILE is missing (docs/BACKUPS.md, 'Pre-deploy copies'). Nothing was changed."
+  echo "[deploy] Copying the database before deploying $SHA ..."
+  timeout "$PREDEPLOY_TIMEOUT" docker run --rm --network "$PG_NETWORK" --env-file "$BACKUP_ENV_FILE" \
+    -v "$BACKUPS_VOLUME:/backups" --entrypoint sh "$BACKUP_IMAGE" \
+    /usr/local/bin/pre-deploy-backup.sh "$SHA" </dev/null \
+    || fail "The database copy before $SHA failed (above). Nothing was changed; the live version is still running."
+}
+
 # Images built before #1263 ignore IMSDA_PREP_ONLY (their prep run would start
 # the app and never exit), so they get the old stop-and-start switch.
 # grep answers 1 for "not found"; anything else is a Docker error.
 legacy=0
 docker run --rm --entrypoint grep "$IMAGE" -q IMSDA_PREP_ONLY /usr/local/bin/docker-entrypoint.sh || legacy=$?
 [ "$legacy" -le 1 ] || fail "Could not inspect $IMAGE (docker exit $legacy). Nothing was changed."
+pre_deploy_backup
 if [ "$legacy" -eq 1 ]; then
   echo "[deploy] $IMAGE predates zero-downtime deploys; restarting the app on it (about a minute offline)."
   move_live_tag

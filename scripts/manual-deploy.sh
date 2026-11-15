@@ -13,6 +13,8 @@
 # 3. validates the full production environment inside the NEW image before
 #    touching the running app, so a missing or conflicting variable stops here
 #    instead of leaving the site down;
+# 3b. takes a copy of the database (scripts/backup/pre-deploy-backup.sh, #1790)
+#    before the new image can migrate it, and stops if the copy fails;
 # 4. renames the running app to <name>-old, starts the new one wired the same
 #    way, waits for /api/health to report this release, and rolls back to the
 #    -old container automatically if it does not;
@@ -195,6 +197,30 @@ if [ "$preflight_supported" -eq 0 ]; then
   docker run --rm $(run_args) -e IMSDA_PREFLIGHT_ONLY=1 \
     -v "$ASSETS_VOLUME:/app/storage/event-assets" "$IMAGE" true \
     || fail "the new image's user cannot use the uploads volume or a key file (above). Nothing was changed; the current app is still running. See docs/DEPLOY-DOCKER.md, 'Running as the node user'."
+fi
+
+# --- 3b. Database copy before the new version can migrate it (#1790) ---------
+# The new container runs the migrations when it starts, so this comes first.
+# IMSDA_PREDEPLOY_BACKUP=skip is a human's decision for an emergency only.
+if [ "${IMSDA_PREDEPLOY_BACKUP:-}" = skip ]; then
+  log "WARNING: IMSDA_PREDEPLOY_BACKUP=skip, so no database copy was taken before $SHORT_SHA"
+else
+  [ -r "$BACKUP_ENV_FILE" ] \
+    || fail "no database copy was taken: $BACKUP_ENV_FILE is missing (docs/BACKUPS.md, 'Pre-deploy copies'). Nothing was changed; the current app is still running."
+  if [ -n "${IMSDA_BACKUP_IMAGE:-}" ]; then
+    PREDEPLOY_IMAGE="$IMSDA_BACKUP_IMAGE"
+  elif [ "$SOURCE" = build ]; then
+    PREDEPLOY_IMAGE="$REGISTRY-backup:main"
+  else
+    PREDEPLOY_IMAGE="$REGISTRY-backup:$SHA"
+  fi
+  log "Copying the database before deploying $SHORT_SHA (with $PREDEPLOY_IMAGE)"
+  docker pull "$PREDEPLOY_IMAGE" >/dev/null \
+    || fail "could not pull $PREDEPLOY_IMAGE, so no database copy was taken. Nothing was changed; the current app is still running."
+  timeout "${IMSDA_PREDEPLOY_BACKUP_TIMEOUT_SECONDS:-1800}" docker run --rm --network "$PG_NETWORK" \
+    --env-file "$BACKUP_ENV_FILE" -v imsda_events_backups:/backups \
+    --entrypoint sh "$PREDEPLOY_IMAGE" /usr/local/bin/pre-deploy-backup.sh "$SHA" </dev/null \
+    || fail "the database copy failed (above). Nothing was changed; the current app is still running."
 fi
 
 # --- 4. Swap -----------------------------------------------------------------
