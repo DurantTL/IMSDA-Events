@@ -7,7 +7,8 @@
 #   sh scripts/manual-deploy.sh <full commit sha>
 #
 # 1. checks the server files and decides how the encryption key is supplied
-#    (key file mount or SECRET_ENCRYPTION_KEY in .env, never both, #876);
+#    (key file mount or SECRET_ENCRYPTION_KEY in .env, never both, #876), and
+#    mounts the Azure Key Vault client secret file when it exists (#1652);
 # 2. pulls ghcr.io/duranttl/imsda-events:<sha> (or builds it with
 #    IMSDA_DEPLOY_SOURCE=build);
 # 3. validates the full production environment inside the NEW image before
@@ -52,6 +53,10 @@ ASSETS_VOLUME="${IMSDA_ASSETS_VOLUME:-imsda_events_assets}"
 KEY_DIR="${IMSDA_KEY_DIR:-/etc/imsda}"
 KEY_TARGET=/run/secrets/encryption-key
 KEY_TARGET_PREVIOUS=/run/secrets/encryption-key-previous
+# The Azure Key Vault client secret for the personal-data key (#1652,
+# docs/DATA-KEY-AZURE-KEY-VAULT.md), kept in a protected file like the key files.
+AZURE_SECRET_FILE="${IMSDA_AZURE_CLIENT_SECRET_FILE:-$KEY_DIR/azure-client-secret}"
+AZURE_SECRET_TARGET=/run/secrets/azure-client-secret
 REGISTRY="${IMSDA_IMAGE_REPO:-ghcr.io/duranttl/imsda-events}"
 SOURCE="${IMSDA_DEPLOY_SOURCE:-ghcr}"
 CHECKOUT="${IMSDA_CHECKOUT:-/var/www/events.imsda.org}"
@@ -141,6 +146,19 @@ if [ -n "$PREVIOUS_VERSION" ]; then
   elif ! has_var SECRET_ENCRYPTION_PREVIOUS_KEY "$ENV_FILE"; then
     fail "SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=$PREVIOUS_VERSION is set but $KEY_FILE_PREVIOUS is missing or empty. Restore the old key file, or remove the line once the rotation is finished."
   fi
+fi
+
+# Azure Key Vault client secret (#1652): mounted read-only when its file exists, and AZURE_CLIENT_SECRET_FILE is
+# set only then. Never both the file and AZURE_CLIENT_SECRET in .env (the app refuses both).
+has_var AZURE_CLIENT_SECRET_FILE "$ENV_FILE" \
+  && fail "remove AZURE_CLIENT_SECRET_FILE from $ENV_FILE; this script sets it when it mounts $AZURE_SECRET_FILE"
+if [ -f "$AZURE_SECRET_FILE" ] && [ -s "$AZURE_SECRET_FILE" ]; then
+  has_var AZURE_CLIENT_SECRET "$ENV_FILE" \
+    && fail "AZURE_CLIENT_SECRET is in $ENV_FILE and $AZURE_SECRET_FILE also exists. The app refuses both; remove the line from $ENV_FILE."
+  KEY_ARGS="$KEY_ARGS --mount type=bind,source=$AZURE_SECRET_FILE,target=$AZURE_SECRET_TARGET,readonly -e AZURE_CLIENT_SECRET_FILE=$AZURE_SECRET_TARGET"
+  log "Key vault client secret: file $AZURE_SECRET_FILE"
+elif has_var AZURE_CLIENT_SECRET "$ENV_FILE"; then
+  log "WARNING: AZURE_CLIENT_SECRET is in $ENV_FILE. Move it to $AZURE_SECRET_FILE (docs/DATA-KEY-AZURE-KEY-VAULT.md, step 5)."
 fi
 
 docker network inspect "$PG_NETWORK" >/dev/null 2>&1 || fail "database network $PG_NETWORK not found (docker network ls)"

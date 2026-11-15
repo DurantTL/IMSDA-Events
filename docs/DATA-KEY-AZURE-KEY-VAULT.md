@@ -130,10 +130,11 @@ Keep it in a protected file, the same way as the sign-in key file:
    `docker-compose.yml` do the same with its commented lines.
 3. Do not also set `AZURE_CLIENT_SECRET` (the server refuses to start with both).
 
-For a deployment made with `scripts/manual-deploy.sh`, which passes `.env` into
-the container and mounts only the sign-in key file, ask the developer to add
-the client secret file mount first; until then use `AZURE_CLIENT_SECRET` in the
-protected `.env` (mode 600).
+For a deployment made with `scripts/manual-deploy.sh`, write the file to
+`/etc/imsda/azure-client-secret` as in point 1 and leave `AZURE_CLIENT_SECRET_FILE`
+out of `.env`: the script mounts the file read-only and sets
+`AZURE_CLIENT_SECRET_FILE` itself, and checks before the swap that the app's user
+can read it. It stops if `.env` also holds `AZURE_CLIENT_SECRET`.
 
 `DATA_KEY_SOURCE=dev-env` exists for local development and CI only. The server
 refuses it in production.

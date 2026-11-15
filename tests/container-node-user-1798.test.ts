@@ -99,7 +99,7 @@ describe("docker-entrypoint.sh checks what the node user needs (#1798)", () => {
     expect(calls).toBe("");
   });
 
-  it.skipIf(asRoot).each(["SECRET_ENCRYPTION_KEY_FILE", "SECRET_ENCRYPTION_PREVIOUS_KEY_FILE"])("stops when the file named by %s is not readable, without printing it", (variable) => {
+  it.skipIf(asRoot).each(["SECRET_ENCRYPTION_KEY_FILE", "SECRET_ENCRYPTION_PREVIOUS_KEY_FILE", "AZURE_CLIENT_SECRET_FILE"])("stops when the file named by %s is not readable, without printing it", (variable) => {
     const data = scratch();
     writeFileSync(path.join(data, "key"), "synthetic-key-value");
     chmodSync(path.join(data, "key"), 0o000);
@@ -143,7 +143,7 @@ describe("docker-entrypoint.sh checks what the node user needs (#1798)", () => {
   it("names the same key file variables the app reads", () => {
     const env = readFileSync(path.join(root, "lib/env.ts"), "utf8");
     const script = readFileSync(entrypoint, "utf8");
-    for (const variable of ["SECRET_ENCRYPTION_KEY_FILE", "SECRET_ENCRYPTION_PREVIOUS_KEY_FILE"]) {
+    for (const variable of ["SECRET_ENCRYPTION_KEY_FILE", "SECRET_ENCRYPTION_PREVIOUS_KEY_FILE", "AZURE_CLIENT_SECRET_FILE"]) {
       expect(env).toContain(variable);
       expect(script).toContain(variable);
     }

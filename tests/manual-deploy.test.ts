@@ -256,6 +256,66 @@ describe("manual-deploy.sh", () => {
     expect(result.stderr).toContain("SECRET_ENCRYPTION_PREVIOUS_KEY is in");
   });
 
+  describe("key vault client secret file (#1652)", () => {
+    function secretDir(contents?: string) {
+      const dir = mkdtempSync(path.join(tmpdir(), "manual-deploy-azure-"));
+      dirs.push(dir);
+      if (contents !== undefined) writeFileSync(path.join(dir, "azure-client-secret"), contents);
+      return dir;
+    }
+
+    it("mounts the client secret file read-only and sets AZURE_CLIENT_SECRET_FILE, in the user check and the new container", () => {
+      const { run } = setup(envWithoutKey, "k");
+      const dir = secretDir("synthetic-client-secret");
+      const result = run([sha], { IMSDA_AZURE_CLIENT_SECRET_FILE: path.join(dir, "azure-client-secret") });
+      expect(result.status).toBe(0);
+      const mount = `source=${dir}/azure-client-secret,target=/run/secrets/azure-client-secret,readonly -e AZURE_CLIENT_SECRET_FILE=/run/secrets/azure-client-secret`;
+      const lines = result.calls.split("\n");
+      expect(lines.find((line) => line.includes("IMSDA_PREFLIGHT_ONLY=1"))).toContain(mount);
+      expect(lines.find((line) => line.startsWith("run -d"))).toContain(mount);
+      expect(result.stdout + result.stderr).not.toContain("synthetic-client-secret");
+    });
+
+    it("finds the file in the key folder by default", () => {
+      const { run } = setup(envWithoutKey, "k");
+      const dir = secretDir("synthetic-client-secret");
+      const result = run([sha], { IMSDA_KEY_DIR: dir });
+      expect(result.status).toBe(0);
+      expect(result.calls).toMatch(new RegExp(`run -d .*source=${dir}/azure-client-secret,target=/run/secrets/azure-client-secret,readonly`));
+    });
+
+    it("mounts nothing and sets no AZURE_CLIENT_SECRET_FILE without the file", () => {
+      const { run } = setup(envWithoutKey, "k");
+      const result = run([sha], { IMSDA_KEY_DIR: secretDir() });
+      expect(result.status).toBe(0);
+      expect(result.calls).not.toContain("AZURE_CLIENT_SECRET_FILE");
+    });
+
+    it("refuses the secret in both .env and the file, before touching the running app", () => {
+      const { run } = setup(`${envWithoutKey}AZURE_CLIENT_SECRET=x\n`, "k");
+      const dir = secretDir("synthetic-client-secret");
+      const result = run([sha], { IMSDA_AZURE_CLIENT_SECRET_FILE: path.join(dir, "azure-client-secret") });
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("The app refuses both");
+      expect(result.calls).not.toContain(`stop ${app}`);
+    });
+
+    it("refuses AZURE_CLIENT_SECRET_FILE in .env, since the script sets it", () => {
+      const { run } = setup(`${envWithoutKey}AZURE_CLIENT_SECRET_FILE=/somewhere\n`, "k");
+      const result = run([sha], { IMSDA_KEY_DIR: secretDir() });
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("remove AZURE_CLIENT_SECRET_FILE");
+    });
+
+    it("still deploys with the secret in .env, with a warning to move it to the file", () => {
+      const { run } = setup(`${envWithoutKey}AZURE_CLIENT_SECRET=x\n`, "k");
+      const result = run([sha], { IMSDA_KEY_DIR: secretDir() });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Move it to");
+      expect(result.calls).not.toContain("AZURE_CLIENT_SECRET_FILE");
+    });
+  });
+
   it("sends the sweep token to the health URL on stdin, never on the command line", () => {
     const { run } = setup(envWithoutKey, "k");
     const result = run([sha]);
