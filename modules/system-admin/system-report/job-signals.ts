@@ -191,6 +191,15 @@ export function classWaitlistFields(key: string, run: JobRun, readAt: Date): Fie
   return ranFields(key, run, "ok", text);
 }
 
+export function eventPageScheduledPublishFields(key: string, run: JobRun, readAt: Date): Fields {
+  const problem = runProblem(key, run, readAt, "the scheduled event page publish");
+  if (problem) return problem;
+  const c = counts(run, ["events", "published", "failed"]);
+  if (!c) return ranFields(key, run, "watch", COUNTS_MISSING);
+  const text = `${c.published} sections published across ${c.events} events, ${c.failed} failed.`;
+  return ranFields(key, run, c.failed > 0 ? "watch" : "ok", c.failed > 0 ? `${text} An event that failed is tried again on the next sweep.` : text);
+}
+
 export function instructorClassEmailFields(key: string, run: JobRun, readAt: Date): Fields {
   const problem = runProblem(key, run, readAt, "the instructor class emails");
   if (problem) return problem;
