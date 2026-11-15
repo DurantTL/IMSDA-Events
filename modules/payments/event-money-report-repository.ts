@@ -43,7 +43,7 @@ export async function loadEventMoneyReport(eventId: string, client: Prisma.Trans
       select: { registrationId: true, status: true, method: true, amount: true, refunds: { select: { status: true, amount: true } } },
     }),
     prisma.registrationAdjustment.findMany({
-      where: { eventId, kind: { in: ["SCHOLARSHIP", "DISCOUNT", "PROMO_CODE"] } },
+      where: { eventId, kind: { in: ["SCHOLARSHIP", "DISCOUNT", "PROMO_CODE", "PRICE_OVERRIDE"] } },
       select: { registrationId: true, kind: true, amountCents: true },
     }),
     prisma.promoCodeRedemption.findMany({ where: { eventId }, select: { registrationId: true, discountAmountCents: true } }),
@@ -74,15 +74,17 @@ export async function loadEventMoneyReport(eventId: string, client: Prisma.Trans
       }
     }
   }
-  const reductions = new Map<string, { promo: number; discount: number; scholarship: number }>();
+  const reductions = new Map<string, { promo: number; discount: number; scholarship: number; priceOverride: number }>();
   const reduction = (registrationId: string) => {
-    const existing = reductions.get(registrationId) ?? { promo: 0, discount: 0, scholarship: 0 };
+    const existing = reductions.get(registrationId) ?? { promo: 0, discount: 0, scholarship: 0, priceOverride: 0 };
     reductions.set(registrationId, existing);
     return existing;
   };
   for (const adjustment of adjustments) {
     const entry = reduction(adjustment.registrationId);
-    if (adjustment.kind === "PROMO_CODE") entry.promo -= adjustment.amountCents;
+    // A price override is a signed change (positive raised the price), not a reduction; a reversal carries the opposite sign.
+    if (adjustment.kind === "PRICE_OVERRIDE") entry.priceOverride += adjustment.amountCents;
+    else if (adjustment.kind === "PROMO_CODE") entry.promo -= adjustment.amountCents;
     else if (adjustment.kind === "DISCOUNT") entry.discount -= adjustment.amountCents;
     else entry.scholarship -= adjustment.amountCents;
   }
@@ -105,6 +107,7 @@ export async function loadEventMoneyReport(eventId: string, client: Prisma.Trans
       promoReductionCents: own?.promo ?? 0,
       discountReductionCents: own?.discount ?? 0,
       scholarshipReductionCents: own?.scholarship ?? 0,
+      priceOverrideCents: own?.priceOverride ?? 0,
     };
   });
 

@@ -65,6 +65,7 @@ export function EventMoneyReportView({ eventId, data, canManageFinance, unmatche
           <Line sub label="Discounts" cents={charges.discountCents} includes="Discounts staff added to a registration, net of reversals." href={payments("ACTIVE")} />
           <Line sub label="Scholarships" cents={charges.scholarshipCents} includes="Scholarships, pledged and funded, net of reversals." href={page("/finance/scholarship-fund")} linkLabel="Open the scholarship fund" />
           <Line label="Net due" cents={charges.netDueCents} includes="What these registrations owe in total: the registration totals, including church-billed ones." href={payments("ACTIVE")} />
+          <Line sub label="Staff price overrides" cents={charges.priceOverrideCents} includes="Already inside net due. The net change from staff setting one person's price, net of reversals: a positive amount raised what is owed, a negative one lowered it." href={payments("ACTIVE")} />
         </ul>
       </section>
 

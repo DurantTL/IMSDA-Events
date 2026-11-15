@@ -18,7 +18,10 @@ import { activeFinancialStatuses, attendeeBalanceCents, summarizeFinanceTotals }
  *   (DISCOUNT adjustments) and scholarships (SCHOLARSHIP adjustments), each net of reversals, over active
  *   registrations. Positive lowers what is owed.
  * - Gross charges: net due plus those reductions, rebuilt from the recorded discounts. It is an estimate and takes no
- *   part in the reconciliation. Corrections, meal and asset lines stay inside it.
+ *   part in the reconciliation. Corrections, meal and asset lines stay inside it, and so do staff price overrides.
+ * - Staff price overrides (#1509): the PRICE_OVERRIDE adjustment lines (one person's price set by staff), net of
+ *   reversals, over active registrations. Signed: positive raised what is owed, negative lowered it. Already inside
+ *   net due; shown on its own line so finance can see how much was changed by override. No part of any other figure.
  * - Church-billed: an active registration of a church-billed (deferred organization invoice) event. Its total is
  *   what the church owes after the event; it is never an attendee balance and is listed on its own line.
  * - Paid: gross SUCCEEDED payments, by method. Refunds: SUCCEEDED refunds of SUCCEEDED payments. Pending, failed and
@@ -60,6 +63,8 @@ export type MoneyReportRegistration = {
   promoReductionCents: number;
   discountReductionCents: number;
   scholarshipReductionCents: number;
+  /** Net staff price-override change already inside `totalAmountCents` (#1509), signed: positive raised what is owed. */
+  priceOverrideCents: number;
 };
 
 export type StatusTally = { count: number; cents: number };
@@ -76,7 +81,7 @@ export type MoneyReportInput = {
 export type ReconciliationLine = { key: string; label: string; cents: number; sign: "+" | "-" | "=" };
 
 export type MoneyReport = {
-  charges: { grossCents: number; promoCents: number; discountCents: number; scholarshipCents: number; netDueCents: number };
+  charges: { grossCents: number; promoCents: number; discountCents: number; scholarshipCents: number; netDueCents: number; priceOverrideCents: number };
   paid: { byMethod: Record<MoneyMethod, number>; totalCents: number };
   refundsCents: number;
   uncountedPayments: MoneyReportInput["uncountedPayments"];
@@ -115,6 +120,7 @@ export function buildMoneyReport(input: MoneyReportInput): MoneyReport {
   const promoCents = sum(active, (row) => row.promoReductionCents);
   const discountCents = sum(active, (row) => row.discountReductionCents);
   const scholarshipCents = sum(active, (row) => row.scholarshipReductionCents);
+  const priceOverrideCents = sum(active, (row) => row.priceOverrideCents);
 
   const byMethod = zeroMethods();
   for (const row of rows) for (const method of moneyMethods) byMethod[method] += row.grossPaidByMethod[method];
@@ -160,7 +166,7 @@ export function buildMoneyReport(input: MoneyReportInput): MoneyReport {
   const everyRegistrationPaidMatches = rows.every((row) => grossPaid(row) - row.refundedCents === row.paidCents);
 
   return {
-    charges: { grossCents: netDueCents + promoCents + discountCents + scholarshipCents, promoCents, discountCents, scholarshipCents, netDueCents },
+    charges: { grossCents: netDueCents + promoCents + discountCents + scholarshipCents, promoCents, discountCents, scholarshipCents, netDueCents, priceOverrideCents },
     paid: { byMethod, totalCents: totalPaid },
     refundsCents,
     uncountedPayments: input.uncountedPayments,
@@ -206,6 +212,7 @@ export function moneyReportCsvRows(eventName: string, report: MoneyReport, range
     ["Discounts", dollars(charges.discountCents), "Discount adjustments, net of reversals."],
     ["Scholarships", dollars(charges.scholarshipCents), "Scholarship adjustments, net of reversals (pledged and funded)."],
     ["Net due", dollars(charges.netDueCents), "Registration totals of active registrations, including church-billed ones."],
+    ["Staff price overrides", dollars(charges.priceOverrideCents), "Net change from staff setting one person's price, net of reversals, on active registrations. Already inside net due; positive raised what is owed, negative lowered it."],
     ...moneyMethods.map((method): Array<string | number> => [`Paid: ${moneyMethodLabels[method]}`, dollars(paid.byMethod[method]), "Successful payments, before refunds, on any registration of this event."]),
     ["Paid: total", dollars(paid.totalCents), "All successful payments, before refunds."],
     ["Refunds", dollars(report.refundsCents), "Successful refunds of successful payments."],

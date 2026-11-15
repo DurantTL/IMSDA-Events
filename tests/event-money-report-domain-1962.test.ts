@@ -29,6 +29,7 @@ function row(id: string, over: Partial<MoneyReportRegistration> & { gross?: Part
     promoReductionCents: 0,
     discountReductionCents: 0,
     scholarshipReductionCents: 0,
+    priceOverrideCents: 0,
     ...over,
   };
 }
@@ -58,6 +59,20 @@ describe("event money report (#1962)", () => {
     expect(report.refundsCents).toBe(11_000);
     expect(report.check.ok).toBe(true);
     expect(report.owing.map((entry) => entry.id)).toEqual(["a"]);
+  });
+
+  it("totals staff price overrides on their own line, active registrations only, without changing net due or gross (#1509)", () => {
+    const registrations = [
+      row("a", { totalAmountCents: 9000, priceOverrideCents: -1000 }),
+      row("b", { totalAmountCents: 12_500, priceOverrideCents: 2500 }),
+      row("c", { status: "CANCELLED", priceOverrideCents: -4000 }),
+    ];
+    const report = buildMoneyReport({ ...extras, registrations });
+    expect(report.charges.priceOverrideCents).toBe(1500);
+    expect(report.charges.netDueCents).toBe(21_500);
+    expect(report.charges.grossCents).toBe(21_500);
+    expect(report.check.ok).toBe(true);
+    expect(toCsv(moneyReportCsvRows("Test Event", report, "note"))).toContain('"Staff price overrides","15",');
   });
 
   it("never lists church-billed or inactive registrations as owing", () => {
