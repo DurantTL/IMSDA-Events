@@ -13,6 +13,10 @@ import {
   BULK_RECORD_UNIT,
   BulkActionError,
   EXPORT_FIELDS,
+  auditParams,
+  completedLabel,
+  messageSkipReason,
+  messageTemplateKey,
   NOT_COMPLETED_LIST_MAX,
   APPLYING_STALE_MINUTES,
   PREVIEW_TTL_MINUTES,
@@ -39,6 +43,8 @@ import {
   type SnapshotEntry,
   type StoredParams,
 } from "@/modules/bulk-actions/domain";
+import { getSelectedAudiencePreview } from "@/modules/communications/messaging-repository";
+import { selectedAudienceTemplateLabels } from "@/modules/communications/selected-audience-templates";
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
 import { registrationMoneyStatus } from "@/modules/registrations/status-words";
 import { enumerateOperationsRegistrationIds } from "@/modules/registrations/operations-search-repository";
@@ -90,18 +96,18 @@ async function requireTag(eventId: string, tagId: string, applying: boolean) {
 
 const tagHandler: ActionHandler = {
   async assertReady(viewer, params) {
-    if (params.action === "EXPORT_FIELDS") throw new BulkActionError("INVALID_REQUEST", "Choose a tag.");
+    if (params.action !== "APPLY_TAG" && params.action !== "REMOVE_TAG") throw new BulkActionError("INVALID_REQUEST", "Choose a tag.");
     const tag = await requireTag(viewer.eventId, params.tagId, params.action === "APPLY_TAG");
     return { proposed: params.action === "APPLY_TAG" ? `Apply the tag "${tag.name}"` : `Remove the tag "${tag.name}"` };
   },
   async skipsFor(eventId, params, ids) {
-    if (params.action === "EXPORT_FIELDS") return [];
+    if (params.action !== "APPLY_TAG" && params.action !== "REMOVE_TAG") return [];
     const have = await activeAssignments(getPrisma(), eventId, params.tagId, ids);
     return ids.filter((id) => (params.action === "APPLY_TAG" ? have.has(id) : !have.has(id)))
       .map((id) => ({ id, reason: (params.action === "APPLY_TAG" ? "ALREADY_APPLIED" : "NOT_APPLIED") as BulkReasonCode }));
   },
   async apply({ eventId, actorUserId, runId, params, ids, sink }) {
-    if (params.action === "EXPORT_FIELDS") return {};
+    if (params.action !== "APPLY_TAG" && params.action !== "REMOVE_TAG") return {};
     const have = await activeAssignments(getPrisma(), eventId, params.tagId, ids);
     const outcomes = sink;
     for (const [index, registrationId] of ids.entries()) {
@@ -242,11 +248,100 @@ const exportHandler: ActionHandler = {
   },
 };
 
+/**
+ * Queue a message for approval, or request missing information (which is the announcement template with the request as its
+ * text). Confirming only QUEUES: it never calls the selected-registration send and never writes the message outbox. A person
+ * with communications access sends it later from the approval step (`message-approvals.ts`).
+ */
+function messageText(params: BulkActionParams) {
+  if (params.action === "QUEUE_MESSAGE") return { title: params.announcementTitle, body: params.announcementBody };
+  if (params.action === "REQUEST_INFORMATION") return { title: params.title, body: params.details };
+  return { title: "", body: "" };
+}
+
+const messageHandler: ActionHandler = {
+  async assertReady(viewer, params) {
+    const templateKey = messageTemplateKey(params);
+    if (!templateKey) throw new BulkActionError("INVALID_REQUEST", "Choose which message to queue.");
+    // The same readiness the selected-registration send checks, read without any recipients.
+    const state = await getSelectedAudiencePreview(viewer.eventId, templateKey, []);
+    if (!state.templatePublished) throw new BulkActionError("INVALID_REQUEST", "The Custom message template has not been published for this event. Write and publish it in Communications, then preview again.", 409);
+    if (state.attachmentProblem) throw new BulkActionError("INVALID_REQUEST", state.attachmentProblem, 409);
+    const label = selectedAudienceTemplateLabels[templateKey];
+    const proposed = params.action === "REQUEST_INFORMATION"
+      ? `Request missing information: "${params.title}"`
+      : templateKey === "EVENT_ANNOUNCEMENT" ? `Queue the ${label.toLowerCase()} "${messageText(params).title}" for approval` : `Queue the ${label.toLowerCase()} for approval`;
+    return { proposed };
+  },
+  async skipsFor(eventId, params, ids) {
+    const templateKey = messageTemplateKey(params);
+    if (!templateKey || ids.length === 0) return [];
+    const preview = await getSelectedAudiencePreview(eventId, templateKey, ids);
+    return preview.skipped.map((skip) => ({ id: skip.registrationId, reason: messageSkipReason(skip.code) }));
+  },
+  async apply({ eventId, actorUserId, runId, params, ids, sink }) {
+    const templateKey = messageTemplateKey(params);
+    if (!templateKey || ids.length === 0) return {};
+    const prisma = getPrisma();
+    const preview = await getSelectedAudiencePreview(eventId, templateKey, ids);
+    const included = preview.recipients.map((recipient) => recipient.registrationId);
+    const skipped = new Map(preview.skipped.map((skip) => [skip.registrationId, messageSkipReason(skip.code)]));
+    const sendable = preview.templatePublished && !preview.attachmentProblem;
+    let approvalId: string | null = null;
+    if (sendable && included.length > 0) {
+      const text = messageText(params);
+      approvalId = randomUUID();
+      try {
+        // One run, one approval: the run id is unique. This row is all that confirming leaves behind; nothing is sent.
+        await prisma.bulkMessageApproval.create({
+          data: {
+            id: approvalId,
+            eventId,
+            runId,
+            action: params.action,
+            templateKey,
+            announcementTitle: templateKey === "EVENT_ANNOUNCEMENT" ? text.title : null,
+            announcementBody: templateKey === "EVENT_ANNOUNCEMENT" ? text.body : null,
+            registrationIds: included as Prisma.InputJsonValue,
+            queuedCount: included.length,
+            status: "PENDING_APPROVAL",
+            queuedByUserId: actorUserId,
+          },
+        });
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error;
+        // Already queued for this run: keep the one that exists.
+        approvalId = null;
+      }
+    }
+    const includedSet = new Set(included);
+    for (const registrationId of ids) {
+      if (includedSet.has(registrationId) && sendable) sink.push({ registrationId, outcome: "COMPLETED" });
+      else sink.push({ registrationId, outcome: skipped.has(registrationId) ? "SKIPPED" : "FAILED", reason: skipped.get(registrationId) ?? "NOT_QUEUED" });
+    }
+    if (approvalId) {
+      await writeAuditLog({
+        eventId,
+        actorUserId,
+        action: "BULK_MESSAGE_QUEUED",
+        entityType: "BulkMessageApproval",
+        entityId: approvalId,
+        correlationId: runId,
+        summary: `Queued a bulk message for approval (${selectedAudienceTemplateLabels[templateKey]}) for ${included.length} ${BULK_RECORD_UNIT}. Nothing was sent.`,
+        metadata: { action: params.action, templateKey, runId, queuedCount: included.length, skippedCount: ids.length - included.length, actorUserId } as Prisma.InputJsonValue,
+      });
+    }
+    return {};
+  },
+};
+
 /** One handler per action key. The type makes a missing handler a compile error. */
 const HANDLERS: Record<BulkActionKey, ActionHandler> = {
   APPLY_TAG: tagHandler,
   REMOVE_TAG: tagHandler,
   EXPORT_FIELDS: exportHandler,
+  QUEUE_MESSAGE: messageHandler,
+  REQUEST_INFORMATION: messageHandler,
 };
 
 /* ---------- shapes ---------- */
@@ -275,6 +370,8 @@ export type BulkSummary = {
   action: BulkActionKey;
   actionLabel: string;
   status: "PREVIEWED" | "APPLYING" | "APPLIED" | "EXPIRED";
+  /** What a COMPLETED record means for this action: "Queued for approval" for a message, so it is never read as sent. */
+  completedLabel: string;
   scope: { kind: "FILTER" | "SELECTED"; filters: string[] };
   recordUnit: string;
   candidateCount: number;
@@ -291,7 +388,10 @@ export type BulkConfirmResult = { summary: BulkSummary; file: ExportFile | null 
 /* ---------- helpers ---------- */
 
 export function runFingerprint(input: { action: BulkActionKey; params: StoredParams; queryString: string; scopeKind: "FILTER" | "SELECTED"; selectedIds: readonly string[] | null; snapshot: readonly SnapshotEntry[] }) {
-  const params = "fields" in input.params ? { fields: input.params.fields } : { tagId: input.params.tagId };
+  const params = "fields" in input.params ? { fields: input.params.fields }
+    : "tagId" in input.params ? { tagId: input.params.tagId }
+    : "details" in input.params ? { title: input.params.title, details: input.params.details }
+    : { templateKey: input.params.templateKey, announcementTitle: input.params.announcementTitle, announcementBody: input.params.announcementBody };
   return createHash("sha256").update(JSON.stringify({ a: input.action, p: params, q: input.queryString, k: input.scopeKind, s: input.selectedIds, r: input.snapshot })).digest("hex");
 }
 
@@ -405,10 +505,10 @@ export async function createBulkPreview(
     entityId: runId,
     correlationId: runId,
     summary: `Previewed a bulk action (${catalog.label}) on ${snapshot.length} ${BULK_RECORD_UNIT}.`,
-    metadata: { action, params: stored, queryString: auditQueryString(queryString), scopeKind, recordUnit: BULK_RECORD_UNIT, candidateCount: snapshot.length, actorUserId: viewer.userId } as Prisma.InputJsonValue,
+    metadata: { action, params: auditParams(stored), queryString: auditQueryString(queryString), scopeKind, recordUnit: BULK_RECORD_UNIT, candidateCount: snapshot.length, actorUserId: viewer.userId } as Prisma.InputJsonValue,
   });
 
-  const exclusions = (["ALREADY_APPLIED", "NOT_APPLIED"] as const).flatMap((reason) => {
+  const exclusions = [...new Set(skips.map((skip) => skip.reason))].flatMap((reason) => {
     const hit = skips.filter((skip) => skip.reason === reason);
     return hit.length === 0 ? [] : [{
       reason,
@@ -462,6 +562,7 @@ async function summarize(prisma: Db, run: RunRow, replayed: boolean): Promise<Bu
     action: run.action,
     actionLabel: BULK_ACTION_CATALOG[run.action].label,
     status: isStaleUnconfirmed(run) ? "EXPIRED" : run.status,
+    completedLabel: completedLabel(run.action),
     scope: { kind: run.scopeKind, filters: describeQueryFilters(run.queryString, { showText: false }) },
     recordUnit: run.recordUnit,
     candidateCount: run.candidateCount,
@@ -553,7 +654,7 @@ export async function confirmBulkAction(
     entityId: run.id,
     correlationId: run.id,
     summary: `Confirmed a bulk action (${BULK_ACTION_CATALOG[action].label}) on ${run.candidateCount} ${run.recordUnit}.`,
-    metadata: { action, params: storedParams(params), queryString: auditQueryString(run.queryString), scopeKind: run.scopeKind, candidateCount: run.candidateCount, actorUserId: viewer.userId } as Prisma.InputJsonValue,
+    metadata: { action, params: auditParams(storedParams(params)), queryString: auditQueryString(run.queryString), scopeKind: run.scopeKind, candidateCount: run.candidateCount, actorUserId: viewer.userId } as Prisma.InputJsonValue,
   });
 
   const pending: RecordOutcome[] = [];
@@ -646,7 +747,7 @@ async function finishRun(prisma: Db, run: RunRow, actorUserId: string, params: B
     summary: `Applied a bulk action (${BULK_ACTION_CATALOG[run.action].label}): ${counts.completed} completed, ${counts.skipped} skipped, ${counts.conflict} changed since preview, ${counts.failed} failed, ${counts.obsolete} no longer matching.`,
     metadata: {
       action: run.action,
-      params: stored,
+      params: auditParams(stored),
       queryString: auditQueryString(run.queryString),
       scopeKind: run.scopeKind,
       recordUnit: run.recordUnit,
@@ -732,6 +833,7 @@ export type RecentBulkAction = {
   previewedAt: string;
   actionLabel: string;
   status: BulkSummary["status"];
+  completedLabel: string;
   scope: { kind: "FILTER" | "SELECTED"; filters: string[] };
   candidateCount: number;
   counts: OutcomeCounts;
@@ -752,6 +854,7 @@ export async function listRecentBulkActions(eventId: string, take = 10, now: Dat
     previewedAt: run.previewedAt.toISOString(),
     actionLabel: BULK_ACTION_CATALOG[run.action].label,
     status: isStaleUnconfirmed(run) ? "EXPIRED" : run.status,
+    completedLabel: completedLabel(run.action),
     scope: { kind: run.scopeKind, filters: describeQueryFilters(run.queryString, { showText: false }) },
     candidateCount: run.candidateCount,
     counts: countsOf(run),

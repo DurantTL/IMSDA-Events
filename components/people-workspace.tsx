@@ -226,6 +226,7 @@ export function PeopleWorkspace({
   initialRegistrations,
   canEdit,
   canEmail,
+  bulkActionsHref,
   initialFilter = "ALL",
   initialRegistrationId,
   backgroundFlaggedAttendeeIds = [],
@@ -249,6 +250,8 @@ export function PeopleWorkspace({
   initialRegistrations: RegistrationRecord[];
   canEdit: boolean;
   canEmail: boolean;
+  /** The bulk actions page with this list's filters (#182). The ticked rows go there through the browser's session storage, never the URL. */
+  bulkActionsHref?: string;
   /** MANAGE_IMPORTS: shows the Imports link, which left the sidebar (#964). */
   /** System administrators only: the cross-event queue of possible duplicate people (#126). */
   initialFilter?: string;
@@ -354,6 +357,17 @@ export function PeopleWorkspace({
 
   const filtersActive = query.trim() !== "" || filter !== "ALL" || serverFiltered;
   // Server-side narrowing needs a reload to undo; the client search and status filter are cleared either way.
+  /** Hands the ticked ids to the bulk actions page. They travel in session storage under a key for this event; the URL only says "ticked". */
+  function openBulkActionsForSelected() {
+    if (!bulkActionsHref) return;
+    try {
+      window.sessionStorage.setItem(`bulk-selection:${eventId}`, JSON.stringify([...selectedIds]));
+    } catch {
+      // Storage can be blocked. The bulk page then says the ticked rows were not carried and uses the whole filter.
+    }
+    router.push(`${bulkActionsHref}${bulkActionsHref.includes("?") ? "&" : "?"}selection=ticked`);
+  }
+
   const clearHref = serverFiltered ? `/people?event=${encodeURIComponent(eventId)}` : undefined;
   // Nothing matches only when something narrowed a list that has rows; an empty event with a stray filter is just empty.
   const nothingYet = !filtersActive || (!serverFiltered && registrations.length === 0);
@@ -830,6 +844,7 @@ export function PeopleWorkspace({
               <>
                 <button className="text-button" type="button" onClick={() => setSelectedIds(new Set())}>Clear selection</button>
                 <button className="secondary-button outline-action" type="button" onClick={() => setEmailingSelection(true)}><MailPlus aria-hidden="true" size={16} /> Email selected</button>
+                {bulkActionsHref && <button className="text-button" type="button" onClick={openBulkActionsForSelected}>Bulk actions for selected</button>}
               </>
             )}
           </div>

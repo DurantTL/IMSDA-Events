@@ -2,9 +2,12 @@ import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { BulkActionsPanel } from "@/components/bulk-actions-panel";
+import { BulkMessageApprovals } from "@/components/bulk-message-approvals";
 import { PageHeader } from "@/components/page-header";
 import { BULK_ACTION_CATALOG, EXPORT_FIELDS, canonicalBulkQuery, describeQueryFilters } from "@/modules/bulk-actions/domain";
+import { listMessageApprovals } from "@/modules/bulk-actions/message-approvals";
 import { listRecentBulkActions } from "@/modules/bulk-actions/repository";
+import { selectedAudienceTemplateKeys, selectedAudienceTemplateLabels } from "@/modules/communications/selected-audience-templates";
 import { resolveEventContext } from "@/modules/events/selection";
 import { pickSearchParams } from "@/modules/registrations/operations-search-domain";
 import { enumerateOperationsRegistrationIds } from "@/modules/registrations/operations-search-repository";
@@ -28,7 +31,13 @@ export default async function BulkActionsPage({ searchParams }: { searchParams: 
   const found = await enumerateOperationsRegistrationIds({ eventId: event.id, permissions }, new URLSearchParams(queryString), undefined, issues);
   const canTag = permissions.includes("MANAGE_REGISTRATION");
   const canExport = permissions.includes("VIEW_REPORTS") && permissions.includes("VIEW_SENSITIVE_DATA");
-  const [tags, removableTags, recent] = await Promise.all([canTag ? listActiveTags(event.id) : Promise.resolve([]), canTag ? listTags(event.id) : Promise.resolve([]), listRecentBulkActions(event.id, 10)]);
+  const canMessage = permissions.includes("MANAGE_COMMUNICATIONS");
+  const [tags, removableTags, recent, approvals] = await Promise.all([
+    canTag ? listActiveTags(event.id) : Promise.resolve([]),
+    canTag ? listTags(event.id) : Promise.resolve([]),
+    listRecentBulkActions(event.id, 10),
+    canMessage ? listMessageApprovals({ eventId: event.id, userId: "", permissions }) : Promise.resolve(null),
+  ]);
   const carryNotes = String(Array.isArray(rawParams.notCarried) ? rawParams.notCarried[0] : rawParams.notCarried ?? "").split(",").filter((note) => note === "quick filter" || note === "form answer filter");
   const exportFields = EXPORT_FIELDS.filter((field) => field.permissions.some((needed) => permissions.includes(needed))).map((field) => ({ key: field.key, label: field.label, personal: field.personal }));
   const peopleHref = `/people${queryString ? `?${queryString}&` : "?"}event=${encodeURIComponent(event.id)}`;
@@ -37,7 +46,7 @@ export default async function BulkActionsPage({ searchParams }: { searchParams: 
     <section className="page-stack">
       <PageHeader
         title="Bulk actions"
-        description="Apply or remove a tag, or export chosen fields, for the registrations in the current filter. You review a preview first, then confirm."
+        description="Apply or remove a tag, export chosen fields, or queue a message or an information request for the registrations in the current filter. You review a preview first, then confirm. A message is never sent when you confirm: someone with communications access approves it first."
         actions={<li><a href={peopleHref}>Back to registrations</a></li>}
       />
       <BulkActionsPanel
@@ -52,11 +61,15 @@ export default async function BulkActionsPage({ searchParams }: { searchParams: 
         notCarried={carryNotes}
         canTag={canTag}
         canExport={canExport}
+        canMessage={canMessage}
+        templateChoices={selectedAudienceTemplateKeys.map((key) => ({ key, label: selectedAudienceTemplateLabels[key] }))}
+        selectionTicked={String(Array.isArray(rawParams.selection) ? rawParams.selection[0] : rawParams.selection ?? "") === "ticked"}
         exportFields={exportFields}
         hiddenFieldCount={EXPORT_FIELDS.length - exportFields.length}
-        limits={{ tag: BULK_ACTION_CATALOG.APPLY_TAG.maxRecords, export: BULK_ACTION_CATALOG.EXPORT_FIELDS.maxRecords }}
+        limits={{ tag: BULK_ACTION_CATALOG.APPLY_TAG.maxRecords, export: BULK_ACTION_CATALOG.EXPORT_FIELDS.maxRecords, message: BULK_ACTION_CATALOG.QUEUE_MESSAGE.maxRecords }}
         recent={recent}
       />
+      {approvals && <BulkMessageApprovals eventId={event.id} pending={approvals.pending} decided={approvals.decided} />}
     </section>
   </>;
 }
