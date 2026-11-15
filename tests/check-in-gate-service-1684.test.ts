@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => {
     }
   }
   class MockPassError extends Error {
-    constructor(public readonly code: string, message: string) {
+    constructor(public readonly code: string, message: string, public readonly registrationStatus?: string) {
       super(message);
     }
   }
@@ -301,10 +301,32 @@ describe("gate lookup by pass (#1684)", () => {
     expect(db.registrationAttendee.findMany).not.toHaveBeenCalled();
   });
 
-  it("treats a cancelled registration's pass as not registered", async () => {
+  it("treats a pass whose registration status is unknown as not registered", async () => {
     mocks.resolvePassLookupForEvent.mockRejectedValue(new mocks.MockPassError("REGISTRATION_NOT_ELIGIBLE", "no"));
     const response = await gateLookup(station, { kind: "pass", value: passValue });
     expect(response.outcome).toBe("NOT_REGISTERED");
+    expect(response.message).toBeNull();
+  });
+
+  it("sends a cancelled registration's pass to desk review, with no details", async () => {
+    mocks.resolvePassLookupForEvent.mockRejectedValue(new mocks.MockPassError("REGISTRATION_NOT_ELIGIBLE", "no", "CANCELLED"));
+    const response = await gateLookup(station, { kind: "pass", value: passValue });
+    expect(response).toEqual({
+      outcome: "NEEDS_DESK_REVIEW",
+      results: [],
+      moreAvailable: false,
+      message: "Needs desk review: this registration was cancelled. Send them to the check-in desk.",
+    });
+    expect(mocks.writeAuditLog.mock.calls.at(-1)?.[0].metadata).toMatchObject({ outcome: "NOT_ELIGIBLE", resultCount: 0, attendeeIds: [] });
+  });
+
+  it("uses the not active wording for a draft or waitlisted registration's pass", async () => {
+    for (const status of ["DRAFT", "WAITLISTED"]) {
+      mocks.resolvePassLookupForEvent.mockRejectedValue(new mocks.MockPassError("REGISTRATION_NOT_ELIGIBLE", "no", status));
+      const response = await gateLookup(station, { kind: "pass", value: passValue });
+      expect(response.outcome).toBe("NEEDS_DESK_REVIEW");
+      expect(response.message).toBe("Needs desk review: this registration is not active. Send them to the check-in desk.");
+    }
   });
 
   it("answers plainly for an expired pass and for one from another event", async () => {

@@ -50,6 +50,7 @@ const mocks = vi.hoisted(() => {
     checkLookupRateLimit: vi.fn(),
     requirePermission: vi.fn(),
     getCurrentSession: vi.fn(),
+    signOutThisBrowser: vi.fn(),
     cookieSet: vi.fn(),
     cookieGet: vi.fn(),
   };
@@ -59,6 +60,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({
   cookies: async () => ({ set: mocks.cookieSet, get: mocks.cookieGet }),
 }));
+vi.mock("@/modules/account-merge/sign-out", () => ({ signOutThisBrowser: mocks.signOutThisBrowser }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
 vi.mock("@/modules/access/authorization", () => ({
   AccessDeniedError: mocks.MockAccessDeniedError,
@@ -295,11 +297,35 @@ describe("check-in station API: payments (#892)", () => {
     expect(mocks.noteStationSquareAppPayment).toHaveBeenCalledWith(station, { registrationId: "registration_1", amountCents: 6200, receiptNumber: "R-1234" });
   });
 
-  it("stops the station and clears the cookie", async () => {
+  it("stops the station, signs the staff session out and clears the station cookie", async () => {
+    mocks.signOutThisBrowser.mockResolvedValue(true);
     const response = await stopPost(post("/api/check-in-station/stop", {}));
     expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ stopped: true, signedOut: true });
     expect(mocks.stopStation).toHaveBeenCalledWith(station);
-    expect(response.headers.get("set-cookie")).toContain("imsda_check_in_station=;");
+    expect(mocks.signOutThisBrowser).toHaveBeenCalledWith("staff");
+    expect(mocks.cookieSet).toHaveBeenCalledWith("imsda_check_in_station", "", expect.objectContaining({ maxAge: 0, path: "/" }));
+  });
+
+  it("still stops the station and clears its cookie when the sign-out fails", async () => {
+    mocks.signOutThisBrowser.mockResolvedValueOnce(false);
+    const failed = await stopPost(post("/api/check-in-station/stop", {}));
+    expect(failed.status).toBe(200);
+    expect(await failed.json()).toEqual({ stopped: true, signedOut: false });
+    expect(mocks.cookieSet).toHaveBeenCalledWith("imsda_check_in_station", "", expect.objectContaining({ maxAge: 0, path: "/" }));
+    mocks.signOutThisBrowser.mockRejectedValueOnce(new Error("down"));
+    const threw = await stopPost(post("/api/check-in-station/stop", {}));
+    expect(threw.status).toBe(200);
+    expect(mocks.stopStation).toHaveBeenCalledTimes(2);
+    expect(mocks.cookieSet).toHaveBeenCalledWith("imsda_check_in_station", "", expect.objectContaining({ maxAge: 0, path: "/" }));
+  });
+
+  it("does not sign anyone out when the station is already stopped (401)", async () => {
+    mocks.resolveStation.mockResolvedValue(null);
+    const response = await stopPost(post("/api/check-in-station/stop", {}));
+    expect(response.status).toBe(401);
+    expect(mocks.stopStation).not.toHaveBeenCalled();
+    expect(mocks.signOutThisBrowser).not.toHaveBeenCalled();
   });
 });
 

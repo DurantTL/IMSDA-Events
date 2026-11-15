@@ -162,9 +162,13 @@ export function CheckInStationScreen({
   const [stopError, setStopError] = useState("");
   const [stopped, setStopped] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  // True after a deliberate stop here, which signed this device out. A stop seen as a 401 did not.
+  const [signedOutHere, setSignedOutHere] = useState(false);
   const leavingHeading = useRef<HTMLHeadingElement>(null);
   const router = useRouter();
   const checkInHref = `/check-in?event=${encodeURIComponent(eventId)}`;
+  // The stop signs this device out, so the way back is the sign-in page, returning to this event's Check-in tab.
+  const signInHref = `/login?next=${encodeURIComponent(checkInHref)}`;
   const [unsyncedNames, setUnsyncedNames] = useState<string[]>([]);
   const queuedHeading = useRef<HTMLHeadingElement>(null);
   const noHandOut: HandOut = { keyTypes: [], rooms: [], attendeeIds: [] };
@@ -590,7 +594,8 @@ export function CheckInStationScreen({
       return;
     }
     setStopping(false);
-    // A deliberate stop with nothing waiting or needing attention goes straight back to the Check-in tab. A stop seen
+    if (response.ok) setSignedOutHere(true);
+    // A deliberate stop (which also signs this device out) with nothing waiting or needing attention goes straight to sign-in. A stop seen
     // as a 401 (stopped elsewhere), or one with names still to send to the desk, keeps the stopped screen.
     const nothingPending = response.ok
       && queueRef.current.length === 0
@@ -599,7 +604,7 @@ export function CheckInStationScreen({
       stoppedRef.current = true;
       writeJustIn(stationId, []);
       setLeaving(true);
-      router.replace(checkInHref);
+      router.replace(signInHref);
       return;
     }
     markStopped();
@@ -610,9 +615,9 @@ export function CheckInStationScreen({
       <main className={styles.cisShell}>
         <section className={styles.cisCard}>
           <h1 ref={leavingHeading} tabIndex={-1}>Check-in station</h1>
-          <p role="status">Station stopped. Going back to Check-in...</p>
+          <p role="status">Station stopped and signed out. Going to the sign-in page...</p>
           <p className={styles.cisActions}>
-            <Link href={checkInHref} className={`secondary-button ${styles.large}`}>Go to Check-in</Link>
+            <Link href={signInHref} className={`secondary-button ${styles.large}`}>Sign in to Check-in</Link>
           </p>
         </section>
       </main>
@@ -624,7 +629,9 @@ export function CheckInStationScreen({
       <main className={styles.cisShell}>
         <section className={styles.cisCard}>
           <h1>Check-in station</h1>
-          <p>This station is not active. Ask a staff member to start it again from Check-in.</p>
+          <p>{signedOutHere
+            ? "Station stopped and signed out."
+            : "This station is not active. Ask a staff member to start it again from Check-in."}</p>
           {unsyncedNames.length > 0 && (
             <p role="status" className={styles.cisDeskNotice}>
               <ShieldAlert aria-hidden="true" size={18} />
@@ -632,7 +639,9 @@ export function CheckInStationScreen({
             </p>
           )}
           <p className={styles.cisActions}>
-            <Link href={checkInHref} className={`secondary-button ${styles.large}`}>Go to Check-in</Link>
+            {signedOutHere
+              ? <Link href={signInHref} className={`secondary-button ${styles.large}`}>Sign in to Check-in</Link>
+              : <Link href={checkInHref} className={`secondary-button ${styles.large}`}>Go to Check-in</Link>}
           </p>
         </section>
       </main>
@@ -913,7 +922,7 @@ export function CheckInStationScreen({
         open={stopping}
         title="Stop this station?"
       >
-        <p>This device goes back to the Check-in tab.</p>
+        <p>This device signs out and goes back to the sign-in page.</p>
         {waiting > 0 && <p><strong>{stationStopQueueWarning(waiting)}</strong></p>}
       </ConfirmDialog>
     </main>

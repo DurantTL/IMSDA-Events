@@ -14,6 +14,8 @@ import { clubPassTokenPrefix } from "@/modules/checkin/club-pass-token";
 import { CheckInOperationError, checkInAttendee, undoCheckIn } from "@/modules/checkin/repository";
 import {
   GATE_MODE_OFF_MESSAGE,
+  STATION_CANCELLED_MESSAGE,
+  STATION_INACTIVE_REGISTRATION_MESSAGE,
   STATION_HISTORY_LIMIT,
   stationBadgeLine,
   stationBalanceReasonLabel,
@@ -65,9 +67,9 @@ export class StationServiceError extends Error {
           : code === "SEND_TO_DESK"
             ? "Send this person to the check-in desk."
             : code === "REGISTRATION_CANCELLED"
-              ? "Needs desk review: this registration was cancelled. Send them to the check-in desk."
+              ? STATION_CANCELLED_MESSAGE
               : code === "REGISTRATION_INACTIVE"
-                ? "Needs desk review: this registration is not active. Send them to the check-in desk."
+                ? STATION_INACTIVE_REGISTRATION_MESSAGE
                 : code === "BILLED_TO_GROUP"
               ? "This registration is billed to the church or group, so nothing is collected here."
               : code === "BALANCE_REASON_REQUIRED"

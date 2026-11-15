@@ -170,6 +170,11 @@ export function CheckInStationGate({
         {fieldError && <p id="cis-gate-field-error" className={styles.gateError}>{fieldError}</p>}
         {error && <p className={styles.gateError}>{error}</p>}
         {(response?.outcome === "SEARCH_BY_NAME" || response?.outcome === "NAME_OR_PASS_ONLY") && <p className={styles.gateNotice}>{response.message}</p>}
+        {response?.outcome === "NEEDS_DESK_REVIEW" && (
+          <article className={`${styles.gateResult} ${styles.stateYellow}`}>
+            <p className={styles.gateStatus}><ShieldAlert aria-hidden="true" size={22} /> <span>{response.message}</span></p>
+          </article>
+        )}
         {response?.outcome === "NOT_REGISTERED" && (
           <article className={`${styles.gateResult} ${stateClass("NOT_REGISTERED")}`}>
             <p className={styles.gateStatus}><StateIcon state="NOT_REGISTERED" /> {gateStateLabel("NOT_REGISTERED")}</p>

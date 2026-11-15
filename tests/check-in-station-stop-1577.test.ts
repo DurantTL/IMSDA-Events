@@ -13,6 +13,7 @@ import { stationQueueStorageKey } from "@/modules/checkin-stations/offline-queue
 /** #1577: where a device goes after Stop. Synthetic names and ids; fetch is a stand-in. */
 const stationId = "station_1";
 const eventId = "event_1";
+const signInHref = `/login?next=${encodeURIComponent("/check-in?event=event_1")}`;
 const queuedBatch = {
   id: "batch_1",
   queuedAt: "2026-11-10T15:00:00.000Z",
@@ -68,19 +69,19 @@ afterEach(() => {
 });
 
 describe("Stop station (#1577)", () => {
-  it("goes straight back to the Check-in tab for this event when nothing is waiting", async () => {
+  it("signs out and goes to sign-in, returning to this event, when nothing is waiting", async () => {
     stubFetch({ stop: { status: 200, body: { stopped: true } } });
     mount();
     await settle();
     await act(async () => { button("Stop station").click(); });
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("This device goes back to the Check-in tab.");
-    expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("sign in");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("This device signs out and goes back to the sign-in page.");
     await act(async () => { button("Cancel").click(); });
     await stopStation();
-    expect(replace).toHaveBeenCalledWith("/check-in?event=event_1");
+    expect(fetch).toHaveBeenCalledWith("/api/check-in-station/stop", expect.objectContaining({ method: "POST" }));
+    expect(replace).toHaveBeenCalledWith(signInHref);
     expect(document.querySelector("h1")?.textContent).toBe("Check-in station");
-    expect(document.body.textContent).toContain("Going back to Check-in");
-    expect(document.querySelector("a")?.getAttribute("href")).toBe("/check-in?event=event_1");
+    expect(document.body.textContent).toContain("Going to the sign-in page");
+    expect(document.querySelector("a")?.getAttribute("href")).toBe(signInHref);
     expect(document.activeElement).toBe(document.querySelector("h1"));
   });
 
@@ -91,9 +92,10 @@ describe("Stop station (#1577)", () => {
     await settle();
     await stopStation();
     expect(replace).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain("This station is not active");
+    expect(document.body.textContent).toContain("Station stopped and signed out.");
     expect(document.body.textContent).toContain("Pat Sample");
-    expect(document.querySelector("a")?.getAttribute("href")).toBe("/check-in?event=event_1");
+    expect(document.querySelector("a")?.getAttribute("href")).toBe(signInHref);
+    expect(document.querySelector("a")?.textContent).toBe("Sign in to Check-in");
   });
 
   it("keeps the stopped screen with the names when a check-in needs attention", async () => {
@@ -107,9 +109,10 @@ describe("Stop station (#1577)", () => {
     expect(document.body.textContent).toContain("Needs attention");
     await stopStation();
     expect(replace).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain("This station is not active");
+    expect(document.body.textContent).toContain("Station stopped and signed out.");
     expect(document.body.textContent).toContain("Pat Sample");
-    expect(document.querySelector("a")?.getAttribute("href")).toBe("/check-in?event=event_1");
+    expect(document.querySelector("a")?.getAttribute("href")).toBe(signInHref);
+    expect(document.querySelector("a")?.textContent).toBe("Sign in to Check-in");
   });
 
   it("keeps the stopped screen, with no redirect, when the stop was already done elsewhere (401)", async () => {
@@ -120,5 +123,6 @@ describe("Stop station (#1577)", () => {
     expect(replace).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain("This station is not active");
     expect(document.querySelector("a")?.getAttribute("href")).toBe("/check-in?event=event_1");
+    expect(document.querySelector("a")?.textContent).toBe("Go to Check-in");
   });
 });
