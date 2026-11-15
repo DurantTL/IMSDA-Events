@@ -507,7 +507,7 @@ recent activity first (Square still holds the payments).
      --network postgresql_9kgaw_239292_xcloud-network \
      -v imsda_events_backups:/backups:ro --entrypoint sh \
      ghcr.io/duranttl/imsda-events-backup:main -c '
-       set -e
+       set -e -o pipefail   # a failed pg_restore stops here
        DB="${DATABASE_URL%%\?*}"   # psql refuses Prisma-only options such as ?schema=
        # COMMIT is sent only if pg_restore read the whole copy; without it
        # psql ends and PostgreSQL rolls the transaction back.
