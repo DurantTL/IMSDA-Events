@@ -497,9 +497,10 @@ export function CommunicationsWorkspace({
   function previewEmailLook(look: EmailLook | null | undefined): EmailLook | null {
     return look ? { primary: look.primary, accent: look.accent, eventName: look.eventName } : null;
   }
-  // A message not yet attempted has no stamp; delivery will stamp the look published then, so it previews as the current one.
-  function messageEmailLook(message: { emailLook?: EmailLook | null; status: string; attemptCount: number }) {
-    const queued = message.attemptCount === 0 && (message.status === "PENDING" || message.status === "PROCESSING");
+  // A queued message with no stamp yet (never tried, or every earlier try ended before the stamp) gets the look published
+  // when delivery next tries it, so it previews as the current one.
+  function messageEmailLook(message: { emailLook?: EmailLook | null; status: string }) {
+    const queued = message.status === "PENDING" || message.status === "PROCESSING";
     return previewEmailLook(message.emailLook ?? (queued ? messaging?.currentEmailLook : null));
   }
   function withPreviewImages(html: string) {

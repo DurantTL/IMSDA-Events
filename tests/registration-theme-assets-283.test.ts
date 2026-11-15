@@ -163,7 +163,7 @@ describe("client bundles stay free of sharp", () => {
   it("keeps the client-safe checks module and the staff panel's local imports free of sharp and Node modules", () => {
     const imports = (file: string) => read(file).split("\n").filter((line) => /^\s*(import|export) .* from |import\(/.test(line)).join("\n");
     expect(imports("modules/registration-themes/assets.ts")).toBe("");
-    expect(read("modules/registration-themes/assets.ts")).not.toMatch(/import\(|require\(/);
+    expect(read("modules/registration-themes/assets.ts")).not.toMatch(/import\(|require\(|from\s+"|^\s*import\s/m);
     expect(imports("components/registration-theme-panel.tsx")).not.toMatch(/sharp|assets-server|node:|registration-themes\/repository"$/m);
     expect(imports("components/registration-theme-panel.tsx")).not.toMatch(/^import (?!type)[^\n]*registration-themes\/repository"/m);
     // The sharp reader exists only in the server-only module.

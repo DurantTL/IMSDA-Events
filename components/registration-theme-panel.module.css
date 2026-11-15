@@ -242,7 +242,8 @@
   border-radius: var(--radius-container);
 }
 
-.imageOption {
+/* Scoped under the list so it beats the shared `.form-stack label { display: grid }` rule. */
+.pickerList .imageOption {
   display: flex;
   min-height: 44px;
   align-items: center;

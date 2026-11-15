@@ -398,6 +398,14 @@ export async function findEventAssetForStaff(eventId: string, assetId: string) {
   });
 }
 
+/** The registration look versions whose logo and banner the public view may serve (#283). */
+function themeVersionAccess(eventSlug: string) {
+  return {
+    event: { slug: eventSlug },
+    OR: [{ status: "PUBLISHED" as const }, { status: "ARCHIVED" as const, messages: { some: {} } }],
+  };
+}
+
 /**
  * Public view: an asset is reachable only while it belongs to the named
  * *published* event, and a *published* section of that same event links to
@@ -412,16 +420,10 @@ export async function findEventAssetForStaff(eventId: string, assetId: string) {
  * somewhere else. Scoping to `eventSlug` (the event whose page is being
  * rendered) closes both. Unpublishing a section (or disabling/archiving a
  * product, or pulling catalog approval) takes its files down with it, which
- * is what unpublishing is for. The logo and banner of a published or archived
- * registration look (#283) are reachable the same way; a draft look's are not.
+ * is what unpublishing is for. The logo and banner of the published
+ * registration look (#283) are reachable the same way, and an archived look's
+ * only while an email sent with it still exists; a draft look's never are.
  */
-function themeVersionAccess(eventSlug: string) {
-  return {
-    event: { slug: eventSlug },
-    OR: [{ status: "PUBLISHED" as const }, { status: "ARCHIVED" as const, messages: { some: {} } }],
-  };
-}
-
 export async function findPublishedEventAsset(eventSlug: string, assetId: string) {
   return getPrisma().eventAsset.findFirst({
     where: {
