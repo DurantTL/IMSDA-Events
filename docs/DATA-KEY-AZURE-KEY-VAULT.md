@@ -268,14 +268,22 @@ From the restart in step 6 on, every new save of personal data is sealed with th
 data key, even before step 7 moves the older values.
 
 - Going back is only safe when no value has been sealed with the data key. Read
-  `npm run key:check`: in the lines for the six personal-data columns
+  `npm run key:check`. The data key line must show the key loaded (`version N`).
+  Then, in the lines for the six personal-data columns
   (`ClubRosterMember.sealedBirthDate`, `BackgroundCheckEntry.sealedBirthDate`,
   `ClubFormSubmission.sealedSensitiveAnswers`, `CalendarFeed.sealedUrl`,
-  `HealthRecordField.sealedValue`, `HealthRecordSnapshotField.sealedValue`) every
-  line must show `0 current`. A value sealed with the data key counts as
-  "current", and a value still on the sign-in key counts as "older" (and "not
-  moved to the data key yet"). In practice that means nothing was saved since
-  step 6 and step 7 was not run. Then unset `DATA_KEY_SOURCE` and redeploy.
+  `HealthRecordField.sealedValue`, `HealthRecordSnapshotField.sealedValue`),
+  every line must show all of these:
+  - `0 current` and `0 unreadable`;
+  - the "not moved to the data key yet" count equal to the `older` count and to
+    the `total` (a line with `0 total` is fine).
+
+  A value still on the sign-in key is counted as "not moved to the data key
+  yet". A value sealed with an older version of the data key is counted as
+  "older" but not as "not moved", so if `older` is higher than "not moved" on
+  any line, going back is **not** safe. In practice going back is only possible
+  when nothing was saved since step 6, step 7 was not run and the data key was
+  never rotated. Then unset `DATA_KEY_SOURCE` and redeploy.
 - In every other case, **keep the vault** and the wrapped key settings. Values
   sealed with the data key can only be opened with it. Do not unset
   `DATA_KEY_SOURCE`, and do not delete the vault key or its backup.

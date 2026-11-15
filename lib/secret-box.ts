@@ -330,7 +330,10 @@ function dataKeyForVersion(version: number): DataKeyMaterial {
   if (ring.previous && version === ring.previous.version) return ring.previous;
   // A previous key is configured but could not be loaded: a value on any other version may be sealed with it, so it is
   // locked (retried in the background), not a damaged value.
-  if (ring.previousProblem) throw new DataKeyUnavailableError("The stored value may be sealed with the previous personal-data key, which is not loaded right now.");
+  if (ring.previousProblem) {
+    void ensureDataKeyLoaded();
+    throw new DataKeyUnavailableError("The stored value may be sealed with the previous personal-data key, which is not loaded right now.");
+  }
   throw new SecretBoxError(`The stored value was sealed with data key version ${version}, which is not loaded.`);
 }
 
@@ -425,7 +428,9 @@ export function isSealedDataLocked(sealed: string): boolean {
   }
   if (version === ring.current.version) return false;
   if (ring.previous && version === ring.previous.version) return false;
-  return Boolean(ring.previousProblem);
+  if (!ring.previousProblem) return false;
+  void ensureDataKeyLoaded();
+  return true;
 }
 
 /** The data key version new values are sealed with. Throws `DataKeyUnavailableError` when a separate key is not loaded. */

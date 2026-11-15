@@ -2,6 +2,7 @@ import "server-only";
 
 import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
 import { getPrisma } from "@/lib/prisma";
+import { DataKeyUnavailableError, isSealedDataLocked } from "@/lib/secret-box";
 import { logError } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { AccessDeniedError } from "@/modules/access/authorization";
@@ -197,6 +198,11 @@ export async function viewSealedSnapshots(viewer: HealthViewer, personId: string
       fields: { select: { fieldKey: true, sealedValue: true } },
     },
   });
+  // A copy whose key is not loaded is refused before anything is recorded, as for the live record: no break-glass use
+  // and no view entry for copies that could not be shown.
+  if (rows.some((row) => row.fields.some((field) => isHealthFieldKey(field.fieldKey) && isSealedDataLocked(field.sealedValue)))) {
+    throw new DataKeyUnavailableError("The sealed health copies are locked because the personal-data key is not loaded right now.");
+  }
   const kind: BreakGlassUseKind = "SEALED_COPIES";
   await prisma.$transaction(async (tx) => {
     await recordBreakGlassUse(tx, { grantId: grant.id, userId: admin.userId, personId, kind });
