@@ -3,7 +3,7 @@
 Status: **Accepted.** Approved by Caleb Durant, Communication Director, on
 2026-11-02 ([his approval on #189](https://github.com/DurantTL/IMSDA-Events/issues/189#issuecomment-6580955085)). This is the deliverable GitHub issue #189
 asked for. The human test restore of the key backup is tracked separately.
-Addenda D–F below are still Proposed. Addendum H (health records after the site is retired) is Accepted.
+Addenda D–F below are still Proposed; Addenda G and H are Accepted.
 
 Date: 2026-08-09
 
@@ -1328,11 +1328,13 @@ the sealed copy rule of 2026-10-14 (#924, Addendum B) and changes nothing else.
   the daily retention job that deletes expired copies stops with the site.
 - **Decision: a written shutdown kit, no new software.** The kit is the last
   site image, the final database backup and the encryption key, kept together
-  as one set but stored apart (the key only in the conference password manager).
+  as one set but stored apart (the key only in its two offline copies, the
+  conference password manager and the custodian's sealed printed copy, as
+  `docs/DEPLOY-DOCKER.md` already requires).
   The runbook is `docs/HEALTH-RECORDS-SHUTDOWN-KIT.md`.
 - **Custodian: the conference IT lead.** The custodian keeps the key and the kit,
   is the only person who starts the old site, and does so on a computer they
-  control, reachable from that computer only, for a lookup this ADR already
+  control, listening on that computer only (localhost), for a lookup this ADR already
   allows. The lookup uses the normal permissions, break-glass and access log;
   a new backup afterwards keeps the access log entry; then the site is shut
   down and the working copy deleted.
