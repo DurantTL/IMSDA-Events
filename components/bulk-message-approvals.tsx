@@ -115,6 +115,7 @@ export function BulkMessageApprovals({ eventId, pending, decided }: Props) {
       router.refresh();
     } catch {
       setError("The answer was lost. Reload this page to see whether the message was declined.");
+      setConfirmingDecline(false);
     } finally {
       setBusy(null);
     }

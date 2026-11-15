@@ -29,7 +29,7 @@ vi.mock("@/modules/communications/messaging-repository", () => ({
 }));
 
 import { BulkActionError } from "@/modules/bulk-actions/domain";
-import { approveMessage, declineMessage, getMessageApprovalReview, listMessageApprovals, type ApprovalViewer } from "@/modules/bulk-actions/message-approvals";
+import { approveMessage, declineMessage, isReservedBatchId, getMessageApprovalReview, listMessageApprovals, type ApprovalViewer } from "@/modules/bulk-actions/message-approvals";
 import { confirmBulkAction, createBulkPreview, listRecentBulkActions, type BulkActionViewer } from "@/modules/bulk-actions/repository";
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -342,7 +342,7 @@ describe("a send that committed but was not recorded", () => {
 
   it("is marked SENT, not reset to waiting, when the send failed after its batch was written", async () => {
     const approvalId = await queuedOne();
-    batchAudit = { metadata: { includedCount: 2, skippedCount: 2 } };
+    batchAudit = { metadata: { batchId: approvalId, templateKey: "BALANCE_REMINDER", selectedCount: 2, includedCount: 2, skippedCount: 2 } };
     batchMessages = [{ status: "CAPTURED" }, { status: "CAPTURED" }];
     mocks.enqueue.mockRejectedValueOnce(new Error("capture failed after commit"));
     const decision = await approveMessage(approver(), approvalId, FINGERPRINT, { now: NOW });
@@ -363,11 +363,60 @@ describe("a send that committed but was not recorded", () => {
     const approvalId = await queuedOne();
     approvals[0].status = "SENDING";
     approvals[0].updatedAt = new Date(NOW.getTime() - 11 * 60_000);
-    batchAudit = { metadata: { includedCount: 2, skippedCount: 2 } };
+    batchAudit = { metadata: { batchId: approvalId, templateKey: "BALANCE_REMINDER", selectedCount: 2, includedCount: 2, skippedCount: 2 } };
     batchMessages = [{ status: "PENDING" }, { status: "SUPPRESSED" }];
     const decision = await approveMessage(approver(), approvalId, STALE_FINGERPRINT, { now: NOW });
     expect(decision).toMatchObject({ status: "SENT", sendResult: { queued: 1, suppressed: 1 } });
     expect(mocks.enqueue).not.toHaveBeenCalled();
+  });
+});
+
+describe("recording a send that already exists", () => {
+  async function queuedOne() {
+    await queue();
+    return approvals[0].id as string;
+  }
+
+  it("does not count a batch of another template or size as this approval's", async () => {
+    const approvalId = await queuedOne();
+    batchAudit = { metadata: { batchId: approvalId, templateKey: "EVENT_ANNOUNCEMENT", selectedCount: 2, includedCount: 2, skippedCount: 0 } };
+    mocks.enqueue.mockRejectedValueOnce(new mocks.MessagingError("IDEMPOTENCY_KEY_REUSED", "used"));
+    await expect(approveMessage(approver(), approvalId, FINGERPRINT)).rejects.toMatchObject({ code: "IDEMPOTENCY_KEY_REUSED" });
+    expect(approvals[0].status).toBe("PENDING_APPROVAL");
+    batchAudit = { metadata: { batchId: approvalId, templateKey: "BALANCE_REMINDER", selectedCount: 9, includedCount: 9, skippedCount: 0 } };
+    mocks.enqueue.mockRejectedValueOnce(new mocks.MessagingError("IDEMPOTENCY_KEY_REUSED", "used"));
+    await expect(approveMessage(approver(), approvalId, FINGERPRINT)).rejects.toMatchObject({ code: "IDEMPOTENCY_KEY_REUSED" });
+    expect(approvals[0].status).toBe("PENDING_APPROVAL");
+  });
+
+  it("leaves the row SENDING when the existence check itself fails, so a later approval can take it over", async () => {
+    const approvalId = await queuedOne();
+    mocks.enqueue.mockRejectedValueOnce(new Error("capture failed"));
+    const db = mocks.getPrisma();
+    db.auditLog.findFirst.mockRejectedValueOnce(new Error("lookup failed"));
+    await expect(approveMessage(approver(), approvalId, FINGERPRINT, { now: NOW })).rejects.toThrow("lookup failed");
+    expect(approvals[0].status).toBe("SENDING");
+    // Not stale yet: refused. Stale: taken over, and the existing batch is recorded.
+    expect((await refusal(approveMessage(approver(), approvalId, FINGERPRINT, { now: NOW }))).code).toBe("IN_PROGRESS");
+    approvals[0].updatedAt = new Date(NOW.getTime() - 11 * 60_000);
+    batchAudit = { metadata: { batchId: approvalId, templateKey: "BALANCE_REMINDER", selectedCount: 2, includedCount: 2, skippedCount: 2 } };
+    await expect(approveMessage(approver(), approvalId, FINGERPRINT, { now: NOW })).resolves.toMatchObject({ status: "SENT" });
+  });
+
+  it("answers not found when the row is gone after a failed claim", async () => {
+    const approvalId = await queuedOne();
+    const db = mocks.getPrisma();
+    // The claim matches nothing and the reload finds nothing.
+    db.bulkMessageApproval.updateMany.mockImplementationOnce(async () => { approvals = []; return { count: 0 }; });
+    const error = await refusal(approveMessage(approver(), approvalId, FINGERPRINT));
+    expect(error.code).toBe("NOT_FOUND");
+    expect(error.message).toBe("This message is no longer waiting for approval.");
+  });
+
+  it("reserves the batch id of a queued message within its own event", async () => {
+    const approvalId = await queuedOne();
+    expect(await isReservedBatchId("event-1", approvalId)).toBe(true);
+    expect(await isReservedBatchId("event-1", "11111111-1111-4111-8111-111111111111")).toBe(false);
   });
 });
 
@@ -381,6 +430,14 @@ describe("a run that cannot record its outcomes", () => {
     expect(mocks.enqueue).not.toHaveBeenCalled();
   });
 
+  it("notes in the audit trail that a removed queued message was withdrawn", async () => {
+    const preview = await createBulkPreview(viewer(), messageInput());
+    failOutcomeWrites = true;
+    await confirmBulkAction(viewer(), preview.runId, KEY);
+    const withdrawn = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "BULK_MESSAGE_WITHDRAWN");
+    expect(withdrawn).toMatchObject({ summary: "Queued message removed: the bulk action did not finish.", entityId: preview.runId });
+  });
+
   it("writes the approval and its audit row in one transaction, and neither when the audit row fails", async () => {
     const preview = await createBulkPreview(viewer(), messageInput());
     mocks.writeAuditLog.mockImplementation(async (entry: { action: string }) => { if (entry.action === "BULK_MESSAGE_QUEUED") throw new Error("audit failed"); });
@@ -388,6 +445,31 @@ describe("a run that cannot record its outcomes", () => {
     await confirmBulkAction(viewer(), preview.runId, KEY);
     expect(approvals).toHaveLength(0);
     expect(outcomes.every((row) => row.outcome === "FAILED")).toBe(true);
+  });
+});
+
+describe("recovering a run that stopped after queueing", () => {
+  async function stuckRun() {
+    const preview = await createBulkPreview(viewer(), messageInput());
+    const run = runs.find((row) => row.id === preview.runId)!;
+    Object.assign(run, { status: "APPLYING", idempotencyKey: KEY, confirmedAt: new Date(NOW.getTime() - 20 * 60_000) });
+    approvals.push({ id: "approval-x", eventId: "event-1", runId: run.id, action: "QUEUE_MESSAGE", templateKey: "BALANCE_REMINDER", registrationIds: ["reg-1"], queuedCount: 1, status: "PENDING_APPROVAL", queuedByUserId: "user-a", decidedByUserId: null, decidedAt: null, sendResult: null, createdAt: NOW, updatedAt: NOW });
+    return run;
+  }
+
+  it("removes the waiting approval when nothing was recorded as done", async () => {
+    const run = await stuckRun();
+    const { summary } = await confirmBulkAction(viewer(), run.id, KEY, { now: NOW });
+    expect(summary.counts.completed).toBe(0);
+    expect(approvals).toHaveLength(0);
+    expect(mocks.writeAuditLog.mock.calls.map(([entry]) => entry.action)).toContain("BULK_MESSAGE_WITHDRAWN");
+  });
+
+  it("keeps the approval when some outcome was recorded as done", async () => {
+    const run = await stuckRun();
+    outcomes.push({ runId: run.id, registrationId: "reg-1", outcome: "COMPLETED", reason: null });
+    await confirmBulkAction(viewer(), run.id, KEY, { now: NOW });
+    expect(approvals).toHaveLength(1);
   });
 });
 

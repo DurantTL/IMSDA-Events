@@ -152,3 +152,53 @@ describe("Registration detail on a phone (#1574)", () => {
     expect(css).toMatch(/position: sticky;/);
   });
 });
+
+describe("Selection bar gating for bulk actions (#182)", () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+  afterEach(() => document.body.replaceChildren());
+
+  async function mount(props: Record<string, unknown>) {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => root.render(createElement(PeopleWorkspace, { ...base, initialRegistrations: records, bulkActionsHref: "/people/bulk-actions?event=event-1", ...props } as never)));
+    return { host, root };
+  }
+
+  it("shows tick boxes and the bulk link, but not Email selected, to someone who can only run bulk actions", async () => {
+    const { host, root } = await mount({ canEmail: false, canBulk: true });
+    const boxes = host.querySelectorAll('.record-select input[type="checkbox"]');
+    expect(boxes.length).toBeGreaterThan(0);
+    expect(host.textContent).toContain("Tick registrations to use bulk actions");
+    expect(host.querySelector(".record-select .sr-only")?.textContent).toBe("Select TEST-1001 for bulk actions");
+    await act(async () => { (boxes[0] as HTMLInputElement).click(); });
+    const labels = [...host.querySelectorAll(".selection-bar button")].map((button) => button.textContent);
+    expect(labels).toContain("Bulk actions for selected");
+    expect(labels.join(" ")).not.toContain("Email selected");
+    await act(async () => root.unmount());
+  });
+
+  it("shows no tick boxes and no selection bar to someone with no bulk action and no email access", async () => {
+    const { host, root } = await mount({ canEmail: false, canBulk: false });
+    expect(host.querySelector(".record-select")).toBeNull();
+    expect(host.querySelector(".selection-bar")).toBeNull();
+    await act(async () => root.unmount());
+  });
+
+  it("keeps both Email selected and the bulk link for someone with both", async () => {
+    const { host, root } = await mount({ canEmail: true, canBulk: true });
+    await act(async () => { (host.querySelector('.record-select input[type="checkbox"]') as HTMLInputElement).click(); });
+    const labels = [...host.querySelectorAll(".selection-bar button")].map((button) => button.textContent).join(" ");
+    expect(labels).toContain("Email selected");
+    expect(labels).toContain("Bulk actions for selected");
+    await act(async () => root.unmount());
+  });
+
+  it("the People page computes canBulk from the base access plus one bulk permission", () => {
+    const page = readFileSync("app/(workspace)/people/page.tsx", "utf8");
+    expect(page).toContain('canBulk={permissions.includes("VIEW_SENSITIVE_DATA") && (permissions.includes("MANAGE_REGISTRATION") || permissions.includes("MANAGE_COMMUNICATIONS") || permissions.includes("VIEW_REPORTS"))}');
+  });
+});

@@ -194,8 +194,9 @@ export async function approveMessage(viewer: ApprovalViewer, approvalId: string,
   });
   if (claimed.count !== 1) {
     const current = await loadApproval(viewer.eventId, approvalId);
-    if (current?.status === "SENT") return decision(current, true);
-    if (current?.status === "DECLINED") throw new BulkActionError("ALREADY_DECIDED", "This message was declined and will not be sent.", 409);
+    if (!current) throw new BulkActionError("NOT_FOUND", "This message is no longer waiting for approval.", 404);
+    if (current.status === "SENT") return decision(current, true);
+    if (current.status === "DECLINED") throw new BulkActionError("ALREADY_DECIDED", "This message was declined and will not be sent.", 409);
     throw new BulkActionError("IN_PROGRESS", "This message is being sent. Check Messages waiting for approval in a moment.", 409);
   }
 
@@ -217,7 +218,8 @@ export async function approveMessage(viewer: ApprovalViewer, approvalId: string,
     }, viewer.userId);
   } catch (error) {
     // The send may have committed before the failure (a crash, or a step after the commit). If the batch exists it is SENT.
-    const done = await recordIfAlreadySent(viewer, row, now).catch(() => null);
+    // If that check itself fails the row stays SENDING: a later approval takes it over once it is stale.
+    const done = await recordIfAlreadySent(viewer, row, now);
     if (done) return done;
     // Nothing was written: it goes back to waiting, with the same id.
     await prisma.bulkMessageApproval.updateMany({ where: { id: row.id, eventId: viewer.eventId, status: "SENDING" }, data: { status: "PENDING_APPROVAL" } });
@@ -231,10 +233,16 @@ export async function approveMessage(viewer: ApprovalViewer, approvalId: string,
     captured: operation.capturedCount,
     suppressed: operation.suppressedCount,
   };
-  await prisma.bulkMessageApproval.updateMany({
+  const marked = await prisma.bulkMessageApproval.updateMany({
     where: { id: row.id, eventId: viewer.eventId, status: "SENDING" },
     data: { status: "SENT", decidedByUserId: viewer.userId, decidedAt: now, sendResult: sendResult as Prisma.InputJsonValue },
   });
+  if (marked.count !== 1) {
+    // Someone else recorded it in the meantime: return what is stored and write no second audit row.
+    const stored = await loadApproval(viewer.eventId, approvalId);
+    if (!stored) throw new BulkActionError("NOT_FOUND", "This message is no longer waiting for approval.", 404);
+    return decision(stored, true);
+  }
   await writeAuditLog({
     eventId: viewer.eventId,
     actorUserId: viewer.userId,
@@ -261,6 +269,9 @@ async function recordIfAlreadySent(viewer: ApprovalViewer, row: ApprovalRow, now
   });
   if (!audit) return null;
   const metadata = audit.metadata && typeof audit.metadata === "object" && !Array.isArray(audit.metadata) ? audit.metadata as Record<string, unknown> : {};
+  // Only a batch that is this approval's own: the same batch id and template, and the same number of registrations.
+  if (metadata.batchId !== row.id || metadata.templateKey !== row.templateKey) return null;
+  if (typeof metadata.selectedCount === "number" && metadata.selectedCount !== idsOf(row.registrationIds).length) return null;
   const messages = await prisma.messageOutbox.findMany({ where: { eventId: viewer.eventId, correlationId: row.id }, select: { status: true } });
   const num = (value: unknown) => (typeof value === "number" ? value : 0);
   const sendResult: SendResultCounts = {
@@ -270,10 +281,11 @@ async function recordIfAlreadySent(viewer: ApprovalViewer, row: ApprovalRow, now
     captured: messages.filter((message) => message.status === "CAPTURED").length,
     suppressed: messages.filter((message) => message.status === "SUPPRESSED").length,
   };
-  await prisma.bulkMessageApproval.updateMany({
+  const marked = await prisma.bulkMessageApproval.updateMany({
     where: { id: row.id, eventId: viewer.eventId, status: { in: ["SENDING", "PENDING_APPROVAL"] } },
     data: { status: "SENT", decidedByUserId: viewer.userId, decidedAt: now, sendResult: sendResult as Prisma.InputJsonValue },
   });
+  if (marked.count !== 1) return { id: row.id, status: "SENT", sendResult, replayed: true };
   await writeAuditLog({
     eventId: viewer.eventId,
     actorUserId: viewer.userId,
@@ -314,4 +326,10 @@ export async function declineMessage(viewer: ApprovalViewer, approvalId: string,
     metadata: { action: row.action, templateKey: row.templateKey, runId: row.runId, queuedCount: row.queuedCount, actorUserId: viewer.userId } as Prisma.InputJsonValue,
   });
   return { id: row.id, status: "DECLINED", sendResult: null, replayed: false };
+}
+
+/** Batch ids of queued bulk messages are reserved for their approval. */
+export async function isReservedBatchId(eventId: string, batchId: string) {
+  const found = await getPrisma().bulkMessageApproval.findFirst({ where: { id: batchId, eventId }, select: { id: true } });
+  return found !== null;
 }

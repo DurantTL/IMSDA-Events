@@ -121,6 +121,7 @@ import {
   selectedAudienceConfirmationTemplateKeys,
   type SelectedAudiencePreview,
   type SelectedAudienceTemplateKey,
+  selectedAudienceTemplateLabels,
 } from "@/modules/communications/selected-audience";
 import { enqueueSelectedAudienceMessage, isRegistrationConfirmation } from "@/modules/communications/transactional-messages";
 import {
@@ -4050,7 +4051,7 @@ export async function enqueueSelectedAudienceBatch(
         if (!state.preview.templatePublished) {
           throw new MessagingError(
             "TEMPLATE_NOT_PUBLISHED",
-            "The Custom message template has not been published for this event. Write and publish it in Communications, then try again.",
+            `The ${selectedAudienceTemplateLabels[input.templateKey]} template has not been published for this event. Write and publish it in Communications, then try again.`,
             { selectedAudiencePreview: state.preview },
           );
         }

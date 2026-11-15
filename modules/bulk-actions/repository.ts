@@ -84,7 +84,7 @@ type ActionHandler = {
   skipsFor(eventId: string, params: BulkActionParams, ids: readonly string[]): Promise<PreviewSkip[]>;
   /** Apply to records that passed the apply-time checks. One record failing never stops the rest. */
   /** Called when the run could not record its outcomes after `apply` ran: undo anything `apply` left that could act later. */
-  cleanup?(input: { eventId: string; runId: string }): Promise<void>;
+  cleanup?(input: { eventId: string; runId: string; actorUserId: string }): Promise<void>;
   apply(input: { eventId: string; actorUserId: string; runId: string; params: BulkActionParams; ids: readonly string[]; /** Each record's outcome is pushed here as it is reached, so a throw part-way keeps what was done. */ sink: OutcomeSink }): Promise<{ file?: ExportFile; exportRowCount?: number }>;
 };
 
@@ -281,9 +281,21 @@ const messageHandler: ActionHandler = {
     const preview = await getSelectedAudiencePreview(eventId, templateKey, ids);
     return preview.skipped.map((skip) => ({ id: skip.registrationId, reason: messageSkipReason(skip.code) }));
   },
-  async cleanup({ eventId, runId }) {
-    // Only a message still waiting is removed; one that was somehow already acted on is left alone.
-    await getPrisma().bulkMessageApproval.deleteMany({ where: { runId, eventId, status: "PENDING_APPROVAL" } });
+  async cleanup({ eventId, runId, actorUserId }) {
+    // Only a message still waiting is removed; one that was already acted on is left alone.
+    const removed = await getPrisma().bulkMessageApproval.deleteMany({ where: { runId, eventId, status: "PENDING_APPROVAL" } });
+    if (removed.count > 0) {
+      await writeAuditLog({
+        eventId,
+        actorUserId,
+        action: "BULK_MESSAGE_WITHDRAWN",
+        entityType: "BulkActionRun",
+        entityId: runId,
+        correlationId: runId,
+        summary: "Queued message removed: the bulk action did not finish.",
+        metadata: { runId, actorUserId } as Prisma.InputJsonValue,
+      });
+    }
   },
   async apply({ eventId, actorUserId, runId, params, ids, sink }) {
     const templateKey = messageTemplateKey(params);
@@ -706,11 +718,19 @@ export async function confirmBulkAction(
   try { await flush(); } catch (error) { flushFailed = true; logError("Bulk action progress could not be saved", error, { runId: run.id }); }
   if (handlerFailed || flushFailed) {
     // The run records these records as not done, so nothing the handler left behind may stay actionable.
-    try { await handler.cleanup?.({ eventId: viewer.eventId, runId: run.id }); } catch (error) { logError("Bulk action cleanup failed", error, { runId: run.id }); }
+    await runCleanup(action, viewer.eventId, run.id, viewer.userId);
   }
   const { summary, won } = await finishRun(prisma, run, viewer.userId, params, extras, missingReason);
   // A run that was ended under this request (a recovery) has already been accounted for; its file is not handed out.
   return { summary, file: won ? extras.file ?? null : null };
+}
+
+async function runCleanup(action: BulkActionKey, eventId: string, runId: string, actorUserId: string) {
+  try {
+    await HANDLERS[action].cleanup?.({ eventId, runId, actorUserId });
+  } catch (error) {
+    logError("Bulk action cleanup failed", error, { runId });
+  }
 }
 
 async function writeOutcomes(prisma: Db, runId: string, batch: readonly RecordOutcome[]) {
@@ -785,6 +805,8 @@ async function recoverStuckRun(prisma: Db, run: RunRow, now: Date): Promise<Bulk
   const claim = await prisma.bulkActionRun.updateMany({ where: { id: run.id, status: "APPLYING", confirmedAt: { lt: cutoff } }, data: { confirmedAt: now } });
   if (claim.count !== 1) return null;
   const { summary } = await finishRun(prisma, run, run.actorUserId, paramsFromStored(run.action, run.params), {}, "INTERRUPTED");
+  // A run that recorded nothing as done leaves nothing behind that could act later.
+  if (summary.counts.completed === 0) await runCleanup(run.action, run.eventId, run.id, run.actorUserId);
   return { ...summary, replayed: true };
 }
 

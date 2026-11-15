@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => {
     findActiveMembership: vi.fn(),
     enqueueSelectedAudienceBatch: vi.fn(),
     getSelectedAudiencePreview: vi.fn(),
+    isReservedBatchId: vi.fn(),
   };
 });
 
@@ -51,6 +52,8 @@ vi.mock("@/modules/communications/messaging-repository", () => ({
   getSelectedAudiencePreview: mocks.getSelectedAudiencePreview,
 }));
 
+vi.mock("@/modules/bulk-actions/message-approvals", () => ({ isReservedBatchId: mocks.isReservedBatchId }));
+
 import { POST } from "@/app/api/events/[eventId]/selected-audience-messages/route";
 
 const batchId = "2d037129-32a3-4935-a4ce-b08a1d92cb6a";
@@ -67,6 +70,7 @@ function request(body: unknown) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
+  mocks.isReservedBatchId.mockResolvedValue(false);
   mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1" } });
   mocks.requirePermission.mockResolvedValue({ user: { id: "staff-1" } });
   mocks.getSelectedAudiencePreview.mockResolvedValue({ templateKey: "CUSTOM_MESSAGE", fingerprint: "a".repeat(64) });
@@ -105,6 +109,20 @@ describe("selected-audience route and the custom message", () => {
       expect.objectContaining({ templateKey: "CUSTOM_MESSAGE", announcementTitle: "", announcementBody: "" }),
       "staff-1",
     );
+  });
+
+  it("refuses a batch id that is reserved for a queued bulk message, before sending anything", async () => {
+    mocks.isReservedBatchId.mockResolvedValue(true);
+    const response = await POST(request({
+      batchId,
+      templateKey: "BALANCE_REMINDER",
+      registrationIds: ["registration-1"],
+      previewFingerprint: "a".repeat(64),
+    }), context);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "BATCH_ID_IN_USE", message: "That batch ID is already in use. Refresh and try again." });
+    expect(mocks.isReservedBatchId).toHaveBeenCalledWith("event-1", batchId);
+    expect(mocks.enqueueSelectedAudienceBatch).not.toHaveBeenCalled();
   });
 
   it("says plainly when the template has not been published", async () => {

@@ -12,6 +12,7 @@ import {
   selectedAudienceTemplateKeys,
 } from "@/modules/communications/selected-audience";
 import { SELECTED_AUDIENCE_MAX_REGISTRATIONS } from "@/modules/communications/selected-audience-limit";
+import { isReservedBatchId } from "@/modules/bulk-actions/message-approvals";
 import { findActiveMembership } from "@/modules/events/repository";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -58,6 +59,10 @@ async function postHandler(
       });
     }
     const input = selectedAudienceBatchInputSchema.parse(body);
+    // Batch ids of queued bulk messages are reserved for their approval.
+    if (await isReservedBatchId(eventId, input.batchId)) {
+      return Response.json({ error: "BATCH_ID_IN_USE", message: "That batch ID is already in use. Refresh and try again." }, { status: 409 });
+    }
     const operation = await enqueueSelectedAudienceBatch(
       eventId,
       input,
