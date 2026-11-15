@@ -629,7 +629,9 @@ export function CheckInStationScreen({
       <main className={styles.cisShell}>
         <section className={styles.cisCard}>
           <h1>Check-in station</h1>
-          <p>This station is not active. Ask a staff member to start it again from Check-in.</p>
+          <p>{signedOutHere
+            ? "Station stopped and signed out."
+            : "This station is not active. Ask a staff member to start it again from Check-in."}</p>
           {unsyncedNames.length > 0 && (
             <p role="status" className={styles.cisDeskNotice}>
               <ShieldAlert aria-hidden="true" size={18} />

@@ -304,7 +304,7 @@ describe("check-in station API: payments (#892)", () => {
     expect(await response.json()).toEqual({ stopped: true, signedOut: true });
     expect(mocks.stopStation).toHaveBeenCalledWith(station);
     expect(mocks.signOutThisBrowser).toHaveBeenCalledWith("staff");
-    expect(response.headers.get("set-cookie")).toContain("imsda_check_in_station=;");
+    expect(mocks.cookieSet).toHaveBeenCalledWith("imsda_check_in_station", "", expect.objectContaining({ maxAge: 0, path: "/" }));
   });
 
   it("still stops the station and clears its cookie when the sign-out fails", async () => {
@@ -312,12 +312,12 @@ describe("check-in station API: payments (#892)", () => {
     const failed = await stopPost(post("/api/check-in-station/stop", {}));
     expect(failed.status).toBe(200);
     expect(await failed.json()).toEqual({ stopped: true, signedOut: false });
-    expect(failed.headers.get("set-cookie")).toContain("imsda_check_in_station=;");
+    expect(mocks.cookieSet).toHaveBeenCalledWith("imsda_check_in_station", "", expect.objectContaining({ maxAge: 0, path: "/" }));
     mocks.signOutThisBrowser.mockRejectedValueOnce(new Error("down"));
     const threw = await stopPost(post("/api/check-in-station/stop", {}));
     expect(threw.status).toBe(200);
     expect(mocks.stopStation).toHaveBeenCalledTimes(2);
-    expect(threw.headers.get("set-cookie")).toContain("imsda_check_in_station=;");
+    expect(mocks.cookieSet).toHaveBeenCalledWith("imsda_check_in_station", "", expect.objectContaining({ maxAge: 0, path: "/" }));
   });
 
   it("does not sign anyone out when the station is already stopped (401)", async () => {

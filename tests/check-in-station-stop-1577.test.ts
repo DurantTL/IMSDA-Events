@@ -92,7 +92,7 @@ describe("Stop station (#1577)", () => {
     await settle();
     await stopStation();
     expect(replace).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain("This station is not active");
+    expect(document.body.textContent).toContain("Station stopped and signed out.");
     expect(document.body.textContent).toContain("Pat Sample");
     expect(document.querySelector("a")?.getAttribute("href")).toBe(signInHref);
     expect(document.querySelector("a")?.textContent).toBe("Sign in to Check-in");
@@ -109,7 +109,7 @@ describe("Stop station (#1577)", () => {
     expect(document.body.textContent).toContain("Needs attention");
     await stopStation();
     expect(replace).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain("This station is not active");
+    expect(document.body.textContent).toContain("Station stopped and signed out.");
     expect(document.body.textContent).toContain("Pat Sample");
     expect(document.querySelector("a")?.getAttribute("href")).toBe(signInHref);
     expect(document.querySelector("a")?.textContent).toBe("Sign in to Check-in");

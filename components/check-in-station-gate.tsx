@@ -172,7 +172,7 @@ export function CheckInStationGate({
         {(response?.outcome === "SEARCH_BY_NAME" || response?.outcome === "NAME_OR_PASS_ONLY") && <p className={styles.gateNotice}>{response.message}</p>}
         {response?.outcome === "NEEDS_DESK_REVIEW" && (
           <article className={`${styles.gateResult} ${styles.stateYellow}`}>
-            <p className={styles.gateStatus}><ShieldAlert aria-hidden="true" size={22} /> {response.message}</p>
+            <p className={styles.gateStatus}><ShieldAlert aria-hidden="true" size={22} /> <span>{response.message}</span></p>
           </article>
         )}
         {response?.outcome === "NOT_REGISTERED" && (

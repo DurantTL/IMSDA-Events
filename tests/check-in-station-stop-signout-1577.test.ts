@@ -72,8 +72,8 @@ describe("Stop station signs the staff session out (#1577)", () => {
     expect(mocks.endActAs).toHaveBeenCalledWith("session_1");
     expect(mocks.revokeStaff).toHaveBeenCalledWith("staff-token");
     expect(mocks.revokeAttendee).not.toHaveBeenCalled();
-    expect(clearedNames()).toEqual(["__Host-imsda_session", "imsda_session"]);
-    expect(response.headers.get("set-cookie")).toContain("imsda_check_in_station=;");
+    expect(clearedNames()).toEqual(["__Host-imsda_session", "imsda_check_in_station", "imsda_session"]);
+    expect(clearedNames()).toContain("imsda_check_in_station");
   });
 
   it("also ends the attendee session with one sign-in on", async () => {
@@ -90,8 +90,8 @@ describe("Stop station signs the staff session out (#1577)", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ stopped: true, signedOut: false });
     expect(mocks.stopStation).toHaveBeenCalledTimes(1);
-    expect(clearedNames()).toEqual(["__Host-imsda_session", "imsda_session"]);
-    expect(response.headers.get("set-cookie")).toContain("imsda_check_in_station=;");
+    expect(clearedNames()).toEqual(["__Host-imsda_session", "imsda_check_in_station", "imsda_session"]);
+    expect(clearedNames()).toContain("imsda_check_in_station");
   });
 
   it("signs nobody out when the station was already stopped (401)", async () => {

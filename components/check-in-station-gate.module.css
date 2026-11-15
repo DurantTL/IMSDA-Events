@@ -37,6 +37,7 @@
 .gateName { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1.35rem); line-height: 1.25; overflow-wrap: anywhere; }
 .gateClub { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 1rem); overflow-wrap: anywhere; }
 .gateStatus { display: flex; align-items: center; gap: 8px; margin: 0; font-size: max(var(--type-staff-floor, 0px), 1.15rem); font-weight: 700; }
+.gateStatus svg { flex-shrink: 0; }
 .gateReminder { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1rem); }
 .gateArrived { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 1rem); font-weight: 700; }
 .gateResult button { justify-self: start; }
