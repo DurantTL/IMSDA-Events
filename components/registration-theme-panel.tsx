@@ -426,7 +426,7 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
       <p className={styles.help}>Saving a draft never changes what the public sees. Only Publish does.</p>
 
       <h4 className={styles.subheading}>Club emails</h4>
-      <label className={styles.clubToggle}>
+      <label className={`checkbox-label ${styles.clubToggle}`}>
         <input
           type="checkbox"
           checked={state.clubEmailsUseRegistrationLook}
@@ -438,7 +438,7 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
         />
         Use this look in club registration emails
       </label>
-      <p className={styles.help} id="registration-theme-club-help">Off keeps the standard club email header. It applies to club emails sent from now on; email already sent is not changed.</p>
+      <p className={styles.help} id="registration-theme-club-help">Off keeps the standard club email header. It has no effect until a look is published. It applies to club emails sent from now on; email already sent is not changed.</p>
 
       <h4 className={styles.subheading}>Version history</h4>
       {published || state.history.length > 0 ? (

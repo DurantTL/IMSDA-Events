@@ -79,7 +79,7 @@ import {
 } from "@/modules/communications/club-assignment-audience";
 import { emptyClubAssignmentFields } from "@/modules/club-registrations/assignments";
 import { loadAnnouncementOptOuts } from "@/modules/communications/email-preferences-repository";
-import { isScheduledEmailMetadata, messageBatchKey, metadataAnnouncementId } from "@/modules/communications/retry-failed-domain";
+import { isScheduledEmailMetadata, messageBatchKey, metadataAnnouncementId, metadataIsRegistrationRequest } from "@/modules/communications/retry-failed-domain";
 import {
   messageRetryIdempotencyKey,
   messageRetryRequestFingerprint,
@@ -3120,6 +3120,8 @@ export async function createMessageRetryCopy(
         ...(messageBatchKey(source) ? { sourceBatchId: messageBatchKey(source)! } : {}),
         // An announcement's copy stays tied to it, so delivery sees its current essential mark (#838).
         ...(metadataAnnouncementId(source) ? { announcementId: metadataAnnouncementId(source)! } : {}),
+        // A registration request (#182) stays transactional when retried: no opt-out check, no unsubscribe link.
+        ...(metadataIsRegistrationRequest(source) ? { registrationRequest: true } : {}),
         ...(input.extraMetadata ?? {}),
       },
       idempotencyKey: input.idempotencyKey,

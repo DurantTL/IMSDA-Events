@@ -210,6 +210,17 @@ beforeEach(() => {
 });
 
 describe("retry failed messages", () => {
+  it("keeps the registration-request flag (#182) on a retry copy, and only when the source had it", async () => {
+    const db = fixture([
+      row("failed-1", { metadata: { trigger: "STAFF_SELECTED_AUDIENCE_BATCH", batchId, registrationRequest: true } }),
+      row("failed-2"),
+    ]);
+    await confirm();
+    const copies = new Map([...db.messages.values()].filter((message) => message.retryOfMessageId).map((copy) => [copy.retryOfMessageId, copy]));
+    expect(copies.get("failed-1")!.metadata).toMatchObject({ registrationRequest: true });
+    expect(copies.get("failed-2")!.metadata).not.toHaveProperty("registrationRequest");
+  });
+
   it("copies only the failed messages of a batch and never the sent ones, and sends nothing in the request", async () => {
     const db = fixture([
       row("failed-1"),
