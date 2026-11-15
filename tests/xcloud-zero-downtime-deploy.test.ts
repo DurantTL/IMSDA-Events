@@ -17,7 +17,8 @@ const fakeDocker = `#!/bin/sh
 echo "$* prep=\${IMSDA_PREP_ONLY:-} skip=\${IMSDA_SKIP_DB_PREP:-}" >> "$FAKE_LOG"
 case "$1" in
   image) case "$*" in *--format*) echo "\${FAKE_PREVIOUS:-}" ;; esac; exit 0 ;;
-  run) exit "\${FAKE_LEGACY_EXIT:-0}" ;;
+  run) case "$*" in *pre-deploy-backup.sh*) exit "\${FAKE_BACKUP_EXIT:-0}" ;; esac
+    exit "\${FAKE_LEGACY_EXIT:-0}" ;;
   compose) case "$*" in
     *printenv*) printf '%s' "$FAKE_TOKEN"; exit 0 ;;
     *" run "*) exit "\${FAKE_PREP_EXIT:-0}" ;;
@@ -68,6 +69,8 @@ function setup(tools: Record<string, string>) {
 function runDeploy(env: Record<string, string>) {
   const ctx = setup({ docker: fakeDocker, curl: fakeCurl, git: fakeGit, sleep: fakeSleep });
   writeFileSync(ctx.log, "");
+  const backupEnv = path.join(ctx.dir, ".env.backup");
+  writeFileSync(backupEnv, "PGHOST=db\n");
   const result = spawnSync("sh", [deployScript], {
     encoding: "utf8",
     env: {
@@ -79,6 +82,7 @@ function runDeploy(env: Record<string, string>) {
       FAKE_TOKEN: sweepToken,
       IMSDA_HEALTH_WAIT_SECONDS: "6",
       IMSDA_CLEANUP: "/nonexistent",
+      IMSDA_BACKUP_ENV_FILE: backupEnv,
       IMSDA_FAILED_SHA_FILE: path.join(ctx.dir, "failed-sha"),
       FAKE_PREVIOUS: "c".repeat(40),
       FAKE_LOG: ctx.log,
@@ -187,6 +191,57 @@ describe("deploy.sh zero-downtime switch", () => {
     expect(calls.some((c) => c.includes(" run ") && c.includes("compose"))).toBe(false);
     expect(calls.some((c) => c.includes("standby"))).toBe(false);
     expect(calls.some((c) => c.includes("up -d --no-deps app"))).toBe(true);
+  });
+});
+
+// #1790: a database copy is taken before anything can migrate the database.
+describe("deploy.sh pre-deploy database copy", () => {
+  const isBackup = (c: string) => c.startsWith("run ") && c.includes("pre-deploy-backup.sh");
+
+  it("copies the database with the same commit's backup image before the migrations run", () => {
+    const { status, calls } = runDeploy({ FAKE_SHA_8101: sha, FAKE_SHA_8100: sha });
+    expect(status).toBe(0);
+    expect(calls).toContain(`pull --quiet ghcr.io/duranttl/imsda-events-backup:${sha} prep= skip=`);
+    const backup = calls.findIndex(isBackup);
+    const prep = calls.findIndex((c) => c.includes("compose") && c.includes(" run ") && c.includes("prep=1"));
+    expect(backup).toBeGreaterThan(-1);
+    expect(prep).toBeGreaterThan(backup);
+    const line = calls[backup];
+    expect(line).toContain("--network postgresql_9kgaw_239292_xcloud-network");
+    expect(line).toContain("-v imsda_events_backups:/backups");
+    expect(line).toContain(`ghcr.io/duranttl/imsda-events-backup:${sha} /usr/local/bin/pre-deploy-backup.sh ${sha}`);
+  });
+
+  it("stops before any migration or restart when the copy fails", () => {
+    const { status, calls, stderr, failed } = runDeploy({ FAKE_BACKUP_EXIT: "1", FAKE_SHA_8101: sha, FAKE_SHA_8100: sha });
+    expect(status).toBe(1);
+    expect(stderr).toContain("database copy");
+    expect(failed).toBe(sha);
+    expect(calls.some((c) => c.includes("compose") && c.includes(" run "))).toBe(false);
+    expect(calls.some((c) => c.includes("up -d") || (c.startsWith("tag") && c.includes("imsda-events:live")))).toBe(false);
+  });
+
+  it("stops when the backup env file is missing", () => {
+    const { status, calls, stderr } = runDeploy({ IMSDA_BACKUP_ENV_FILE: "/nonexistent/.env.backup", FAKE_SHA_8101: sha, FAKE_SHA_8100: sha });
+    expect(status).toBe(1);
+    expect(stderr).toContain("No database copy was taken");
+    expect(calls.some(isBackup)).toBe(false);
+    expect(calls.some((c) => c.includes("up -d"))).toBe(false);
+  });
+
+  it("also copies before the old-style switch for images from before #1263", () => {
+    const { status, calls } = runDeploy({ FAKE_LEGACY_EXIT: "1", FAKE_SHA_8101: sha, FAKE_SHA_8100: sha });
+    expect(status).toBe(0);
+    const backup = calls.findIndex(isBackup);
+    expect(backup).toBeGreaterThan(-1);
+    expect(calls.findIndex((c) => c.includes("up -d --no-deps app"))).toBeGreaterThan(backup);
+  });
+
+  it("skips the copy only when a person sets IMSDA_PREDEPLOY_BACKUP=skip, and says so", () => {
+    const { status, calls, stderr } = runDeploy({ IMSDA_PREDEPLOY_BACKUP: "skip", FAKE_SHA_8101: sha, FAKE_SHA_8100: sha });
+    expect(status).toBe(0);
+    expect(stderr).toContain("no database copy was taken");
+    expect(calls.some(isBackup)).toBe(false);
   });
 });
 
