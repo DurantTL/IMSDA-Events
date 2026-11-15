@@ -207,7 +207,7 @@ export function moneyReportCsvRows(eventName: string, report: MoneyReport, range
     ["Note", rangeNote],
     [],
     ["Figure", "Amount", "What it includes"],
-    ["Gross charges", dollars(charges.grossCents), "An estimate, not part of the reconciliation: net due plus the promo code discounts, discounts and scholarships recorded on active (submitted or confirmed) registrations. Corrections, meal and asset lines stay inside."],
+    ["Gross charges", dollars(charges.grossCents), "An estimate, not part of the reconciliation: net due plus the promo code discounts, discounts and scholarships recorded on active (submitted or confirmed) registrations. Corrections, meal and asset lines and staff price overrides stay inside."],
     ["Promo code discounts", dollars(charges.promoCents), "Registration-level promo code discount plus per-person promo code adjustments, net of reversals."],
     ["Discounts", dollars(charges.discountCents), "Discount adjustments, net of reversals."],
     ["Scholarships", dollars(charges.scholarshipCents), "Scholarship adjustments, net of reversals (pledged and funded)."],
