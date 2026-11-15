@@ -343,6 +343,10 @@ export const GATE_MODE_OFF_MESSAGE =
 
 export const GATE_NAME_OR_PASS_MESSAGE = "The gate looks people up by name or by pass, not by confirmation code. Type the person's name or scan their pass.";
 
+/** What a station or gate lookup says for a registration that is not active (#1577). No names, money or other details. */
+export const STATION_CANCELLED_MESSAGE = "Needs desk review: this registration was cancelled. Send them to the check-in desk.";
+export const STATION_INACTIVE_REGISTRATION_MESSAGE = "Needs desk review: this registration is not active. Send them to the check-in desk.";
+
 export const GATE_NAME_MIN_LENGTH = 2;
 export const GATE_NAME_MAX_LENGTH = 80;
 export const GATE_NAME_MESSAGE = `Type at least ${GATE_NAME_MIN_LENGTH} letters of the name.`;
@@ -402,8 +406,8 @@ export type GateResult = {
 };
 
 export type GateLookupResponse = {
-  /** MATCHES has at least one result; SEARCH_BY_NAME means a club pass named no one person; NAME_OR_PASS_ONLY means a confirmation code was typed. */
-  outcome: "MATCHES" | "NOT_REGISTERED" | "SEARCH_BY_NAME" | "NAME_OR_PASS_ONLY";
+  /** MATCHES has at least one result; SEARCH_BY_NAME means a club pass named no one person; NAME_OR_PASS_ONLY means a confirmation code was typed; NEEDS_DESK_REVIEW means a pass named a cancelled or inactive registration (message says which). */
+  outcome: "MATCHES" | "NOT_REGISTERED" | "SEARCH_BY_NAME" | "NAME_OR_PASS_ONLY" | "NEEDS_DESK_REVIEW";
   results: GateResult[];
   /** More people matched than are listed; the volunteer should type more of the name. */
   moreAvailable: boolean;

@@ -12,6 +12,8 @@ import { formatInTimeZone } from "@/modules/calendar/conference-format";
 import {
   GATE_NAME_OR_PASS_MESSAGE,
   GATE_RESULT_LIMIT,
+  STATION_CANCELLED_MESSAGE,
+  STATION_INACTIVE_REGISTRATION_MESSAGE,
   gateStateFor,
   stationSummarySuffix,
   type GateArrivalResponse,
@@ -208,6 +210,16 @@ export async function gateLookup(
       if (error instanceof AttendeePassResolutionError) {
         if (error.code === "REGISTRATION_NOT_ELIGIBLE") {
           await auditGateLookup(station, method, [], "NOT_ELIGIBLE");
+          // A registration that exists but is not active is a desk question, not "Not registered" (#1577).
+          const status = error.registrationStatus;
+          if (status === "CANCELLED" || status === "DRAFT" || status === "WAITLISTED") {
+            return {
+              outcome: "NEEDS_DESK_REVIEW",
+              results: [],
+              moreAvailable: false,
+              message: status === "CANCELLED" ? STATION_CANCELLED_MESSAGE : STATION_INACTIVE_REGISTRATION_MESSAGE,
+            };
+          }
           return { outcome: "NOT_REGISTERED", results: [], moreAvailable: false, message: null };
         }
         const expired = error.code === "PASS_EXPIRED";
