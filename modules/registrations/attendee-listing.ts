@@ -24,6 +24,20 @@ const STAFF_GROUP_LABEL = { STAFF: "Staff", PASTOR: "Pastor", VOLUNTEER: "Volunt
 export type ListingStatus = "CONFIRMED" | "SUBMITTED" | "CANCELLED";
 export const LISTING_STATUSES: readonly ListingStatus[] = ["CONFIRMED", "SUBMITTED", "CANCELLED"];
 export const DEFAULT_LISTING_STATUSES: readonly ListingStatus[] = ["CONFIRMED"];
+/**
+ * Club events (#2017): a club registration is billed to its church after the event, so it stays Submitted. Their list
+ * starts with Submitted and Confirmed, the same registrations the club event reports count.
+ */
+export const CLUB_DEFAULT_LISTING_STATUSES: readonly ListingStatus[] = ["CONFIRMED", "SUBMITTED"];
+
+/** The statuses the list, its CSV and the event archive start with on this kind of event. */
+export function defaultListingStatuses(clubEvent: boolean): readonly ListingStatus[] {
+  return clubEvent ? CLUB_DEFAULT_LISTING_STATUSES : DEFAULT_LISTING_STATUSES;
+}
+
+function sameStatuses(statuses: readonly ListingStatus[], defaults: readonly ListingStatus[]) {
+  return statuses.length === defaults.length && statuses.every((status) => defaults.includes(status));
+}
 
 export type MealCategory = "regular" | "vegetarian" | "vegan" | "gluten_free" | "other" | "none";
 export const MEAL_CATEGORIES: ReadonlyArray<{ value: MealCategory; label: string }> = [
@@ -318,18 +332,18 @@ const SORT_KEYS: ReadonlySet<string> = new Set(LISTING_COLUMNS.map((column) => c
 const MEAL_VALUES: ReadonlySet<string> = new Set(MEAL_CATEGORIES.map((category) => category.value));
 
 /** Whether anything narrows the list beyond its defaults (view and sort only change columns and order): picks "nothing matches" over "nothing yet" (#1449). */
-export function attendeeFiltersSet(query: Pick<AttendeeListingQuery, "search" | "meal" | "dietaryOnly" | "statuses">): boolean {
+export function attendeeFiltersSet(query: Pick<AttendeeListingQuery, "search" | "meal" | "dietaryOnly" | "statuses">, defaults: readonly ListingStatus[] = DEFAULT_LISTING_STATUSES): boolean {
   return Boolean(query.search?.trim()) || Boolean(query.meal) || Boolean(query.dietaryOnly)
-    || query.statuses.length !== DEFAULT_LISTING_STATUSES.length
-    || query.statuses.some((status) => !DEFAULT_LISTING_STATUSES.includes(status));
+    || !sameStatuses(query.statuses, defaults);
 }
 
 /**
  * The listing's filters from URL parameters. Anything unknown is ignored, so a
- * hand-edited URL cannot widen the list: statuses default to Confirmed only,
- * and Draft or Waitlisted can never be asked for.
+ * hand-edited URL cannot widen the list: statuses default to `defaults`
+ * (Confirmed only, or Submitted and Confirmed on a club event), and Draft or
+ * Waitlisted can never be asked for.
  */
-export function parseAttendeeListingQuery(params: URLSearchParams | Record<string, string | string[] | undefined>): AttendeeListingQuery {
+export function parseAttendeeListingQuery(params: URLSearchParams | Record<string, string | string[] | undefined>, defaults: readonly ListingStatus[] = DEFAULT_LISTING_STATUSES): AttendeeListingQuery {
   const all = (key: string): string[] => {
     if (params instanceof URLSearchParams) return params.getAll(key);
     const value = params[key];
@@ -347,7 +361,7 @@ export function parseAttendeeListingQuery(params: URLSearchParams | Record<strin
   const sortKey = SORT_KEYS.has(sort) && visibleListingColumns(view).some((column) => column.key === sort) ? (sort as ListingSortKey) : null;
   return {
     view,
-    statuses: statuses.length > 0 ? statuses : [...DEFAULT_LISTING_STATUSES],
+    statuses: statuses.length > 0 ? statuses : LISTING_STATUSES.filter((status) => defaults.includes(status)),
     meal: MEAL_VALUES.has(meal) ? (meal as MealCategory) : null,
     dietaryOnly: get("dietary") === "1",
     search: get("q").trim().slice(0, 100),
@@ -357,11 +371,10 @@ export function parseAttendeeListingQuery(params: URLSearchParams | Record<strin
 }
 
 /** The query as URL parameters (defaults left out), for links, the form and the export button. */
-export function attendeeListingParams(query: AttendeeListingQuery): URLSearchParams {
+export function attendeeListingParams(query: AttendeeListingQuery, defaults: readonly ListingStatus[] = DEFAULT_LISTING_STATUSES): URLSearchParams {
   const params = new URLSearchParams();
   if (query.view !== DEFAULT_LISTING_VIEW) params.set("view", query.view);
-  const isDefault = query.statuses.length === DEFAULT_LISTING_STATUSES.length && query.statuses.every((status) => DEFAULT_LISTING_STATUSES.includes(status));
-  if (!isDefault) params.set("statuses", query.statuses.join(","));
+  if (!sameStatuses(query.statuses, defaults)) params.set("statuses", query.statuses.join(","));
   if (query.meal) params.set("meal", query.meal);
   if (query.dietaryOnly) params.set("dietary", "1");
   if (query.search) params.set("q", query.search);

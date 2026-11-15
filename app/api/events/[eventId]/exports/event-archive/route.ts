@@ -2,13 +2,13 @@ import { AccessDeniedError, effectivePermissions, requireEventMembership } from 
 import { getCurrentSession } from "@/modules/access/current-session";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { findEventArchiveFacts } from "@/modules/events/archive-download-facts";
-import { findActiveMembership } from "@/modules/events/repository";
+import { findActiveMembership, isClubAudienceEvent } from "@/modules/events/repository";
 import { effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { resolveLocationFilter } from "@/modules/event-locations/filter";
 import { InformationFormError } from "@/modules/information-forms/errors";
 import { listInformationForms } from "@/modules/information-forms/repository";
 import { buildInformationFormResponsesCsv } from "@/modules/information-forms/responses";
-import { buildAttendeeListingRows, attendeeListingCsv, filterAttendeeListing, parseAttendeeListingQuery } from "@/modules/registrations/attendee-listing";
+import { buildAttendeeListingRows, attendeeListingCsv, defaultListingStatuses, filterAttendeeListing, parseAttendeeListingQuery } from "@/modules/registrations/attendee-listing";
 import { listRegistrations } from "@/modules/registrations/repository";
 import { registrationsExportRows } from "@/modules/registrations/registrations-export-rows";
 import { toCsv } from "@/modules/reporting/csv";
@@ -77,7 +77,8 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
 
     // Attendees: the attendees export's own gate, the default listing, dietary detail never shown.
     if (permissions.has("VIEW_REPORTS") && permissions.has("VIEW_SENSITIVE_DATA")) {
-      const query = parseAttendeeListingQuery(new URLSearchParams());
+      // A club event's default includes Submitted registrations, as its Attendee list does (#2017).
+      const query = parseAttendeeListingQuery(new URLSearchParams(), defaultListingStatuses(await isClubAudienceEvent(eventId)));
       const registrations = await listRegistrations(eventId, { statuses: query.statuses });
       include("attendees.csv", attendeeListingCsv(filterAttendeeListing(buildAttendeeListingRows(registrations, { showDietaryDetails: false }), query), { omitDietaryColumns: true }));
     } else {
