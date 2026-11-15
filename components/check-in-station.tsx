@@ -3,6 +3,7 @@
 import { Money } from "@/components/exact-value";
 import { CheckCircle2, Clock, CreditCard, ShieldAlert, Square, TriangleAlert, WifiOff } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { formatPersonName } from "@/lib/person-name";
 import { CheckInStationGate, StationModeSwitch, type StationMode } from "@/components/check-in-station-gate";
@@ -132,12 +133,14 @@ async function post<T>(path: string, body: unknown, timeoutMs?: number): Promise
  */
 export function CheckInStationScreen({
   stationId,
+  eventId,
   eventName,
   stationLabel,
   canRecordPayments,
   gateModeEnabled = false,
 }: {
   stationId: string;
+  eventId: string;
   eventName: string;
   stationLabel: string;
   canRecordPayments: boolean;
@@ -158,6 +161,9 @@ export function CheckInStationScreen({
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState("");
   const [stopped, setStopped] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const router = useRouter();
+  const checkInHref = `/check-in?event=${encodeURIComponent(eventId)}`;
   const [unsyncedNames, setUnsyncedNames] = useState<string[]>([]);
   const queuedHeading = useRef<HTMLHeadingElement>(null);
   const noHandOut: HandOut = { keyTypes: [], rooms: [], attendeeIds: [] };
@@ -578,7 +584,30 @@ export function CheckInStationScreen({
       return;
     }
     setStopping(false);
+    // A deliberate stop with nothing waiting or needing attention goes straight back to the Check-in tab. A stop seen
+    // as a 401 (stopped elsewhere), or one with names still to send to the desk, keeps the stopped screen.
+    const nothingPending = response.ok
+      && queueRef.current.length === 0
+      && attentionRef.current.length === 0;
+    if (nothingPending) {
+      stoppedRef.current = true;
+      writeJustIn(stationId, []);
+      setLeaving(true);
+      router.replace(checkInHref);
+      return;
+    }
     markStopped();
+  }
+
+  if (leaving) {
+    return (
+      <main className={styles.cisShell}>
+        <section className={styles.cisCard}>
+          <h1>Check-in station</h1>
+          <p role="status">Station stopped. Going back to Check-in...</p>
+        </section>
+      </main>
+    );
   }
 
   if (stopped) {
@@ -594,7 +623,7 @@ export function CheckInStationScreen({
             </p>
           )}
           <p className={styles.cisActions}>
-            <Link href="/check-in" className={`secondary-button ${styles.large}`}>Go to Check-in</Link>
+            <Link href={checkInHref} className={`secondary-button ${styles.large}`}>Go to Check-in</Link>
           </p>
         </section>
       </main>
@@ -875,7 +904,7 @@ export function CheckInStationScreen({
         open={stopping}
         title="Stop this station?"
       >
-        <p>This device will go back to the &quot;not active&quot; screen. Staff can start it again from Check-in.</p>
+        <p>This device goes back to the Check-in tab. A staff member needs to sign in to start it again.</p>
         {waiting > 0 && <p><strong>{stationStopQueueWarning(waiting)}</strong></p>}
       </ConfirmDialog>
     </main>

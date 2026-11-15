@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   class MockPassError extends Error {
-    constructor(public readonly code: string, message: string) {
+    constructor(public readonly code: string, message: string, public readonly registrationStatus?: string) {
       super(message);
     }
   }
@@ -173,6 +173,37 @@ describe("station family lookup (#892)", () => {
     prismaFor(registrationRow({ clubRegistration: { id: "club_1" } }));
     await expect(lookupStationFamily(station, { kind: "confirmation", value: "CM27-ONE" })).rejects.toMatchObject({ code: "SEND_TO_DESK" });
     await expect(lookupStationFamily(station, { kind: "pass", value: "imsda-club-pass.v1.a.b.c" })).rejects.toMatchObject({ code: "SEND_TO_DESK" });
+  });
+
+  it("says a cancelled registration needs desk review, and any other inactive one is not active", async () => {
+    prismaFor();
+    mocks.resolveAttendeePassForEvent.mockRejectedValue(new mocks.MockPassError("REGISTRATION_NOT_ELIGIBLE", "no", "CANCELLED"));
+    const cancelled = await lookupStationFamily(station, { kind: "confirmation", value: "CM27-ONE" }).catch((error: unknown) => error);
+    expect(cancelled).toMatchObject({
+      code: "REGISTRATION_CANCELLED",
+      message: "Needs desk review: this registration was cancelled. Send them to the check-in desk.",
+    });
+    for (const status of ["DRAFT", "WAITLISTED"]) {
+      mocks.resolveAttendeePassForEvent.mockRejectedValue(new mocks.MockPassError("REGISTRATION_NOT_ELIGIBLE", "no", status));
+      const inactive = await lookupStationFamily(station, { kind: "pass", value: "imsda-pass.v1.x.y.z" }).catch((error: unknown) => error);
+      expect(inactive).toMatchObject({
+        code: "REGISTRATION_INACTIVE",
+        message: "Needs desk review: this registration is not active. Send them to the check-in desk.",
+      });
+    }
+  });
+
+  it("does not name a status for a code from another event", async () => {
+    prismaFor();
+    mocks.resolveAttendeePassForEvent.mockRejectedValue(new mocks.MockPassError("CONFIRMATION_NOT_FOUND", "none"));
+    await expect(lookupStationFamily(station, { kind: "confirmation", value: "OTHER-1" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("still refuses a registration cancelled between lookup and check-in", async () => {
+    prismaFor();
+    mocks.checkInAttendee.mockRejectedValue(new mocks.MockCheckInError("REGISTRATION_NOT_ELIGIBLE"));
+    const results = await checkInStationFamily(station, { registrationId: "registration_1", items: [{ attendeeId: "attendee_1", idempotencyKey: keyA }], balanceReason: { code: "PAYING_LATER", note: "" } });
+    expect(results).toEqual([{ attendeeId: "attendee_1", status: "SEND_TO_DESK" }]);
   });
 
   it("flags a Sterling-held person only as needing desk review", async () => {

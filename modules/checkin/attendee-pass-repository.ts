@@ -44,6 +44,8 @@ export class AttendeePassResolutionError extends Error {
       | "CONFIRMATION_NOT_FOUND"
       | "REGISTRATION_NOT_ELIGIBLE",
     message: string,
+    /** Set only on REGISTRATION_NOT_ELIGIBLE, after the event-scoped lookup found the registration. */
+    public readonly registrationStatus?: string,
   ) {
     super(message);
     this.name = "AttendeePassResolutionError";
@@ -189,6 +191,7 @@ async function resolveSignedPass(
     throw new AttendeePassResolutionError(
       "REGISTRATION_NOT_ELIGIBLE",
       "This registration is no longer eligible for check-in.",
+      attendee.registration.status,
     );
   }
   if (attendee.registration.clubRegistration) {
@@ -238,6 +241,7 @@ async function resolveConfirmationCode(
     throw new AttendeePassResolutionError(
       "REGISTRATION_NOT_ELIGIBLE",
       "This registration is no longer eligible for check-in.",
+      registration.status,
     );
   }
   return {

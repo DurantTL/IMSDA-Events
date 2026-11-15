@@ -36,6 +36,7 @@ export default async function CheckInStationPage() {
   return (
     <CheckInStationScreen
       stationId={station.station.id}
+      eventId={station.station.eventId}
       eventName={station.eventName}
       stationLabel={station.station.label}
       canRecordPayments={station.capabilities.canRecordPayments}
