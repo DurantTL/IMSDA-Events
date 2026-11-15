@@ -62,6 +62,8 @@ export type RegistrationThemeEditorState = {
   history: RegistrationThemeVersionView[];
   /** The event's PNG, JPEG and WebP uploads, newest first. */
   images: RegistrationThemeImageChoice[];
+  /** Whether club emails for this event use the registration look. Off by default: club mail keeps the platform club header. */
+  clubEmailsUseRegistrationLook: boolean;
 };
 
 const HISTORY_LIMIT = 10;
@@ -116,7 +118,7 @@ export async function getPublishedThemeRowBySlug(eventSlug: string) {
 export async function getRegistrationThemeEditorState(eventId: string): Promise<RegistrationThemeEditorState> {
   const prisma = getPrisma();
   const include = { createdBy: personSelect, publishedBy: personSelect } as const;
-  const [draft, published, history, assets] = await Promise.all([
+  const [draft, published, history, assets, eventRow] = await Promise.all([
     prisma.registrationThemeVersion.findFirst({ where: { eventId, status: "DRAFT" }, include }),
     prisma.registrationThemeVersion.findFirst({ where: { eventId, status: "PUBLISHED" }, include }),
     prisma.registrationThemeVersion.findMany({ where: { eventId, status: "ARCHIVED" }, include, orderBy: { versionNumber: "desc" }, take: HISTORY_LIMIT }),
@@ -125,9 +127,10 @@ export async function getRegistrationThemeEditorState(eventId: string): Promise<
       orderBy: { createdAt: "desc" },
       select: { id: true, displayName: true, contentType: true, byteSize: true },
     }),
+    prisma.event.findUnique({ where: { id: eventId }, select: { clubEmailsUseRegistrationLook: true } }),
   ]);
   const images = assets.map((asset) => ({ id: asset.id, name: asset.displayName, contentType: asset.contentType, byteSize: asset.byteSize, url: assetInlineUrl(eventId, asset.id) }));
-  return { draft: draft ? view(draft) : null, published: published ? view(published) : null, history: history.map(view), images };
+  return { draft: draft ? view(draft) : null, published: published ? view(published) : null, history: history.map(view), images, clubEmailsUseRegistrationLook: eventRow?.clubEmailsUseRegistrationLook === true };
 }
 
 function validTokens(input: unknown): RegistrationThemeTokens {
@@ -277,5 +280,24 @@ export async function revertRegistrationThemeToPlatformDefault(eventId: string, 
       summary: `Went back to the platform registration look (version ${published.versionNumber} archived).`, metadata: { versionNumber: published.versionNumber },
     }, tx);
   }));
+  return getRegistrationThemeEditorState(eventId);
+}
+
+/**
+ * Turns the per-event switch for club emails using the registration look on or off (#283). Off is the default. Audited with
+ * the old and new value; saving the value it already has changes nothing and writes no audit row.
+ */
+export async function setClubEmailsUseRegistrationLook(eventId: string, enabled: boolean, actorUserId: string) {
+  await getPrisma().$transaction(async (tx) => {
+    const event = await tx.event.findUnique({ where: { id: eventId }, select: { clubEmailsUseRegistrationLook: true } });
+    if (!event) throw conflict();
+    if (event.clubEmailsUseRegistrationLook === enabled) return;
+    await tx.event.update({ where: { id: eventId }, data: { clubEmailsUseRegistrationLook: enabled } });
+    await writeAuditLog({
+      eventId, actorUserId, action: "CLUB_EMAIL_REGISTRATION_LOOK_CHANGED", entityType: "Event", entityId: eventId,
+      summary: enabled ? "Club emails now use the registration look." : "Club emails no longer use the registration look.",
+      metadata: { oldValue: event.clubEmailsUseRegistrationLook, newValue: enabled },
+    }, tx);
+  });
   return getRegistrationThemeEditorState(eventId);
 }

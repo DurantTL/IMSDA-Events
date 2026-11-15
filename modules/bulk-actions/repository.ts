@@ -42,6 +42,7 @@ import {
   type OutcomeCounts,
   type SnapshotEntry,
   type StoredParams,
+  isRegistrationRequestAction,
 } from "@/modules/bulk-actions/domain";
 import { getSelectedAudiencePreview } from "@/modules/communications/messaging-repository";
 import { selectedAudienceTemplateLabels } from "@/modules/communications/selected-audience-templates";
@@ -266,7 +267,7 @@ const messageHandler: ActionHandler = {
     const templateKey = messageTemplateKey(params);
     if (!templateKey) throw new BulkActionError("INVALID_REQUEST", "Choose which message to queue.");
     // The same readiness the selected-registration send checks, read without any recipients.
-    const state = await getSelectedAudiencePreview(viewer.eventId, templateKey, []);
+    const state = await getSelectedAudiencePreview(viewer.eventId, templateKey, [], { registrationRequest: isRegistrationRequestAction(params.action) });
     if (!state.templatePublished) throw new BulkActionError("INVALID_REQUEST", `The ${selectedAudienceTemplateLabels[templateKey]} template has not been published for this event. Write and publish it in Communications, then preview again.`, 409);
     if (state.attachmentProblem) throw new BulkActionError("INVALID_REQUEST", state.attachmentProblem, 409);
     const label = selectedAudienceTemplateLabels[templateKey];
@@ -278,7 +279,7 @@ const messageHandler: ActionHandler = {
   async skipsFor(eventId, params, ids) {
     const templateKey = messageTemplateKey(params);
     if (!templateKey || ids.length === 0) return [];
-    const preview = await getSelectedAudiencePreview(eventId, templateKey, ids);
+    const preview = await getSelectedAudiencePreview(eventId, templateKey, ids, { registrationRequest: isRegistrationRequestAction(params.action) });
     return preview.skipped.map((skip) => ({ id: skip.registrationId, reason: messageSkipReason(skip.code) }));
   },
   async cleanup({ eventId, runId, actorUserId }) {
@@ -301,7 +302,7 @@ const messageHandler: ActionHandler = {
     const templateKey = messageTemplateKey(params);
     if (!templateKey || ids.length === 0) return {};
     const prisma = getPrisma();
-    const preview = await getSelectedAudiencePreview(eventId, templateKey, ids);
+    const preview = await getSelectedAudiencePreview(eventId, templateKey, ids, { registrationRequest: isRegistrationRequestAction(params.action) });
     const included = preview.recipients.map((recipient) => recipient.registrationId);
     const skipped = new Map(preview.skipped.map((skip) => [skip.registrationId, messageSkipReason(skip.code)]));
     const sendable = preview.templatePublished && !preview.attachmentProblem;

@@ -63,6 +63,8 @@ function fakeStore(overrides: Record<string, unknown> = {}) {
           bodyTextSnapshot: message.bodyTextSnapshot,
           bodyHtmlSnapshot: message.bodyHtmlSnapshot,
           registrationThemeVersionId: message.registrationThemeVersionId,
+          recipientKind: message.recipientKind,
+          registration: message.registration,
           attachment: null,
           files: [],
           attemptCount: message.attemptCount,
@@ -119,7 +121,7 @@ describe("the email look on a delivered message (#283)", () => {
     const store = fakeStore();
     const published = vi.fn(async () => "version-1");
     const loadLook = vi.fn(async (id: string) => (id === "version-1" ? GREEN : PLUM));
-    const source: EmailLookSource = { findPublishedVersionId: published, loadLook };
+    const source: EmailLookSource = { clubEmailsUseLook: async () => false, findPublishedVersionId: published, loadLook };
 
     const failing = vi.fn(async () => { throw new EmailProviderRequestError("Try again later.", "HTTP_503", true, 503); });
     await run(store, source, failing as never);
@@ -142,7 +144,7 @@ describe("the email look on a delivered message (#283)", () => {
 
   it("stamps with a conditional update held by this worker's lock, only while the stamp is still empty", async () => {
     const store = fakeStore();
-    const source: EmailLookSource = { findPublishedVersionId: async () => "version-1", loadLook: async () => GREEN };
+    const source: EmailLookSource = { clubEmailsUseLook: async () => false, findPublishedVersionId: async () => "version-1", loadLook: async () => GREEN };
     await run(store, source, ok());
     const stampCalls = store.messageOutbox.updateMany.mock.calls
       .map((call) => call[0] as { where: Record<string, unknown>; data: Record<string, unknown> })
@@ -155,7 +157,7 @@ describe("the email look on a delivered message (#283)", () => {
   it("uses an already stamped version without asking which look is published now", async () => {
     const store = fakeStore({ registrationThemeVersionId: "version-1" });
     const published = vi.fn(async () => "version-2");
-    const source: EmailLookSource = { findPublishedVersionId: published, loadLook: async (id) => (id === "version-1" ? GREEN : PLUM) };
+    const source: EmailLookSource = { clubEmailsUseLook: async () => false, findPublishedVersionId: published, loadLook: async (id) => (id === "version-1" ? GREEN : PLUM) };
     const sendEmail = ok();
     await run(store, source, sendEmail);
     expect(published).not.toHaveBeenCalled();
@@ -167,7 +169,7 @@ describe("the email look on a delivered message (#283)", () => {
     const store = fakeStore();
     const loadLook = vi.fn();
     const sendEmail = ok();
-    await run(store, { findPublishedVersionId: async () => null, loadLook }, sendEmail);
+    await run(store, { clubEmailsUseLook: async () => false, findPublishedVersionId: async () => null, loadLook }, sendEmail);
     expect(store.message.registrationThemeVersionId).toBeNull();
     expect(loadLook).not.toHaveBeenCalled();
     expect(htmlOf(sendEmail)).toContain("#f0b323");
@@ -176,14 +178,14 @@ describe("the email look on a delivered message (#283)", () => {
   it("falls back to the platform layout, and still sends, when the look cannot be read", async () => {
     const store = fakeStore();
     const sendEmail = ok();
-    const result = await run(store, { findPublishedVersionId: async () => { throw new Error("database busy"); }, loadLook: async () => GREEN }, sendEmail);
+    const result = await run(store, { clubEmailsUseLook: async () => false, findPublishedVersionId: async () => { throw new Error("database busy"); }, loadLook: async () => GREEN }, sendEmail);
     expect(result.sentIds).toEqual(["message-1"]);
     expect(store.message.registrationThemeVersionId).toBeNull();
     expect(htmlOf(sendEmail)).toContain("#f0b323");
 
     const store2 = fakeStore({ registrationThemeVersionId: "version-1" });
     const sendEmail2 = ok();
-    const result2 = await run(store2, { findPublishedVersionId: async () => "version-1", loadLook: async () => { throw new Error("gone"); } }, sendEmail2);
+    const result2 = await run(store2, { clubEmailsUseLook: async () => false, findPublishedVersionId: async () => "version-1", loadLook: async () => { throw new Error("gone"); } }, sendEmail2);
     expect(result2.sentIds).toEqual(["message-1"]);
     expect(htmlOf(sendEmail2)).toContain("#f0b323");
   });
@@ -195,7 +197,7 @@ describe("the email look on a delivered message (#283)", () => {
     expect(plainStore.message.registrationThemeVersionId).toBeNull();
     const themedStore = fakeStore();
     const themedSend = ok();
-    await run(themedStore, { findPublishedVersionId: async () => "version-1", loadLook: async () => GREEN }, themedSend);
+    await run(themedStore, { clubEmailsUseLook: async () => false, findPublishedVersionId: async () => "version-1", loadLook: async () => GREEN }, themedSend);
     expect(themedSend.mock.calls[0][0].bodyText).toBe(plainSend.mock.calls[0][0].bodyText);
     expect(htmlOf(themedSend)).not.toBe(htmlOf(plainSend));
     expect(htmlOf(plainSend)).toBe(renderEmailLayoutDocument({
@@ -205,5 +207,68 @@ describe("the email look on a delivered message (#283)", () => {
       helpLine: "Questions about this event? Email help@imsda.org.",
       calendarUrl: "https://events.example.test/calendar",
     }));
+  });
+});
+
+describe("club email and the event look (#283 follow-up)", () => {
+  const clubMessage = { templateKey: "REGISTRATION_CONFIRMATION_PAID", registration: { clubRegistration: { id: "club-registration-1" } } };
+  const sourceWith = (useLook: boolean, extra: Partial<EmailLookSource> = {}): EmailLookSource => ({
+    clubEmailsUseLook: async () => useLook,
+    findPublishedVersionId: async () => "version-1",
+    loadLook: async () => GREEN,
+    ...extra,
+  });
+
+  it("keeps the platform layout, and stamps nothing, for club email while the switch is off", async () => {
+    const store = fakeStore(clubMessage);
+    const sendEmail = ok();
+    const published = vi.fn(async () => "version-1");
+    await run(store, sourceWith(false, { findPublishedVersionId: published }), sendEmail);
+    expect(store.message.registrationThemeVersionId).toBeNull();
+    expect(published).not.toHaveBeenCalled();
+    expect(htmlOf(sendEmail)).toContain("#f0b323");
+    expect(htmlOf(sendEmail)).not.toContain("#1b4d3e");
+  });
+
+  it("uses and stamps the look for club email once the switch is on", async () => {
+    const store = fakeStore(clubMessage);
+    const sendEmail = ok();
+    await run(store, sourceWith(true), sendEmail);
+    expect(store.message.registrationThemeVersionId).toBe("version-1");
+    expect(htmlOf(sendEmail)).toContain('bgcolor="#1b4d3e" class="em-bar"');
+  });
+
+  it("treats a club director's invoice and a club-only template as club email", async () => {
+    for (const overrides of [{ templateKey: "REGISTRATION_CONFIRMATION_PAID", recipientKind: "CLUB_DIRECTOR", registration: null }, { templateKey: "CLUB_DRAFT_REMINDER" }]) {
+      const store = fakeStore(overrides);
+      await run(store, sourceWith(false), ok());
+      expect(store.message.registrationThemeVersionId).toBeNull();
+    }
+  });
+
+  it("leaves non-club email alone whatever the switch says", async () => {
+    for (const useLook of [false, true]) {
+      const store = fakeStore();
+      const sendEmail = ok();
+      const clubSetting = vi.fn(async () => useLook);
+      await run(store, sourceWith(useLook, { clubEmailsUseLook: clubSetting }), sendEmail);
+      expect(store.message.registrationThemeVersionId).toBe("version-1");
+      expect(htmlOf(sendEmail)).toContain("#1b4d3e");
+      expect(clubSetting).not.toHaveBeenCalled();
+    }
+  });
+
+  it("keeps a look already stamped on a club message even with the switch off, and never throws if the setting cannot be read", async () => {
+    const stamped = fakeStore({ ...clubMessage, registrationThemeVersionId: "version-1" });
+    const sendEmail = ok();
+    await run(stamped, sourceWith(false), sendEmail);
+    expect(htmlOf(sendEmail)).toContain("#1b4d3e");
+
+    const broken = fakeStore(clubMessage);
+    const brokenSend = ok();
+    const result = await run(broken, sourceWith(true, { clubEmailsUseLook: async () => { throw new Error("database busy"); } }), brokenSend);
+    expect(result.sentIds).toEqual(["message-1"]);
+    expect(broken.message.registrationThemeVersionId).toBeNull();
+    expect(htmlOf(brokenSend)).toContain("#f0b323");
   });
 });

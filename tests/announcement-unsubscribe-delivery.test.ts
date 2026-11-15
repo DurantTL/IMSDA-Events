@@ -187,6 +187,30 @@ describe("announcement opt-outs at delivery (#838)", () => {
     expect(sent.bodyText).not.toMatch(/unsubscribe|announcements/i);
   });
 
+  it.each(["EVENT", "ALL"] as const)("sends a registration request (#182) to an address that opted out for %s, with no unsubscribe link or header", async (scope) => {
+    vi.stubEnv("APP_BASE_URL", "https://events.imsda.test");
+    resetServerEnvCache();
+    const state = store({ metadata: { trigger: "STAFF_SELECTED_AUDIENCE_BATCH", registrationRequest: true } });
+    const deps = dependenciesFor(state, { optOut: scope }, vi.fn(async (...args: [Record<string, unknown>]) => (void args, { provider: "RESEND" as const, providerMessageId: "provider-1" })));
+    const result = await processExternalEmailQueue("event-1", { dependencies: deps });
+    expect(result.sentIds).toEqual(["message-1"]);
+    expect(deps.findAnnouncementOptOut).not.toHaveBeenCalled();
+    expect(deps.issueUnsubscribeToken).not.toHaveBeenCalled();
+    const sent = (deps.sendEmail as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0] as { listUnsubscribe?: unknown; bodyText: string; bodyHtml: string };
+    expect(sent.listUnsubscribe ?? null).toBeNull();
+    expect(sent.bodyText).not.toMatch(/unsubscribe/i);
+    expect(sent.bodyHtml ?? "").not.toMatch(/unsubscribe/i);
+    expect(state.auditRows).toEqual([]);
+  });
+
+  it("only honours the flag when it is exactly true", async () => {
+    const state = store({ metadata: { registrationRequest: "yes" } });
+    const { sendEmail, done } = run(state, { optOut: "ALL" });
+    await done;
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(state.message.status).toBe("SUPPRESSED");
+  });
+
   it("sends an announcement with an opaque unsubscribe link, in the body and as one-click headers", async () => {
     vi.stubEnv("APP_BASE_URL", "https://events.imsda.test");
     resetServerEnvCache();

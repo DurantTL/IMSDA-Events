@@ -79,7 +79,7 @@ import {
 } from "@/modules/communications/club-assignment-audience";
 import { emptyClubAssignmentFields } from "@/modules/club-registrations/assignments";
 import { loadAnnouncementOptOuts } from "@/modules/communications/email-preferences-repository";
-import { isScheduledEmailMetadata, messageBatchKey, metadataAnnouncementId } from "@/modules/communications/retry-failed-domain";
+import { isScheduledEmailMetadata, messageBatchKey, metadataAnnouncementId, metadataIsRegistrationRequest } from "@/modules/communications/retry-failed-domain";
 import {
   messageRetryIdempotencyKey,
   messageRetryRequestFingerprint,
@@ -916,6 +916,17 @@ async function loadPreviewEmailLooks(eventId: string, stampedVersionIds: string[
   return { current, stamped: new Map(stamped) };
 }
 
+/** The staff previews read the same switch delivery does. A failed read means off (the standard club header). */
+async function loadClubEmailsUseRegistrationLook(client: MessagingDatabaseClient, eventId: string) {
+  try {
+    const row = await client.event.findUnique({ where: { id: eventId }, select: { clubEmailsUseRegistrationLook: true } });
+    return row?.clubEmailsUseRegistrationLook === true;
+  } catch (error) {
+    logError("An event's club email look setting could not be read for a staff preview.", error);
+    return false;
+  }
+}
+
 export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryLogQuery = DEFAULT_DELIVERY_QUERY): Promise<MessagingWorkspaceData> {
   await ensureEventMessagingDefaults(eventId);
   const prisma = getPrisma();
@@ -930,6 +941,7 @@ export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryL
     groupedCounts,
     reminderState,
     shirtSizeState,
+    clubEmailsUseRegistrationLook,
   ] = await Promise.all([
     loadEventEmailSettingsOrThrow(prisma, eventId),
     prisma.eventMessageTemplate.findMany({
@@ -963,6 +975,7 @@ export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryL
     }),
     loadBalanceReminderState(eventId, prisma),
     loadShirtSizeRequestState(eventId, prisma),
+    loadClubEmailsUseRegistrationLook(prisma, eventId),
   ]);
 
   const counts = Object.fromEntries(outboxStatuses.map((status) => [status, 0])) as Record<MessageOutboxStatusValue, number>;
@@ -981,6 +994,7 @@ export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryL
   return {
     settings: settingsRecord(settings),
     currentEmailLook: previewLooks.current,
+    clubEmailsUseRegistrationLook,
     templates: templates
       .filter(isEventTemplateRow)
       .map((template) => serializeTemplate(template, filesByVersion))
@@ -3106,6 +3120,8 @@ export async function createMessageRetryCopy(
         ...(messageBatchKey(source) ? { sourceBatchId: messageBatchKey(source)! } : {}),
         // An announcement's copy stays tied to it, so delivery sees its current essential mark (#838).
         ...(metadataAnnouncementId(source) ? { announcementId: metadataAnnouncementId(source)! } : {}),
+        // A registration request (#182) stays transactional when retried: no opt-out check, no unsubscribe link.
+        ...(metadataIsRegistrationRequest(source) ? { registrationRequest: true } : {}),
         ...(input.extraMetadata ?? {}),
       },
       idempotencyKey: input.idempotencyKey,
@@ -3813,6 +3829,12 @@ export async function enqueuePublicRegistrationMessages(
   };
 }
 
+/** Server-set only (never read from a request body). */
+export type SelectedAudienceOptions = {
+  /** A request for missing information (#182): sent regardless of announcement opt-outs, with no unsubscribe link. */
+  registrationRequest?: boolean;
+};
+
 /**
  * Loads one staff-chosen audience and prices it exactly as the send will.
  *
@@ -3827,6 +3849,7 @@ async function loadSelectedAudienceState(
   registrationIds: readonly string[],
   client: MessagingDatabaseClient,
   now = new Date(),
+  options: SelectedAudienceOptions = {},
 ) {
   const uniqueIds = [...new Set(registrationIds)];
   const sourceKeys: PrismaMessageTemplateKey[] = templateKey === "REGISTRATION_CONFIRMATION"
@@ -3949,13 +3972,14 @@ async function loadSelectedAudienceState(
   }
 
   // Announcements honour opt-outs (#838): read here so the review and the send count the same people.
-  const optOuts = templateKey === "EVENT_ANNOUNCEMENT"
+  const optOuts = templateKey === "EVENT_ANNOUNCEMENT" && !options.registrationRequest
     ? await loadAnnouncementOptOuts(client, candidates.map((candidate) => candidate.recipientEmail), eventId)
     : [];
   const preview = computeSelectedAudiencePreview(uniqueIds, candidates, {
     eventId,
     templateKey,
     optOuts,
+    registrationRequest: options.registrationRequest === true && templateKey === "EVENT_ANNOUNCEMENT",
     isDeferredOrganizationBilling:
       event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
     deliveryMode: settings.deliveryMode,
@@ -3984,6 +4008,7 @@ export async function getSelectedAudiencePreview(
   eventId: string,
   templateKey: SelectedAudienceTemplateKey,
   registrationIds: readonly string[],
+  options: SelectedAudienceOptions = {},
 ): Promise<SelectedAudiencePreview> {
   await ensureEventMessagingDefaults(eventId);
   return (await loadSelectedAudienceState(
@@ -3991,6 +4016,8 @@ export async function getSelectedAudiencePreview(
     templateKey,
     registrationIds,
     getPrisma(),
+    new Date(),
+    options,
   )).preview;
 }
 
@@ -4021,6 +4048,7 @@ export async function enqueueSelectedAudienceBatch(
   eventId: string,
   input: SelectedAudienceBatchInput,
   actorUserId: string,
+  options: SelectedAudienceOptions = {},
 ): Promise<SelectedAudienceBatchOperation> {
   await ensureEventMessagingDefaults(eventId);
   const prisma = getPrisma();
@@ -4093,6 +4121,8 @@ export async function enqueueSelectedAudienceBatch(
           input.templateKey,
           input.registrationIds,
           tx,
+          new Date(),
+          options,
         );
         if (!state.preview.templatePublished) {
           throw new MessagingError(
@@ -4181,6 +4211,7 @@ export async function enqueueSelectedAudienceBatch(
               previewFingerprint: input.previewFingerprint,
               selectedTemplateKey: input.templateKey,
               resolvedTemplateKey: recipient.resolvedTemplateKey,
+              ...(state.preview.registrationRequest ? { registrationRequest: true } : {}),
             },
           });
           messageIds.push(...queued.messageIds);
@@ -4206,6 +4237,7 @@ export async function enqueueSelectedAudienceBatch(
               skippedCount: state.preview.skippedCount,
               deliveryMode: state.settings.deliveryMode,
               realDelivery: false,
+              ...(state.preview.registrationRequest ? { sentAs: "REGISTRATION_REQUEST" } : {}),
             },
           }],
           skipDuplicates: true,

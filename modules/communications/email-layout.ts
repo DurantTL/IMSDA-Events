@@ -138,6 +138,37 @@ export function emailIsClubLinked(input: { clubRegistration?: boolean; recipient
   return Boolean(input.clubRegistration) || input.recipientKind === "CLUB_DIRECTOR";
 }
 
+/**
+ * Whether an event message is club email: its header context is "club" (#283 follow-up). Delivery and the staff previews
+ * both decide it here, so they cannot disagree about when the per-event "club emails use the registration look" switch applies.
+ */
+export function emailIsClubEmail(
+  templateKey: MessageTemplateKey | string,
+  input: { clubRegistration?: boolean; recipientKind?: string | null } = {},
+) {
+  return emailHeaderContext(templateKey, { clubRegistration: emailIsClubLinked(input) }) === "club";
+}
+
+/**
+ * The look a staff email preview draws (#283). A look stamped on the message always wins (retries stay consistent). Otherwise
+ * the current look applies only when the caller says the message or template would be stamped now (`useCurrentWhenUnstamped`),
+ * and never to club email while the event's switch is off, as delivery decides it. Delivery and previews share
+ * `emailIsClubEmail`, so they cannot disagree.
+ */
+export function previewEmailLookChoice<Look>(input: {
+  templateKey: MessageTemplateKey | string;
+  clubLinked?: boolean;
+  stampedLook?: Look | null;
+  currentLook?: Look | null;
+  useCurrentWhenUnstamped: boolean;
+  clubEmailsUseRegistrationLook?: boolean;
+}): Look | null {
+  if (input.stampedLook) return input.stampedLook;
+  if (!input.useCurrentWhenUnstamped || !input.currentLook) return null;
+  if (emailIsClubEmail(input.templateKey, { clubRegistration: input.clubLinked }) && !input.clubEmailsUseRegistrationLook) return null;
+  return input.currentLook;
+}
+
 /** The header name for a context from the platform settings. */
 export function emailHeaderName(settings: EmailLayoutSettings, context: EmailHeaderContext) {
   return context === "club" ? settings.clubHeaderName : settings.headerName;

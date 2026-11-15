@@ -257,3 +257,11 @@ export function metadataAnnouncementId(message: { metadata: unknown }): string |
     : {};
   return typeof metadata.announcementId === "string" && metadata.announcementId ? metadata.announcementId : null;
 }
+
+/** Whether a message was queued as a registration request (#182), which its retry copies keep so they stay transactional. */
+export function metadataIsRegistrationRequest(message: { metadata: unknown }): boolean {
+  const metadata = message.metadata && typeof message.metadata === "object" && !Array.isArray(message.metadata)
+    ? message.metadata as Record<string, unknown>
+    : {};
+  return metadata.registrationRequest === true;
+}

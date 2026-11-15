@@ -152,6 +152,8 @@ export type MessagingWorkspaceData = {
   settings: MessagingSettingsRecord;
   /** The event's published look as the template preview shows it (#283); null or absent means the platform layout. */
   currentEmailLook?: EmailLook | null;
+  /** The event's switch for club emails using its registration look (#283). Off by default. */
+  clubEmailsUseRegistrationLook?: boolean;
   templates: MessageTemplateRecord[];
   /** One page of the delivery log, in the database's order (#1492). */
   messages: MessageOutboxRecord[];

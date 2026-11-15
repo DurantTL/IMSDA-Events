@@ -177,8 +177,8 @@ describe("previewing a message action", () => {
   it("describes a request for information with its title and the opt-out note", async () => {
     const preview = await createBulkPreview(viewer(), infoInput());
     expect(preview.proposedChange).toBe('Request missing information: "Shirt sizes"');
-    expect(preview.effect).toContain("opted out of announcements are skipped");
-    expect(mocks.preview).toHaveBeenCalledWith("event-1", "EVENT_ANNOUNCEMENT", expect.anything());
+    expect(preview.effect).toContain("including people who turned off announcements");
+    expect(mocks.preview).toHaveBeenCalledWith("event-1", "EVENT_ANNOUNCEMENT", expect.anything(), { registrationRequest: true });
   });
 
   it("needs communications access on top of the People list access", async () => {
@@ -270,7 +270,7 @@ describe("approving", () => {
     const decision = await approveMessage(approver(), approvalId, FINGERPRINT, { now: NOW });
     expect(decision).toMatchObject({ status: "SENT", replayed: false, sendResult: { included: 2, skipped: 2, queued: 0, captured: 2, suppressed: 0 } });
     expect(mocks.enqueue).toHaveBeenCalledTimes(1);
-    expect(mocks.enqueue).toHaveBeenCalledWith("event-1", { batchId: approvalId, templateKey: "BALANCE_REMINDER", registrationIds: ["reg-1", "reg-2"], announcementTitle: "", announcementBody: "", previewFingerprint: FINGERPRINT }, "user-b");
+    expect(mocks.enqueue).toHaveBeenCalledWith("event-1", { batchId: approvalId, templateKey: "BALANCE_REMINDER", registrationIds: ["reg-1", "reg-2"], announcementTitle: "", announcementBody: "", previewFingerprint: FINGERPRINT }, "user-b", { registrationRequest: false });
     expect(approvals[0]).toMatchObject({ status: "SENT", decidedByUserId: "user-b", decidedAt: NOW });
     expect(Object.keys(approvals[0].sendResult).sort()).toEqual(["captured", "included", "queued", "skipped", "suppressed"]);
     expect(mocks.writeAuditLog.mock.calls.map(([entry]) => entry.action)).toContain("BULK_MESSAGE_APPROVED");
@@ -314,7 +314,7 @@ describe("approving", () => {
     expect(mocks.enqueue).not.toHaveBeenCalled();
     approvals[0].updatedAt = new Date(NOW.getTime() - 11 * 60_000);
     await expect(approveMessage(approver(), approvalId, FINGERPRINT, { now: NOW })).resolves.toMatchObject({ status: "SENT" });
-    expect(mocks.enqueue).toHaveBeenCalledWith("event-1", expect.objectContaining({ batchId: approvalId }), "user-b");
+    expect(mocks.enqueue).toHaveBeenCalledWith("event-1", expect.objectContaining({ batchId: approvalId }), "user-b", { registrationRequest: false });
   });
 
   it("refuses a missing or malformed fingerprint", async () => {
@@ -331,6 +331,27 @@ describe("approving", () => {
     expect((await refusal(getMessageApprovalReview(approver(["MANAGE_COMMUNICATIONS"], "user-b", "event-2"), approvalId))).code).toBe("NOT_FOUND");
     expect(mocks.enqueue).not.toHaveBeenCalled();
     expect(approvals[0].status).toBe("PENDING_APPROVAL");
+  });
+});
+
+describe("a request for missing information is transactional (#182)", () => {
+  it("is previewed, queued and sent as a registration request, set by the server from the stored action", async () => {
+    await queue(infoInput());
+    for (const call of mocks.preview.mock.calls) expect(call[3]).toEqual({ registrationRequest: true });
+    const approvalId = approvals[0].id as string;
+    await approveMessage(approver(), approvalId, FINGERPRINT, { now: NOW });
+    expect(mocks.enqueue).toHaveBeenCalledWith("event-1", expect.objectContaining({ batchId: approvalId, templateKey: "EVENT_ANNOUNCEMENT" }), "user-b", { registrationRequest: true });
+    const audit = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "BULK_MESSAGE_APPROVED");
+    expect(audit.metadata).toMatchObject({ action: "REQUEST_INFORMATION", sentAs: "REGISTRATION_REQUEST" });
+  });
+
+  it("lets the person who queued it approve it, and a plain announcement keeps the opt-out behaviour", async () => {
+    await queue(messageInput({ params: { templateKey: "EVENT_ANNOUNCEMENT", announcementTitle: "Hello", announcementBody: "News" } }));
+    for (const call of mocks.preview.mock.calls) expect(call[3]).toEqual({ registrationRequest: false });
+    await approveMessage(approver(["MANAGE_COMMUNICATIONS"], "user-a"), approvals[0].id, FINGERPRINT, { now: NOW });
+    expect(mocks.enqueue.mock.calls[0][3]).toEqual({ registrationRequest: false });
+    const audit = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "BULK_MESSAGE_APPROVED");
+    expect(audit.metadata).not.toHaveProperty("sentAs");
   });
 });
 
@@ -499,7 +520,8 @@ describe("the fresh review and the list", () => {
     const approvalId = approvals[0].id as string;
     mocks.preview.mockClear();
     const review = await getMessageApprovalReview(approver(), approvalId);
-    expect(mocks.preview).toHaveBeenCalledWith("event-1", "EVENT_ANNOUNCEMENT", ["reg-1", "reg-2"]);
+    expect(mocks.preview).toHaveBeenCalledWith("event-1", "EVENT_ANNOUNCEMENT", ["reg-1", "reg-2"], { registrationRequest: true });
+    expect(review.registrationRequest).toBe(true);
     expect(review).toMatchObject({ title: "Shirt sizes", body: "Please add each camper's shirt size.", fingerprint: FINGERPRINT, deliveryMode: "LOCAL_CAPTURE", queuedCount: 2, includedCount: 2, sampleCodes: ["CODE-reg-1", "CODE-reg-2"], status: "PENDING_APPROVAL" });
     expect(JSON.stringify(review)).not.toMatch(/example\.test|Pat Sample/);
   });

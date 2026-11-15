@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import type { EventPermission } from "@/modules/access/permissions";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { BULK_ACTION_CATALOG, BulkActionError, messageSkipReason, reasonLabel, type BulkActionKey, type BulkReasonCode } from "@/modules/bulk-actions/domain";
+import { BULK_ACTION_CATALOG, BulkActionError, isRegistrationRequestAction, messageSkipReason, reasonLabel, type BulkActionKey, type BulkReasonCode } from "@/modules/bulk-actions/domain";
 import { enqueueSelectedAudienceBatch, getSelectedAudiencePreview } from "@/modules/communications/messaging-repository";
 import { selectedAudienceTemplateKeys, selectedAudienceTemplateLabels, type SelectedAudienceTemplateKey } from "@/modules/communications/selected-audience-templates";
 
@@ -56,6 +56,8 @@ export type MessageApprovalReview = {
   skippedCount: number;
   skippedByReason: Array<{ reason: BulkReasonCode; label: string; count: number }>;
   fingerprint: string;
+  /** True for a request for missing information: it goes to everyone listed, including people who turned off announcements. */
+  registrationRequest: boolean;
   deliveryMode: "DISABLED" | "LOCAL_CAPTURE" | "EXTERNAL_EMAIL";
   templatePublished: boolean;
   attachmentProblem: string | null;
@@ -137,7 +139,7 @@ export async function getMessageApprovalReview(viewer: ApprovalViewer, approvalI
   requireCommunications(viewer);
   const row = await loadApproval(viewer.eventId, approvalId);
   if (!row || !isTemplateKey(row.templateKey)) throw notFound();
-  const preview = await getSelectedAudiencePreview(viewer.eventId, row.templateKey, idsOf(row.registrationIds));
+  const preview = await getSelectedAudiencePreview(viewer.eventId, row.templateKey, idsOf(row.registrationIds), { registrationRequest: isRegistrationRequestAction(row.action) });
   const groups = new Map<BulkReasonCode, number>();
   for (const skip of preview.skipped) {
     const reason = messageSkipReason(skip.code);
@@ -156,6 +158,7 @@ export async function getMessageApprovalReview(viewer: ApprovalViewer, approvalI
     skippedCount: preview.skippedCount,
     skippedByReason: [...groups].map(([reason, count]) => ({ reason, label: reasonLabel(reason), count })),
     fingerprint: preview.fingerprint,
+    registrationRequest: isRegistrationRequestAction(row.action),
     deliveryMode: preview.deliveryMode,
     templatePublished: preview.templatePublished,
     attachmentProblem: preview.attachmentProblem,
@@ -215,7 +218,7 @@ export async function approveMessage(viewer: ApprovalViewer, approvalId: string,
       announcementTitle: row.announcementTitle ?? "",
       announcementBody: row.announcementBody ?? "",
       previewFingerprint: fingerprint,
-    }, viewer.userId);
+    }, viewer.userId, { registrationRequest: isRegistrationRequestAction(row.action) });
   } catch (error) {
     // The send may have committed before the failure (a crash, or a step after the commit). If the batch exists it is SENT.
     // If that check itself fails the row stays SENDING: a later approval takes it over once it is stale.
@@ -253,7 +256,7 @@ export async function approveMessage(viewer: ApprovalViewer, approvalId: string,
     entityId: row.id,
     correlationId: row.runId,
     summary: `Approved and sent a bulk message (${selectedAudienceTemplateLabels[row.templateKey]}) to ${sendResult.included} registrations.`,
-    metadata: { action: row.action, templateKey: row.templateKey, runId: row.runId, ...sendResult, deliveryMode: operation.deliveryMode, replayed: operation.replayed, actorUserId: viewer.userId } as Prisma.InputJsonValue,
+    metadata: { action: row.action, templateKey: row.templateKey, runId: row.runId, ...(isRegistrationRequestAction(row.action) ? { sentAs: "REGISTRATION_REQUEST" } : {}), ...sendResult, deliveryMode: operation.deliveryMode, replayed: operation.replayed, actorUserId: viewer.userId } as Prisma.InputJsonValue,
   });
   return { id: row.id, status: "SENT", sendResult, replayed: false };
 }

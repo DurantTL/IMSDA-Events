@@ -20,7 +20,7 @@ import { processAccountEmailQueue, processExternalEmailQueue } from "@/modules/c
 
 type Message = Record<string, unknown> & { id: string; status: string; recipientEmail: string; lockToken: string | null };
 
-function fakeStore(options: { recipientEmail?: string; suppressions?: Array<{ normalizedEmail: string; reason: "BOUNCE" | "COMPLAINT"; suppressedAt: Date; reenabledAt: Date | null }>; lookupFails?: boolean; eventId?: string | null; templateKey?: string }) {
+function fakeStore(options: { recipientEmail?: string; suppressions?: Array<{ normalizedEmail: string; reason: "BOUNCE" | "COMPLAINT"; suppressedAt: Date; reenabledAt: Date | null }>; lookupFails?: boolean; eventId?: string | null; templateKey?: string; metadata?: Record<string, unknown> }) {
   const message: Message = {
     id: "message-1",
     eventId: options.eventId === undefined ? "event-1" : options.eventId,
@@ -35,6 +35,7 @@ function fakeStore(options: { recipientEmail?: string; suppressions?: Array<{ no
     subjectSnapshot: "Registration received",
     bodyTextSnapshot: "Your registration is saved.",
     bodyHtmlSnapshot: null,
+    ...(options.metadata ? { metadata: options.metadata } : {}),
     status: "PENDING",
     attemptCount: 0,
     availableAt: new Date("2026-10-23T11:00:00Z"),
@@ -107,6 +108,19 @@ describe("a suppressed address receives nothing (#863)", () => {
     expect(store.audits).toEqual([expect.objectContaining({ action: "EMAIL_SKIPPED_ADDRESS_SUPPRESSED", entityId: "message-1", metadata: { messageId: "message-1", reason } })]);
     // Ids and the reason only: never the address.
     expect(JSON.stringify(store.audits)).not.toContain("example.test");
+  });
+
+  it("still holds back a registration request (#182) to a suppressed address, though it skips the opt-out check", async () => {
+    const store = fakeStore({
+      templateKey: "EVENT_ANNOUNCEMENT",
+      metadata: { registrationRequest: true },
+      suppressions: [{ normalizedEmail: "attendee@example.test", reason: "BOUNCE", suppressedAt: new Date("2026-10-20T00:00:00Z"), reenabledAt: null }],
+    });
+    const sendEmail = accepted();
+    await processExternalEmailQueue("event-1", { dependencies: { ...dependencies, prisma: store.prisma as never, sendEmail } });
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(store.message).toMatchObject({ status: "SUPPRESSED" });
+    expect(store.audits).toEqual([expect.objectContaining({ action: "EMAIL_SKIPPED_ADDRESS_SUPPRESSED" })]);
   });
 
   it("compares addresses lower-cased and trimmed", async () => {

@@ -2051,6 +2051,8 @@ model Event {
   hubIntro             String?
   /// Refund policy shown to registrants (#891): plain text, paragraphs split on blank lines. Display only; refund rules and processing live elsewhere. Blank hides it.
   refundPolicy         String?
+  /// Whether club emails for this event use its registration look (#283). Off: they keep the platform club header.
+  clubEmailsUseRegistrationLook Boolean @default(false)
   isPublished          Boolean            @default(false)
   registrationOpensOn  String?
   registrationClosesOn String?

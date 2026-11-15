@@ -63,7 +63,8 @@ describe("message actions in the catalog", () => {
       expect(entry.createsFile).toBe(false);
       expect(entry.effect).toContain("Nothing is sent now. The message waits for approval under Messages waiting for approval.");
     }
-    expect(BULK_ACTION_CATALOG.REQUEST_INFORMATION.effect).toMatch(/opted out of announcements are skipped/);
+    expect(BULK_ACTION_CATALOG.REQUEST_INFORMATION.effect).toMatch(/including people who turned off announcements, except addresses that cannot receive email/);
+    expect(BULK_ACTION_CATALOG.QUEUE_MESSAGE.effect).not.toMatch(/turned off announcements/);
   });
 
   it("name what is missing in plain words", () => {

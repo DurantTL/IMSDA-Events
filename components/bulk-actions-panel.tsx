@@ -303,7 +303,7 @@ export function BulkActionsPanel(props: Props) {
               <label className={styles.field}>
                 What is missing
                 <textarea className={styles.textarea} value={infoDetails} maxLength={MESSAGE_BODY_MAX} onChange={(event) => { reset(); setInfoDetails(event.target.value); }} />
-                <span className={styles.help}>Sent as an event announcement with each person&apos;s private registration link, where they can add it. People who opted out of announcements are skipped. Up to {limits.message} registrations at a time. Nothing is sent now: it waits for approval.</span>
+                <span className={styles.help}>Sent as an event announcement with each person&apos;s private registration link, where they can add it. It is a request about their own registration, so it goes to everyone on the list, including people who turned off announcements, except addresses that can&apos;t receive email. Up to {limits.message} registrations at a time. Nothing is sent now: it waits for approval.</span>
               </label>
             </>
           )}

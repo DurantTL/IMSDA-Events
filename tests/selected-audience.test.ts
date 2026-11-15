@@ -329,6 +329,24 @@ describe("announcement opt-outs in a staff-chosen batch (#838)", () => {
     expect(after.fingerprint).not.toBe(before.fingerprint);
   });
 
+  it("a registration request (#182) includes opted-out contacts, still skips an invalid email, and changes the fingerprint", () => {
+    const withBad = [...candidates, candidate({ registrationId: "reg-bad", confirmationCode: "C-bad", recipientEmail: "not-an-email" })];
+    const allIds = withBad.map((entry) => entry.registrationId);
+    const announcement = computeSelectedAudiencePreview(allIds, withBad, { ...context(), templateKey: "EVENT_ANNOUNCEMENT", optOuts }, now);
+    const request = computeSelectedAudiencePreview(allIds, withBad, { ...context(), templateKey: "EVENT_ANNOUNCEMENT", optOuts, registrationRequest: true }, now);
+    expect(announcement.registrationRequest).toBeUndefined();
+    expect(request.registrationRequest).toBe(true);
+    expect(request.recipients.map((entry) => entry.registrationId).sort()).toEqual(["reg-four", "reg-one", "reg-three", "reg-two"]);
+    expect(request.skipped.map((entry) => [entry.registrationId, entry.code])).toEqual([["reg-bad", "INVALID_CONTACT_EMAIL"]]);
+    expect(request.fingerprint).not.toBe(announcement.fingerprint);
+  });
+
+  it("the registration-request flag does not change any other template", () => {
+    const base = computeSelectedAudiencePreview(ids, candidates, { ...context(), templateKey: "CUSTOM_MESSAGE" }, now);
+    const flagged = computeSelectedAudiencePreview(ids, candidates, { ...context(), templateKey: "CUSTOM_MESSAGE", registrationRequest: true }, now);
+    expect(flagged.recipients).toEqual(base.recipients);
+  });
+
   it("never applies an opt-out to any other template", () => {
     for (const templateKey of ["BALANCE_REMINDER", "CUSTOM_MESSAGE", "REGISTRATION_CONFIRMATION"] as const) {
       const preview = computeSelectedAudiencePreview(
