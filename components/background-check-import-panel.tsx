@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BackgroundCheckImport } from "@/components/background-check-import";
+import styles from "./background-check-import-panel.module.css";
 
 /** The Sterling Volunteers CSV upload (#388, #427, #527), refreshing the page's counts when saved. */
 export function BackgroundCheckImportPanel() {
@@ -10,7 +11,7 @@ export function BackgroundCheckImportPanel() {
   const [notice, setNotice] = useState("");
   return (
     <>
-      <div className="intro-actions honor-csv-actions">
+      <div className={`intro-actions honor-csv-actions ${styles.actions}`}>
         <BackgroundCheckImport
           onImported={(result) => {
             setNotice(`Saved Sterling Volunteers: ${Number(result.added ?? 0)} added, ${Number(result.changed ?? 0)} changed, ${Number(result.dropped ?? 0)} dropped.`);

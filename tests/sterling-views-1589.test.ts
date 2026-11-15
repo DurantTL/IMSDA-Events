@@ -124,3 +124,13 @@ describe("the Sterling Volunteers page", () => {
     }
   });
 });
+
+describe("the Sterling Volunteers upload actions", () => {
+  it("keep a 44px tap target on desktop too, over the shared 36px desktop rule", async () => {
+    const { readFileSync } = await import("node:fs");
+    const css = readFileSync("components/background-check-import-panel.module.css", "utf8");
+    expect(css).toMatch(/\.actions > :is\(a, button\)\s*\{\s*min-height: var\(--target-touch, 44px\);/);
+    const panel = readFileSync("components/background-check-import-panel.tsx", "utf8");
+    expect(panel).toContain("styles.actions");
+  });
+});

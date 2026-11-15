@@ -1,0 +1,4 @@
+/* Sterling Volunteers upload actions (#1589 part D): CSV template and Upload CSV keep a 44px tap target on every width. */
+.actions > :is(a, button) {
+  min-height: var(--target-touch, 44px);
+}
