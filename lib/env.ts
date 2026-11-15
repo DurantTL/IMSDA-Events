@@ -26,6 +26,114 @@ const keyVersion = z
   .regex(/^[1-9]\d{0,5}$/, "must be a positive whole number")
   .transform(Number);
 
+/** `<kekVersion>.<base64url ciphertext>`: the vault key version id (hex), then the wrapped data key. */
+export const WRAPPED_KEY_PATTERN = /^[0-9a-fA-F]{8,64}\.[A-Za-z0-9_-]{16,2048}$/;
+
+type DataKeyFields = {
+  NODE_ENV: string;
+  SECRET_ENCRYPTION_KEY?: string;
+  DATA_KEY_SOURCE?: "azure-key-vault" | "dev-env";
+  DATA_ENCRYPTION_KEY_VERSION: number;
+  DATA_ENCRYPTION_PREVIOUS_KEY_VERSION?: number;
+  DATA_ENCRYPTION_KEY?: string;
+  DATA_ENCRYPTION_PREVIOUS_KEY?: string;
+  AZURE_KEY_VAULT_URL?: string;
+  AZURE_KEY_VAULT_KEY_NAME?: string;
+  AZURE_TENANT_ID?: string;
+  AZURE_CLIENT_ID?: string;
+  AZURE_CLIENT_SECRET?: string;
+  DATA_ENCRYPTION_KEY_WRAPPED?: string;
+  DATA_ENCRYPTION_PREVIOUS_KEY_WRAPPED?: string;
+};
+
+/** Messages name the variable and the rule, never a value. */
+function validateDataKeySettings(value: DataKeyFields, context: z.RefinementCtx) {
+  const issue = (path: string, message: string) => context.addIssue({ code: "custom", path: [path], message });
+  const source = value.DATA_KEY_SOURCE;
+  const hasPrevious = Boolean(value.DATA_ENCRYPTION_PREVIOUS_KEY || value.DATA_ENCRYPTION_PREVIOUS_KEY_WRAPPED);
+  const previousVersion = value.DATA_ENCRYPTION_PREVIOUS_KEY_VERSION;
+
+  if (!hasPrevious && previousVersion !== undefined) {
+    issue("DATA_ENCRYPTION_PREVIOUS_KEY_VERSION", "is set but no previous data key is set; remove it, or set the previous data key");
+  }
+  if (hasPrevious) {
+    if (previousVersion === undefined) {
+      issue("DATA_ENCRYPTION_PREVIOUS_KEY_VERSION", "is required when a previous data key is set");
+    } else if (previousVersion >= value.DATA_ENCRYPTION_KEY_VERSION) {
+      issue("DATA_ENCRYPTION_PREVIOUS_KEY_VERSION", "must be lower than DATA_ENCRYPTION_KEY_VERSION");
+    }
+  }
+
+  if (source === "dev-env") {
+    if (value.NODE_ENV === "production") {
+      issue("DATA_KEY_SOURCE", "\"dev-env\" is for local development and CI only; use \"azure-key-vault\" in production");
+    }
+    if ((value.DATA_ENCRYPTION_KEY ?? "").length < SECRET_MIN_LENGTH) {
+      issue("DATA_ENCRYPTION_KEY", `is required with DATA_KEY_SOURCE=dev-env and must contain at least ${SECRET_MIN_LENGTH} characters`);
+    } else if (value.DATA_ENCRYPTION_KEY === value.SECRET_ENCRYPTION_KEY) {
+      issue("DATA_ENCRYPTION_KEY", "must not be the same as the sign-in encryption key");
+    }
+    if (value.DATA_ENCRYPTION_PREVIOUS_KEY) {
+      if (value.DATA_ENCRYPTION_PREVIOUS_KEY.length < SECRET_MIN_LENGTH) {
+        issue("DATA_ENCRYPTION_PREVIOUS_KEY", `must contain at least ${SECRET_MIN_LENGTH} characters`);
+      } else if (value.DATA_ENCRYPTION_PREVIOUS_KEY === value.DATA_ENCRYPTION_KEY) {
+        issue("DATA_ENCRYPTION_PREVIOUS_KEY", "must not be the same key as the current data key");
+      } else if (value.DATA_ENCRYPTION_PREVIOUS_KEY === value.SECRET_ENCRYPTION_KEY) {
+        issue("DATA_ENCRYPTION_PREVIOUS_KEY", "must not be the same as the sign-in encryption key");
+      }
+    }
+  }
+
+  if (source === "azure-key-vault") {
+    const required: [keyof DataKeyFields, string][] = [
+      ["AZURE_KEY_VAULT_URL", "AZURE_KEY_VAULT_URL"],
+      ["AZURE_KEY_VAULT_KEY_NAME", "AZURE_KEY_VAULT_KEY_NAME"],
+      ["AZURE_TENANT_ID", "AZURE_TENANT_ID"],
+      ["AZURE_CLIENT_ID", "AZURE_CLIENT_ID"],
+      ["AZURE_CLIENT_SECRET", "AZURE_CLIENT_SECRET"],
+      ["DATA_ENCRYPTION_KEY_WRAPPED", "DATA_ENCRYPTION_KEY_WRAPPED"],
+    ];
+    for (const [key, name] of required) {
+      if (!value[key]) {
+        issue(name, name === "AZURE_CLIENT_SECRET"
+          ? "is required with DATA_KEY_SOURCE=azure-key-vault (or set AZURE_CLIENT_SECRET_FILE)"
+          : "is required with DATA_KEY_SOURCE=azure-key-vault");
+      }
+    }
+    if (value.AZURE_KEY_VAULT_URL && !isVaultUrl(value.AZURE_KEY_VAULT_URL)) {
+      issue("AZURE_KEY_VAULT_URL", "must be an https address on vault.azure.net, such as https://<name>.vault.azure.net");
+    }
+    if (value.AZURE_KEY_VAULT_KEY_NAME && !/^[0-9A-Za-z-]{1,127}$/.test(value.AZURE_KEY_VAULT_KEY_NAME)) {
+      issue("AZURE_KEY_VAULT_KEY_NAME", "must be a vault key name (letters, digits and dashes)");
+    }
+    if (value.AZURE_TENANT_ID && !/^[0-9A-Za-z.-]{1,255}$/.test(value.AZURE_TENANT_ID)) {
+      issue("AZURE_TENANT_ID", "must be a tenant id or domain name");
+    }
+    for (const name of ["DATA_ENCRYPTION_KEY_WRAPPED", "DATA_ENCRYPTION_PREVIOUS_KEY_WRAPPED"] as const) {
+      const wrapped = value[name];
+      if (wrapped && !WRAPPED_KEY_PATTERN.test(wrapped)) {
+        issue(name, "must look like <key version>.<wrapped key>, as printed by npm run data-key:wrap");
+      }
+    }
+  }
+}
+
+/** `https://<name>.vault.azure.net`, nothing else: no credentials, port, path or query. */
+export function isVaultUrl(raw: string) {
+  try {
+    const url = new URL(raw);
+    return (
+      url.protocol === "https:" &&
+      url.hostname.endsWith(".vault.azure.net") &&
+      url.hostname.length > ".vault.azure.net".length &&
+      !url.username && !url.password && !url.port &&
+      (url.pathname === "/" || url.pathname === "") && !url.search && !url.hash
+    );
+  } catch {
+    return false;
+  }
+}
+
 export const serverEnvSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -188,6 +296,25 @@ export const serverEnvSchema = z
     SECRET_ENCRYPTION_PREVIOUS_KEY_FILE: optionalTrimmed,
     SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION: keyVersion.optional(),
 
+    // The personal-data key (#1652, docs/decisions/0017-sign-in-key-and-data-key.md). Unset: not separate yet, and
+    // personal data keeps using the sign-in key above. "azure-key-vault": production; the server holds only a
+    // wrapped copy of the key and asks the vault to unwrap it (docs/DATA-KEY-AZURE-KEY-VAULT.md). "dev-env": the
+    // key is a plain value in the environment, for local development and CI only; refused in production.
+    DATA_KEY_SOURCE: z.enum(["azure-key-vault", "dev-env"]).optional(),
+    DATA_ENCRYPTION_KEY_VERSION: keyVersion.default(1),
+    DATA_ENCRYPTION_PREVIOUS_KEY_VERSION: keyVersion.optional(),
+    DATA_ENCRYPTION_KEY: optionalTrimmed,
+    DATA_ENCRYPTION_PREVIOUS_KEY: optionalTrimmed,
+    AZURE_KEY_VAULT_URL: optionalTrimmed,
+    AZURE_KEY_VAULT_KEY_NAME: optionalTrimmed,
+    AZURE_TENANT_ID: optionalTrimmed,
+    AZURE_CLIENT_ID: optionalTrimmed,
+    // Like the sign-in key, the client secret can come from a protected file (AZURE_CLIENT_SECRET_FILE).
+    AZURE_CLIENT_SECRET: optionalTrimmed,
+    AZURE_CLIENT_SECRET_FILE: optionalTrimmed,
+    DATA_ENCRYPTION_KEY_WRAPPED: optionalTrimmed,
+    DATA_ENCRYPTION_PREVIOUS_KEY_WRAPPED: optionalTrimmed,
+
     // Pathfinder Health Record (#611). Off unless exactly "true": with it off
     // there are no health routes, no Health tab, and nothing is stored. Do not
     // turn it on in production before ADR 0005 Addendum B is Accepted and the
@@ -290,6 +417,8 @@ export const serverEnvSchema = z
         });
       }
     }
+
+    validateDataKeySettings(value, context);
 
     // The offline stand-in returns invented points; it must never run in production.
     if (isProduction && value.GEOCODING_PROVIDER === "fake") {
@@ -525,6 +654,19 @@ export const SERVER_ENV_KEYS = [
     "SECRET_ENCRYPTION_PREVIOUS_KEY",
     "SECRET_ENCRYPTION_PREVIOUS_KEY_FILE",
     "SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION",
+    "DATA_KEY_SOURCE",
+    "DATA_ENCRYPTION_KEY_VERSION",
+    "DATA_ENCRYPTION_PREVIOUS_KEY_VERSION",
+    "DATA_ENCRYPTION_KEY",
+    "DATA_ENCRYPTION_PREVIOUS_KEY",
+    "AZURE_KEY_VAULT_URL",
+    "AZURE_KEY_VAULT_KEY_NAME",
+    "AZURE_TENANT_ID",
+    "AZURE_CLIENT_ID",
+    "AZURE_CLIENT_SECRET",
+    "AZURE_CLIENT_SECRET_FILE",
+    "DATA_ENCRYPTION_KEY_WRAPPED",
+    "DATA_ENCRYPTION_PREVIOUS_KEY_WRAPPED",
     "HEALTH_RECORDS_ENABLED",
     "GEOCODING_ENABLED",
     "GEOCODING_PROVIDER",
@@ -600,6 +742,17 @@ export function resolvePreviousEncryptionKey(
 }
 
 /**
+ * The vault client secret: from AZURE_CLIENT_SECRET or the file named by
+ * AZURE_CLIENT_SECRET_FILE, with the same rules and message style as the
+ * sign-in key.
+ */
+export function resolveAzureClientSecret(
+  source: Record<string, string | undefined> = process.env,
+): EncryptionKeyResolution {
+  return resolveKeyFrom(source, "AZURE_CLIENT_SECRET", "AZURE_CLIENT_SECRET_FILE");
+}
+
+/**
  * Numbers, booleans and the source only: never key text. `version` is the
  * version new values are sealed with (null when SECRET_ENCRYPTION_KEY_VERSION
  * is not a valid number); `previousVersion` is null when no previous key is set.
@@ -653,6 +806,7 @@ function readSource(
   source: Record<string, string | undefined>,
   encryptionKey: string | undefined,
   previousEncryptionKey: string | undefined,
+  azureClientSecret: string | undefined,
 ) {
   return Object.fromEntries(
     SERVER_ENV_KEYS
@@ -662,7 +816,9 @@ function readSource(
           ? encryptionKey
           : key === "SECRET_ENCRYPTION_PREVIOUS_KEY"
             ? previousEncryptionKey
-            : source[key]?.trim() ? source[key] : undefined,
+            : key === "AZURE_CLIENT_SECRET"
+              ? azureClientSecret
+              : source[key]?.trim() ? source[key] : undefined,
       ])
       .filter(([, value]) => value !== undefined),
   );
@@ -677,22 +833,30 @@ export function validateServerEnv(
 ): ServerEnvValidation {
   const encryption = resolveEncryptionKey(source);
   const previous = resolvePreviousEncryptionKey(source);
+  const clientSecret = resolveAzureClientSecret(source);
   const result = serverEnvSchema.safeParse(
-    readSource(source, encryption.ok ? encryption.key : undefined, previous.ok ? previous.key : undefined),
+    readSource(
+      source,
+      encryption.ok ? encryption.key : undefined,
+      previous.ok ? previous.key : undefined,
+      clientSecret.ok ? clientSecret.key : undefined,
+    ),
   );
-  if (result.success && encryption.ok && previous.ok) return { ok: true, env: result.data };
+  if (result.success && encryption.ok && previous.ok && clientSecret.ok) return { ok: true, env: result.data };
 
   const issues = result.success
     ? []
     : result.error.issues
         .filter((issue) => encryption.ok || issue.path[0] !== "SECRET_ENCRYPTION_KEY")
         .filter((issue) => previous.ok || issue.path[0] !== "SECRET_ENCRYPTION_PREVIOUS_KEY")
+        .filter((issue) => clientSecret.ok || issue.path[0] !== "AZURE_CLIENT_SECRET")
         .map((issue) => {
           const variable = issue.path.join(".") || "environment";
           return `${variable}: ${issue.message}`;
         });
   if (!encryption.ok) issues.push(encryption.issue);
   if (!previous.ok) issues.push(previous.issue);
+  if (!clientSecret.ok) issues.push(clientSecret.issue);
   return { ok: false, issues };
 }
 
