@@ -55,6 +55,7 @@ function setup() {
     const result = spawnSync("sh", [script, ...args], {
       encoding: "utf8",
       env: {
+        NODE_ENV: "test",
         PATH: `${bin}:/usr/bin:/bin`,
         BACKUP_DIR: backups,
         PGDATABASE: "imsda_events",
@@ -120,7 +121,8 @@ describe("pre-deploy-backup.sh", () => {
   });
 
   it("fails and keeps nothing when the copy is tiny or cannot be read back", () => {
-    for (const env of [{ FAKE_DUMP_BYTES: "10" }, { FAKE_RESTORE_FAIL: "1" }]) {
+    const cases: Record<string, string>[] = [{ FAKE_DUMP_BYTES: "10" }, { FAKE_RESTORE_FAIL: "1" }];
+    for (const env of cases) {
       const { run } = setup();
       const result = run([sha], env);
       expect(result.status).not.toBe(0);

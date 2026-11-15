@@ -497,20 +497,30 @@ recent activity first (Square still holds the payments).
    not a read-mostly backup role. Empty the schema first: `pg_restore --clean`
    only drops what is in the copy, so tables the bad migration created would
    survive and make the fixed release's migration fail with "already exists".
-   (For a drill, restore into a scratch database instead.)
+   (For a drill, restore into a scratch database instead.) The emptying and
+   the restore run as **one transaction**: if anything fails (for example the
+   role cannot recreate the `btree_gist` extension), everything is rolled back
+   and the database is left as it was.
 
    ```bash
    docker run --rm --env-file /home/u_events/.xcloud/.env.dburl \
      --network postgresql_9kgaw_239292_xcloud-network \
      -v imsda_events_backups:/backups:ro --entrypoint sh \
      ghcr.io/duranttl/imsda-events-backup:main -c '
+       set -e
        DB="${DATABASE_URL%%\?*}"   # psql refuses Prisma-only options such as ?schema=
-       psql "$DB" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" &&
-       pg_restore --dbname="$DB" --exit-on-error --no-owner --no-privileges \
-         /backups/pre-deploy/imsda-predeploy-<stamp>-<sha>.pgdump &&
+       # COMMIT is sent only if pg_restore read the whole copy; without it
+       # psql ends and PostgreSQL rolls the transaction back.
+       { echo "BEGIN; DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+         pg_restore --no-owner --no-privileges -f - \
+           /backups/pre-deploy/imsda-predeploy-<stamp>-<sha>.pgdump && echo "COMMIT;"
+       } | psql "$DB" -v ON_ERROR_STOP=1 --quiet
        psql "$DB" -c "SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY started_at DESC LIMIT 5"'
    ```
 
+   If it prints an error (from `pg_restore` or `psql`), nothing was changed:
+   fix the cause (ask the database administrator if it is a permission error)
+   before trying again.
    The last lines should list the migrations of the version you are going
    back to, and not the bad one. If `DATABASE_URL` needs `sslmode` or other
    options after the `?`, add them back to `DB`. (From R2, mount
