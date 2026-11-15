@@ -27,6 +27,7 @@ vi.mock("@/modules/health-records/snapshot-repository", () => ({
 
 import { resetDataKeyringForTests, setDataKeyStateForTests } from "@/lib/data-key/keyring";
 import { DataKeyUnavailableError } from "@/lib/secret-box";
+import { clubRegistrationApiError } from "@/modules/club-registrations/api-errors";
 import { clubFormApiError } from "@/modules/club-forms/api-errors";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { requireSensitiveSealing, openSensitiveAnswers, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
@@ -106,6 +107,24 @@ describe("API answers while the key is unavailable (#1652)", () => {
     expect((await response.json()).error).toBe("DATA_KEY_UNAVAILABLE");
     const typed = clubFormApiError(new ClubFormError("DATA_KEY_UNAVAILABLE", "Locked."), "Saving a form");
     expect(typed.status).toBe(503);
+  });
+
+  it("club registration routes answer a retryable 503 and log a warning, not an error", async () => {
+    const response = clubRegistrationApiError(new DataKeyUnavailableError(), "Submitting the registration");
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body.error).toBe("DATA_KEY_UNAVAILABLE");
+    expect(body.message).toContain("can't be submitted right now");
+    expect(response.headers.get("Retry-After")).toBe("60");
+    expect(mocks.logError).not.toHaveBeenCalled();
+    expect(mocks.logWarn).toHaveBeenCalledTimes(1);
+  });
+
+  it("health and club form routes warn once per request instead of logging an error (#1652)", () => {
+    healthApiError(new DataKeyUnavailableError(), "Reading a health record");
+    clubFormApiError(new DataKeyUnavailableError(), "Saving a form");
+    expect(mocks.logError).not.toHaveBeenCalled();
+    expect(mocks.logWarn).toHaveBeenCalledTimes(2);
   });
 
   it("roster routes answer 503 DATA_KEY_UNAVAILABLE when a birth date cannot be saved", async () => {

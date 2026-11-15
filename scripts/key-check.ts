@@ -18,10 +18,13 @@ import { loadEnvConfig } from "@next/env";
 import { getEncryptionKeyStatus, validateServerEnv } from "../lib/env";
 
 /** The data key line both key commands print: the state and version numbers only, never a key. */
-export function dataKeyLine(status: { mode: string; state: string; version: number | null; previousVersion: number | null; reason: string | null }) {
+export function dataKeyLine(status: { mode: string; state: string; version: number | null; previousVersion: number | null; reason: string | null; previousProblem?: string | null }) {
   if (status.mode === "not-separate") return "not separate yet (using the sign-in key)";
   if (status.state === "ready") {
-    return `version ${status.version}; previous ${status.previousVersion === null ? "not loaded" : `loaded (version ${status.previousVersion})`}`;
+    const previous = status.previousVersion !== null
+      ? `loaded (version ${status.previousVersion})`
+      : status.previousProblem ? `NOT LOADED (${status.previousProblem})` : "not loaded";
+    return `version ${status.version}; previous ${previous}`;
   }
   return `unavailable (${status.reason ?? "still loading"})`;
 }

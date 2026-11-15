@@ -39,7 +39,8 @@ option A). Health information must never depend on a person being available to u
    - pages show the field as locked, and ages worked out from a birth date show as unknown;
    - saving a protected value is refused with a plain message; everything else on the page still saves;
    - sign-in, registration, check-in and payments keep working;
-   - the server keeps retrying in the background and unlocks itself when the vault answers again.
+   - a club registration, teacher or Year-End Report that needs a locked birth date is refused with a retry message, and no substitute age is stored;
+   - the server keeps retrying in the background and unlocks itself when the vault answers again. The vault is asked only at startup and on those retries, so switching off its access takes effect at the next restart or redeploy.
 6. **The vault adapter** (`lib/data-key/`) uses the vault's REST interface over HTTPS with the standard Microsoft sign-in
    for an application (tenant, client ID, client secret). It needs only permission to unwrap with one key. No new package
    is added. It logs a reason category, never a key, a token or a secret.

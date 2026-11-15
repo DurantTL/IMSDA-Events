@@ -210,17 +210,26 @@ checklist (`docs/SERVER-SECURITY-CHECKLIST.md`).
 5. Remove the two `PREVIOUS` settings, redeploy, and run `npm run key:check`
    again. Keep the old wrapped value in the backup record from step 9.
 
-### 11. If the vault cannot be reached or access is switched off
+### 11. If the vault cannot be reached or access is stopped (human-run)
 
 What people see: protected fields show as locked ("Locked: the personal-data key
-is unavailable right now"), ages worked out from a birth date show as unknown,
-exports that include birth dates are refused, and saving a protected value says
-it cannot be saved right now. Everything else keeps working. Sign-in,
-registration, check-in and payments are not affected.
+is unavailable right now"), ages worked out from a birth date show as unknown on
+lists, exports that include birth dates are refused, and saving a protected value
+says it cannot be saved right now. A club registration, a teacher being named or
+a Year-End Report that needs a locked birth date is refused with a message to try
+again; it never stores a substitute age. Everything else keeps working. Sign-in,
+check-in, payments and registrations that need no locked birth date are not
+affected.
 
 What the server does: it tries again in the background every minute and unlocks
 itself as soon as the vault answers. It writes one log line when the key becomes
 unavailable (a reason, never a key) and one when it loads again.
+
+**Switching off the app's access in Azure does not lock the server at once.** The
+server asks the vault only when it starts, so access that is switched off takes
+effect at the next restart or redeploy. To apply it now, restart or redeploy the
+server. To bring the data back after access was restored, nothing is needed: the
+background retry unlocks it (or restart to do it at once).
 
 What to check, in this order, using the reason shown on System readiness:
 
@@ -232,15 +241,41 @@ What to check, in this order, using the reason shown on System readiness:
 - **The key vault could not unwrap the data key:** that
   `DATA_ENCRYPTION_KEY_WRAPPED` was copied whole, and that its key version id is
   still enabled on the vault key.
-- **The settings are not usable:** `npm run key:check` names the setting.
+- **The key vault sign-in or the settings are not usable:** the tenant id and
+  client id; `npm run key:check` names a setting that is wrong.
+- **Loaded, but the previous key could not be loaded** (while rotating): current
+  values work and values still on the previous key are locked. Check the previous
+  wrapped value and its key version id, as above.
+
+After an outage, three things are not caught up by themselves:
+
+- **Sealed health copies at check-in.** A person checked in while the key was
+  unavailable has no sealed copy for that event. The event-start sweep only takes
+  copies for confirmed registrations of events that started in the last three
+  days, so after a longer outage, or for a registration that was only submitted,
+  the copy is not taken later. There is no admin action to take a missed copy.
+  The live health record is not affected and opens again once the key loads.
+- **Sterling Volunteers matches.** Matches are not recalculated when the key
+  loads. After an outage, run **Re-match** once on the Sterling Volunteers list
+  (or upload the next list) so matches that depend on birth dates are current.
+- **Calendar refreshes** skipped while locked run again on their next scheduled
+  refresh.
 
 ### 12. Going back (human-run)
 
-- **Before step 7:** unset `DATA_KEY_SOURCE` and redeploy. Personal data was
-  never moved, so it keeps using the sign-in key as before.
-- **After step 7:** keep the vault. Values moved to the data key can only be
-  opened with it. Do not unset `DATA_KEY_SOURCE` after the move; the server
-  would then be unable to open them.
+There is no reverse move: nothing re-seals personal data with the sign-in key.
+From the restart in step 6 on, every new save of personal data is sealed with the
+data key, even before step 7 moves the older values.
+
+- Going back is only safe when `npm run key:check` shows **no** data-key values
+  (no `d1` values), which in practice means nothing was saved since step 6 and
+  step 7 was not run. Then unset `DATA_KEY_SOURCE` and redeploy.
+- In every other case, **keep the vault** and the wrapped key settings. Values
+  sealed with the data key can only be opened with it. Do not unset
+  `DATA_KEY_SOURCE`, and do not delete the vault key or its backup.
+- Never roll the server image back to a build from before this change once
+  `DATA_KEY_SOURCE` has been set: that build cannot open data-key values and
+  would treat them as unreadable.
 
 ## What the commands print
 
@@ -248,6 +283,6 @@ What to check, in this order, using the reason shown on System readiness:
 a value, key, token or secret. The data key line reads one of:
 
 - `not separate yet (using the sign-in key)`
-- `version N; previous not loaded` (or `previous loaded (version M)` while rotating)
+- `version N; previous not loaded` (or `previous loaded (version M)` while rotating, or `previous NOT LOADED (<reason>)` when a previous key is configured but could not be loaded)
 - `unavailable (<reason>)`, where the reason is one of `vault-unreachable`,
   `access-denied`, `unwrap-failed` or `misconfigured`.

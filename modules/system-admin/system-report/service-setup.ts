@@ -9,7 +9,7 @@ type EnvService = EnvironmentStatus["services"][number];
 export function serviceSetupFor(services: readonly EnvService[]): ServiceSetup[] {
   // A service with no entry gets no panel, never another service's steps. The guard test fails for any unmapped id.
   return services
-    .filter((service) => service.status === "not-configured" && service.id in ENVIRONMENT_SERVICE_SETUP)
+    .filter((service) => (service.status === "not-configured" || service.status === "not-separate" || service.status === "unavailable") && service.id in ENVIRONMENT_SERVICE_SETUP)
     .map((service) => ({ id: service.id, label: service.label, setup: systemSetupFor(ENVIRONMENT_SERVICE_SETUP[service.id]) }));
 }
 
@@ -19,15 +19,21 @@ type ServiceSummary = Pick<Signal, "key" | "checkedAt" | "whenLabel" | "state" |
 export function summarizeServices(key: string, services: EnvService[], readAt: Date): ServiceSummary {
   const setUp = services.filter((service) => service.status === "configured").length;
   const notSet = services.filter((service) => service.status === "not-configured");
+  // The personal-data key (#1652): not separate yet, or set up but not loaded. Worded as what it is, never "not set up".
+  const attention = services.filter((service) => service.status === "not-separate" || service.status === "unavailable");
   const unknown = services.filter((service) => service.status === "unknown");
   const common = { key, checkedAt: readAt.toISOString() };
   const counted = `${setUp} of ${services.length} set up.`;
-  if (notSet.length > 0) {
+  if (notSet.length > 0 || attention.length > 0) {
     return {
       ...common,
       whenLabel: "Checked",
       state: "watch" as const,
-      resultText: `${counted} Not set up: ${notSet.map((service) => service.label).join(", ")}.`,
+      resultText: [
+        counted,
+        notSet.length > 0 ? `Not set up: ${notSet.map((service) => service.label).join(", ")}.` : "",
+        attention.length > 0 ? `Needs attention: ${attention.map((service) => service.label).join(", ")}.` : "",
+      ].filter(Boolean).join(" "),
       needsSetup: true,
       serviceSetup: serviceSetupFor(services),
     };

@@ -37,20 +37,22 @@ type AzureEnv = {
   DATA_ENCRYPTION_PREVIOUS_KEY_VERSION?: number;
 };
 
-function reasonForStatus(status: number): DataKeyUnavailableReason {
+function reasonForStatus(status: number, step: "token" | "unwrap"): DataKeyUnavailableReason {
+  // The sign-in endpoint answers 400 (or 404) for a wrong tenant or client id: a settings problem, not an unwrap problem.
+  if (step === "token" && (status === 400 || status === 404)) return "misconfigured";
   if (status === 401 || status === 403) return "access-denied";
   if (status >= 500 || status === 408 || status === 429) return "vault-unreachable";
   return "unwrap-failed";
 }
 
-async function call(fetchImpl: FetchLike, url: string, init: RequestInit): Promise<unknown> {
+async function call(fetchImpl: FetchLike, url: string, init: RequestInit, step: "token" | "unwrap"): Promise<unknown> {
   let response: Response;
   try {
     response = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   } catch {
     throw new DataKeySourceError("vault-unreachable");
   }
-  if (!response.ok) throw new DataKeySourceError(reasonForStatus(response.status));
+  if (!response.ok) throw new DataKeySourceError(reasonForStatus(response.status, step));
   try {
     return await response.json();
   } catch {
@@ -78,6 +80,7 @@ export function createAzureKeyVaultDataKeySource(options: { fetch?: FetchLike; e
       fetchImpl,
       `https://login.microsoftonline.com/${encodeURIComponent(env.AZURE_TENANT_ID ?? "")}/oauth2/v2.0/token`,
       { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: form.toString() },
+      "token",
     );
     return stringField(body, "access_token");
   }
@@ -96,6 +99,7 @@ export function createAzureKeyVaultDataKeySource(options: { fetch?: FetchLike; e
         headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
         body: JSON.stringify({ alg: "RSA-OAEP-256", value: ciphertext }),
       },
+      "unwrap",
     );
     const ikm = Buffer.from(stringField(body, "value"), "base64url");
     if (ikm.length !== KEY_BYTES) throw new DataKeySourceError("unwrap-failed");
@@ -115,8 +119,13 @@ export function createAzureKeyVaultDataKeySource(options: { fetch?: FetchLike; e
       if (!env.DATA_ENCRYPTION_PREVIOUS_KEY_WRAPPED || env.DATA_ENCRYPTION_PREVIOUS_KEY_VERSION === undefined) {
         return { current };
       }
-      const previous = await unwrap(env, token, env.DATA_ENCRYPTION_PREVIOUS_KEY_WRAPPED, env.DATA_ENCRYPTION_PREVIOUS_KEY_VERSION);
-      return { current, previous };
+      // A previous key that fails must not lock everything: the current key alone still opens current values.
+      try {
+        const previous = await unwrap(env, token, env.DATA_ENCRYPTION_PREVIOUS_KEY_WRAPPED, env.DATA_ENCRYPTION_PREVIOUS_KEY_VERSION);
+        return { current, previous };
+      } catch (error) {
+        return { current, previousProblem: error instanceof DataKeySourceError ? error.reason : "unwrap-failed" };
+      }
     },
   };
 }

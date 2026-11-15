@@ -7,7 +7,7 @@ import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowl
 import { HealthRecordView, HealthStatusChip } from "@/components/health-record-view";
 import { HealthStepUp } from "@/components/health-step-up";
 import { attendeeUnlockMethods, requireAreaCoordinatorHealthViewer } from "@/modules/health-records/access";
-import { HealthRecordError } from "@/modules/health-records/errors";
+import { HealthRecordError, HealthRecordLockedError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { viewHealthRecord } from "@/modules/health-records/repository";
 
@@ -40,11 +40,11 @@ export default async function AreaCoordinatorHealthPage({
     // The one-time privacy notice (#923) comes before any record opens.
     if (error instanceof HealthRecordError && error.code === "ACKNOWLEDGMENT_REQUIRED") return null;
     // The personal-data key is unavailable (#1652): say so instead of failing the page.
-    if (error instanceof DataKeyUnavailableError) return "LOCKED" as const;
+    if (error instanceof DataKeyUnavailableError) return error;
     if (error instanceof HealthRecordError) notFound();
     throw error;
   });
-  if (health === "LOCKED") return <HealthRecordLocked />;
+  if (health instanceof DataKeyUnavailableError) return <HealthRecordLocked memberName={health instanceof HealthRecordLockedError ? health.memberName : undefined} />;
   if (!health) return <HealthPrivacyAcknowledgment as="ATTENDEE" />;
   return (
     <section className="page-stack club-form-page">

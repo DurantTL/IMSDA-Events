@@ -80,8 +80,9 @@ function openEntryBirthDate(sealed: string | null) {
 
 /**
  * Matching reads birth dates, so a list upload or a full re-match while the personal-data key is unavailable would
- * work from missing dates and could change matches wrongly. Those are refused (#1652); the refresh after a save
- * is skipped, like one that finds an upload in progress, and is covered by the next full pass.
+ * work from missing dates and could change matches wrongly. Those are refused (#1652). The refresh after a save is
+ * skipped, and nothing recalculates it when the key loads again: the next list upload or "Re-match" does, so an
+ * administrator runs Re-match once the key is back (docs/DATA-KEY-AZURE-KEY-VAULT.md, step 11).
  */
 function requireBirthDatesReadable() {
   if (isDataKeyUnavailable()) {

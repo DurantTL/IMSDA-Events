@@ -27,6 +27,7 @@ import {
 import type { YearEndReportInput } from "@/modules/club-reports/year-end-schemas";
 import { directorGrantIsActive } from "@/modules/organizations/director-grants-domain";
 import { ageOn } from "@/modules/club-rosters/domain";
+import { DataKeyUnavailableError } from "@/lib/secret-box";
 import { openBirthDate } from "@/modules/club-rosters/birth-dates";
 
 /**
@@ -66,7 +67,10 @@ export async function yearEndPrefill(organizationId: string, reportYear: string,
     if (row.sealedBirthDate) {
       try {
         age = ageOn(openBirthDate(row.sealedBirthDate), asOf);
-      } catch {
+      } catch (error) {
+        // Locked (the personal-data key is unavailable): refuse, rather than count everyone by a reported age and
+        // file numbers that look right and are not (#1652). Any other unreadable value keeps its old fallback.
+        if (error instanceof DataKeyUnavailableError) throw error;
         age = null;
       }
     }

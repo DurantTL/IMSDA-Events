@@ -11,7 +11,7 @@ import { BREAK_GLASS_REQUIRED_MESSAGE } from "@/modules/health-records/break-gla
 import { canStartBreakGlassInline, rosterMemberPersonId } from "@/modules/health-records/break-glass-form";
 import { HealthRecordLocked } from "@/components/health-record-locked";
 import { DataKeyUnavailableError } from "@/lib/secret-box";
-import { HealthRecordError } from "@/modules/health-records/errors";
+import { HealthRecordError, HealthRecordLockedError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { viewHealthRecord } from "@/modules/health-records/repository";
 
@@ -54,15 +54,15 @@ export default async function StaffHealthRecordPage({
     // A system administrator reads a live record only through break-glass (#929); the refusal is already audited.
     if (error instanceof HealthRecordError && error.code === "BREAK_GLASS_REQUIRED") return "BREAK_GLASS" as const;
     // The personal-data key is unavailable (#1652): say so instead of failing the page.
-    if (error instanceof DataKeyUnavailableError) return "LOCKED" as const;
+    if (error instanceof DataKeyUnavailableError) return error;
     if (error instanceof HealthRecordError) notFound();
     throw error;
   });
-  if (health === "LOCKED") {
+  if (health instanceof DataKeyUnavailableError) {
     return (
       <>
         <HealthRecordPageHeader eventId={event} />
-        <HealthRecordLocked />
+        <HealthRecordLocked memberName={health instanceof HealthRecordLockedError ? health.memberName : undefined} />
       </>
     );
   }

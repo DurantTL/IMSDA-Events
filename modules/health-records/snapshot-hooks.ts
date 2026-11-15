@@ -27,7 +27,9 @@ export async function sealHealthSnapshotAfterCheckIn(eventId: string, attendeeId
     const attendee = await getPrisma().registrationAttendee.findFirst({ where: { id: attendeeId, eventId }, select: { personId: true } });
     if (!attendee) return;
     const result = await sealHealthSnapshot({ eventId, personId: attendee.personId, trigger: "CHECK_IN" });
-    // The check-in stands. The event-start sweep takes the copy once the key is back.
+    // The check-in stands. The copy is not retaken automatically in every case: the event-start sweep takes copies only for
+    // CONFIRMED registrations (check-in also covers SUBMITTED ones) and only for events that started in the last
+    // HEALTH_SNAPSHOT_START_CATCH_UP_DAYS days, so a copy missed during a longer outage is not taken later (#924 rules).
     if (result.outcome === "DATA_KEY_UNAVAILABLE") logWarn("A health copy was not taken at check-in because the personal-data key is unavailable.");
   } catch (error) {
     const action = "Sealing a health copy at check-in";

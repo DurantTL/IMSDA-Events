@@ -1,5 +1,5 @@
 import { ZodError } from "zod";
-import { logError } from "@/lib/logger";
+import { logError, logWarn } from "@/lib/logger";
 import { DataKeyUnavailableError, SecretBoxError } from "@/lib/secret-box";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { ClubFormError, formBusyError, isLockTimeoutError } from "@/modules/club-forms/errors";
@@ -69,7 +69,8 @@ export function clubFormApiError(error: unknown, action: string) {
     return Response.json({ error: busy.code, message: busy.message }, { status: statusByCode.FORM_BUSY, headers: { "Retry-After": "60" } });
   }
   if (error instanceof DataKeyUnavailableError) {
-    logError(action, error);
+    // Expected while the key is down, and the keyring already logs it once: no error line per request.
+    logWarn(`${action}: protected answers are locked (the personal-data key is unavailable)`);
     return Response.json(
       { error: "DATA_KEY_UNAVAILABLE", message: "This can't be saved or shown right now because protected answers are locked. Please try again in a few minutes." },
       { status: 503, headers: { "Retry-After": "60" } },

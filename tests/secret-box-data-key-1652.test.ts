@@ -131,10 +131,16 @@ describe("with a separate data key", () => {
     expect(candidates[2]).toBe(fingerprintSecret("https://calendar.example.test/a.ics", "calendar-feed-url"));
   });
 
+  it("reports a previous key that could not be loaded, and still works with the current key", () => {
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 2, ikm: ikm2 }, previousProblem: "access-denied" } });
+    expect(dataKeyStatus()).toMatchObject({ state: "ready", version: 2, previousVersion: null, previousProblem: "access-denied" });
+    expect(openData(sealData("ok", purpose), purpose)).toBe("ok");
+  });
+
   it("is available only when the key is ready, and reports a status without a key", () => {
     ready(3);
     expect(isDataEncryptionAvailable()).toBe(true);
-    expect(dataKeyStatus()).toEqual({ mode: "azure-key-vault", state: "ready", version: 3, previousVersion: null, reason: null });
+    expect(dataKeyStatus()).toEqual({ mode: "azure-key-vault", state: "ready", version: 3, previousVersion: null, reason: null, previousProblem: null });
   });
 });
 

@@ -1,5 +1,5 @@
 import { ZodError } from "zod";
-import { logError } from "@/lib/logger";
+import { logError, logWarn } from "@/lib/logger";
 import { DataKeyUnavailableError, SecretBoxError } from "@/lib/secret-box";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { RosterAccessError } from "@/modules/club-rosters/access";
@@ -89,7 +89,8 @@ export function healthApiError(error: unknown, action: string) {
     );
   }
   if (error instanceof DataKeyUnavailableError) {
-    logError(action, error);
+    // Expected while the key is down, and the keyring already logs it once: no error line per request.
+    logWarn(`${action}: health records are locked (the personal-data key is unavailable)`);
     return healthJson({ error: "DATA_KEY_UNAVAILABLE", message: "Health records are locked right now. Please try again in a few minutes." }, { status: 503 });
   }
   if (error instanceof SecretBoxError) {

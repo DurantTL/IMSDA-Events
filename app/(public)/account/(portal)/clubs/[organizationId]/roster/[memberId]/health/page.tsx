@@ -14,7 +14,7 @@ import { getRosterAccessStateForPage, RosterAccessError } from "@/modules/club-r
 import { requireHealthViewerForClub } from "@/modules/health-records/access";
 import { BREAK_GLASS_REQUIRED_MESSAGE } from "@/modules/health-records/break-glass";
 import { canStartBreakGlassInline, rosterMemberPersonId } from "@/modules/health-records/break-glass-form";
-import { HealthRecordError } from "@/modules/health-records/errors";
+import { HealthRecordError, HealthRecordLockedError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { listHealthRecordLinks, viewHealthEntryStatus, viewHealthRecord } from "@/modules/health-records/repository";
 import { clubAccessClosed } from "@/components/club-access-closed";
@@ -93,11 +93,13 @@ export default async function ClubMemberHealthPage({ params }: { params: Promise
     // A system administrator acting as the director still needs break-glass for a live record (#929).
     if (error instanceof HealthRecordError && error.code === "BREAK_GLASS_REQUIRED") return "BREAK_GLASS" as const;
     // The personal-data key is unavailable (#1652): say so instead of failing the page.
-    if (error instanceof DataKeyUnavailableError) return "LOCKED" as const;
+    if (error instanceof DataKeyUnavailableError) return error;
     if (error instanceof HealthRecordError) notFound();
     throw error;
   });
-  if (health === "LOCKED") return <HealthRecordLocked />;
+  if (health instanceof DataKeyUnavailableError) {
+    return <HealthRecordLocked back={{ href: rosterHref, label: "Back to roster" }} memberName={health instanceof HealthRecordLockedError ? health.memberName : undefined} />;
+  }
   if (health === "BREAK_GLASS") {
     // A system administrator or Clubs Administrator acting as the director (any viewer the break-glass route accepts) can start break-glass here (#1617).
     const personId = canStartBreakGlassInline(viewer) ? await rosterMemberPersonId(organizationId, memberId) : null;

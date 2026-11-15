@@ -172,12 +172,12 @@ describe("environment-managed provider status (#1258)", () => {
     const find = (dataKey: () => { mode: "not-separate" | "azure-key-vault" | "dev-env"; state: "not-separate" | "loading" | "ready" | "unavailable"; version: number | null; reason: "vault-unreachable" | "access-denied" | "unwrap-failed" | "misconfigured" | null }) =>
       buildEnvironmentStatus(secrets, { ...readers, dataKey }).services.find((service) => service.id === "data-key")!;
     expect(find(() => ({ mode: "not-separate", state: "not-separate", version: null, reason: null }))).toMatchObject({
-      status: "not-configured",
+      status: "not-separate",
       note: expect.stringContaining("docs/DATA-KEY-AZURE-KEY-VAULT.md"),
     });
     expect(find(() => ({ mode: "azure-key-vault", state: "ready", version: 2, reason: null }))).toMatchObject({ status: "configured", note: "Loaded, version 2." });
     const down = find(() => ({ mode: "azure-key-vault", state: "unavailable", version: null, reason: "access-denied" }));
-    expect(down.status).toBe("not-configured");
+    expect(down.status).toBe("unavailable");
     expect(down.note).toContain("refused access");
     expect(down.note).not.toContain("access-denied");
     expect(buildEnvironmentStatus(secrets, { ...readers, dataKey: () => { throw new Error("boom"); } }).services.find((service) => service.id === "data-key")?.status).toBe("unknown");

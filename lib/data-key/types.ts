@@ -15,6 +15,11 @@ export type DataKeyMaterial = {
 export type DataKeyRing = {
   current: DataKeyMaterial;
   previous?: DataKeyMaterial;
+  /**
+   * Set when a previous key is configured but could not be loaded. The current key still works: values sealed with the
+   * previous one are unreadable until it loads, and the status shows why. A category only.
+   */
+  previousProblem?: DataKeyUnavailableReason;
 };
 
 /** Why the key could not be loaded, in the four categories an operator can act on. */
@@ -40,5 +45,5 @@ export const DATA_KEY_REASON_TEXT: Record<DataKeyUnavailableReason, string> = {
   "vault-unreachable": "the key vault could not be reached",
   "access-denied": "the key vault refused access (check the app's client secret and its permission)",
   "unwrap-failed": "the key vault could not unwrap the data key (check the wrapped key and the vault key version)",
-  misconfigured: "the personal-data key settings are not usable",
+  misconfigured: "the key vault sign-in or the personal-data key settings are not usable (check the tenant id, client id and settings)",
 };

@@ -117,7 +117,7 @@ async function gatherFacts(now: Date): Promise<ReadinessFacts> {
     pendingMigrations,
     sweep,
     encryptionKeyConfigured: Boolean(env.SECRET_ENCRYPTION_KEY),
-    dataKey: (({ mode, state, version, reason }) => ({ mode, state, version, reason }))(dataKeyStatus()),
+    dataKey: (({ mode, state, version, reason, previousProblem }) => ({ mode, state, version, reason, previousProblem }))(dataKeyStatus()),
     email: {
       deliveryConfigured: getEmailAvailability().deliveryConfigured,
       senderConfigured: senders.length > 0,

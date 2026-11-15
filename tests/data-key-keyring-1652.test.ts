@@ -209,6 +209,32 @@ describe("Azure Key Vault source", () => {
     expect(calls[2].url).toContain("/fedcba9876543210fedcba9876543210/unwrapkey");
   });
 
+  it("loads the current key alone when the previous wrapped key fails, and says why", async () => {
+    let unwraps = 0;
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url.startsWith("https://login.microsoftonline.com/")) return json({ access_token: "synthetic-token" });
+      unwraps += 1;
+      return unwraps === 1 ? json({ value: ikm.toString("base64url") }) : json({ error: "secret-body" }, 403);
+    });
+    const ring = await createAzureKeyVaultDataKeySource({
+      fetch: fetchImpl,
+      env: {
+        ...azureEnv,
+        DATA_ENCRYPTION_KEY_VERSION: 2,
+        DATA_ENCRYPTION_PREVIOUS_KEY_WRAPPED: "fedcba9876543210fedcba9876543210.b2xkLXdyYXBwZWQta2V5LWJ5dGVzLXN5bnRoZXRpYw",
+        DATA_ENCRYPTION_PREVIOUS_KEY_VERSION: 1,
+      },
+    }).load();
+    expect(ring.current.version).toBe(2);
+    expect(ring.previous).toBeUndefined();
+    expect(ring.previousProblem).toBe("access-denied");
+  });
+
+  it("treats a 400 from the sign-in endpoint as a settings problem, not an unwrap failure", async () => {
+    expect(await reasonOf({ token: () => json({ error: "secret-body" }, 400) })).toBe("misconfigured");
+    expect(await reasonOf({ unwrap: () => json({ error: "secret-body" }, 400) })).toBe("unwrap-failed");
+  });
+
   async function reasonOf(options: Parameters<typeof vaultFetch>[0], env = azureEnv) {
     const { fetchImpl } = vaultFetch(options);
     try {

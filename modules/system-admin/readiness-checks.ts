@@ -27,7 +27,7 @@ export type ReadinessFacts = {
   sweep: SweepHeartbeat | null;
   encryptionKeyConfigured: boolean;
   /** The personal-data key (#1652): categories and numbers only. */
-  dataKey: { mode: "not-separate" | "azure-key-vault" | "dev-env"; state: "not-separate" | "loading" | "ready" | "unavailable"; version: number | null; reason: string | null };
+  dataKey: { mode: "not-separate" | "azure-key-vault" | "dev-env"; state: "not-separate" | "loading" | "ready" | "unavailable"; version: number | null; reason: string | null; previousProblem?: string | null };
   email: {
     deliveryConfigured: boolean;
     senderConfigured: boolean;
@@ -228,7 +228,7 @@ const DATA_KEY_REASON_WORDS: Record<string, string> = {
   "vault-unreachable": "the key vault could not be reached",
   "access-denied": "the key vault refused access",
   "unwrap-failed": "the key vault could not unwrap the data key",
-  misconfigured: "the settings are not usable",
+  misconfigured: "the key vault sign-in or the settings are not usable",
 };
 
 /** The personal-data key row (#1652). Never a value; the reason is a category in plain words. */
@@ -238,6 +238,9 @@ function dataKeyRow(dataKey: ReadinessFacts["dataKey"]): AutomaticReadinessRow {
     return { ...base, status: "attention", summary: "Not separate yet: personal data uses the sign-in key. Set up the vault: docs/DATA-KEY-AZURE-KEY-VAULT.md." };
   }
   if (dataKey.state === "ready") {
+    if (dataKey.previousProblem) {
+      return { ...base, status: "attention", summary: `Loaded${dataKey.version === null ? "" : `, version ${dataKey.version}`}, but the previous key could not be loaded: ${DATA_KEY_REASON_WORDS[dataKey.previousProblem] ?? "it could not be loaded"}. Values sealed with the previous key are locked until it loads.` };
+    }
     return { ...base, status: "ok", summary: `Yes${dataKey.version === null ? "" : `, version ${dataKey.version}`}. The value is never shown.` };
   }
   const reason = dataKey.reason ? DATA_KEY_REASON_WORDS[dataKey.reason] ?? "it could not be loaded" : "it is still loading";

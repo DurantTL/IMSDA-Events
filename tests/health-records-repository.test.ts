@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- a loose in-memory stand-in for the Prisma client */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resetDataKeyringForTests, setDataKeyStateForTests } from "@/lib/data-key/keyring";
+import { DataKeyUnavailableError } from "@/lib/secret-box";
+import { HealthRecordLockedError } from "@/modules/health-records/errors";
 import { hashOpaqueToken } from "@/modules/access/tokens";
 import { healthMarkers, syntheticRecord } from "./health-records-fixtures";
 
@@ -311,6 +314,39 @@ describe("director entry and viewing", () => {
     expect(state.audit).toHaveLength(1);
     expect(state.audit[0]).toMatchObject({ action: "HEALTH_RECORD_VIEWED", entityType: "HealthRecord" });
     for (const marker of healthMarkers) expect(JSON.stringify(state.audit)).not.toContain(marker);
+  });
+
+  it("shows the record as locked, with the member's name, and records no view, while the personal-data key is unavailable (#1652)", async () => {
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 1, ikm: Buffer.alloc(32, 97) } } });
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    expect(state.fields[0]!.sealedValue.startsWith("d1.")).toBe(true);
+    state.audit = [];
+    setDataKeyStateForTests({ kind: "unavailable", reason: "access-denied" });
+    try {
+      const failure = await viewHealthRecord(leader, "club-a", "member-1", now).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(HealthRecordLockedError);
+      expect(failure).toBeInstanceOf(DataKeyUnavailableError);
+      expect((failure as HealthRecordLockedError).clubName).toBe("Synthetic Pathfinders");
+      expect(state.audit).toEqual([]);
+      for (const marker of healthMarkers) expect(JSON.stringify(failure)).not.toContain(marker);
+    } finally {
+      resetDataKeyringForTests();
+    }
+  });
+
+  it("uses no break-glass grant and writes no audit entry for a locked load by a system administrator (#1652)", async () => {
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 1, ikm: Buffer.alloc(32, 97) } } });
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    state.audit = [];
+    grantBreakGlass("admin-1", state.members.find((member) => member.id === "member-1")!.personId as string);
+    setDataKeyStateForTests({ kind: "unavailable", reason: "vault-unreachable" });
+    try {
+      await expect(viewHealthRecord(admin, "club-a", "member-1", now)).rejects.toBeInstanceOf(DataKeyUnavailableError);
+      expect(state.audit).toEqual([]);
+      expect(state.uses).toEqual([]);
+    } finally {
+      resetDataKeyringForTests();
+    }
   });
 
   it("audits every create and update with a field count and no health text", async () => {

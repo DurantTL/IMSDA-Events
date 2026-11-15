@@ -203,7 +203,7 @@ export function openSecretWithKey(sealed: string, purpose: string, key: string) 
 /**
  * A keyed, stable fingerprint of a value (HMAC-SHA256, base64url), for finding
  * "the same secret" without storing or decrypting it. It is derived from
- * the sign-in key (`SECRET_ENCRYPTION_KEY` (always the current key) with its own purpose string,
+ * the sign-in key (`SECRET_ENCRYPTION_KEY`, always the current key) with its own purpose string,
  * so it can't be computed (or guessed by brute force) without the key, and a
  * fingerprint from one purpose says nothing about another.
  */
@@ -415,6 +415,8 @@ export type DataKeyStatus = {
   previousVersion: number | null;
   /** A reason category while unavailable, otherwise null. */
   reason: DataKeyUnavailableReason | null;
+  /** A reason category when a previous key is configured but could not be loaded (the current key still works), otherwise null. */
+  previousProblem: DataKeyUnavailableReason | null;
 };
 
 /** Non-secret summary for health and readiness displays: categories and numbers only. */
@@ -422,11 +424,11 @@ export function dataKeyStatus(): DataKeyStatus {
   const mode = dataKeyMode();
   const state = getDataKeyState();
   if (state.kind === "ready") {
-    return { mode, state: "ready", version: state.ring.current.version, previousVersion: state.ring.previous?.version ?? null, reason: null };
+    return { mode, state: "ready", version: state.ring.current.version, previousVersion: state.ring.previous?.version ?? null, reason: null, previousProblem: state.ring.previousProblem ?? null };
   }
   if (state.kind === "unavailable") {
     void ensureDataKeyLoaded();
-    return { mode, state: "unavailable", version: null, previousVersion: null, reason: state.reason };
+    return { mode, state: "unavailable", version: null, previousVersion: null, reason: state.reason, previousProblem: null };
   }
-  return { mode, state: state.kind, version: null, previousVersion: null, reason: null };
+  return { mode, state: state.kind, version: null, previousVersion: null, reason: null, previousProblem: null };
 }

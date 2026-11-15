@@ -116,6 +116,9 @@ async function attempt(mode: DataKeyMode) {
     const ring = await sourceFor(mode).load();
     h.state = { kind: "ready", ring };
     logInfo("The personal-data key is loaded.", { version: ring.current.version });
+    if (ring.previousProblem) {
+      logWarn("The previous personal-data key could not be loaded; values sealed with it are locked until it loads.", { reason: ring.previousProblem });
+    }
   } catch (error) {
     const reason = reasonOf(error);
     const since = before?.kind === "unavailable" ? before.since : Date.now();

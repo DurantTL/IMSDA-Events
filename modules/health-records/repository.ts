@@ -37,7 +37,7 @@ import {
   type HealthRecordStatus,
   type HealthViewer,
 } from "@/modules/health-records/domain";
-import { HEALTH_LINK_UNAVAILABLE_MESSAGE, HEALTH_MEMBER_NOT_FOUND_MESSAGE, HealthRecordError } from "@/modules/health-records/errors";
+import { HEALTH_LINK_UNAVAILABLE_MESSAGE, HEALTH_MEMBER_NOT_FOUND_MESSAGE, HealthRecordError, HealthRecordLockedError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled, requireHealthRecordsEnabled } from "@/modules/health-records/flag";
 import { HEALTH_RECORD_LINK_TEMPLATE_KEY, healthRecordLinkEmailContent } from "@/modules/health-records/link-email";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
@@ -254,6 +254,17 @@ export async function viewHealthRecord(
       throw breakGlassRequired();
     }
   }
+  // Opened before the view is recorded: a load that fails because the personal-data key is unavailable shows nothing,
+  // so it records no view and uses no break-glass grant (#1652). Nothing leaves this function until the audit is written.
+  let values: Record<string, unknown>;
+  try {
+    values = record ? openFields(record.id, record.fields) : {};
+  } catch (error) {
+    if (error instanceof DataKeyUnavailableError) {
+      throw new HealthRecordLockedError(`${member.person?.firstName ?? ""} ${member.person?.lastName ?? ""}`.trim(), member.organization.name);
+    }
+    throw error;
+  }
   const viewAudit = {
     // No top-level eventId: that column feeds the event staff audit log, which must not list these views. The event is in the metadata.
     actorUserId: who.actorUserId,
@@ -281,7 +292,6 @@ export async function viewHealthRecord(
   } else {
     await writeAuditLog(viewAudit);
   }
-  const values = record ? openFields(record.id, record.fields) : {};
   return {
     member: { id: member.id, firstName: member.person?.firstName ?? "", lastName: member.person?.lastName ?? "" },
     club: { name: member.organization.name, sponsoringChurch: member.organization.parentOrganization?.name ?? null },

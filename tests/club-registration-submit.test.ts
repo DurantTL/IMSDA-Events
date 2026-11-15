@@ -20,7 +20,8 @@ vi.mock("@/modules/communications/messaging-repository", () => ({
 }));
 vi.mock("@/modules/communications/transactional-messages", () => ({ enqueueWaitlistJoinedMessage: dependencies.enqueueWaitlistJoinedMessage }));
 
-import { sealSecret } from "@/lib/secret-box";
+import { resetDataKeyringForTests, setDataKeyStateForTests } from "@/lib/data-key/keyring";
+import { DataKeyUnavailableError, sealData, sealSecret } from "@/lib/secret-box";
 import { normalizeTeamName } from "@/modules/club-teams/domain";
 import { clubAttendeePreparer, clubSubmissionAttribution } from "@/modules/club-registrations/repository";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
@@ -83,10 +84,12 @@ const baseInput: {
   website: "",
 };
 
-function fixture({ billingMode = "DEFERRED_ORGANIZATION_INVOICE", audience = "CLUB", form = definition(), registrationClosesOn = "2026-11-30", waitlistEnabled = false } = {}) {
+function fixture({ billingMode = "DEFERRED_ORGANIZATION_INVOICE", audience = "CLUB", form = definition(), registrationClosesOn = "2026-11-30", waitlistEnabled = false, dataSealed = false } = {}) {
+  // Birth dates sealed with the personal-data key (#1652) when asked; otherwise the sign-in key, as before the move.
+  const seal = (value: string, purpose: string) => (dataSealed ? sealData(value, purpose) : sealSecret(value, purpose));
   const members = [
-    { id: "m1", personId: "person-m1", attendeeType: "YOUTH", role: "Pathfinder", gender: "FEMALE", sealedBirthDate: sealSecret("2014-12-06", "club-roster:birth-date"), person: { firstName: "Alex", lastName: "Sample" } },
-    { id: "m2", personId: "person-m2", attendeeType: "STAFF", role: "Counselor", gender: null, sealedBirthDate: sealSecret("1988-03-02", "club-roster:birth-date"), person: { firstName: "Jordan", lastName: "Example" } },
+    { id: "m1", personId: "person-m1", attendeeType: "YOUTH", role: "Pathfinder", gender: "FEMALE", sealedBirthDate: seal("2014-12-06", "club-roster:birth-date"), person: { firstName: "Alex", lastName: "Sample" } },
+    { id: "m2", personId: "person-m2", attendeeType: "STAFF", role: "Counselor", gender: null, sealedBirthDate: seal("1988-03-02", "club-roster:birth-date"), person: { firstName: "Jordan", lastName: "Example" } },
     // No birth date on the roster (#639).
     { id: "m3", personId: "person-m3", attendeeType: "YOUTH", role: "Pathfinder", gender: null, sealedBirthDate: null, person: { firstName: "Casey", lastName: "Nobirth" } },
     // No birth date, but a reported age from an import (#639).
@@ -214,6 +217,31 @@ beforeEach(() => {
   dependencies.processQueuedMessageIdsAfterCommit.mockResolvedValue({ capturedIds: [], sentIds: [], failedIds: [], rescheduledIds: [], skippedIds: [] });
   dependencies.enqueuePublicRegistrationMessages.mockResolvedValue({ messageIds: ["m"], pendingMessageIds: ["m"], registrantMessageIds: ["m"], deliveryMode: "LOCAL_CAPTURE" });
   dependencies.enqueueWaitlistJoinedMessage.mockResolvedValue({ messageIds: ["w"], pendingMessageIds: ["w"], deliveryMode: "LOCAL_CAPTURE", skippedReason: null });
+});
+
+describe("club registration submit while the personal-data key is unavailable (#1652)", () => {
+  const ring = { current: { version: 1, ikm: Buffer.alloc(32, 91) } };
+  const lock = () => setDataKeyStateForTests({ kind: "unavailable", reason: "vault-unreachable" });
+
+  it("refuses a submit that needs a locked birth date, stores no age at all, and writes nothing", async () => {
+    setDataKeyStateForTests({ kind: "ready", ring });
+    const tx = fixture({ dataSealed: true });
+    lock();
+    await expect(submit()).rejects.toBeInstanceOf(DataKeyUnavailableError);
+    expect(tx.registrationAttendee.create).not.toHaveBeenCalled();
+    expect(tx.registration.create).not.toHaveBeenCalled();
+    resetDataKeyringForTests();
+  });
+
+  it("still submits for people whose birth dates are not locked", async () => {
+    setDataKeyStateForTests({ kind: "ready", ring });
+    // The sign-in-sealed values stay readable while the data key is unavailable.
+    const tx = fixture();
+    lock();
+    await submit();
+    expect(tx.registrationAttendee.create.mock.calls.map(([call]) => call.data.profileSnapshot?.ageOnEventDate)).toEqual([11, 38]);
+    resetDataKeyringForTests();
+  });
 });
 
 describe("club registration submit", () => {
