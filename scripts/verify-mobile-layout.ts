@@ -238,6 +238,7 @@ const pages: PageSpec[] = [
   { name: "public-events-open", path: "/events", role: "visitor" },
   { name: "public-events-filtered", path: "/events?q=retreat&from=2026-01-01&to=2027-12-31&for=everyone", role: "visitor" },
   { name: "public-events-filtered-empty", path: "/events?q=zzzz-no-match", role: "visitor" },
+  { name: "public-events-ended-notice", path: "/events?ended=1", role: "visitor", expectText: /no longer open for registration/ },
   { name: "public-clubs", path: "/clubs", role: "visitor" },
   // The public Club forms list (#1221).
   { name: "public-club-forms", path: "/clubs/forms", role: "visitor" },

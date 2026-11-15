@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { BrandLink } from "@/components/brand-link";
 import { InformationFormFillIn } from "@/components/information-form-fill-in";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { attendeeSignInPathFor, twoStepPathFor } from "@/modules/attendee-accounts/return-destination";
+import { isArchivedPublicEventSlug } from "@/modules/events/public-repository";
 import { publicInformationFormKey, publicInformationFormPath, resolvePublicInformationForm, type PublicInformationFormTarget } from "@/modules/information-forms/public";
 import { checkInformationFormClientRateLimit, checkInformationFormRateLimit } from "@/modules/rate-limit/service";
 import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
@@ -54,7 +55,11 @@ export async function InformationFormPublicPage({ target }: { target: PublicInfo
     return <Notice eyebrow="Please wait" title="Too many attempts"><p>Try this page again in a few minutes.</p></Notice>;
   }
   const view = await resolvePublicInformationForm(target);
-  if (view.state === "NOT_FOUND") notFound();
+  if (view.state === "NOT_FOUND") {
+    // A form of an archived event goes to the events list with a notice (#1514).
+    if (target.eventSlug && await isArchivedPublicEventSlug(target.eventSlug)) redirect("/events?ended=1");
+    notFound();
+  }
   if (view.state === "NOT_YET_OPEN") {
     return (
       <Notice eyebrow={view.eventName ?? "Not open yet"} title={view.name}>

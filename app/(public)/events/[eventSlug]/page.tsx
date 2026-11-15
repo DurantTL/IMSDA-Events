@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { PublicEventLandingView } from "@/components/public-event-landing-view";
 import { publicEventAssetUrl } from "@/components/event-content-blocks";
 import { getPublishedHubContent } from "@/modules/site-content/hub-content";
 import { getAutoEventInfoCards } from "@/modules/event-info-cards/repository";
-import { getPublicEventLanding } from "@/modules/events/public-repository";
+import { getPublicEventLanding, isArchivedPublicEventSlug } from "@/modules/events/public-repository";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +48,11 @@ export default async function PublicEventPage({
 }: PublicEventPageProps) {
   const { eventSlug } = await params;
   const landing = await getPublicEventLanding(eventSlug);
-  if (!landing) notFound();
+  if (!landing) {
+    // An archived event goes to the events list with a notice (#1514); a temporary redirect, since unarchiving restores it.
+    if (await isArchivedPublicEventSlug(eventSlug)) redirect("/events?ended=1");
+    notFound();
+  }
   const hubContent = await getPublishedHubContent();
   // Auto-built info cards (#651) are for club events only; every other event's
   // page renders exactly as before, without even reading the card data.

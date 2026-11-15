@@ -226,6 +226,18 @@ export type PublicEventLanding = NonNullable<
 
 export const getPublicEventLanding = cache(loadPublicEventLanding);
 
+/**
+ * Whether a slug belongs to a published event that has since been archived (#1514), so its public pages can send visitors
+ * to the events list instead of a dead end. A draft or never-published event is never matched, so its slug is not revealed.
+ */
+export async function isArchivedPublicEventSlug(slug: string) {
+  const event = await getPrisma().event.findFirst({
+    where: { slug, isPublished: true, archivedAt: { not: null }, isBillingContainer: false },
+    select: { id: true },
+  });
+  return event !== null;
+}
+
 /** The landing for a private preview link (#1514): the event whether or not it is published, with every section. */
 export async function getEventPreviewLanding(eventId: string, now = new Date()) {
   return loadLanding({ kind: "preview", eventId }, now);

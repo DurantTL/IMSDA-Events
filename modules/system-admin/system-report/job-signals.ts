@@ -191,6 +191,15 @@ export function classWaitlistFields(key: string, run: JobRun, readAt: Date): Fie
   return ranFields(key, run, "ok", text);
 }
 
+export function eventPageScheduledPublishFields(key: string, run: JobRun, readAt: Date): Fields {
+  const problem = runProblem(key, run, readAt, "the scheduled event page publish");
+  if (problem) return problem;
+  const c = counts(run, ["events", "published", "failed"]);
+  if (!c) return ranFields(key, run, "watch", COUNTS_MISSING);
+  // The sweep records a run with any failure as FAILED, so a good run always has none.
+  return ranFields(key, run, "ok", `${c.published} sections published (${c.events} events had changes due).`);
+}
+
 export function instructorClassEmailFields(key: string, run: JobRun, readAt: Date): Fields {
   const problem = runProblem(key, run, readAt, "the instructor class emails");
   if (problem) return problem;

@@ -44,3 +44,7 @@
   .directory :global(.public-registration-hero) { margin: 12px; padding: 26px 22px; }
   .discovery { padding: 18px; }
 }
+.endedNotice { box-sizing: border-box; max-width: 1180px; margin: 16px auto 0; padding: 12px 16px; border: 1px solid var(--line); border-left: 4px solid var(--imsda-gold); border-radius: var(--radius-card); background: var(--card); color: var(--ink, inherit); font-size: var(--text-helper-min); line-height: 1.5; }
+@media (max-width: 760px) {
+  .endedNotice { margin: 12px; }
+}

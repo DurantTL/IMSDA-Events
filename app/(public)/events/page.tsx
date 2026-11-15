@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays, ChevronRight, MapPin } from "lucide-react";
+import { firstParam } from "@/lib/search-params";
 import { EventsSearchField } from "./events-search-field";
 import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
 import { BrandLink } from "@/components/brand-link";
@@ -84,7 +85,10 @@ function EventCard({ item, directsClub, featured }: { item: CalendarItem; direct
 
 /** Events people can register for now or soon (#1217): exactly what the public calendar shows, narrowed by status. */
 export default async function OpenForRegistrationPage({ searchParams }: { searchParams: Promise<EventDirectorySearchParams> }) {
-  const filters = parseEventDirectoryFilters(await searchParams);
+  const rawParams = await searchParams;
+  // `?ended=1` (#1514) only shows a notice; it is read here and never passed to the filters or echoed.
+  const ended = firstParam(rawParams.ended) === "1";
+  const filters = parseEventDirectoryFilters(rawParams);
   const filter = filters.audience;
   const filtering = hasActiveDirectoryFilters(filters);
   // Only which filters were used is counted, never what was typed or chosen (#111).
@@ -130,6 +134,7 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
       ]} />
       <NoResultSearchBeacon term={noResultTerm} />
       <SiteNoticesView notices={activeNotices(hubContent, today)} />
+      {ended && <p className={styles.endedNotice} role="status">That event is no longer open for registration. Here are the events open now.</p>}
 
       <section className="public-registration-hero calendar-hero public-home-banner">
         <div>

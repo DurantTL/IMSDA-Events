@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { PublicEventSlugNotFound } from "@/components/public-event-slug-not-found";
-import { getPublicEventLanding } from "@/modules/events/public-repository";
+import { getPublicEventLanding, isArchivedPublicEventSlug } from "@/modules/events/public-repository";
 
 export const dynamic = "force-dynamic";
 
@@ -23,5 +23,6 @@ export default async function RegisterEventPage({ params }: RegisterEventPagePro
   const { eventSlug } = await params;
   const landing = await getPublicEventLanding(eventSlug);
   if (landing) redirect(`/events/${encodeURIComponent(landing.event.slug)}`);
+  if (await isArchivedPublicEventSlug(eventSlug)) redirect("/events?ended=1");
   return <PublicEventSlugNotFound slug={eventSlug} />;
 }
