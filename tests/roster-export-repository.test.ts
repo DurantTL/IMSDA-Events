@@ -11,6 +11,7 @@ vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 
+import { resetDataKeyringForTests, setDataKeyStateForTests } from "@/lib/data-key/keyring";
 import { sealSecret } from "@/lib/secret-box";
 import { ROSTER_EXPORT_PREVIEW_ROW_LIMIT } from "@/modules/club-rosters/export-columns";
 import {
@@ -113,6 +114,26 @@ describe("running a roster export (#490)", () => {
     const columns = [{ key: "birthDate" as const, header: "DOB" }];
     const result = await runRosterExport("club-1", "2026-27", { mode: "preview", columns, confirmSensitive: true }, true, actor);
     expect(result.rows).toEqual([["2014-05-06"]]);
+  });
+
+  it("refuses an export that includes birth dates while the personal-data key is unavailable, never exporting blanks (#1652)", async () => {
+    const { sealBirthDate } = await import("@/modules/club-rosters/birth-dates");
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 1, ikm: Buffer.alloc(32, 61) } } });
+    addMember(db, { id: "member-d1", firstName: "Dee", lastName: "Locked", attendeeType: "YOUTH", sealedBirthDate: sealBirthDate("2013-03-04") });
+    setDataKeyStateForTests({ kind: "unavailable", reason: "vault-unreachable" });
+    try {
+      const columns = [{ key: "firstName" as const, header: "First" }, { key: "birthDate" as const, header: "DOB" }];
+      for (const mode of ["preview", "csv"] as const) {
+        await expect(runRosterExport("club-1", "2026-27", { mode, columns, confirmSensitive: true }, true, actor))
+          .rejects.toMatchObject({ code: "DATA_KEY_UNAVAILABLE", message: expect.stringContaining("Birth dates are locked") });
+      }
+      expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+      // A names-only export does not need the key.
+      const names = await runRosterExport("club-1", "2026-27", { mode: "csv", columns: [{ key: "firstName" as const, header: "First" }], confirmSensitive: false }, false, actor);
+      expect(JSON.stringify(names)).toContain("Dee");
+    } finally {
+      resetDataKeyringForTests();
+    }
   });
 
   it("audits a CSV export with the club and columns, never a name or birth date", async () => {

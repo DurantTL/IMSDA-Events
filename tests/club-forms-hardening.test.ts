@@ -65,6 +65,15 @@ describe("the passenger list print (#610)", () => {
   });
   const render = (value: ReturnType<typeof submission>) => renderToStaticMarkup(createElement(ClubFormSubmissionView, { submission: value }));
 
+  it("shows a sensitive answer as Locked, with a note and no value, while the personal-data key is unavailable (#1652)", () => {
+    const base = submission({ passenger_1_name: "Riley Sample", passenger_1_phone: "555-0100" });
+    const html = render({ ...base, lockedKeys: ["passenger_1_emergency_contact"], hasSensitiveAnswers: true });
+    expect(html).toContain("Locked: the personal-data key is unavailable right now");
+    expect(html).toContain(">Locked<");
+    expect(html).toContain("Riley Sample");
+    expect(render(base)).not.toContain("Locked");
+  });
+
   it("prints roll-call columns 1 to 5 for each passenger", () => {
     const html = render(submission({ passenger_1_name: "Riley Sample", passenger_1_phone: "555-0100", passenger_1_emergency_contact: "Pat Sample 555-0101" }));
     for (const call of [1, 2, 3, 4, 5]) expect(html).toContain(`>${call}</th>`);

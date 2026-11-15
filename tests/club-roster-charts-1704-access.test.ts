@@ -46,7 +46,11 @@ vi.mock("@/modules/attendee-accounts/return-redirect", () => ({ twoStepRedirectP
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/modules/club-rosters/home-view", () => ({ yearLabel: (year: string) => year }));
 // Sealed birth dates are plain "sealed:YYYY-MM-DD" strings here, so no key is needed.
-vi.mock("@/modules/club-rosters/birth-dates", () => ({ openBirthDate: (sealed: string) => sealed.replace("sealed:", ""), sealBirthDate: (value: string) => `sealed:${value}` }));
+vi.mock("@/modules/club-rosters/birth-dates", () => ({
+  openBirthDate: (sealed: string) => sealed.replace("sealed:", ""),
+  openBirthDateOrLocked: (sealed: string) => ({ locked: false, birthDate: sealed.replace("sealed:", "") }),
+  sealBirthDate: (value: string) => `sealed:${value}`,
+}));
 
 import ClubRosterChartsPage, { metadata } from "@/app/(public)/account/(portal)/clubs/[organizationId]/charts/page";
 import { setClubFeature } from "@/modules/club-features/repository";

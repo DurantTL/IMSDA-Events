@@ -185,7 +185,7 @@ retired with the rest of that procedure. Test the new backup with
   Store the file with the existing offline key backup (the password manager
   entry and the sealed printout held by the key custodian), never with the
   database dumps. The backup file can only be restored into an Azure Key Vault
-  in the same subscription and region group.
+  in the same Azure subscription and geography.
 - **Wrapped data key:** record `DATA_ENCRYPTION_KEY_WRAPPED` and the vault key
   version id with the deployment settings. Keep every wrapped value you ever
   used while any value could still be sealed with it.

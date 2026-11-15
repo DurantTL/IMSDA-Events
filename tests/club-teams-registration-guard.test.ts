@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({ getTeamSettings: vi.fn(), writeAuditLog: vi.fn(), syncTeamMemberPermissions: vi.fn() }));
 vi.mock("@/modules/club-teams/permission-repository", () => ({ syncTeamMemberPermissions: mocks.syncTeamMemberPermissions }));
-vi.mock("@/modules/club-rosters/birth-dates", () => ({ openBirthDate: (value: string) => value.replace("sealed:", "") }));
+vi.mock("@/modules/club-rosters/birth-dates", () => ({
+  openBirthDate: (value: string) => value.replace("sealed:", ""),
+  openBirthDateOrNull: (value: string | null | undefined) => (value ? value.replace("sealed:", "") : null),
+}));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/modules/club-teams/settings-repository", () => ({ getTeamSettings: mocks.getTeamSettings }));
 

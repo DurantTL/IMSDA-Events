@@ -1,3 +1,5 @@
+import { HealthRecordLocked } from "@/components/health-record-locked";
+import { DataKeyUnavailableError } from "@/lib/secret-box";
 import { ExactValue } from "@/components/exact-value";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -37,9 +39,12 @@ export default async function AreaCoordinatorHealthPage({
   const health = await viewHealthRecord(viewer, organizationId, memberId, new Date(), { eventId }).catch((error: unknown) => {
     // The one-time privacy notice (#923) comes before any record opens.
     if (error instanceof HealthRecordError && error.code === "ACKNOWLEDGMENT_REQUIRED") return null;
+    // The personal-data key is unavailable (#1652): say so instead of failing the page.
+    if (error instanceof DataKeyUnavailableError) return "LOCKED" as const;
     if (error instanceof HealthRecordError) notFound();
     throw error;
   });
+  if (health === "LOCKED") return <HealthRecordLocked />;
   if (!health) return <HealthPrivacyAcknowledgment as="ATTENDEE" />;
   return (
     <section className="page-stack club-form-page">

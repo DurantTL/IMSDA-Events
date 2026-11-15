@@ -9,6 +9,8 @@ import { HealthRecordView, HealthStatusChip } from "@/components/health-record-v
 import { requireStaffHealthViewer } from "@/modules/health-records/access";
 import { BREAK_GLASS_REQUIRED_MESSAGE } from "@/modules/health-records/break-glass";
 import { canStartBreakGlassInline, rosterMemberPersonId } from "@/modules/health-records/break-glass-form";
+import { HealthRecordLocked } from "@/components/health-record-locked";
+import { DataKeyUnavailableError } from "@/lib/secret-box";
 import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { viewHealthRecord } from "@/modules/health-records/repository";
@@ -51,9 +53,19 @@ export default async function StaffHealthRecordPage({
     if (error instanceof HealthRecordError && error.code === "ACKNOWLEDGMENT_REQUIRED") return null;
     // A system administrator reads a live record only through break-glass (#929); the refusal is already audited.
     if (error instanceof HealthRecordError && error.code === "BREAK_GLASS_REQUIRED") return "BREAK_GLASS" as const;
+    // The personal-data key is unavailable (#1652): say so instead of failing the page.
+    if (error instanceof DataKeyUnavailableError) return "LOCKED" as const;
     if (error instanceof HealthRecordError) notFound();
     throw error;
   });
+  if (health === "LOCKED") {
+    return (
+      <>
+        <HealthRecordPageHeader eventId={event} />
+        <HealthRecordLocked />
+      </>
+    );
+  }
   if (health === "BREAK_GLASS") {
     // A system administrator or Clubs Administrator (any viewer the break-glass route accepts) can start break-glass right here (#1617).
     const personId = canStartBreakGlassInline(viewer) ? await rosterMemberPersonId(organizationId, memberId) : null;

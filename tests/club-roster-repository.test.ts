@@ -7,7 +7,8 @@ vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 
-import { openSecret } from "@/lib/secret-box";
+import { resetDataKeyringForTests, setDataKeyStateForTests } from "@/lib/data-key/keyring";
+import { DataKeyUnavailableError, openSecret } from "@/lib/secret-box";
 import {
   addRosterMember,
   listRoster,
@@ -885,5 +886,53 @@ describe("club roster storage", () => {
       const text = JSON.stringify(mocks.writeAuditLog.mock.calls);
       for (const value of ["GRADE_7", "PUBLIC_SCHOOL", "HOMESCHOOL", "NOT_SURE"]) expect(text).not.toContain(value);
     });
+  });
+});
+
+describe("club roster while the personal-data key is unavailable (#1652)", () => {
+  const ring = { current: { version: 1, ikm: Buffer.alloc(32, 51) } };
+
+  async function addWhileReadyThenLock() {
+    setDataKeyStateForTests({ kind: "ready", ring });
+    const { memberId } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+    expect((db.members[0].sealedBirthDate as string).startsWith("d1.")).toBe(true);
+    setDataKeyStateForTests({ kind: "unavailable", reason: "access-denied" });
+    return memberId;
+  }
+
+  beforeEach(() => resetDataKeyringForTests());
+
+  it("keeps the stored birth date and saves everything else about a member", async () => {
+    const id = await addWhileReadyThenLock();
+    const sealedBefore = db.members[0].sealedBirthDate;
+    await updateRosterMember("club-1", id, { role: "TLT" }, actor, now);
+    expect(db.members[0]).toMatchObject({ role: "TLT", sealedBirthDate: sealedBefore });
+  });
+
+  it("lists the roster with the age unknown instead of failing", async () => {
+    await addWhileReadyThenLock();
+    const [member] = await listRoster("club-1", "2026-27", now);
+    expect(member).toMatchObject({ firstName: "Test", age: null });
+  });
+
+  it("refuses a name change that needs the birth date for the duplicate check, with a clear message", async () => {
+    const id = await addWhileReadyThenLock();
+    await expect(updateRosterMember("club-1", id, { firstName: "Renamed" }, actor, now))
+      .rejects.toMatchObject({ code: "DATA_KEY_UNAVAILABLE", message: expect.stringContaining("Birth dates are locked") });
+    expect(db.members[0].sealedBirthDate).toEqual(expect.any(String));
+  });
+
+  it("refuses to add the same name while its birth date is locked, and cannot seal any new one", async () => {
+    await addWhileReadyThenLock();
+    await expect(addRosterMember("club-1", "2026-27", youth, actor, { now })).rejects.toMatchObject({ code: "DATA_KEY_UNAVAILABLE" });
+    await expect(addRosterMember("club-1", "2026-27", { ...youth, firstName: "Other" }, actor, { now })).rejects.toBeInstanceOf(DataKeyUnavailableError);
+    expect(db.members).toHaveLength(1);
+  });
+
+  it("refuses to reveal birth dates, writes no audit entry for it, and shows no blanks", async () => {
+    await addWhileReadyThenLock();
+    mocks.writeAuditLog.mockClear();
+    await expect(revealRosterBirthDates("club-1", "2026-27", actor)).rejects.toMatchObject({ code: "DATA_KEY_UNAVAILABLE" });
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 });

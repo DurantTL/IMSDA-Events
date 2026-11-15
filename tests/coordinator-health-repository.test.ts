@@ -28,6 +28,7 @@ vi.mock("@/lib/env", () => ({ getServerEnv: () => mocks.env }));
 vi.mock("@/lib/logger", () => ({ logError: mocks.logError }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 
+import { resetDataKeyringForTests, setDataKeyStateForTests } from "@/lib/data-key/keyring";
 import { sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 import type { HealthViewer } from "@/modules/coordinator-health/domain";
 import { HealthViewError, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
@@ -309,6 +310,23 @@ describe("emergency contact matching (#658)", () => {
     ]);
     const contacts = (await loadEventHealth(admin, "e1", {}, now)).clubs[0].attendees[0].emergencyContacts;
     expect(contacts.map((contact) => [contact.value, contact.forThisEvent])).toEqual([["555-0202", true], ["555-0201", false]]);
+  });
+});
+
+describe("loadEventHealth while the personal-data key is unavailable (#1652)", () => {
+  it("says the emergency contacts are locked right now, with its own message, and returns nothing sensitive", async () => {
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 1, ikm: Buffer.alloc(32, 71) } } });
+    seed();
+    setDataKeyStateForTests({ kind: "unavailable", reason: "access-denied" });
+    try {
+      const failure = await loadEventHealth(admin, "e1", {}, now).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(HealthViewError);
+      expect(failure).toMatchObject({ code: "ENCRYPTION_UNAVAILABLE", message: expect.stringContaining("locked right now") });
+      expect((failure as Error).message).not.toMatch(/set up on this server/);
+      expect(JSON.stringify(failure)).not.toContain(SLIP_PHONE);
+    } finally {
+      resetDataKeyringForTests();
+    }
   });
 });
 
