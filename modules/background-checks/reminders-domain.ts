@@ -14,7 +14,7 @@ import { compareByName, sortRows, type SortDirection, type SortValue } from "@/l
 /** The conference's Sterling Volunteers (NCSRisk) sign-in page, where a volunteer completes or renews a check and training (Caleb, Nov 11, 2026). */
 export const STERLING_VOLUNTEERS_URL = "https://www.ncsrisk.org/adventist/index.cfm";
 
-/** The anchor on the review panel that the page's "Needs a look" quick filter jumps to. */
+/** The id of the review panel, shown as the page's Needs a look view (`?view=review`, #1589). */
 export const NEEDS_A_LOOK_ID = "needs-a-look";
 
 /** Reminding the same person about the same club again within this many days asks staff to confirm. */

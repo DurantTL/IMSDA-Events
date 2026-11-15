@@ -575,6 +575,9 @@ const pages: PageSpec[] = [
   staff("youth-directory-filtered", "/admin/youth?grade=GRADE_7&schoolType=PUBLIC_SCHOOL&sort=grade", "system-admin"),
   staff("club-transfers-overdue", "/admin/clubs/transfers?view=overdue", "system-admin"),
   staff("background-checks", "/admin/organizations/background-checks", "system-admin"),
+  // Sterling Volunteers views (#1589 part D): Needs a look and Youth and children's events, each on its own.
+  staff("background-checks-review", "/admin/organizations/background-checks?view=review", "system-admin"),
+  staff("background-checks-events", "/admin/organizations/background-checks?view=events", "system-admin"),
   staff("club-as-director", `/admin/organizations/${clubA}/club`, "system-admin"),
   staff("club-as-director-honors", `/admin/organizations/${clubA}/club/honors`, "system-admin"),
   // People & access (#1275): the list, and one person (the seeded Registration manager, a non-admin staff login with an event membership) with its boxes.

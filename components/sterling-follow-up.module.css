@@ -129,3 +129,33 @@
   cursor: not-allowed;
   opacity: 0.58;
 }
+
+/* The Sterling Volunteers page intro (#1589 part D): last upload time and the policy notes, folded. */
+.intro {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.intro .current {
+  margin: 0;
+}
+
+.how {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.how summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--imsda-navy);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.how p {
+  margin: 0 0 8px;
+  max-width: 72ch;
+}

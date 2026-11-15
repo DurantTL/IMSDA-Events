@@ -16,7 +16,6 @@ import { backgroundCheckSummary } from "@/modules/background-checks/repository";
 import { listSterlingActionPeople } from "@/modules/background-checks/reminders";
 import {
   DEFAULT_REMINDER_FILTER,
-  NEEDS_A_LOOK_ID,
   REMINDER_FILTERS,
   SORT_KEYS as FOLLOW_UP_SORT_KEYS,
   parseReminderFilter,
@@ -30,6 +29,8 @@ import { parsePageParam } from "@/lib/pagination";
 import { searchPageHref } from "@/lib/search-page-href";
 import styles from "@/components/sterling-follow-up.module.css";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import { StaffViewStrip } from "@/components/staff-view-strip";
+import { STERLING_PAGE_PATH, parseSterlingView, sterlingViews } from "@/modules/background-checks/sterling-views";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export const metadata: Metadata = { title: "Sterling Volunteers" };
@@ -39,6 +40,9 @@ export const dynamic = "force-dynamic";
  * Sterling Volunteers (#388, #427): the upload, what's on file, and which
  * youth or children's events have adults still needing a check. Moved under
  * Clubs and churches (#427); `/admin/background-checks` redirects here.
+ * One screening task with three views (#1589 part D): People to follow up
+ * (the default), Needs a look (`?view=review`) and Youth and children's
+ * events (`?view=events`). Each view loads only what it shows.
  */
 const EVENT_SORT_COLUMNS = ["event", "starts", "adults", "needed"] as const;
 type EventSortColumn = typeof EVENT_SORT_COLUMNS[number];
@@ -51,7 +55,7 @@ const eventAccessors: Record<EventSortColumn, (event: EventRow) => SortValue> = 
 };
 const eventSortLabels: Record<EventSortColumn, string> = { event: "event", starts: "start date", adults: "adults", needed: "adults needing a check" };
 
-const PAGE_PATH = "/admin/organizations/background-checks";
+const PAGE_PATH = STERLING_PAGE_PATH;
 const FOLLOW_UP_HASH = "#follow-up";
 const followUpSortLabels: Record<ReminderSortKey, { label: string; kind: "text" | "date" }> = {
   name: { label: "last name", kind: "text" },
@@ -68,6 +72,93 @@ export default async function BackgroundChecksPage({ searchParams }: { searchPar
   const sorting = serverSort<EventSortColumn>(PAGE_PATH, await searchParams, EVENT_SORT_COLUMNS, { key: null, dir: "asc" }, { hash: "#events" });
   const events = sorting.order.key ? sortRows(summary.events, sorting.order.key, sorting.order.dir, eventAccessors) : summary.events;
   const params = await searchParams;
+  const view = parseSterlingView(params.view);
+
+  const views = <StaffViewStrip choice label="Sterling Volunteers views" views={sterlingViews(view, summary.reviewCount)} />;
+  const intro = (
+    <>
+      <AdminPageHeader path={PAGE_PATH} />
+      <StaffPageHeader
+        description="Upload the roster export (matched by name and club or church; no email or birth date needed) or the older Sterling Volunteers list. The newest upload replaces whatever was on file for a person."
+        primary={<BackgroundCheckImportPanel />}
+      />
+      <div className={styles.intro}>
+        {summary.lastRecordedAt && (
+          <p className={styles.current}>Last recorded {formatInConferenceTime(summary.lastRecordedAt, { dateStyle: "medium", timeStyle: "short" })}.</p>
+        )}
+        <details className={styles.how}>
+          <summary>How the status is used</summary>
+          <p>
+            At events marked as youth or children&apos;s events (in Event settings), every adult with no check on file, an
+            expired check, or a roster mark of not in compliance is flagged in red on the dashboard, People, rosters,
+            and check-in. Expiring soon is not flagged there, and registration is never blocked. At those events check-in is held for adults and staff who are not current unless staff override.
+          </p>
+          <p>
+            Each adult on a club&apos;s roster shows Clear, Expiring soon, Not in compliance, or No record. Club
+            directors and deputies see the status only; the roster note, with the check and training dates, is shown
+            to staff only.
+          </p>
+        </details>
+      </div>
+      {views}
+    </>
+  );
+
+  if (view === "review") {
+    return (
+      <section className="page-stack">
+        {intro}
+        <BackgroundCheckReviewPanel />
+      </section>
+    );
+  }
+
+  if (view === "events") {
+    return (
+      <section className="page-stack">
+        {intro}
+        <section className="panel" id="events">
+          <div className="section-heading">
+            <div>
+              <h2>Youth and children&apos;s events</h2>
+              <p>Upcoming events that check adults. Open one&apos;s reports for the full list.</p>
+            </div>
+          </div>
+          {summary.events.length === 0 ? (
+            <p className="report-empty">No upcoming event is marked as a youth or children&apos;s event. Turn it on in an event&apos;s settings.</p>
+          ) : (
+            <div className="report-table-wrap">
+              {sorting.order.key && <SortOrderNote>{sortOrderText(eventSortLabels[sorting.order.key], sorting.order.dir, sorting.order.key === "event" ? "text" : sorting.order.key === "starts" ? "date" : "number")}</SortOrderNote>}
+              <table role="table" className="report-table table-cards">
+                <caption className="sr-only">Youth and children&apos;s events</caption>
+                <thead role="rowgroup"><tr role="row">
+                  <ColumnHeader column="event" label="Event" sorting={sorting} />
+                  <ColumnHeader column="starts" label="Starts" sorting={sorting} />
+                  <ColumnHeader column="adults" label="Adults" sorting={sorting} />
+                  <ColumnHeader column="needed" label="Need a check" sorting={sorting} />
+                </tr></thead>
+                <tbody role="rowgroup">
+                  {events.map((event) => (
+                    <tr role="row" key={event.id}>
+                      <th role="rowheader" scope="row"><Link className="report-record-link" href={`/more/reports?event=${encodeURIComponent(event.id)}#background-checks`}>{event.name}</Link></th>
+                      <td {...cardCell("Starts")}>{event.startsOn}</td>
+                      <td {...cardCell("Adults")}>{event.adults}</td>
+                      <td {...cardCell("Need a check")}>
+                        {event.needed > 0
+                          ? <span className="status-chip coral background-check-badge"><ShieldAlert aria-hidden="true" size={12} /> {event.needed}</span>
+                          : <span className="status-chip green background-check-badge"><ShieldCheck aria-hidden="true" size={12} /> All current</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </section>
+    );
+  }
+
   const filter = parseReminderFilter(params.people);
   const followUpSort = serverSort<ReminderSortKey>(PAGE_PATH, params, FOLLOW_UP_SORT_KEYS, { key: "expires", dir: "asc" }, { prefix: "people", hash: FOLLOW_UP_HASH });
   const followUp = await listSterlingActionPeople({
@@ -86,53 +177,27 @@ export default async function BackgroundChecksPage({ searchParams }: { searchPar
   };
   return (
     <section className="page-stack">
-      <AdminPageHeader path="/admin/organizations/background-checks" />
-      <StaffPageHeader
-        description="Upload the roster export (matched by name and club or church; no email or birth date needed) or the older Sterling Volunteers list. The newest upload replaces whatever was on file for a person."
-        primary={<BackgroundCheckImportPanel />}
-      />
-      <div className="meta-stack">
-        <p className="field-help">
-          At events marked as youth or children&apos;s events (in Event settings), every adult with no check on file, an
-          expired check, or a roster mark of not in compliance is flagged in red on the dashboard, People, rosters,
-          and check-in. Expiring soon is not flagged there, and registration is never blocked. At those events check-in is held for adults and staff who are not current unless staff override.
-        </p>
-        <p className="field-help">
-          Each adult on a club&apos;s roster shows Clear, Expiring soon, Not in compliance, or No record. Club
-          directors and deputies see the status only; the roster note, with the check and training dates, is shown
-          to staff only.
-        </p>
-        {summary.lastRecordedAt && (
-          <p className="field-help">Last recorded {formatInConferenceTime(summary.lastRecordedAt, { dateStyle: "medium", timeStyle: "short" })}.</p>
-        )}
-      </div>
-
-      <nav aria-label="Jump to the people who need action">
-        <ul className={styles.filters}>
-          {REMINDER_FILTERS.filter((value) => value !== "all").map((value) => (
-            <li key={value}>
-              <Link aria-current={filter === value ? "true" : undefined} href={filterHref(value)}>{reminderFilterLabels[value]} ({filterCounts[value]})</Link>
-            </li>
-          ))}
-          <li><a href={`#${NEEDS_A_LOOK_ID}`}>Needs a look ({summary.reviewCount})</a></li>
-          <li>
-            <Link aria-current={filter === "all" ? "true" : undefined} href={filterHref("all")}>{reminderFilterLabels.all} ({filterCounts.all})</Link>
-          </li>
-        </ul>
+      {intro}
+      <section className="panel" id="follow-up">
+        <div className="section-heading">
+          <div>
+            <h2>People to follow up</h2>
+            <p>Choose people and send a reminder to their club director(s), and to the volunteer when an email is on file.</p>
+          </div>
+        </div>
+        <nav aria-label="Which people to show">
+          <ul className={styles.filters}>
+            {REMINDER_FILTERS.map((value) => (
+              <li key={value}>
+                <Link aria-current={filter === value ? "true" : undefined} href={filterHref(value)}>{reminderFilterLabels[value]} ({filterCounts[value]})</Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
         <p className={styles.current}>
           Current checks: {followUp.counts.current}. Counted from the active adults and staff on this year&apos;s club rosters. Expiring soon is within 60 days.
           {summary.unmatchedCount > 0 && <> {summary.unmatchedCount} more rows in the upload match no club roster or registration yet; that isn&apos;t work to do.</>}
         </p>
-      </nav>
-
-      <section className="panel" id="follow-up">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Sterling Volunteers</p>
-            <h2>People to follow up</h2>
-            <p>Filter: {reminderFilterLabels[filter].toLowerCase()}. Choose people and send a reminder to their club director(s), and to the volunteer when an email is on file.</p>
-          </div>
-        </div>
         <ListPager hrefFor={(page) => searchPageHref(PAGE_PATH, params, page, { prefix: "people", hash: FOLLOW_UP_HASH })} label="People to follow up pages" noun="people" nounOne="person" part="count" slice={followUp} />
         <SterlingFollowUp
           columns={followUpColumns}
@@ -144,48 +209,6 @@ export default async function BackgroundChecksPage({ searchParams }: { searchPar
         />
         <ListPager hrefFor={(page) => searchPageHref(PAGE_PATH, params, page, { prefix: "people", hash: FOLLOW_UP_HASH })} label="People to follow up pages" part="pages" slice={followUp} />
       </section>
-
-      <section className="panel" id="events">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Upcoming</p>
-            <h2>Youth and children&apos;s events</h2>
-            <p>Events that check adults. Open one&apos;s reports for the full list.</p>
-          </div>
-        </div>
-        {summary.events.length === 0 ? (
-          <p className="report-empty">No upcoming event is marked as a youth or children&apos;s event. Turn it on in an event&apos;s settings.</p>
-        ) : (
-          <div className="report-table-wrap">
-            {sorting.order.key && <SortOrderNote>{sortOrderText(eventSortLabels[sorting.order.key], sorting.order.dir, sorting.order.key === "event" ? "text" : sorting.order.key === "starts" ? "date" : "number")}</SortOrderNote>}
-            <table role="table" className="report-table table-cards">
-              <caption className="sr-only">Youth and children&apos;s events</caption>
-              <thead role="rowgroup"><tr role="row">
-                <ColumnHeader column="event" label="Event" sorting={sorting} />
-                <ColumnHeader column="starts" label="Starts" sorting={sorting} />
-                <ColumnHeader column="adults" label="Adults" sorting={sorting} />
-                <ColumnHeader column="needed" label="Need a check" sorting={sorting} />
-              </tr></thead>
-              <tbody role="rowgroup">
-                {events.map((event) => (
-                  <tr role="row" key={event.id}>
-                    <th role="rowheader" scope="row"><Link className="report-record-link" href={`/more/reports?event=${encodeURIComponent(event.id)}#background-checks`}>{event.name}</Link></th>
-                    <td {...cardCell("Starts")}>{event.startsOn}</td>
-                    <td {...cardCell("Adults")}>{event.adults}</td>
-                    <td {...cardCell("Need a check")}>
-                      {event.needed > 0
-                        ? <span className="status-chip coral background-check-badge"><ShieldAlert aria-hidden="true" size={12} /> {event.needed}</span>
-                        : <span className="status-chip green background-check-badge"><ShieldCheck aria-hidden="true" size={12} /> All current</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <BackgroundCheckReviewPanel />
     </section>
   );
 }
