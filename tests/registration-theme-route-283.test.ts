@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   rejectCrossOriginRequest: vi.fn(),
   getPrisma: vi.fn(),
   writeAuditLog: vi.fn(),
+  readAsset: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -20,9 +21,11 @@ vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.find
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
+vi.mock("@/modules/events/asset-storage", () => ({ readAsset: mocks.readAsset }));
 
 import { GET, POST, PUT } from "@/app/api/events/[eventId]/registration-theme/route";
 import { PLATFORM_DEFAULT_THEME } from "@/modules/registration-themes/tokens";
+import sharp from "sharp";
 
 const staff = { id: "staff-1", email: "staff@example.test", displayName: "Staff Member" };
 const membership = (role: string) => ({ eventId: "event-1", userId: "staff-1", role, status: "ACTIVE", permissions: [] });
@@ -38,13 +41,19 @@ function request(method: string, body?: unknown) {
   });
 }
 
-type Row = { updatedAt?: Date; id: string; eventId: string; versionNumber: number; status: string; tokens: unknown; createdAt: Date; publishedAt: Date | null; archivedAt: Date | null; publishedByUserId?: string | null };
+type Asset = { id: string; eventId: string; displayName: string; contentType: string; byteSize: number; storageKey: string; createdAt?: Date };
+type Row = { logoAssetId?: string | null; heroAssetId?: string | null; updatedAt?: Date; id: string; eventId: string; versionNumber: number; status: string; tokens: unknown; createdAt: Date; publishedAt: Date | null; archivedAt: Date | null; publishedByUserId?: string | null };
 
 /** An in-memory stand-in for the one table the repository touches. */
-function database(initial: Row[] = []) {
-  const rows = [...initial];
+function database(initial: Row[] = [], assets: Asset[] = []) {
+  const rows: Row[] = initial.map((entry) => ({ ...entry, logoAssetId: entry.logoAssetId ?? null, heroAssetId: entry.heroAssetId ?? null }));
   const matches = (row: Row, where: Record<string, unknown> = {}) => Object.entries(where).every(([key, value]) => (row as unknown as Record<string, unknown>)[key] === value);
   const tx = {
+    eventAsset: {
+      findMany: vi.fn(async ({ where }: { where: { id?: { in: string[] }; eventId?: string; contentType?: { in: string[] } } }) => assets.filter((asset) => (
+        (!where.id || where.id.in.includes(asset.id)) && (!where.eventId || asset.eventId === where.eventId) && (!where.contentType || where.contentType.in.includes(asset.contentType))
+      ))),
+    },
     registrationThemeVersion: {
       findFirst: vi.fn(async ({ where }: { where: Record<string, unknown> }) => rows.find((row) => matches(row, where)) ?? null),
       findMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) => rows.filter((row) => matches(row, where))),
@@ -141,7 +150,7 @@ describe("registration theme repository", () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(rows.find((entry) => entry.id === "pub")).toMatchObject({ status: "ARCHIVED", archivedAt: new Date("2027-02-01T12:00:00Z") });
     expect(rows.find((entry) => entry.id === "draft")).toMatchObject({ status: "PUBLISHED", publishedAt: new Date("2027-02-01T12:00:00Z"), publishedByUserId: "staff-1" });
-    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "REGISTRATION_THEME_PUBLISHED", metadata: { versionNumber: 2, replacedPublished: true } }), expect.anything());
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "REGISTRATION_THEME_PUBLISHED", metadata: { versionNumber: 2, replacedPublished: true, hasLogo: false, hasBanner: false } }), expect.anything());
   });
 
   it("refuses to publish a low-contrast draft, naming the failing checks, and changes nothing", async () => {
@@ -228,5 +237,127 @@ describe("registration theme repository", () => {
     expect(rows[0]).toMatchObject({ status: "ARCHIVED" });
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "REGISTRATION_THEME_REVERTED" }), expect.anything());
     expect((await POST(request("POST", { action: "revert" }), context)).status).toBe(404);
+  });
+});
+
+/** A real, tiny picture of the given size: sharp reads its metadata exactly as it reads an upload. */
+async function picture(width: number, height: number) {
+  return sharp({ create: { width, height, channels: 3, background: "#888888" } }).png().toBuffer();
+}
+
+const asset = (overrides: Partial<Asset>): Asset => ({ id: "logo-1", eventId: "event-1", displayName: "logo.png", contentType: "image/png", byteSize: 4096, storageKey: "event-1/logo.png", ...overrides });
+const logoAsset = asset({});
+const bannerAsset = asset({ id: "banner-1", displayName: "banner.png", storageKey: "event-1/banner.png" });
+
+function pictures(sizes: Record<string, [number, number]>) {
+  mocks.readAsset.mockImplementation(async (key: string) => {
+    const size = sizes[key];
+    if (!size) throw new Error("missing file");
+    return picture(size[0], size[1]);
+  });
+}
+
+describe("registration look logo and banner (#283)", () => {
+  beforeEach(() => pictures({ "event-1/logo.png": [240, 96], "event-1/banner.png": [1600, 400] }));
+
+  it("saves the chosen images with their descriptions and audits whether a logo and banner are set", async () => {
+    const { rows } = database([], [logoAsset, bannerAsset]);
+    const response = await PUT(request("PUT", {
+      tokens: { ...good, logoAlt: "  Camp Heritage logo ", heroAlt: "Pine trees by the lake", heroFocus: "top" },
+      logoAssetId: "logo-1", heroAssetId: "banner-1",
+    }), context);
+    expect(response.status).toBe(200);
+    expect(rows[0]).toMatchObject({ logoAssetId: "logo-1", heroAssetId: "banner-1", tokens: { logoAlt: "Camp Heritage logo", heroAlt: "Pine trees by the lake", heroFocus: "top" } });
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ metadata: { versionNumber: 1, hasLogo: true, hasBanner: true } }), expect.anything());
+    const body = await response.json() as { theme: { draft: { logoAssetId: string; heroAssetId: string }; images: { id: string; url: string }[] } };
+    expect(body.theme.draft).toMatchObject({ logoAssetId: "logo-1", heroAssetId: "banner-1" });
+    expect(body.theme.images.map((image) => image.id).sort()).toEqual(["banner-1", "logo-1"]);
+    expect(body.theme.images[0]!.url).toContain("/api/events/event-1/assets/");
+  });
+
+  it("keeps the draft's images when the request leaves the ids out, and clears them (and their descriptions) with null", async () => {
+    const { rows } = database([row({ id: "draft", logoAssetId: "logo-1", tokens: { ...good, logoAlt: "Logo" } })], [logoAsset]);
+    await PUT(request("PUT", { tokens: { ...good, logoAlt: "Logo", accent: "#7a2e65" } }), context);
+    expect(rows[0]).toMatchObject({ logoAssetId: "logo-1" });
+    await PUT(request("PUT", { tokens: { ...good, logoAlt: "Leftover", heroAlt: "Leftover", heroFocus: "bottom" }, logoAssetId: null }), context);
+    expect(rows[0]!.logoAssetId).toBeNull();
+    expect(rows[0]!.tokens).not.toHaveProperty("logoAlt");
+    expect(rows[0]!.tokens).not.toHaveProperty("heroAlt");
+    expect(rows[0]!.tokens).not.toHaveProperty("heroFocus");
+  });
+
+  it.each([
+    ["another event's upload", asset({ eventId: "event-2" }), "logo-1", [240, 96], "isn't one of this event's uploads"],
+    ["a PDF", asset({ contentType: "application/pdf" }), "logo-1", [240, 96], "PNG, JPEG or WebP"],
+    ["a logo over 2 MB", asset({ byteSize: 2 * 1024 * 1024 + 1 }), "logo-1", [240, 96], "2 MB or smaller"],
+    ["a logo that is too small", asset({}), "logo-1", [100, 40], "at least 120 by 48"],
+    ["a file that is not a picture", asset({}), "logo-1", null, "couldn't be read as a picture"],
+  ] as const)("refuses %s as the logo and saves nothing", async (_name, stored, id, size, message) => {
+    const { rows } = database([], [stored]);
+    if (size) pictures({ "event-1/logo.png": [size[0], size[1]] });
+    else mocks.readAsset.mockResolvedValue(Buffer.from("not a picture"));
+    const response = await PUT(request("PUT", { tokens: { ...good, logoAlt: "Logo" }, logoAssetId: id }), context);
+    expect(response.status).toBe(400);
+    const body = await response.json() as { error: string; message: string };
+    expect(body.error).toBe("INVALID_ASSET");
+    expect(body.message).toContain(message);
+    expect(rows).toHaveLength(0);
+  });
+
+  it("refuses a missing upload the same way as another event's", async () => {
+    database([], []);
+    const response = await PUT(request("PUT", { tokens: { ...good, logoAlt: "Logo" }, logoAssetId: "nope" }), context);
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: "INVALID_ASSET", message: expect.stringContaining("isn't one of this event's uploads") });
+  });
+
+  it.each([
+    ["too narrow", [1000, 400], "at least 1200 by 300"],
+    ["not wider than tall", [1200, 1300], "wider than it is tall"],
+  ] as const)("refuses a banner that is %s", async (_name, size, message) => {
+    database([], [bannerAsset]);
+    pictures({ "event-1/banner.png": [size[0], size[1]] });
+    const response = await PUT(request("PUT", { tokens: { ...good, heroAlt: "Lake" }, heroAssetId: "banner-1" }), context);
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: "INVALID_ASSET", message: expect.stringContaining(message) });
+  });
+
+  it("requires a description for each chosen image", async () => {
+    const { rows } = database([], [logoAsset, bannerAsset]);
+    const noLogoAlt = await PUT(request("PUT", { tokens: good, logoAssetId: "logo-1" }), context);
+    expect(noLogoAlt.status).toBe(400);
+    await expect(noLogoAlt.json()).resolves.toMatchObject({ error: "INVALID_ASSET", message: expect.stringContaining("Describe the logo") });
+    const noHeroAlt = await PUT(request("PUT", { tokens: { ...good, logoAlt: "Logo" }, logoAssetId: "logo-1", heroAssetId: "banner-1" }), context);
+    expect(noHeroAlt.status).toBe(400);
+    await expect(noHeroAlt.json()).resolves.toMatchObject({ message: expect.stringContaining("Describe the banner") });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("refuses unknown fields and a description over 150 characters", async () => {
+    database([], [logoAsset]);
+    expect((await PUT(request("PUT", { tokens: good, logoUrl: "x" }), context)).status).toBe(400);
+    expect((await PUT(request("PUT", { tokens: { ...good, logoAlt: "a".repeat(151) }, logoAssetId: "logo-1" }), context)).status).toBe(400);
+  });
+
+  it("checks the images again on publish, and publishes a draft whose logo file was deleted without its description", async () => {
+    const { rows } = database([
+      row({ id: "bad", versionNumber: 1, logoAssetId: "logo-1", tokens: { ...good, logoAlt: "Logo" } }),
+    ], [asset({ byteSize: 3 * 1024 * 1024 })]);
+    const refused = await POST(request("POST", { action: "publish" }), context);
+    expect(refused.status).toBe(400);
+    await expect(refused.json()).resolves.toMatchObject({ error: "INVALID_ASSET" });
+    expect(rows[0]!.status).toBe("DRAFT");
+
+    // The file was deleted since the save: the key is null and the description goes with it.
+    rows[0]!.logoAssetId = null;
+    expect((await POST(request("POST", { action: "publish" }), context)).status).toBe(200);
+    expect(rows[0]).toMatchObject({ status: "PUBLISHED", logoAssetId: null });
+    expect(rows[0]!.tokens).not.toHaveProperty("logoAlt");
+  });
+
+  it("lists only the event's PNG, JPEG and WebP uploads for the picker", async () => {
+    database([], [logoAsset, asset({ id: "pdf-1", contentType: "application/pdf" }), asset({ id: "other", eventId: "event-2" })]);
+    const body = await (await GET(request("GET"), context)).json() as { theme: { images: { id: string; name: string; contentType: string; byteSize: number }[] } };
+    expect(body.theme.images).toEqual([expect.objectContaining({ id: "logo-1", name: "logo.png", contentType: "image/png", byteSize: 4096 })]);
   });
 });

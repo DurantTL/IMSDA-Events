@@ -1,18 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Palette } from "lucide-react";
 import { checkThemeContrast } from "@/modules/registration-themes/contrast";
-import type { RegistrationThemeEditorState, RegistrationThemeVersionView } from "@/modules/registration-themes/repository";
+import type { RegistrationThemeEditorState, RegistrationThemeImageChoice, RegistrationThemeVersionView } from "@/modules/registration-themes/repository";
 import { themeCssVariables } from "@/modules/registration-themes/resolve";
 import {
   PLATFORM_DEFAULT_THEME,
+  THEME_ALT_MAX,
   THEME_COLOR_KEYS,
   THEME_FONT_KEYS,
   THEME_FONT_LABELS,
+  THEME_HERO_FOCUS_POSITIONS,
   type RegistrationThemeTokens,
+  type ThemeHeroFocus,
   type ThemeColorKey,
 } from "@/modules/registration-themes/tokens";
+import { THEME_IMAGE_LIMITS } from "@/modules/registration-themes/assets";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { useConfirm } from "@/components/use-confirm";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -49,6 +54,20 @@ function startingTokens(state: RegistrationThemeEditorState): RegistrationThemeT
   return state.draft?.tokens ?? state.published?.tokens ?? PLATFORM_DEFAULT_THEME;
 }
 
+type ImageIds = { logoAssetId: string | null; heroAssetId: string | null };
+
+function startingIds(state: RegistrationThemeEditorState): ImageIds {
+  const source = state.draft ?? state.published;
+  return { logoAssetId: source?.logoAssetId ?? null, heroAssetId: source?.heroAssetId ?? null };
+}
+
+/** The staff inline URL of one of the event's uploads, for thumbnails and the sample. */
+const staffImageUrl = (eventId: string, assetId: string) => `/api/events/${encodeURIComponent(eventId)}/assets/${encodeURIComponent(assetId)}?disposition=inline`;
+
+const FOCUS_OPTIONS: [ThemeHeroFocus, string][] = [["top", "Top"], ["center", "Center"], ["bottom", "Bottom"]];
+
+const formatSize = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+
 type ChoiceKey = "headingFont" | "bodyFont" | "contentWidth" | "density" | "cardRadius" | "shadow" | "buttonShape";
 
 /**
@@ -60,6 +79,10 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
   const [state, setState] = useState(initialState);
   const [tokens, setTokens] = useState<RegistrationThemeTokens>(() => startingTokens(initialState));
   const [saved, setSaved] = useState<RegistrationThemeTokens>(() => startingTokens(initialState));
+  // What is typed in the two description boxes (a blank or spaces-only box is "no description" in the tokens).
+  const [altText, setAltText] = useState(() => ({ logo: startingTokens(initialState).logoAlt ?? "", hero: startingTokens(initialState).heroAlt ?? "" }));
+  const [ids, setIds] = useState<ImageIds>(() => startingIds(initialState));
+  const [savedIds, setSavedIds] = useState<ImageIds>(() => startingIds(initialState));
   const [hexText, setHexText] = useState<Record<ThemeColorKey, string>>(() => ({ ...startingTokens(initialState) } as Record<ThemeColorKey, string>));
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   // Which button is working: it reads its "…ing" label and is aria-busy until the answer comes back.
@@ -68,13 +91,20 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
   // One message slot under the buttons (B10): "Saved. ..." or "Not saved: ...".
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
-  const dirty = JSON.stringify(tokens) !== JSON.stringify(saved);
+  const dirty = JSON.stringify(tokens) !== JSON.stringify(saved) || JSON.stringify(ids) !== JSON.stringify(savedIds);
   useUnsavedChangesGuard(dirty);
   const report = checkThemeContrast(tokens);
   const hexProblems = THEME_COLOR_KEYS.filter((key) => !HEX.test(hexText[key]));
+  const altProblems = {
+    logo: ids.logoAssetId !== null && !tokens.logoAlt,
+    hero: ids.heroAssetId !== null && !tokens.heroAlt,
+  };
+  const hasAltProblem = altProblems.logo || altProblems.hero;
   const hasDraftToPublish = Boolean(state.draft) && !dirty;
   const publishBlocker = hexProblems.length > 0
     ? "Fix the color values marked below first."
+    : hasAltProblem
+      ? "Describe the logo or banner you chose first."
     : dirty
       ? "Save the draft first. Publish uses the saved draft."
       : !state.draft
@@ -90,11 +120,33 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
   function setChoice(key: ChoiceKey, value: string) {
     setTokens((current) => ({ ...current, [key]: value }) as RegistrationThemeTokens);
   }
+  function pickImage(kind: "logo" | "hero", assetId: string | null) {
+    setIds((current) => (kind === "logo" ? { ...current, logoAssetId: assetId } : { ...current, heroAssetId: assetId }));
+    // A description belongs to one picture: choosing none drops it, and a new picture starts with an empty one.
+    setTokens((current) => {
+      const next = { ...current };
+      if (kind === "logo") delete next.logoAlt;
+      else { delete next.heroAlt; if (!assetId) delete next.heroFocus; }
+      return next;
+    });
+  }
+  function setAlt(kind: "logo" | "hero", value: string) {
+    const key = kind === "logo" ? "logoAlt" : "heroAlt";
+    setTokens((current) => {
+      const next = { ...current };
+      if (value.trim()) next[key] = value; else delete next[key];
+      return next;
+    });
+    setAltText((current) => ({ ...current, [kind]: value }));
+  }
   function load(next: RegistrationThemeEditorState) {
     const start = startingTokens(next);
     setState(next);
     setTokens(start);
     setSaved(start);
+    setIds(startingIds(next));
+    setSavedIds(startingIds(next));
+    setAltText({ logo: start.logoAlt ?? "", hero: start.heroAlt ?? "" });
     setHexText({ ...start } as Record<ThemeColorKey, string>);
   }
 
@@ -122,7 +174,7 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
     }
   }
 
-  const saveDraft = () => send("save", "PUT", { tokens }, savedMessage("The public form still shows the published look."), "The look couldn't be saved.");
+  const saveDraft = () => send("save", "PUT", { tokens, ...ids }, savedMessage("The public form still shows the published look."), "The look couldn't be saved.");
   const publish = () => send("publish", "POST", { action: "publish" }, "Saved. Published: the registration form now uses this look.", "The look couldn't be published.");
   async function discard() {
     const confirmed = await askConfirm({
@@ -236,10 +288,70 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
             </label>
             <small className={styles.help}>Fonts are the ones every device already has. Nothing is downloaded.</small>
           </fieldset>
+
+          <fieldset className={styles.group}>
+            <legend>Logo and banner</legend>
+            <ImagePicker
+              kind="logo"
+              legend="Logo"
+              help={`A PNG, JPEG or WebP picture, ${formatSize(THEME_IMAGE_LIMITS.logo.maxBytes)} or smaller and at least ${THEME_IMAGE_LIMITS.logo.minWidth} by ${THEME_IMAGE_LIMITS.logo.minHeight} pixels. It sits on a light tile at the top of the form.`}
+              images={state.images}
+              eventId={eventId}
+              value={ids.logoAssetId}
+              onChange={(assetId) => pickImage("logo", assetId)}
+            />
+            {ids.logoAssetId && (
+              <div className={styles.altField}>
+                <label htmlFor="theme-logo-alt">Logo description (required)</label>
+                <input aria-describedby={altProblems.logo ? "theme-logo-alt-help theme-logo-alt-error" : "theme-logo-alt-help"} aria-invalid={altProblems.logo} aria-required="true" autoComplete="off" id="theme-logo-alt" maxLength={THEME_ALT_MAX} type="text" value={altText.logo} onChange={(event) => setAlt("logo", event.target.value)} />
+                <small className={styles.help} id="theme-logo-alt-help">What a screen reader says for the logo, such as the name on it. Up to {THEME_ALT_MAX} characters.</small>
+                {altProblems.logo && <small className={styles.fieldError} id="theme-logo-alt-error">Describe the logo to save it.</small>}
+              </div>
+            )}
+            <ImagePicker
+              kind="hero"
+              legend="Banner"
+              help={`A wide PNG, JPEG or WebP picture, ${formatSize(THEME_IMAGE_LIMITS.hero.maxBytes)} or smaller and at least ${THEME_IMAGE_LIMITS.hero.minWidth} by ${THEME_IMAGE_LIMITS.hero.minHeight} pixels. It shows as its own strip above the event name, never behind text.`}
+              images={state.images}
+              eventId={eventId}
+              value={ids.heroAssetId}
+              onChange={(assetId) => pickImage("hero", assetId)}
+            />
+            {ids.heroAssetId && (
+              <>
+                <div className={styles.altField}>
+                  <label htmlFor="theme-hero-alt">Banner description (required)</label>
+                  <input aria-describedby={altProblems.hero ? "theme-hero-alt-help theme-hero-alt-error" : "theme-hero-alt-help"} aria-invalid={altProblems.hero} aria-required="true" autoComplete="off" id="theme-hero-alt" maxLength={THEME_ALT_MAX} type="text" value={altText.hero} onChange={(event) => setAlt("hero", event.target.value)} />
+                  <small className={styles.help} id="theme-hero-alt-help">What a screen reader says for the banner, such as what the picture shows. Up to {THEME_ALT_MAX} characters.</small>
+                  {altProblems.hero && <small className={styles.fieldError} id="theme-hero-alt-error">Describe the banner to save it.</small>}
+                </div>
+                <div className={styles.altField}>
+                  <label htmlFor="theme-hero-focus">Banner focus</label>
+                  <select aria-describedby="theme-hero-focus-help" id="theme-hero-focus" value={tokens.heroFocus ?? "center"} onChange={(event) => setTokens((current) => ({ ...current, heroFocus: event.target.value as ThemeHeroFocus }))}>
+                    {FOCUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                  <small className={styles.help} id="theme-hero-focus-help">On a phone the banner is cropped. This keeps the top, middle or bottom of the picture in view.</small>
+                </div>
+              </>
+            )}
+            <small className={styles.help}>
+              Pictures come from this event&apos;s uploads. <Link href={`/more/event-content?event=${encodeURIComponent(eventId)}`}>Add or remove uploads in Public content</Link>.
+            </small>
+          </fieldset>
         </form>
 
         <div className={styles.side}>
           <div className={styles.sample} style={sampleStyle} data-testid="registration-theme-sample" role="group" aria-label="Sample of the look">
+            {ids.heroAssetId && (
+              // eslint-disable-next-line @next/next/no-img-element -- staff sample of the event's own upload
+              <img alt={tokens.heroAlt ?? ""} className={styles.sampleBanner} src={staffImageUrl(eventId, ids.heroAssetId)} style={{ objectPosition: THEME_HERO_FOCUS_POSITIONS[tokens.heroFocus ?? "center"] }} />
+            )}
+            {ids.logoAssetId && (
+              <span className={styles.sampleLogoTile}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- staff sample of the event's own upload */}
+                <img alt={tokens.logoAlt ?? ""} className={styles.sampleLogo} src={staffImageUrl(eventId, ids.logoAssetId)} />
+              </span>
+            )}
             <h4 className={styles.sampleHeading}>Sample registration</h4>
             <p>Body text shows how a question and its answer read.</p>
             <p className={styles.sampleMuted}>Hint text sits under a question.</p>
@@ -278,7 +390,7 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
       </div>
 
       <div className={styles.actions}>
-        <button aria-busy={pending === "save" || undefined} className="secondary-button" disabled={busy || !dirty || hexProblems.length > 0} type="button" onClick={() => void saveDraft()}>{pending === "save" ? "Saving…" : "Save draft"}</button>
+        <button aria-busy={pending === "save" || undefined} className="secondary-button" disabled={busy || !dirty || hexProblems.length > 0 || hasAltProblem} type="button" onClick={() => void saveDraft()}>{pending === "save" ? "Saving…" : "Save draft"}</button>
         <button aria-busy={pending === "publish" || undefined} className="primary-button" aria-describedby={publishBlocker ? "registration-theme-publish-reason" : undefined} disabled={busy || !hasDraftToPublish || !report.passes} type="button" onClick={() => void publish()}>{pending === "publish" ? "Publishing…" : "Publish"}</button>
         <button aria-busy={pending === "discard" || undefined} className="secondary-button" disabled={busy || !state.draft} type="button" onClick={() => void discard()}>{pending === "discard" ? "Discarding…" : "Discard draft"}</button>
         <button aria-busy={pending === "revert" || undefined} className="secondary-button" disabled={busy || !published} type="button" onClick={() => void revert()}>{pending === "revert" ? "Switching…" : "Use platform look"}</button>
@@ -290,11 +402,61 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
       <h4 className={styles.subheading}>Version history</h4>
       {published || state.history.length > 0 ? (
         <ul className={styles.history}>
-          {published && <li><strong>Current:</strong> {describeVersion(published)}</li>}
-          {state.history.map((version) => <li key={version.id}>{describeVersion(version)}, replaced {formatDay(version.archivedAt)}</li>)}
+          {published && <li><strong>Current:</strong> {describeVersion(published)}<VersionImages eventId={eventId} version={published} /></li>}
+          {state.history.map((version) => <li key={version.id}>{describeVersion(version)}, replaced {formatDay(version.archivedAt)}<VersionImages eventId={eventId} version={version} /></li>)}
         </ul>
       ) : <p className={styles.help}>No published looks yet.</p>}
       {confirmDialog}
     </section>
+  );
+}
+
+/** One picker: "None" and the event's PNG, JPEG and WebP uploads, each with a thumbnail. */
+function ImagePicker({ kind, legend, help, images, eventId, value, onChange }: {
+  kind: "logo" | "hero";
+  legend: string;
+  help: string;
+  images: RegistrationThemeImageChoice[];
+  eventId: string;
+  value: string | null;
+  onChange: (assetId: string | null) => void;
+}) {
+  return (
+    <fieldset aria-describedby={`theme-${kind}-picker-help`} className={styles.picker}>
+      <legend>{legend}</legend>
+      <small className={styles.help} id={`theme-${kind}-picker-help`}>{help}</small>
+      <div className={styles.pickerList}>
+        <label className={styles.imageOption}>
+          <input checked={value === null} name={`theme-${kind}`} type="radio" onChange={() => onChange(null)} />
+          <span>None</span>
+        </label>
+        {images.map((image) => (
+          <label className={styles.imageOption} key={image.id}>
+            <input checked={value === image.id} name={`theme-${kind}`} type="radio" onChange={() => onChange(image.id)} />
+            {/* eslint-disable-next-line @next/next/no-img-element -- thumbnail of the event's own upload */}
+            <img alt="" className={styles.thumb} loading="lazy" src={staffImageUrl(eventId, image.id)} />
+            <span>{image.name} <span className={styles.imageMeta}>({formatSize(image.byteSize)})</span></span>
+          </label>
+        ))}
+      </div>
+      {images.length === 0 && <small className={styles.help}>This event has no PNG, JPEG or WebP uploads yet.</small>}
+    </fieldset>
+  );
+}
+
+/** Small pictures of a version's logo and banner in the history list, with their descriptions as alt text. */
+function VersionImages({ eventId, version }: { eventId: string; version: RegistrationThemeVersionView }) {
+  if (!version.logoAssetId && !version.heroAssetId) return null;
+  return (
+    <span className={styles.versionImages}>
+      {version.logoAssetId && (
+        // eslint-disable-next-line @next/next/no-img-element -- thumbnail of the event's own upload
+        <img alt={`Logo: ${version.tokens?.logoAlt ?? ""}`} className={styles.thumb} loading="lazy" src={staffImageUrl(eventId, version.logoAssetId)} />
+      )}
+      {version.heroAssetId && (
+        // eslint-disable-next-line @next/next/no-img-element -- thumbnail of the event's own upload
+        <img alt={`Banner: ${version.tokens?.heroAlt ?? ""}`} className={styles.thumbWide} loading="lazy" src={staffImageUrl(eventId, version.heroAssetId)} />
+      )}
+    </span>
   );
 }

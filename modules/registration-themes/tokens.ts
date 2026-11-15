@@ -42,6 +42,15 @@ export const THEME_SHADOWS = {
 } as const;
 export const THEME_BUTTON_RADII = { rounded: "10px", pill: "999px", square: "2px" } as const;
 
+/** Alt text for the event logo or banner: plain text, trimmed, 1 to 150 characters. */
+export const THEME_ALT_MAX = 150;
+const altText = z.string().trim().min(1, "Describe the image in a few words.").max(THEME_ALT_MAX, `Keep the description to ${THEME_ALT_MAX} characters or fewer.`);
+
+/** Where a wide banner is cropped when a narrow screen shows less of it. */
+export const THEME_HERO_FOCUS = ["top", "center", "bottom"] as const;
+export type ThemeHeroFocus = (typeof THEME_HERO_FOCUS)[number];
+export const THEME_HERO_FOCUS_POSITIONS: Record<ThemeHeroFocus, string> = { top: "center top", center: "center center", bottom: "center bottom" };
+
 export const registrationThemeTokensSchema = z
   .object({
     primary: colorToken,
@@ -60,6 +69,13 @@ export const registrationThemeTokensSchema = z
     cardRadius: z.enum(["square", "soft", "round"]),
     shadow: z.enum(["none", "subtle", "raised"]),
     buttonShape: z.enum(["rounded", "pill", "square"]),
+    // Logo and banner descriptions and the banner's crop point (#283). All optional so versions stored before they existed
+    // stay valid. The images themselves are columns on the version (foreign keys to the event's uploads), not tokens.
+    // There is deliberately no overlay token: the banner is shown as its own image strip, never behind text, so there is no
+    // text-on-image contrast to manage.
+    logoAlt: altText.optional(),
+    heroAlt: altText.optional(),
+    heroFocus: z.enum(THEME_HERO_FOCUS).optional(),
   })
   .strict();
 
@@ -92,8 +108,14 @@ export function normalizeThemeTokens(tokens: RegistrationThemeTokens): Registrat
   return next;
 }
 
+const THEME_STYLE_KEYS = (Object.keys(PLATFORM_DEFAULT_THEME) as (keyof RegistrationThemeTokens)[]).filter(
+  (key) => key !== "logoAlt" && key !== "heroAlt" && key !== "heroFocus",
+);
+
 export function isPlatformDefaultTheme(tokens: RegistrationThemeTokens) {
   const a = normalizeThemeTokens(tokens);
   const b = PLATFORM_DEFAULT_THEME;
-  return (Object.keys(b) as (keyof RegistrationThemeTokens)[]).every((key) => a[key] === b[key]);
+  // Only the colors, fonts and layout choices decide this. The image descriptions and banner focus are not styling (the
+  // images arrive through the branding context), so they never turn an otherwise-default look into a restyled one.
+  return THEME_STYLE_KEYS.every((key) => a[key] === b[key]);
 }

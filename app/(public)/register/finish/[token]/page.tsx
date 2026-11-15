@@ -12,8 +12,9 @@ import { securityCheckConfigForPage } from "@/modules/security/security-check-co
 import { getFormsHelpContact } from "@/modules/system-admin/platform-settings";
 import { clubEventEntryRedirect } from "@/modules/general-link-registrations/repository";
 import { RegistrationThemeScope } from "@/components/registration-theme-scope";
+import { publicRegistrationBrandingImages } from "@/components/registration-branding-urls";
 import { getPublishedThemeRowBySlug } from "@/modules/registration-themes/repository";
-import { registrationThemeStyle, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
+import { registrationThemeStyle, resolveRegistrationBranding, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
 import { prefillFromStaffDraft, resolveStaffDraftLink } from "@/modules/staff-registration-drafts/repository";
 
 export const dynamic = "force-dynamic";
@@ -70,9 +71,11 @@ export default async function FinishStaffRegistrationPage({ params }: { params: 
   // The sanitizer keeps plain strings, booleans, string lists and string maps only, which is what the form's answers hold.
   const initialResponses = prefillFromStaffDraft(experience.form.definition, link.responses) as FormResponses;
   const editableCards = await listPublishedRegistrationInfoCards(link.eventSlug);
-  const themeStyle = registrationThemeStyle(resolveRegistrationTheme(await getPublishedThemeRowBySlug(link.eventSlug)));
+  const themeRow = await getPublishedThemeRowBySlug(link.eventSlug);
+  const themeStyle = registrationThemeStyle(resolveRegistrationTheme(themeRow));
+  const themeImages = publicRegistrationBrandingImages(resolveRegistrationBranding(themeRow), link.eventSlug);
   return (
-    <RegistrationThemeScope style={themeStyle}>
+    <RegistrationThemeScope style={themeStyle} images={themeImages}>
     <PublicRegistrationForm
       formsHelpContact={await getFormsHelpContact()}
       event={{

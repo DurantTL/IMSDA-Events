@@ -1760,12 +1760,20 @@ model RegistrationThemeVersion {
   publishedAt       DateTime?
   publishedByUserId String?
   archivedAt        DateTime?
+  /// The event logo and banner (#283): uploads of the same event, checked by `modules/registration-themes/assets.ts`. A
+  /// published version's ids can only be cleared (file deleted), never swapped (trigger). Alt text and banner focus are tokens.
+  logoAssetId       String?
+  heroAssetId       String?
 
   event       Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  logoAsset   EventAsset? @relation("RegistrationThemeLogoAsset", fields: [logoAssetId], references: [id], onDelete: SetNull)
+  heroAsset   EventAsset? @relation("RegistrationThemeHeroAsset", fields: [heroAssetId], references: [id], onDelete: SetNull)
   createdBy   User? @relation("RegistrationThemeVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   publishedBy User? @relation("RegistrationThemeVersionPublishedBy", fields: [publishedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([eventId, versionNumber])
+  @@index([logoAssetId])
+  @@index([heroAssetId])
 }
 
 /// An uploaded image a block's `data` points at (#816), derived from `data` on
@@ -1830,6 +1838,8 @@ model EventAsset {
   blockRefs  EventContentSectionAsset[]
   merchandiseArtworkProducts MerchandiseProduct[] @relation("MerchandiseProductArtwork")
   badgeBackgroundEvents      Event[]              @relation("EventBadgeBackground")
+  themeLogoVersions          RegistrationThemeVersion[] @relation("RegistrationThemeLogoAsset")
+  themeHeroVersions          RegistrationThemeVersion[] @relation("RegistrationThemeHeroAsset")
 
   @@index([eventId, createdAt])
   @@index([libraryImageId])

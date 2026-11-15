@@ -1,0 +1,60 @@
+/* The event logo and banner on a registration page (#283). The banner is its own strip above the hero, never behind text. */
+.banner {
+  position: relative;
+  max-width: var(--reg-theme-max-width, 1180px);
+  aspect-ratio: 4 / 1;
+  max-height: 280px;
+  overflow: hidden;
+  margin: 28px auto 0;
+  border-radius: var(--radius-theme-card, 26px);
+  background: var(--paper);
+}
+
+.bannerImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.logoTile {
+  display: inline-flex;
+  max-width: 100%;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 14px;
+  border-radius: var(--radius-element);
+  background: var(--logo-tile-background, white);
+  padding: 8px 12px;
+}
+
+.logoImage {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 56px;
+  object-fit: contain;
+}
+
+/* The smaller strip inside the form builder's preview pane. */
+.banner.compact {
+  aspect-ratio: 3 / 1;
+  max-height: 120px;
+  margin: 0 0 10px;
+  border-radius: var(--radius-element);
+}
+
+@media (max-width: 1228px) {
+  .banner:not(.compact) { margin-right: 24px; margin-left: 24px; }
+}
+
+@media (max-width: 700px) {
+  .banner:not(.compact) {
+    aspect-ratio: 3 / 1;
+    max-height: 160px;
+    margin: 15px 12px 0;
+    border-radius: var(--radius-theme-card, 20px);
+  }
+}

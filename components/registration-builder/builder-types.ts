@@ -134,6 +134,8 @@ export type BuilderWorkspaceProps = {
   initialForms: FormView[];
   /** The event's published registration look (#283) as CSS custom properties, so the preview matches the public form. Presentation only; undefined for the platform look. */
   registrationThemeStyle?: import("react").CSSProperties;
+  /** The published look's logo and banner (staff URLs), shown at the top of the preview (#283). */
+  registrationThemeImages?: import("@/components/registration-branding").RegistrationBrandingImages;
   /** The event's Meals ticket plan prices in cents, keyed "LUNCH:ADULT" (#1139). A meal ticket field with a price here shows it read-only. */
   mealPlanPrices?: Record<string, number>;
   templates: TemplateView[];

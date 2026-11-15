@@ -217,3 +217,123 @@
     grid-template-columns: minmax(0, 1fr) 44px 7.5rem;
   }
 }
+
+/* Logo and banner pickers and their sample (#283). */
+.picker {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.picker legend {
+  padding: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.pickerList {
+  display: grid;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-container);
+}
+
+.imageOption {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 10px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  cursor: pointer;
+}
+
+.imageOption:last-child {
+  border-bottom: 0;
+}
+
+.imageOption input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
+.imageOption span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.imageMeta {
+  color: var(--muted);
+}
+
+.thumb {
+  flex: none;
+  width: 48px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  object-fit: contain;
+}
+
+.thumbWide {
+  flex: none;
+  width: 96px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  object-fit: cover;
+}
+
+.altField {
+  display: grid;
+  gap: 4px;
+}
+
+.altField > label {
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.altField input,
+.altField select {
+  min-height: 44px;
+}
+
+.sampleBanner {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 1;
+  max-height: 140px;
+  border-radius: var(--radius-theme-card);
+  object-fit: cover;
+}
+
+.sampleLogoTile {
+  display: inline-flex;
+  max-width: 100%;
+  box-sizing: border-box;
+  border-radius: var(--radius-element);
+  background: var(--logo-tile-background, white);
+  padding: 8px 12px;
+}
+
+.sampleLogo {
+  display: block;
+  max-width: 100%;
+  max-height: 48px;
+  object-fit: contain;
+}
+
+.versionImages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
