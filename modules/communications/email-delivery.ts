@@ -707,6 +707,16 @@ function announcementIdOf(metadata: unknown) {
   return typeof value === "string" && value ? value : null;
 }
 
+/**
+ * A request for missing information (#182) is stamped by the server when it is queued from the approval. It is about the
+ * person's own registration, so announcement opt-outs do not apply and it carries no unsubscribe link (opting out would
+ * not stop it). Address suppression (bounces and complaints) still applies. Only the server writes this metadata.
+ */
+function isRegistrationRequestMessage(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return false;
+  return (metadata as Record<string, unknown>).registrationRequest === true;
+}
+
 type AnnouncementPolicy = {
   lookupOptOut: ((email: string, eventId: string) => Promise<AnnouncementOptOutScope | null>) | null;
   isEssential: ((announcementId: string, eventId: string) => Promise<boolean>) | null;
@@ -738,6 +748,7 @@ async function suppressIfAnnouncementOptedOut(
   policy: AnnouncementPolicy,
   at: Date,
 ): Promise<OptOutCheckResult> {
+  if (isRegistrationRequestMessage(message.metadata)) return false;
   // A deadline reminder has no event (#910): only an opt-out of ALL announcements can apply, which an event id no
   // row carries ("") cannot match as an EVENT one. Deadlines are essential (#915), so the switch is off and a
   // reminder skips this check; provider suppression is checked elsewhere. Announcements need their event as before.
@@ -848,6 +859,7 @@ async function suppressIfAddressSuppressed(
  * production a base URL that is not https omits the headers (and warns) rather than sending a link that cannot work.
  */
 async function announcementUnsubscribeLinks(message: ClaimedMessage, policy: AnnouncementPolicy) {
+  if (isRegistrationRequestMessage(message.metadata)) return null;
   if (!isOptOutEligibleTemplate(message.templateKey) || !message.eventId || !message.recipientEmail.trim()) return null;
   // Any failure here is transient and says nothing a person could act on: a typed, retryable error with a generic
   // message, so no raw error text is stored on the message.

@@ -165,7 +165,7 @@ export const BULK_ACTION_CATALOG: Record<BulkActionKey, BulkActionCatalogEntry> 
     label: "Request missing information",
     permissions: ["MANAGE_COMMUNICATIONS"],
     maxRecords: MESSAGE_ACTION_MAX_RECORDS,
-    effect: "Nothing is sent now. The message waits for approval under Messages waiting for approval. It goes out only when someone with communications access approves it after a fresh review. It is sent as an event announcement with each person's private registration link, so people who opted out of announcements are skipped.",
+    effect: "Nothing is sent now. The message waits for approval under Messages waiting for approval. It goes out only when someone with communications access approves it after a fresh review. It is sent as an event announcement with each person's private registration link, as a request about their own registration: it goes to everyone on the list, including people who turned off announcements, except addresses that cannot receive email. It has no unsubscribe link.",
     createsFile: false,
   },
 };
@@ -204,6 +204,14 @@ export function messageTemplateKey(params: BulkActionParams): SelectedAudienceTe
   if (params.action === "QUEUE_MESSAGE") return params.templateKey;
   if (params.action === "REQUEST_INFORMATION") return "EVENT_ANNOUNCEMENT";
   return null;
+}
+
+/**
+ * A request for missing information is about the person's own registration, so announcement opt-outs do not apply (#182).
+ * Decided by the server from the stored action, never from a request body.
+ */
+export function isRegistrationRequestAction(action: string) {
+  return action === "REQUEST_INFORMATION";
 }
 
 export function isTagAction(key: BulkActionKey) {

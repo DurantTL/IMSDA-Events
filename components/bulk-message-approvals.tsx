@@ -203,6 +203,7 @@ export function BulkMessageApprovals({ eventId, pending, decided }: Props) {
               {review.sampleCodes.length > 0 && <div className={styles.fact}><dt>Some who would receive it</dt><dd>{review.sampleCodes.join(", ")}{review.includedCount > review.sampleCodes.length ? ", …" : ""}</dd></div>}
               <div className={styles.fact}><dt>Delivery</dt><dd>{DELIVERY_WORDS[review.deliveryMode]}</dd></div>
             </dl>
+            {review.registrationRequest && <p className={styles.sub}>This request goes to everyone on the list, including people who turned off announcements, except addresses that can&apos;t receive email. It has no unsubscribe link.</p>}
             {!review.templatePublished && <p className={`${styles.notice} ${styles.warn}`}>The {review.templateLabel} template is not published, so this cannot be sent.</p>}
             {review.attachmentProblem && <p className={`${styles.notice} ${styles.warn}`}>{review.attachmentProblem}</p>}
             {review.includedCount === 0 && <p className={`${styles.notice} ${styles.warn}`}>None of these registrations can receive it now.</p>}

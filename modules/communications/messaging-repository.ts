@@ -3813,6 +3813,12 @@ export async function enqueuePublicRegistrationMessages(
   };
 }
 
+/** Server-set only (never read from a request body). */
+export type SelectedAudienceOptions = {
+  /** A request for missing information (#182): sent regardless of announcement opt-outs, with no unsubscribe link. */
+  registrationRequest?: boolean;
+};
+
 /**
  * Loads one staff-chosen audience and prices it exactly as the send will.
  *
@@ -3827,6 +3833,7 @@ async function loadSelectedAudienceState(
   registrationIds: readonly string[],
   client: MessagingDatabaseClient,
   now = new Date(),
+  options: SelectedAudienceOptions = {},
 ) {
   const uniqueIds = [...new Set(registrationIds)];
   const sourceKeys: PrismaMessageTemplateKey[] = templateKey === "REGISTRATION_CONFIRMATION"
@@ -3949,13 +3956,14 @@ async function loadSelectedAudienceState(
   }
 
   // Announcements honour opt-outs (#838): read here so the review and the send count the same people.
-  const optOuts = templateKey === "EVENT_ANNOUNCEMENT"
+  const optOuts = templateKey === "EVENT_ANNOUNCEMENT" && !options.registrationRequest
     ? await loadAnnouncementOptOuts(client, candidates.map((candidate) => candidate.recipientEmail), eventId)
     : [];
   const preview = computeSelectedAudiencePreview(uniqueIds, candidates, {
     eventId,
     templateKey,
     optOuts,
+    registrationRequest: options.registrationRequest === true && templateKey === "EVENT_ANNOUNCEMENT",
     isDeferredOrganizationBilling:
       event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
     deliveryMode: settings.deliveryMode,
@@ -3984,6 +3992,7 @@ export async function getSelectedAudiencePreview(
   eventId: string,
   templateKey: SelectedAudienceTemplateKey,
   registrationIds: readonly string[],
+  options: SelectedAudienceOptions = {},
 ): Promise<SelectedAudiencePreview> {
   await ensureEventMessagingDefaults(eventId);
   return (await loadSelectedAudienceState(
@@ -3991,6 +4000,8 @@ export async function getSelectedAudiencePreview(
     templateKey,
     registrationIds,
     getPrisma(),
+    new Date(),
+    options,
   )).preview;
 }
 
@@ -4021,6 +4032,7 @@ export async function enqueueSelectedAudienceBatch(
   eventId: string,
   input: SelectedAudienceBatchInput,
   actorUserId: string,
+  options: SelectedAudienceOptions = {},
 ): Promise<SelectedAudienceBatchOperation> {
   await ensureEventMessagingDefaults(eventId);
   const prisma = getPrisma();
@@ -4093,6 +4105,8 @@ export async function enqueueSelectedAudienceBatch(
           input.templateKey,
           input.registrationIds,
           tx,
+          new Date(),
+          options,
         );
         if (!state.preview.templatePublished) {
           throw new MessagingError(
@@ -4181,6 +4195,7 @@ export async function enqueueSelectedAudienceBatch(
               previewFingerprint: input.previewFingerprint,
               selectedTemplateKey: input.templateKey,
               resolvedTemplateKey: recipient.resolvedTemplateKey,
+              ...(state.preview.registrationRequest ? { registrationRequest: true } : {}),
             },
           });
           messageIds.push(...queued.messageIds);
@@ -4206,6 +4221,7 @@ export async function enqueueSelectedAudienceBatch(
               skippedCount: state.preview.skippedCount,
               deliveryMode: state.settings.deliveryMode,
               realDelivery: false,
+              ...(state.preview.registrationRequest ? { sentAs: "REGISTRATION_REQUEST" } : {}),
             },
           }],
           skipDuplicates: true,

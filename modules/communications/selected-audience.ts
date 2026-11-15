@@ -139,6 +139,8 @@ export type SelectedAudienceSkip = {
 
 export type SelectedAudiencePreview = {
   fingerprint: string;
+  /** True when this send is a request for missing information: announcement opt-outs were not applied (#182). */
+  registrationRequest?: boolean;
   generatedAt: string;
   templateKey: SelectedAudienceTemplateKey;
   selectedCount: number;
@@ -192,6 +194,12 @@ export type SelectedAudiencePreviewContext = {
    * contact is always skipped here.
    */
   optOuts?: readonly AnnouncementOptOutRow[];
+  /**
+   * Set only by the server, from the stored approval action, for a request for missing information (#182): it is about
+   * the person's own registration, so announcement opt-outs do not apply. It never comes from a request body. Addresses
+   * that cannot receive email are still skipped.
+   */
+  registrationRequest?: boolean;
   /** Published sources for the four current-state confirmation variants. */
   confirmationTemplates?: Partial<Record<
     SelectedAudienceConfirmationTemplateKey,
@@ -293,7 +301,7 @@ export function computeSelectedAudiencePreview(
       skip(registrationId, candidate, "INVALID_CONTACT_EMAIL");
       continue;
     }
-    const optedOut = isOptOutEligibleTemplate(context.templateKey)
+    const optedOut = isOptOutEligibleTemplate(context.templateKey) && !context.registrationRequest
       ? announcementOptOutFor(context.optOuts ?? [], recipientEmail, context.eventId)
       : null;
     if (optedOut) {
@@ -320,6 +328,7 @@ export function computeSelectedAudiencePreview(
     version: 1,
     eventId: context.eventId,
     templateKey: context.templateKey,
+    ...(context.registrationRequest ? { registrationRequest: true } : {}),
     deliveryMode: context.deliveryMode,
     senderName: context.senderName,
     senderEmail: context.senderEmail,
@@ -370,5 +379,6 @@ export function computeSelectedAudiencePreview(
       && filesNeedBackgroundMailer([...attachments, { sizeBytes: context.pictureBytes ?? 0 }]),
     recipients,
     skipped,
+    ...(context.registrationRequest ? { registrationRequest: true } : {}),
   };
 }
