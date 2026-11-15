@@ -1145,7 +1145,7 @@ export function PeopleWorkspace({
                   </div>
                 </section>
                 <RegistrationCommunicationsPanel
-                  key={selected.id}
+                  key={`communications-${selected.id}`}
                   eventId={eventId}
                   registrationId={selected.id}
                   timeZone={eventTimezone}
@@ -1154,7 +1154,7 @@ export function PeopleWorkspace({
                   resendingMessageId={resendingMessageId}
                   onResend={resendConfirmationEmail}
                 />
-                {selected.publicSubmission && <RegistrationSignaturesPanel key={selected.id} eventId={eventId} registrationId={selected.id} timeZone={eventTimezone} attendeeNames={Object.fromEntries(selected.attendees.map((attendee) => [attendee.id, `${attendee.firstName} ${attendee.lastName}`.trim()]))} />}
+                {selected.publicSubmission && <RegistrationSignaturesPanel key={`signatures-${selected.id}`} eventId={eventId} registrationId={selected.id} timeZone={eventTimezone} attendeeNames={Object.fromEntries(selected.attendees.map((attendee) => [attendee.id, `${attendee.firstName} ${attendee.lastName}`.trim()]))} />}
                 <RegistrationNotesTagsPanel eventId={eventId} subjectPath={`registrations/${selected.id}`} canManage={canEdit} />
                 {selected.publicSubmission && <p className="quiet-copy">This registration came through a published form. Submitted attendees, choices, and pricing stay together as one auditable snapshot.</p>}
                 {addingAttendee && <form className="form-stack inset-form" onChange={edits.track("addAttendee", { ignore: ["phone"] })} onSubmit={addAttendee} ref={edits.gone("addAttendee", "addAttendee:phone")}><div className="form-grid two-column"><label>First name<input name="firstName" required /></label><label>Last name<input name="lastName" required /></label></div><div className="form-grid two-column"><label>Email<input name="email" type="email" /></label><label>Phone<PhoneInput label="Phone" name="phone" onValueChange={(value) => edits.mark("addAttendee:phone", value.trim() !== "")} showNow={phoneAttempt === "add"} /></label></div><label>Attendee type<select name="attendeeType" defaultValue="ATTENDEE"><option value="ATTENDEE">Attendee</option><option value="WORKER">Event worker</option><option value="CHILD">Child</option></select></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => { setAddingAttendee(false); setPhoneAttempt(null); setError(""); }}>Cancel</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Adding…" : "Add attendee"}</button></div></form>}

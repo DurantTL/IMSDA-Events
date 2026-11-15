@@ -16,7 +16,7 @@ import { paginate, parsePageParam } from "@/lib/pagination";
 import { isClubAudienceEvent } from "@/modules/events/repository";
 import { listRegistrations } from "@/modules/registrations/repository";
 import {
-  DEFAULT_LISTING_STATUSES,
+  defaultListingStatuses,
   DEFAULT_LISTING_VIEW,
   LISTING_COLUMNS,
   LISTING_STATUSES,
@@ -48,10 +48,13 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
   if (!permissions.includes("VIEW_SENSITIVE_DATA")) {
     return <AccessRestricted title="The attendee list is restricted" detail="Your event role does not include access to attendee names, meal and dietary answers, or contact details." whoToAsk="your event administrator" />;
   }
-  const query = parseAttendeeListingQuery(params);
+  const clubEvent = await isClubAudienceEvent(event.id);
+  // Club registrations stay Submitted (billed to the church), so a club event starts with Submitted too (#2017).
+  const defaultStatuses = defaultListingStatuses(clubEvent);
+  const query = parseAttendeeListingQuery(params, defaultStatuses);
   const registrations = await listRegistrations(event.id, { statuses: query.statuses });
   // Free-text dietary answers are health-type: the same function gates the CSV.
-  const showDietaryDetails = canViewDietaryDetails({ permissions, clubEvent: await isClubAudienceEvent(event.id) });
+  const showDietaryDetails = canViewDietaryDetails({ permissions, clubEvent });
   const rows = filterAttendeeListing(buildAttendeeListingRows(registrations, { showDietaryDetails }), query);
   const totals = mealTotals(rows);
   // Paged after the filter and the sort, so a page is a slice of the whole sorted list, never the other way round (#1458).
@@ -62,17 +65,17 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
   const canExport = permissions.includes("VIEW_REPORTS");
 
   // Anything narrowing the list beyond its defaults (view and sort only change columns and order).
-  const filtersSet = attendeeFiltersSet(query);
+  const filtersSet = attendeeFiltersSet(query, defaultStatuses);
   const clearHref = `/people/attendees?event=${encodeURIComponent(event.id)}`;
 
   const href = (next: Partial<AttendeeListingQuery>) => {
-    const urlParams = attendeeListingParams({ ...query, ...next });
+    const urlParams = attendeeListingParams({ ...query, ...next }, defaultStatuses);
     urlParams.set("event", event.id);
     return `/people/attendees?${urlParams.toString()}`;
   };
   const pageHref = (page: number) => `${href({})}${page > 1 ? `&page=${page}` : ""}`;
   // The CSV always has every permitted column, so the view is not passed on.
-  const exportParams = attendeeListingParams({ ...query, view: DEFAULT_LISTING_VIEW }).toString();
+  const exportParams = attendeeListingParams({ ...query, view: DEFAULT_LISTING_VIEW }, defaultStatuses).toString();
   const exportHref = `/api/events/${encodeURIComponent(event.id)}/exports/attendees${exportParams ? `?${exportParams}` : ""}`;
 
   return (
@@ -129,7 +132,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         <fieldset className="filter-group">
           <legend>Registration status</legend>
           {LISTING_STATUSES.map((status) => (
-            <label className="checkbox-label" key={status}><input type="checkbox" name="statuses" value={status} data-default-checked={DEFAULT_LISTING_STATUSES.includes(status) ? "" : undefined} defaultChecked={query.statuses.includes(status)} /> {registrationStatusWordOrRaw(status)}</label>
+            <label className="checkbox-label" key={status}><input type="checkbox" name="statuses" value={status} data-default-checked={defaultStatuses.includes(status) ? "" : undefined} defaultChecked={query.statuses.includes(status)} /> {registrationStatusWordOrRaw(status)}</label>
           ))}
         </fieldset>
         <div className="filter-bar-actions">

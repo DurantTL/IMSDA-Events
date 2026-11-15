@@ -18,11 +18,11 @@ import AttendeeListingPage from "@/app/(workspace)/people/attendees/page";
 
 const definition = formTemplates.find((template) => template.key === "womens_retreat_export")!.definition;
 
-function registration(id: string) {
+function registration(id: string, status = "CONFIRMED") {
   return {
     id,
     confirmationCode: `WR26-${id}`,
-    status: "CONFIRMED",
+    status,
     accountHolder: { id: `p-${id}`, firstName: "Holder", lastName: id, email: "", phone: "" },
     attendees: [{ id: `at-${id}`, firstName: "Guest", lastName: id, email: "", phone: "", attendeeType: "Adult", responses: { meal_preference: "Vegan", dietary_needs: "synthetic: no peanuts" } }],
     publicSubmission: { definition, responses: {}, attendeeResponses: [] },
@@ -54,6 +54,27 @@ describe("attendee listing page", () => {
     expect(html).toContain("synthetic: no peanuts");
     expect(html).toContain("Download CSV (all columns)");
     expect(html).not.toContain("Dietary details are limited");
+  });
+
+  it("shows submitted club registrations by default on a club event, and only confirmed ones elsewhere (#2017)", async () => {
+    dependencies.resolveEventContext.mockResolvedValue(context(["VIEW_REPORTS", "VIEW_SENSITIVE_DATA"]));
+    dependencies.listRegistrations.mockResolvedValue([registration("C1", "SUBMITTED")]);
+    const general = await render();
+    expect(general).toContain("No attendees yet");
+    expect(dependencies.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED"] });
+
+    dependencies.isClubAudienceEvent.mockResolvedValue(true);
+    const club = await render();
+    expect(dependencies.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
+    expect(club).toContain("WR26-C1");
+    expect(club).not.toContain("No attendees yet");
+    // The default is not a filter: no "Clear filters", and both boxes reset to ticked.
+    expect(club).not.toContain("Clear filters");
+    const submittedBox = club.match(/<input[^>]*value="SUBMITTED"[^>]*>/)?.[0] ?? "";
+    expect(submittedBox).toContain('data-default-checked=""');
+    expect(submittedBox).toMatch(/\schecked=""/);
+    // The CSV link carries no statuses, so the download uses the same club default.
+    expect(club).toMatch(/href="\/api\/events\/evt\/exports\/attendees"/);
   });
 
   it("pages the sorted list on the server: the sort covers every attendee, and a header link drops the page (#1458)", async () => {

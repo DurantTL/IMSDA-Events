@@ -79,6 +79,16 @@ describe("attendees export route", () => {
     expect(text).not.toContain("WR26-X3");
   });
 
+  it("includes submitted registrations by default on a club event, where they are billed to the church (#2017)", async () => {
+    dependencies.isClubAudienceEvent.mockResolvedValue(true);
+    dependencies.listRegistrations.mockResolvedValue([registration("C1", "Standard", "SUBMITTED"), registration("C2", "Vegan"), registration("C3", "Vegan", "CANCELLED")]);
+    const lines = (await rawBody(await call())).text.trim().split("\r\n");
+    expect(dependencies.listRegistrations).toHaveBeenCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
+    expect(lines).toHaveLength(3);
+    expect(lines.join("\n")).toContain("WR26-C1");
+    expect(lines.join("\n")).not.toContain("WR26-C3");
+  });
+
   it("honours the active filters", async () => {
     const response = await call("?meal=vegan&statuses=CONFIRMED,CANCELLED");
     const lines = (await rawBody(response)).text.trim().split("\r\n");

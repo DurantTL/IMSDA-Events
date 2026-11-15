@@ -4,10 +4,12 @@ import { formTemplates } from "@/modules/forms/definition";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import {
   ATTENDEE_LISTING_BOM,
+  attendeeFiltersSet,
   attendeeListingCsv,
   attendeeListingParams,
   buildAttendeeListingRows,
   canViewDietaryDetails,
+  defaultListingStatuses,
   hasDietaryNeeds,
   resolveListingFields,
   filterAttendeeListing,
@@ -404,5 +406,22 @@ describe("food allergy and diet answers on Leadership Weekend and TLT Retreat (#
   it("a form with a meal_preference question keeps reading it", () => {
     const [row] = build([registration("M1", "CONFIRMED", [attendee("m1", "G", "Synthetic", { meal_preference: "Vegan", dietary_needs: "Peanut allergy" })], {}, templateDefinition("womens_retreat_export"))]);
     expect(row.mealCategory).toBe("vegan");
+  });
+});
+
+describe("club event default statuses (#2017)", () => {
+  it("starts a club event with Submitted and Confirmed, and every other event with Confirmed only", () => {
+    expect(defaultListingStatuses(false)).toEqual(["CONFIRMED"]);
+    expect(defaultListingStatuses(true)).toEqual(["CONFIRMED", "SUBMITTED"]);
+    const club = parseAttendeeListingQuery(new URLSearchParams(), defaultListingStatuses(true));
+    expect(club.statuses).toEqual(["CONFIRMED", "SUBMITTED"]);
+    expect(parseAttendeeListingQuery(new URLSearchParams("statuses=nonsense"), defaultListingStatuses(true)).statuses).toEqual(["CONFIRMED", "SUBMITTED"]);
+    // The default is not a filter, and links leave it out.
+    expect(attendeeFiltersSet(club, defaultListingStatuses(true))).toBe(false);
+    expect(attendeeListingParams(club, defaultListingStatuses(true)).has("statuses")).toBe(false);
+    // Narrowing a club event to Confirmed is a filter, and links keep it.
+    const confirmedOnly = parseAttendeeListingQuery(new URLSearchParams("statuses=CONFIRMED"), defaultListingStatuses(true));
+    expect(attendeeFiltersSet(confirmedOnly, defaultListingStatuses(true))).toBe(true);
+    expect(attendeeListingParams(confirmedOnly, defaultListingStatuses(true)).get("statuses")).toBe("CONFIRMED");
   });
 });
