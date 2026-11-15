@@ -12,6 +12,11 @@
  *   2. Restored data: opens one sealed authenticator secret from the scratch
  *      database. That proves the backup key is the key the data was sealed with.
  *
+ * This checks the SIGN-IN key only (#1652). It reads an authenticator secret,
+ * which the sign-in key seals, and ignores personal-data values (`d1.` values,
+ * sealed with the separate data key). The data key's backup is tested by
+ * unwrapping it from the key vault; see docs/DATA-KEY-AZURE-KEY-VAULT.md.
+ *
  * It needs only the key (SECRET_ENCRYPTION_KEY_FILE or SECRET_ENCRYPTION_KEY)
  * and, unless --canary-only, DATABASE_URL. It does not load the full server
  * environment, so it runs without the other production secrets. It prints

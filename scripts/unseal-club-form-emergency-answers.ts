@@ -29,6 +29,8 @@ async function main() {
     console.error("--execute needs --actor <email>: the user account that runs this, recorded in the audit log.");
     process.exit(1);
   }
+  // Opening sealed answers needs the personal-data key (#1652); load it first.
+  await (await import("../lib/data-key/keyring")).ensureDataKeyLoaded();
   const { getPrisma } = await import("../lib/prisma");
   const { unsealEmergencyAnswers } = await import("../modules/club-forms/unseal-emergency");
   const prisma = getPrisma();

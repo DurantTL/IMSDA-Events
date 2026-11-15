@@ -166,6 +166,7 @@
     "admin:reset-mfa": "tsx scripts/reset-mfa.ts",
     "key:check": "tsx --require ./scripts/support/allow-server-only.cjs scripts/key-check.ts",
     "key:rotate": "tsx --require ./scripts/support/allow-server-only.cjs scripts/key-rotate.ts",
+    "data-key:wrap": "tsx scripts/data-key-wrap.ts",
     "key:restore-check": "tsx --require ./scripts/support/allow-server-only.cjs scripts/backup/verify-key-restore.ts",
     "registrations:cleanup": "tsx scripts/cleanup-imported-duplicates.ts",
     "event:readiness": "tsx --require ./scripts/support/allow-server-only.cjs scripts/event-readiness.ts",
