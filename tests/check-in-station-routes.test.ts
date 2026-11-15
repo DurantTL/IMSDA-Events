@@ -234,6 +234,15 @@ describe("check-in station API: scope and results (#892)", () => {
     const response = await lookupPost(post("/api/check-in-station/lookup", { kind: "confirmation", value: "CM27-ONE" }));
     expect(response.status).toBe(409);
   });
+
+  it("answers 409 with the desk-review message for a cancelled or inactive registration", async () => {
+    for (const code of ["REGISTRATION_CANCELLED", "REGISTRATION_INACTIVE"]) {
+      mocks.lookupStationFamily.mockRejectedValue(new mocks.MockServiceError(code));
+      const response = await lookupPost(post("/api/check-in-station/lookup", { kind: "confirmation", value: "CM27-ONE" }));
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ error: code });
+    }
+  });
 });
 
 describe("check-in station API: payments (#892)", () => {

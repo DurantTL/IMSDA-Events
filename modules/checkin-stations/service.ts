@@ -46,6 +46,8 @@ export class StationServiceError extends Error {
       | "NOT_FOUND"
       | "PASS_EXPIRED"
       | "SEND_TO_DESK"
+      | "REGISTRATION_CANCELLED"
+      | "REGISTRATION_INACTIVE"
       | "BILLED_TO_GROUP"
       | "NOTHING_DUE"
       | "BALANCE_REASON_REQUIRED"
@@ -62,7 +64,11 @@ export class StationServiceError extends Error {
           ? "This pass has expired. Enter the confirmation code instead."
           : code === "SEND_TO_DESK"
             ? "Send this person to the check-in desk."
-            : code === "BILLED_TO_GROUP"
+            : code === "REGISTRATION_CANCELLED"
+              ? "Needs desk review: this registration was cancelled. Send them to the check-in desk."
+              : code === "REGISTRATION_INACTIVE"
+                ? "Needs desk review: this registration is not active. Send them to the check-in desk."
+                : code === "BILLED_TO_GROUP"
               ? "This registration is billed to the church or group, so nothing is collected here."
               : code === "BALANCE_REASON_REQUIRED"
                 ? "This registration still has a balance due. Pick a reason before checking anyone in."
@@ -265,7 +271,11 @@ export async function lookupStationFamily(
         error.code === "PASS_EXPIRED"
           ? "PASS_EXPIRED"
           : error.code === "REGISTRATION_NOT_ELIGIBLE"
-            ? "SEND_TO_DESK"
+            ? error.registrationStatus === "CANCELLED"
+              ? "REGISTRATION_CANCELLED"
+              : error.registrationStatus
+                ? "REGISTRATION_INACTIVE"
+                : "SEND_TO_DESK"
             : "NOT_FOUND",
       );
     }
