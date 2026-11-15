@@ -987,8 +987,8 @@ model User {
   authoredStaffNotes             StaffNote[]                      @relation("StaffNoteAuthor")
   audienceSnapshots              EventAudienceSnapshot[]          @relation("EventAudienceSnapshotCreatedBy")
   bulkActionRuns                 BulkActionRun[]                  @relation("BulkActionRunActor")
-  bulkMessagesQueued                BulkMessageApproval[]            @relation("BulkMessageApprovalQueuedBy")
-  bulkMessagesDecided               BulkMessageApproval[]            @relation("BulkMessageApprovalDecidedBy")
+  bulkMessagesQueued             BulkMessageApproval[]            @relation("BulkMessageApprovalQueuedBy")
+  bulkMessagesDecided            BulkMessageApproval[]            @relation("BulkMessageApprovalDecidedBy")
   scheduledEmailsCreated         ScheduledEmailBatch[]            @relation("ScheduledEmailCreatedBy")
   scheduledEmailsActivated       ScheduledEmailBatch[]            @relation("ScheduledEmailActivatedBy")
   authoredStaffNoteRevisions     StaffNoteRevision[]              @relation("StaffNoteRevisionAuthor")
@@ -2849,9 +2849,9 @@ model BulkActionRun {
   obsoleteCount  Int                 @default(0)
   exportRowCount Int?
 
-  event    Event                      @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  actor    User                       @relation("BulkActionRunActor", fields: [actorUserId], references: [id], onDelete: Restrict)
-  outcomes BulkActionRecordOutcome[]
+  event           Event                     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  actor           User                      @relation("BulkActionRunActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  outcomes        BulkActionRecordOutcome[]
   messageApproval BulkMessageApproval?
 
   @@unique([eventId, idempotencyKey])

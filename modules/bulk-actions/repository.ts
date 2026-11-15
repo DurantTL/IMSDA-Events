@@ -83,6 +83,8 @@ type ActionHandler = {
   /** Candidates the action would skip right now, shown in the preview. */
   skipsFor(eventId: string, params: BulkActionParams, ids: readonly string[]): Promise<PreviewSkip[]>;
   /** Apply to records that passed the apply-time checks. One record failing never stops the rest. */
+  /** Called when the run could not record its outcomes after `apply` ran: undo anything `apply` left that could act later. */
+  cleanup?(input: { eventId: string; runId: string }): Promise<void>;
   apply(input: { eventId: string; actorUserId: string; runId: string; params: BulkActionParams; ids: readonly string[]; /** Each record's outcome is pushed here as it is reached, so a throw part-way keeps what was done. */ sink: OutcomeSink }): Promise<{ file?: ExportFile; exportRowCount?: number }>;
 };
 
@@ -265,7 +267,7 @@ const messageHandler: ActionHandler = {
     if (!templateKey) throw new BulkActionError("INVALID_REQUEST", "Choose which message to queue.");
     // The same readiness the selected-registration send checks, read without any recipients.
     const state = await getSelectedAudiencePreview(viewer.eventId, templateKey, []);
-    if (!state.templatePublished) throw new BulkActionError("INVALID_REQUEST", "The Custom message template has not been published for this event. Write and publish it in Communications, then preview again.", 409);
+    if (!state.templatePublished) throw new BulkActionError("INVALID_REQUEST", `The ${selectedAudienceTemplateLabels[templateKey]} template has not been published for this event. Write and publish it in Communications, then preview again.`, 409);
     if (state.attachmentProblem) throw new BulkActionError("INVALID_REQUEST", state.attachmentProblem, 409);
     const label = selectedAudienceTemplateLabels[templateKey];
     const proposed = params.action === "REQUEST_INFORMATION"
@@ -279,6 +281,10 @@ const messageHandler: ActionHandler = {
     const preview = await getSelectedAudiencePreview(eventId, templateKey, ids);
     return preview.skipped.map((skip) => ({ id: skip.registrationId, reason: messageSkipReason(skip.code) }));
   },
+  async cleanup({ eventId, runId }) {
+    // Only a message still waiting is removed; one that was somehow already acted on is left alone.
+    await getPrisma().bulkMessageApproval.deleteMany({ where: { runId, eventId, status: "PENDING_APPROVAL" } });
+  },
   async apply({ eventId, actorUserId, runId, params, ids, sink }) {
     const templateKey = messageTemplateKey(params);
     if (!templateKey || ids.length === 0) return {};
@@ -287,49 +293,51 @@ const messageHandler: ActionHandler = {
     const included = preview.recipients.map((recipient) => recipient.registrationId);
     const skipped = new Map(preview.skipped.map((skip) => [skip.registrationId, messageSkipReason(skip.code)]));
     const sendable = preview.templatePublished && !preview.attachmentProblem;
-    let approvalId: string | null = null;
-    if (sendable && included.length > 0) {
+    const includedSet = new Set(included);
+    const queueable = sendable && included.length > 0;
+    // The approval and its audit row are one transaction, written before any outcome is recorded. If the run then fails to
+    // record its outcomes, `cleanup` removes the approval, so a message nobody was told about is never left to approve.
+    if (queueable) {
       const text = messageText(params);
-      approvalId = randomUUID();
+      const approvalId = randomUUID();
       try {
-        // One run, one approval: the run id is unique. This row is all that confirming leaves behind; nothing is sent.
-        await prisma.bulkMessageApproval.create({
-          data: {
-            id: approvalId,
+        await prisma.$transaction(async (tx) => {
+          // One run, one approval: the run id is unique. This row is all that confirming leaves behind; nothing is sent.
+          await tx.bulkMessageApproval.create({
+            data: {
+              id: approvalId,
+              eventId,
+              runId,
+              action: params.action,
+              templateKey,
+              announcementTitle: templateKey === "EVENT_ANNOUNCEMENT" ? text.title : null,
+              announcementBody: templateKey === "EVENT_ANNOUNCEMENT" ? text.body : null,
+              registrationIds: included as Prisma.InputJsonValue,
+              queuedCount: included.length,
+              status: "PENDING_APPROVAL",
+              queuedByUserId: actorUserId,
+            },
+          });
+          await writeAuditLog({
             eventId,
-            runId,
-            action: params.action,
-            templateKey,
-            announcementTitle: templateKey === "EVENT_ANNOUNCEMENT" ? text.title : null,
-            announcementBody: templateKey === "EVENT_ANNOUNCEMENT" ? text.body : null,
-            registrationIds: included as Prisma.InputJsonValue,
-            queuedCount: included.length,
-            status: "PENDING_APPROVAL",
-            queuedByUserId: actorUserId,
-          },
+            actorUserId,
+            action: "BULK_MESSAGE_QUEUED",
+            entityType: "BulkMessageApproval",
+            entityId: approvalId,
+            correlationId: runId,
+            summary: `Queued a bulk message for approval (${selectedAudienceTemplateLabels[templateKey]}) for ${included.length} ${BULK_RECORD_UNIT}. Nothing was sent.`,
+            metadata: { action: params.action, templateKey, runId, queuedCount: included.length, skippedCount: ids.length - included.length, actorUserId } as Prisma.InputJsonValue,
+          }, tx);
         });
       } catch (error) {
-        if (!isUniqueViolation(error)) throw error;
         // Already queued for this run: keep the one that exists.
-        approvalId = null;
+        if (!isUniqueViolation(error)) throw error;
       }
     }
-    const includedSet = new Set(included);
+    // Nothing is awaited after this point, so the outcomes always match the approval.
     for (const registrationId of ids) {
       if (includedSet.has(registrationId) && sendable) sink.push({ registrationId, outcome: "COMPLETED" });
       else sink.push({ registrationId, outcome: skipped.has(registrationId) ? "SKIPPED" : "FAILED", reason: skipped.get(registrationId) ?? "NOT_QUEUED" });
-    }
-    if (approvalId) {
-      await writeAuditLog({
-        eventId,
-        actorUserId,
-        action: "BULK_MESSAGE_QUEUED",
-        entityType: "BulkMessageApproval",
-        entityId: approvalId,
-        correlationId: runId,
-        summary: `Queued a bulk message for approval (${selectedAudienceTemplateLabels[templateKey]}) for ${included.length} ${BULK_RECORD_UNIT}. Nothing was sent.`,
-        metadata: { action: params.action, templateKey, runId, queuedCount: included.length, skippedCount: ids.length - included.length, actorUserId } as Prisma.InputJsonValue,
-      });
     }
     return {};
   },
@@ -675,6 +683,7 @@ export async function confirmBulkAction(
   let extras: { file?: ExportFile; exportRowCount?: number } = {};
   // Nothing is written until the handler starts, so a failure before that leaves every record untouched.
   let missingReason: BulkReasonCode = "NOT_CHANGED";
+  let handlerFailed = false;
   try {
     const versions = await prisma.registration.findMany({ where: { eventId: viewer.eventId, id: { in: snapshotIds } }, select: { id: true, updatedAt: true } });
     const currentVersion = new Map(versions.map((row) => [row.id, row.updatedAt.toISOString()]));
@@ -691,8 +700,14 @@ export async function confirmBulkAction(
     // A handler that throws still ends the run: what it did stays recorded and the records it did not reach are FAILED.
     logError("A bulk action stopped part-way", error, { runId: run.id });
     extras = {};
+    handlerFailed = true;
   }
-  try { await flush(); } catch (error) { logError("Bulk action progress could not be saved", error, { runId: run.id }); }
+  let flushFailed = false;
+  try { await flush(); } catch (error) { flushFailed = true; logError("Bulk action progress could not be saved", error, { runId: run.id }); }
+  if (handlerFailed || flushFailed) {
+    // The run records these records as not done, so nothing the handler left behind may stay actionable.
+    try { await handler.cleanup?.({ eventId: viewer.eventId, runId: run.id }); } catch (error) { logError("Bulk action cleanup failed", error, { runId: run.id }); }
+  }
   const { summary, won } = await finishRun(prisma, run, viewer.userId, params, extras, missingReason);
   // A run that was ended under this request (a recovery) has already been accounted for; its file is not handed out.
   return { summary, file: won ? extras.file ?? null : null };

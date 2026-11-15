@@ -29,6 +29,7 @@ export function BulkMessageApprovals({ eventId, pending, decided }: Props) {
   const [review, setReview] = useState<MessageApprovalReview | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<"approve" | "decline" | null>(null);
+  const [confirmingDecline, setConfirmingDecline] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const base = `/api/events/${encodeURIComponent(eventId)}/bulk-actions/messages`;
@@ -104,9 +105,11 @@ export function BulkMessageApprovals({ eventId, pending, decided }: Props) {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         setError(data.message ?? "The message could not be declined.");
+        setConfirmingDecline(false);
         return;
       }
       setNotice("Declined. The message will not be sent.");
+      setConfirmingDecline(false);
       setOpenId(null);
       setReview(null);
       router.refresh();
@@ -194,15 +197,27 @@ export function BulkMessageApprovals({ eventId, pending, decided }: Props) {
               {review.sampleCodes.length > 0 && <div className={styles.fact}><dt>Some who would receive it</dt><dd>{review.sampleCodes.join(", ")}{review.includedCount > review.sampleCodes.length ? ", …" : ""}</dd></div>}
               <div className={styles.fact}><dt>Delivery</dt><dd>{DELIVERY_WORDS[review.deliveryMode]}</dd></div>
             </dl>
-            {!review.templatePublished && <p className={`${styles.notice} ${styles.warn}`}>The Custom message template is not published, so this cannot be sent.</p>}
+            {!review.templatePublished && <p className={`${styles.notice} ${styles.warn}`}>The {review.templateLabel} template is not published, so this cannot be sent.</p>}
             {review.attachmentProblem && <p className={`${styles.notice} ${styles.warn}`}>{review.attachmentProblem}</p>}
             {review.includedCount === 0 && <p className={`${styles.notice} ${styles.warn}`}>None of these registrations can receive it now.</p>}
             <p className={styles.sub}>This review was read just now. If anything changes before you approve, nothing is sent and you review again.</p>
             <div className={styles.actions}>
-              <button type="button" className="secondary-button" onClick={decline} disabled={busy !== null || review.status !== "PENDING_APPROVAL"}>Decline, do not send</button>
+              <button type="button" className="secondary-button" onClick={() => setConfirmingDecline(true)} disabled={busy !== null || review.status !== "PENDING_APPROVAL"}>Decline, do not send</button>
             </div>
           </div>
         )}
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={confirmingDecline}
+        title="Decline this message?"
+        confirmLabel="Decline, do not send"
+        busyLabel="Declining…"
+        busy={busy === "decline"}
+        destructive
+        onCancel={() => setConfirmingDecline(false)}
+        onConfirm={decline}
+      >
+        <p className={styles.sub}>It will not be sent. To send it later, queue it again from a bulk action.</p>
       </ConfirmDialog>
     </section>
   );

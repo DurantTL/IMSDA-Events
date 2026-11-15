@@ -38,6 +38,9 @@ let runs: Row[];
 let outcomes: Row[];
 let approvals: Row[];
 let matching: string[];
+let batchAudit: Row | null;
+let batchMessages: Row[];
+let failOutcomeWrites: boolean;
 
 const NOW = new Date("2027-03-01T15:00:00.000Z");
 const FINGERPRINT = "a".repeat(64);
@@ -71,7 +74,7 @@ function installPrisma() {
     updateMany: vi.fn(async ({ where, data }: { where: Row; data: Row }) => { const hit = runs.filter((run) => matches(run, where)); hit.forEach((run) => Object.assign(run, data)); return { count: hit.length }; }),
   };
   const bulkActionRecordOutcome = {
-    createMany: vi.fn(async ({ data }: { data: Row[] }) => { outcomes.push(...data.filter((row) => !outcomes.some((have) => have.runId === row.runId && have.registrationId === row.registrationId))); return { count: data.length }; }),
+    createMany: vi.fn(async ({ data }: { data: Row[] }) => { if (failOutcomeWrites) { failOutcomeWrites = false; throw new Error("outcome write failed"); } outcomes.push(...data.filter((row) => !outcomes.some((have) => have.runId === row.runId && have.registrationId === row.registrationId))); return { count: data.length }; }),
     findMany: vi.fn(async ({ where }: { where: { runId: string; outcome?: { not: string } } }) =>
       outcomes.filter((row) => row.runId === where.runId && (!where.outcome || row.outcome !== where.outcome.not)).map((row) => ({ ...row, registration: { confirmationCode: `CODE-${row.registrationId}` } }))),
   };
@@ -91,10 +94,13 @@ function installPrisma() {
     }),
     findMany: vi.fn(async ({ where }: { where: Row }) => approvals.filter((row) => matches(row, where)).map((row) => ({ ...row, queuedBy: { displayName: "Alex Sample" }, decidedBy: row.decidedByUserId ? { displayName: "Blake Sample" } : null }))),
     updateMany: vi.fn(async ({ where, data }: { where: Row; data: Row }) => { const hit = approvals.filter((row) => matches(row, where)); hit.forEach((row) => Object.assign(row, data, { updatedAt: new Date() })); return { count: hit.length }; }),
+    deleteMany: vi.fn(async ({ where }: { where: Row }) => { const hit = approvals.filter((row) => matches(row, where)); approvals = approvals.filter((row) => !hit.includes(row)); return { count: hit.length }; }),
   };
+  const auditLog = { findFirst: vi.fn(async () => batchAudit) };
   // Confirming a bulk message must never touch the outbox: any call is recorded, and the tests assert there are none.
-  const messageOutbox = { create: mocks.outbox, createMany: mocks.outbox, update: mocks.outbox, updateMany: mocks.outbox };
-  mocks.getPrisma.mockReturnValue({ bulkActionRun, bulkActionRecordOutcome, registration, bulkMessageApproval, messageOutbox });
+  const messageOutbox = { create: mocks.outbox, createMany: mocks.outbox, update: mocks.outbox, updateMany: mocks.outbox, findMany: vi.fn(async () => batchMessages) };
+  const db = { bulkActionRun, bulkActionRecordOutcome, registration, bulkMessageApproval, messageOutbox, auditLog, $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(db)) };
+  mocks.getPrisma.mockReturnValue(db);
 }
 
 function previewFor(ids: string[], skipped: Array<[string, string]> = [], overrides: Row = {}) {
@@ -121,6 +127,10 @@ beforeEach(() => {
   outcomes = [];
   approvals = [];
   matching = ["reg-1", "reg-2", "reg-3", "reg-4"];
+  batchAudit = null;
+  mocks.writeAuditLog.mockReset();
+  batchMessages = [];
+  failOutcomeWrites = false;
   installPrisma();
   mocks.enumerate.mockImplementation(async (_viewer: unknown, _params: unknown, _catalog: unknown, _issues: unknown, onlyIds?: string[]) => {
     const ids = onlyIds ? matching.filter((id) => onlyIds.includes(id)) : [...matching];
@@ -321,6 +331,63 @@ describe("approving", () => {
     expect((await refusal(getMessageApprovalReview(approver(["MANAGE_COMMUNICATIONS"], "user-b", "event-2"), approvalId))).code).toBe("NOT_FOUND");
     expect(mocks.enqueue).not.toHaveBeenCalled();
     expect(approvals[0].status).toBe("PENDING_APPROVAL");
+  });
+});
+
+describe("a send that committed but was not recorded", () => {
+  async function queuedOne() {
+    await queue();
+    return approvals[0].id as string;
+  }
+
+  it("is marked SENT, not reset to waiting, when the send failed after its batch was written", async () => {
+    const approvalId = await queuedOne();
+    batchAudit = { metadata: { includedCount: 2, skippedCount: 2 } };
+    batchMessages = [{ status: "CAPTURED" }, { status: "CAPTURED" }];
+    mocks.enqueue.mockRejectedValueOnce(new Error("capture failed after commit"));
+    const decision = await approveMessage(approver(), approvalId, FINGERPRINT, { now: NOW });
+    expect(decision).toMatchObject({ status: "SENT", sendResult: { included: 2, skipped: 2, captured: 2, queued: 0, suppressed: 0 } });
+    expect(approvals[0]).toMatchObject({ status: "SENT", decidedByUserId: "user-b" });
+    // It can no longer be declined as if it had not gone out.
+    expect((await refusal(declineMessage(approver(), approvalId))).code).toBe("ALREADY_DECIDED");
+  });
+
+  it("resets to waiting only when no batch exists", async () => {
+    const approvalId = await queuedOne();
+    mocks.enqueue.mockRejectedValueOnce(new mocks.MessagingError("PREVIEW_CHANGED", "changed"));
+    await expect(approveMessage(approver(), approvalId, STALE_FINGERPRINT)).rejects.toMatchObject({ code: "PREVIEW_CHANGED" });
+    expect(approvals[0].status).toBe("PENDING_APPROVAL");
+  });
+
+  it("a stale SENDING retry records an existing batch instead of sending again", async () => {
+    const approvalId = await queuedOne();
+    approvals[0].status = "SENDING";
+    approvals[0].updatedAt = new Date(NOW.getTime() - 11 * 60_000);
+    batchAudit = { metadata: { includedCount: 2, skippedCount: 2 } };
+    batchMessages = [{ status: "PENDING" }, { status: "SUPPRESSED" }];
+    const decision = await approveMessage(approver(), approvalId, STALE_FINGERPRINT, { now: NOW });
+    expect(decision).toMatchObject({ status: "SENT", sendResult: { queued: 1, suppressed: 1 } });
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+  });
+});
+
+describe("a run that cannot record its outcomes", () => {
+  it("leaves no approvable message behind", async () => {
+    const preview = await createBulkPreview(viewer(), messageInput());
+    failOutcomeWrites = true;
+    const { summary } = await confirmBulkAction(viewer(), preview.runId, KEY);
+    expect(approvals).toHaveLength(0);
+    expect(summary.counts.completed).toBe(0);
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("writes the approval and its audit row in one transaction, and neither when the audit row fails", async () => {
+    const preview = await createBulkPreview(viewer(), messageInput());
+    mocks.writeAuditLog.mockImplementation(async (entry: { action: string }) => { if (entry.action === "BULK_MESSAGE_QUEUED") throw new Error("audit failed"); });
+    // The transaction stand-in has no rollback, so the cleanup after the failed handler is what removes the approval.
+    await confirmBulkAction(viewer(), preview.runId, KEY);
+    expect(approvals).toHaveLength(0);
+    expect(outcomes.every((row) => row.outcome === "FAILED")).toBe(true);
   });
 });
 

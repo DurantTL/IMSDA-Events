@@ -199,6 +199,12 @@ export async function approveMessage(viewer: ApprovalViewer, approvalId: string,
     throw new BulkActionError("IN_PROGRESS", "This message is being sent. Check Messages waiting for approval in a moment.", 409);
   }
 
+  // A send that already committed (a retry of a stalled one) is recorded, never sent again.
+  if (row.status === "SENDING") {
+    const done = await recordIfAlreadySent(viewer, row, now);
+    if (done) return done;
+  }
+
   let operation: Awaited<ReturnType<typeof enqueueSelectedAudienceBatch>>;
   try {
     operation = await enqueueSelectedAudienceBatch(viewer.eventId, {
@@ -210,7 +216,10 @@ export async function approveMessage(viewer: ApprovalViewer, approvalId: string,
       previewFingerprint: fingerprint,
     }, viewer.userId);
   } catch (error) {
-    // Nothing was marked sent: it goes back to waiting, with the same id, so a retry cannot send twice.
+    // The send may have committed before the failure (a crash, or a step after the commit). If the batch exists it is SENT.
+    const done = await recordIfAlreadySent(viewer, row, now).catch(() => null);
+    if (done) return done;
+    // Nothing was written: it goes back to waiting, with the same id.
     await prisma.bulkMessageApproval.updateMany({ where: { id: row.id, eventId: viewer.eventId, status: "SENDING" }, data: { status: "PENDING_APPROVAL" } });
     throw error;
   }
@@ -237,6 +246,45 @@ export async function approveMessage(viewer: ApprovalViewer, approvalId: string,
     metadata: { action: row.action, templateKey: row.templateKey, runId: row.runId, ...sendResult, deliveryMode: operation.deliveryMode, replayed: operation.replayed, actorUserId: viewer.userId } as Prisma.InputJsonValue,
   });
   return { id: row.id, status: "SENT", sendResult, replayed: false };
+}
+
+/**
+ * Whether the selected-registration batch for this approval already exists (its audit row, written in the same transaction as
+ * the outbox rows). If so the approval is marked SENT with the counts that can be read back, instead of being reset to waiting
+ * where it could be approved again (which the send would refuse) or declined as if it had not gone out.
+ */
+async function recordIfAlreadySent(viewer: ApprovalViewer, row: ApprovalRow, now: Date): Promise<MessageApprovalDecision | null> {
+  const prisma = getPrisma();
+  const audit = await prisma.auditLog.findFirst({
+    where: { eventId: viewer.eventId, action: "SELECTED_AUDIENCE_BATCH_ENQUEUED", entityId: `selected-audience:${viewer.eventId}:${row.id}` },
+    select: { metadata: true },
+  });
+  if (!audit) return null;
+  const metadata = audit.metadata && typeof audit.metadata === "object" && !Array.isArray(audit.metadata) ? audit.metadata as Record<string, unknown> : {};
+  const messages = await prisma.messageOutbox.findMany({ where: { eventId: viewer.eventId, correlationId: row.id }, select: { status: true } });
+  const num = (value: unknown) => (typeof value === "number" ? value : 0);
+  const sendResult: SendResultCounts = {
+    included: num(metadata.includedCount) || messages.length,
+    skipped: num(metadata.skippedCount),
+    queued: messages.filter((message) => message.status === "PENDING" || message.status === "PROCESSING").length,
+    captured: messages.filter((message) => message.status === "CAPTURED").length,
+    suppressed: messages.filter((message) => message.status === "SUPPRESSED").length,
+  };
+  await prisma.bulkMessageApproval.updateMany({
+    where: { id: row.id, eventId: viewer.eventId, status: { in: ["SENDING", "PENDING_APPROVAL"] } },
+    data: { status: "SENT", decidedByUserId: viewer.userId, decidedAt: now, sendResult: sendResult as Prisma.InputJsonValue },
+  });
+  await writeAuditLog({
+    eventId: viewer.eventId,
+    actorUserId: viewer.userId,
+    action: "BULK_MESSAGE_APPROVED",
+    entityType: "BulkMessageApproval",
+    entityId: row.id,
+    correlationId: row.runId,
+    summary: `Recorded a bulk message as sent (${isTemplateKey(row.templateKey) ? selectedAudienceTemplateLabels[row.templateKey] : row.templateKey}): the send had already been written.`,
+    metadata: { action: row.action, templateKey: row.templateKey, runId: row.runId, ...sendResult, recovered: true, actorUserId: viewer.userId } as Prisma.InputJsonValue,
+  });
+  return { id: row.id, status: "SENT", sendResult, replayed: true };
 }
 
 /** Decline: the message is never sent. Only a message that is still waiting can be declined. */

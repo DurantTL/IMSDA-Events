@@ -223,7 +223,7 @@ export function BulkActionsPanel(props: Props) {
         {selectionTicked && tickedChecked && ticked && (
           <p className={styles.notice} role="status">
             {useWholeFilter ? `Using the whole filter. ${ticked.length} ticked ${ticked.length === 1 ? "registration was" : "registrations were"} set aside.` : `${ticked.length} ticked ${ticked.length === 1 ? "registration" : "registrations"} carried over from the list. Any that no longer match the filter are left out.`}{" "}
-            <button type="button" className={styles.linkButton} onClick={() => { reset(); setUseWholeFilter((current) => !current); }}>{useWholeFilter ? "Use the ticked registrations again" : "Use the whole filter instead"}</button>
+            <button type="button" className="text-button" onClick={() => { reset(); setUseWholeFilter((current) => !current); }}>{useWholeFilter ? "Use the ticked registrations again" : "Use the whole filter instead"}</button>
           </p>
         )}
         {selectionTicked && tickedChecked && !ticked && <p className={`${styles.notice} ${styles.warn}`} role="status">The ticked rows were not carried over, so this covers the whole filter. <a href={peopleHref}>Go back to the list</a> to tick them again.</p>}

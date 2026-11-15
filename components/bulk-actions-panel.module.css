@@ -55,14 +55,3 @@
 .body { white-space: pre-wrap; }
 .textarea { min-height: 7rem; max-width: 40rem; resize: vertical; }
 .field input[type="text"], .field textarea { min-height: var(--touch-target, 44px); }
-.linkButton {
-  min-height: var(--touch-target, 44px);
-  border: 0;
-  background: none;
-  padding: 0;
-  color: var(--imsda-navy);
-  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
