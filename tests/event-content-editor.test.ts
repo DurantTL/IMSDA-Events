@@ -26,11 +26,11 @@ function render(isSystemAdmin: boolean, sections: unknown[], sanitized: Record<s
     initialAssets: [{
       id: "a1", displayName: "Chapel photo", filename: "chapel.jpg", contentType: "image/jpeg", byteSize: 2048,
       createdAt: "2026-10-01T00:00:00.000Z", url: "/api/events/event-1/assets/a1?disposition=inline",
-      usage: { publishedSectionTitles: [], draftSectionTitles: [], isBadgeBackground: false },
+      usage: { publishedSectionTitles: [], draftSectionTitles: [], isBadgeBackground: false, isOnPublishedRegistrationLook: false },
     }, {
       id: "a2", displayName: "Flyer", filename: "flyer.pdf", contentType: "application/pdf", byteSize: 2048,
       createdAt: "2026-10-01T00:00:00.000Z", url: "/api/events/event-1/assets/a2",
-      usage: { publishedSectionTitles: [], draftSectionTitles: [], isBadgeBackground: false },
+      usage: { publishedSectionTitles: [], draftSectionTitles: [], isBadgeBackground: false, isOnPublishedRegistrationLook: false },
     }] as never,
   }));
 }

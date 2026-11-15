@@ -1,3 +1,4 @@
+import type { EmailLook } from "@/modules/registration-themes/email-look";
 import type { MessageFileRecord } from "@/modules/communications/message-file-rules";
 import type { SendCheckResult } from "@/modules/communications/send-check";
 
@@ -77,6 +78,8 @@ export type MessageAttemptRecord = {
 
 export type MessageOutboxRecord = {
   id: string;
+  /** The event look this message's email was (or will be) rendered with (#283): the version stamped on it; null means the platform layout. */
+  emailLook?: EmailLook | null;
   templateKey: MessageTemplateKeyValue;
   recipientKind: "REGISTRANT" | "INTERNAL" | "TEST";
   /** A club registration, or an invoice to a club director: the message gets the club email header (#1443). */
@@ -147,6 +150,8 @@ export type MessagingSettingsRecord = {
 
 export type MessagingWorkspaceData = {
   settings: MessagingSettingsRecord;
+  /** The event's published look as the template preview shows it (#283); null or absent means the platform layout. */
+  currentEmailLook?: EmailLook | null;
   templates: MessageTemplateRecord[];
   /** One page of the delivery log, in the database's order (#1492). */
   messages: MessageOutboxRecord[];

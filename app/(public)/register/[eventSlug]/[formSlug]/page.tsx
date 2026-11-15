@@ -22,8 +22,9 @@ import { getAutoEventInfoCards } from "@/modules/event-info-cards/repository";
 import { getPublicRegistrationExperience } from "@/modules/forms/public-repository";
 import { clubEventEntryRedirect } from "@/modules/general-link-registrations/repository";
 import { RegistrationThemeScope } from "@/components/registration-theme-scope";
+import { publicRegistrationBrandingImages } from "@/components/registration-branding-urls";
 import { getPublishedThemeRowBySlug } from "@/modules/registration-themes/repository";
-import { registrationThemeStyle, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
+import { registrationThemeStyle, resolveRegistrationBranding, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
 
 export const dynamic = "force-dynamic";
 
@@ -114,10 +115,12 @@ export default async function PublicRegistrationPage({
   const editableCards = await listPublishedRegistrationInfoCards(eventSlug);
   const formsHelpContact = await getFormsHelpContact();
 
-  const themeStyle = registrationThemeStyle(resolveRegistrationTheme(await getPublishedThemeRowBySlug(eventSlug)));
+  const themeRow = await getPublishedThemeRowBySlug(eventSlug);
+  const themeStyle = registrationThemeStyle(resolveRegistrationTheme(themeRow));
+  const themeImages = publicRegistrationBrandingImages(resolveRegistrationBranding(themeRow), eventSlug);
 
   return (
-    <RegistrationThemeScope style={themeStyle}>
+    <RegistrationThemeScope style={themeStyle} images={themeImages}>
     <PublicMetricsBeacon hits={[{ metric: "REGISTRATION_START", dimension: eventSlug }]} />
     <PublicRegistrationForm
       formsHelpContact={formsHelpContact}

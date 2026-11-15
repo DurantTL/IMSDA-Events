@@ -13,10 +13,17 @@ import {
   THEME_FONT_STACKS,
   THEME_SHADOWS,
   type RegistrationThemeTokens,
+  type ThemeHeroFocus,
 } from "./tokens";
 
 /** The part of a stored version this module reads. */
-export type StoredThemeRow = { status: string; tokens: unknown };
+export type StoredThemeRow = { status: string; tokens: unknown; logoAssetId?: string | null; heroAssetId?: string | null };
+
+/** The published logo and banner of a look, by upload id (the page turns an id into a URL). */
+export type RegistrationBranding = {
+  logo?: { assetId: string; alt: string };
+  hero?: { assetId: string; alt: string; focus: ThemeHeroFocus };
+};
 
 /**
  * The look a registration page uses: the event's PUBLISHED version when its stored tokens still pass the schema and the contrast checks,
@@ -24,12 +31,31 @@ export type StoredThemeRow = { status: string; tokens: unknown };
  * default, so a bad row can never break or restyle a public form.
  */
 export function resolveRegistrationTheme(row: StoredThemeRow | null | undefined): RegistrationThemeTokens {
-  if (!row || row.status !== "PUBLISHED") return PLATFORM_DEFAULT_THEME;
+  return resolvePublishedTokens(row) ?? PLATFORM_DEFAULT_THEME;
+}
+
+/** The row's tokens when it is a published version that passes the schema and the contrast checks; null when the platform look applies. */
+function resolvePublishedTokens(row: StoredThemeRow | null | undefined): RegistrationThemeTokens | null {
+  if (!row || row.status !== "PUBLISHED") return null;
   const parsed = registrationThemeTokensSchema.safeParse(row.tokens);
-  if (!parsed.success) return PLATFORM_DEFAULT_THEME;
+  if (!parsed.success) return null;
   const tokens = normalizeThemeTokens(parsed.data);
   // Publishing checks contrast, but a row that got here another way (or under older rules) must not reach a public form.
-  return checkThemeContrast(tokens).passes ? tokens : PLATFORM_DEFAULT_THEME;
+  return checkThemeContrast(tokens).passes ? tokens : null;
+}
+
+/**
+ * The published look's logo and banner, or an empty object. Only a row that resolves (published, valid, passing contrast)
+ * has any: a row that falls back to the platform look has no images either. An image whose upload was deleted (its id is
+ * cleared) or that has no description is left out, so the result is the same every time for the same row.
+ */
+export function resolveRegistrationBranding(row: StoredThemeRow | null | undefined): RegistrationBranding {
+  const tokens = resolvePublishedTokens(row);
+  if (!tokens || !row) return {};
+  const branding: RegistrationBranding = {};
+  if (row.logoAssetId && tokens.logoAlt) branding.logo = { assetId: row.logoAssetId, alt: tokens.logoAlt };
+  if (row.heroAssetId && tokens.heroAlt) branding.hero = { assetId: row.heroAssetId, alt: tokens.heroAlt, focus: tokens.heroFocus ?? "center" };
+  return branding;
 }
 
 /**

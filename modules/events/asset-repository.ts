@@ -42,6 +42,8 @@ export type EventAssetUsage = {
   draftSectionTitles: string[];
   /** Whether this file is the event's current printed name-badge background. */
   isBadgeBackground: boolean;
+  /** Whether this file is the logo or banner of the event's PUBLISHED registration look (#283). Blocks delete. */
+  isOnPublishedRegistrationLook: boolean;
 };
 
 export type EventAssetRecord = {
@@ -56,7 +58,7 @@ export type EventAssetRecord = {
   url: string;
 };
 
-function assetInlineUrl(eventId: string, assetId: string) {
+export function assetInlineUrl(eventId: string, assetId: string) {
   return `/api/events/${encodeURIComponent(eventId)}/assets/${encodeURIComponent(assetId)}?disposition=inline`;
 }
 
@@ -65,6 +67,8 @@ function summarizeUsage(asset: {
   /** Pictures shown by the #816 blocks (banner, photos, gallery, speakers). */
   blockRefs?: Array<{ section: { title: string; isPublished: boolean } }>;
   badgeBackgroundEvents: Array<{ id: string }>;
+  themeLogoVersions?: Array<{ id: string }>;
+  themeHeroVersions?: Array<{ id: string }>;
 }): EventAssetUsage {
   const published = new Set<string>();
   const draft = new Set<string>();
@@ -75,6 +79,7 @@ function summarizeUsage(asset: {
     publishedSectionTitles: [...published],
     draftSectionTitles: [...draft],
     isBadgeBackground: asset.badgeBackgroundEvents.length > 0,
+    isOnPublishedRegistrationLook: (asset.themeLogoVersions?.length ?? 0) + (asset.themeHeroVersions?.length ?? 0) > 0,
   };
 }
 
@@ -91,6 +96,8 @@ function usageSelect(eventId: string) {
       select: { section: { select: { title: true, isPublished: true } } },
     },
     badgeBackgroundEvents: { select: { id: true } },
+    themeLogoVersions: { where: { eventId, status: "PUBLISHED" }, select: { id: true } },
+    themeHeroVersions: { where: { eventId, status: "PUBLISHED" }, select: { id: true } },
   } as const;
 }
 
@@ -174,7 +181,7 @@ export async function createEventAsset(
       ...asset,
       filename: asset.displayName,
       createdAt: asset.createdAt.toISOString(),
-      usage: { publishedSectionTitles: [], draftSectionTitles: [], isBadgeBackground: false },
+      usage: { publishedSectionTitles: [], draftSectionTitles: [], isBadgeBackground: false, isOnPublishedRegistrationLook: false },
       url: assetInlineUrl(eventId, asset.id),
     };
   } catch (error) {
@@ -262,6 +269,8 @@ export async function removeEventAsset(
             select: { section: { select: { title: true, kind: true, isPublished: true } } },
           },
           badgeBackgroundEvents: { select: { id: true } },
+          themeLogoVersions: { where: { eventId, status: "PUBLISHED" }, select: { id: true } },
+          themeHeroVersions: { where: { eventId, status: "PUBLISHED" }, select: { id: true } },
           _count: { select: { merchandiseArtworkProducts: true } },
         },
       });
@@ -297,6 +306,13 @@ export async function removeEventAsset(
         throw new EventAssetError(
           "ASSET_IN_USE",
           "Remove this image as the name badge background before deleting it.",
+        );
+      }
+      // Only the published look blocks. A draft or archived look that points here just loses the picture (the key clears).
+      if ((asset.themeLogoVersions?.length ?? 0) + (asset.themeHeroVersions?.length ?? 0) > 0) {
+        throw new EventAssetError(
+          "ASSET_IN_USE",
+          `It's the ${(asset.themeLogoVersions?.length ?? 0) > 0 ? "logo" : "banner"} on the published registration look. Publish a look without it first.`,
         );
       }
       if (asset._count.merchandiseArtworkProducts > 0) {
@@ -382,6 +398,14 @@ export async function findEventAssetForStaff(eventId: string, assetId: string) {
   });
 }
 
+/** The registration look versions whose logo and banner the public view may serve (#283). */
+function themeVersionAccess(eventSlug: string) {
+  return {
+    event: { slug: eventSlug },
+    OR: [{ status: "PUBLISHED" as const }, { status: "ARCHIVED" as const, messages: { some: {} } }],
+  };
+}
+
 /**
  * Public view: an asset is reachable only while it belongs to the named
  * *published* event, and a *published* section of that same event links to
@@ -396,7 +420,9 @@ export async function findEventAssetForStaff(eventId: string, assetId: string) {
  * somewhere else. Scoping to `eventSlug` (the event whose page is being
  * rendered) closes both. Unpublishing a section (or disabling/archiving a
  * product, or pulling catalog approval) takes its files down with it, which
- * is what unpublishing is for.
+ * is what unpublishing is for. The logo and banner of the published
+ * registration look (#283) are reachable the same way, and an archived look's
+ * only while an email sent with it still exists; a draft look's never are.
  */
 export async function findPublishedEventAsset(eventSlug: string, assetId: string) {
   return getPrisma().eventAsset.findFirst({
@@ -416,6 +442,10 @@ export async function findPublishedEventAsset(eventSlug: string, assetId: string
             },
           },
         },
+        // The logo or banner of the published registration look (#283), and of an archived look only while an email sent
+        // with it still exists (kept so that email still shows its logo). A draft look never makes a file public.
+        { themeLogoVersions: { some: themeVersionAccess(eventSlug) } },
+        { themeHeroVersions: { some: themeVersionAccess(eventSlug) } },
       ],
     },
     select: { displayName: true, contentType: true, storageKey: true },

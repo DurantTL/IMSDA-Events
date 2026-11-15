@@ -36,6 +36,8 @@ import {
   type DeliveryLogQuery,
 } from "@/modules/communications/delivery-log-model";
 import { logError } from "@/lib/logger";
+import type { EmailLook } from "@/modules/registration-themes/email-look";
+import { findPublishedThemeVersionId, loadEmailLookByVersionId } from "@/modules/registration-themes/email-look-repository";
 import {
   ExternalEmailDeliveryError,
   nextAttemptRowNumber,
@@ -426,6 +428,7 @@ function serializeMessage(message: {
   registration: { id: string; confirmationCode: string; clubRegistration?: { id: string } | null } | null;
   templateVersion: { id: string; versionNumber: number } | null;
   files?: Array<{ disposition: "ATTACHMENT" | "INLINE"; file: { id: string; filename: string; sizeBytes: number } }>;
+  registrationThemeVersionId?: string | null;
   attempts: Array<{
     id: string;
     attemptNumber: number;
@@ -437,9 +440,10 @@ function serializeMessage(message: {
     startedAt: Date;
     completedAt: Date | null;
   }>;
-}, deliveryMode: "DISABLED" | "LOCAL_CAPTURE" | "EXTERNAL_EMAIL"): MessageOutboxRecord {
+}, deliveryMode: "DISABLED" | "LOCAL_CAPTURE" | "EXTERNAL_EMAIL", emailLook: EmailLook | null = null): MessageOutboxRecord {
   return {
     id: message.id,
+    emailLook,
     templateKey: message.templateKey,
     recipientKind: message.recipientKind,
     clubLinked: emailIsClubLinked({ clubRegistration: Boolean(message.registration?.clubRegistration), recipientKind: message.recipientKind }),
@@ -878,6 +882,40 @@ export async function getShirtSizeRequestPreview(
   return (await loadShirtSizeRequestState(eventId, getPrisma())).preview;
 }
 
+/**
+ * The event looks the staff email previews draw (#283): the one published now (for the template preview) and, for each
+ * message on the page, the version stamped on it when it was first attempted (null: the platform layout). A failed read
+ * gives no look, so the workspace always loads.
+ */
+async function loadPreviewEmailLooks(eventId: string, stampedVersionIds: string[]) {
+  let appOrigin: string | null = null;
+  try {
+    appOrigin = new URL(getServerEnv().APP_BASE_URL).origin;
+  } catch {
+    appOrigin = null;
+  }
+  const safeLook = async (versionId: string) => {
+    try {
+      return await loadEmailLookByVersionId(versionId, appOrigin);
+    } catch (error) {
+      logError("An event's email look could not be read for a staff preview.", error);
+      return null;
+    }
+  };
+  let currentVersionId: string | null = null;
+  try {
+    currentVersionId = await findPublishedThemeVersionId(eventId);
+  } catch (error) {
+    logError("An event's published email look could not be found for a staff preview.", error);
+  }
+  const ids = [...new Set(stampedVersionIds)];
+  const [current, stamped] = await Promise.all([
+    currentVersionId ? safeLook(currentVersionId) : Promise.resolve(null),
+    Promise.all(ids.map(async (id) => [id, await safeLook(id)] as const)),
+  ]);
+  return { current, stamped: new Map(stamped) };
+}
+
 export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryLogQuery = DEFAULT_DELIVERY_QUERY): Promise<MessagingWorkspaceData> {
   await ensureEventMessagingDefaults(eventId);
   const prisma = getPrisma();
@@ -935,16 +973,24 @@ export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryL
     listInlineImages(eventId, prisma),
   ]);
 
+  const eventMessages = messages.filter(isEventScopedMessage);
+  const previewLooks = await loadPreviewEmailLooks(
+    eventId,
+    eventMessages.flatMap((message) => (message.registrationThemeVersionId ? [message.registrationThemeVersionId] : [])),
+  );
   return {
     settings: settingsRecord(settings),
+    currentEmailLook: previewLooks.current,
     templates: templates
       .filter(isEventTemplateRow)
       .map((template) => serializeTemplate(template, filesByVersion))
       .sort((left, right) => (keyOrder.get(left.key) ?? 99) - (keyOrder.get(right.key) ?? 99)),
     // The where already holds only event messages (buildDeliveryWhere), so no row is dropped after the page is read.
-    messages: messages
-      .filter(isEventScopedMessage)
-      .map((message) => serializeMessage(message, settings.deliveryMode)),
+    messages: eventMessages.map((message) => serializeMessage(
+      message,
+      settings.deliveryMode,
+      message.registrationThemeVersionId ? previewLooks.stamped.get(message.registrationThemeVersionId) ?? null : null,
+    )),
     messageLog: { total: logTotal, page: logPage, pageSize: DELIVERY_PAGE_SIZE, status: logQuery.status },
     inlineImages,
     counts,

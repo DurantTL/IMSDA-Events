@@ -60,6 +60,7 @@ import {
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { messageRetryRequestPayload } from "@/modules/communications/message-retry-client";
 import { PREHEADER_MAX_LENGTH, renderEmailHtmlDocument } from "@/modules/communications/email-html";
+import type { EmailLook } from "@/modules/registration-themes/email-look";
 import { emailPreviewLayout, plainTextToEmailBodyHtml } from "@/modules/communications/email-layout";
 import { DEFAULT_EMAIL_LAYOUT_SETTINGS, type EmailLayoutSettings } from "@/modules/communications/email-layout-domain";
 import { SendCheckPanel, jumpToSendCheckField } from "@/components/send-check-panel";
@@ -491,6 +492,17 @@ export function CommunicationsWorkspace({
     });
     return () => { cancelled = true; };
   }, [previewImageIds, imageData, eventId]);
+  // The sandboxed preview cannot load the public logo address (the page only allows its own, blob: and data: images), so a
+  // preview shows the event name where the sent email shows the logo (#283). Colors are the same.
+  function previewEmailLook(look: EmailLook | null | undefined): EmailLook | null {
+    return look ? { primary: look.primary, accent: look.accent, eventName: look.eventName } : null;
+  }
+  // A queued message with no stamp yet (never tried, or every earlier try ended before the stamp) gets the look published
+  // when delivery next tries it, so it previews as the current one.
+  function messageEmailLook(message: { emailLook?: EmailLook | null; status: string }) {
+    const queued = message.status === "PENDING" || message.status === "PROCESSING";
+    return previewEmailLook(message.emailLook ?? (queued ? messaging?.currentEmailLook : null));
+  }
   function withPreviewImages(html: string) {
     return html.replace(/<img src="msgfile:([A-Za-z0-9_-]{8,64})"/g, (match, id: string) => (
       imageData[id] ? `<img src="${imageData[id]}"` : match
@@ -2040,6 +2052,8 @@ export function CommunicationsWorkspace({
                     preheader: preview.preheader,
                     bodyHtml: withPreviewImages(preview.bodyHtml),
                     ...emailPreviewLayout(emailLayoutSettings, selectedTemplate.key, messaging.settings.replyToEmail, "recipient@example.org"),
+                    // The event's published look, as delivery will use it for a message first attempted now (#283).
+                    eventLook: previewEmailLook(messaging.currentEmailLook),
                   })}
                 />
                 <div className="message-preview-attachments">
@@ -2284,6 +2298,8 @@ export function CommunicationsWorkspace({
                           // long after the safe render already decided they were not.
                           bodyHtml: withPreviewImages(withPreviewLinks(selectedMessage.bodyHtml)),
                           ...emailPreviewLayout(emailLayoutSettings, selectedMessage.templateKey, selectedMessage.replyToEmail ?? null, selectedMessage.recipientEmail, selectedMessage.clubLinked),
+                          // The look stamped on this message when it was first attempted; none stamped means the platform layout unless it is still queued (#283).
+                          eventLook: messageEmailLook(selectedMessage),
                         })}
                       />
                     ) : (
@@ -2298,6 +2314,8 @@ export function CommunicationsWorkspace({
                           preheader: selectedMessage.preheader ? withPreviewLinks(selectedMessage.preheader) : null,
                           bodyHtml: plainTextToEmailBodyHtml(withPreviewLinks(selectedMessage.bodyText), { buttonOrigins: PREVIEW_ORIGINS }),
                           ...emailPreviewLayout(emailLayoutSettings, selectedMessage.templateKey, selectedMessage.replyToEmail ?? null, selectedMessage.recipientEmail, selectedMessage.clubLinked),
+                          // The look stamped on this message when it was first attempted; none stamped means the platform layout unless it is still queued (#283).
+                          eventLook: messageEmailLook(selectedMessage),
                         })}
                       />
                     )}

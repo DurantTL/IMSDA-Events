@@ -78,6 +78,7 @@ describe("listEventAssets", () => {
       publishedSectionTitles: [],
       draftSectionTitles: [],
       isBadgeBackground: false,
+      isOnPublishedRegistrationLook: false,
     });
     const query = client.eventAsset.findMany.mock.calls[0][0] as { select: { links: { where: unknown } } };
     expect(query.select.links.where).toEqual({ section: { eventId: "event-1" } });
@@ -85,6 +86,7 @@ describe("listEventAssets", () => {
       publishedSectionTitles: ["Weekend schedule"],
       draftSectionTitles: ["Retreat resources"],
       isBadgeBackground: true,
+      isOnPublishedRegistrationLook: false,
     });
   });
 });
@@ -185,6 +187,40 @@ describe("removeEventAsset", () => {
       message: expect.stringContaining("badge background"),
     });
     expect(dependencies.deleteAsset).not.toHaveBeenCalled();
+  });
+
+  it("blocks deleting the logo or banner of the published registration look, and only the published one (#283)", async () => {
+    const { client, tx } = prismaClient();
+    tx.eventAsset.findFirst.mockResolvedValue({ ...unusedAsset(), displayName: "logo.png", themeLogoVersions: [{ id: "look-1" }], themeHeroVersions: [] });
+    dependencies.getPrisma.mockReturnValue(client);
+    await expect(removeEventAsset("event-1", "asset-1", "user-1")).rejects.toMatchObject({
+      code: "ASSET_IN_USE",
+      message: "It's the logo on the published registration look. Publish a look without it first.",
+    });
+    tx.eventAsset.findFirst.mockResolvedValue({ ...unusedAsset(), themeLogoVersions: [], themeHeroVersions: [{ id: "look-1" }] });
+    await expect(removeEventAsset("event-1", "asset-1", "user-1")).rejects.toMatchObject({ message: expect.stringContaining("banner on the published registration look") });
+    expect(tx.eventAsset.delete).not.toHaveBeenCalled();
+
+    // Only PUBLISHED looks of this event are selected, so a draft or archived reference doesn't block (its key just clears).
+    const select = (tx.eventAsset.findFirst.mock.calls[0]![0] as { select: { themeLogoVersions: { where: unknown }; themeHeroVersions: { where: unknown } } }).select;
+    expect(select.themeLogoVersions.where).toEqual({ eventId: "event-1", status: "PUBLISHED" });
+    expect(select.themeHeroVersions.where).toEqual({ eventId: "event-1", status: "PUBLISHED" });
+    tx.eventAsset.findFirst.mockResolvedValue({ ...unusedAsset(), themeLogoVersions: [], themeHeroVersions: [] });
+    await removeEventAsset("event-1", "asset-1", "user-1");
+    expect(tx.eventAsset.delete).toHaveBeenCalled();
+  });
+
+  it("flags a file on the published registration look in the staff file list (#283)", async () => {
+    const client = {
+      eventAsset: {
+        findMany: vi.fn().mockResolvedValue([{
+          id: "a1", displayName: "logo.png", contentType: "image/png", byteSize: 10, createdAt: new Date("2026-09-01T00:00:00.000Z"),
+          links: [], blockRefs: [], badgeBackgroundEvents: [], themeLogoVersions: [{ id: "look-1" }], themeHeroVersions: [],
+        }]),
+      },
+    };
+    dependencies.getPrisma.mockReturnValue(client);
+    expect((await listEventAssets("event-1"))[0]!.usage.isOnPublishedRegistrationLook).toBe(true);
   });
 
   it("looks the file up inside the transaction, scoped to this event", async () => {
@@ -316,6 +352,21 @@ describe("findPublishedEventAsset", () => {
     });
     const sectionBranch = query.where.OR.find((clause) => "links" in clause);
     expect(sectionBranch).toBeDefined();
+  });
+
+  it("serves a published look's logo or banner, and an archived look's only while a sent message references it, never a draft (#283)", async () => {
+    const findFirst = vi.fn().mockResolvedValue(null);
+    dependencies.getPrisma.mockReturnValue({ eventAsset: { findFirst } });
+    await findPublishedEventAsset("event-a", "asset_1");
+    const query = findFirst.mock.calls[0][0] as { where: { event: unknown; OR: Array<Record<string, { some: Record<string, unknown> }>> } };
+    expect(query.where.event).toEqual({ slug: "event-a", isPublished: true, archivedAt: null });
+    for (const key of ["themeLogoVersions", "themeHeroVersions"]) {
+      const branch = query.where.OR.find((clause) => key in clause)!;
+      expect(branch[key]!.some).toEqual({
+        event: { slug: "event-a" },
+        OR: [{ status: "PUBLISHED" }, { status: "ARCHIVED", messages: { some: {} } }],
+      });
+    }
   });
 
   it("never serves an asset through another event's section or product (#508)", async () => {

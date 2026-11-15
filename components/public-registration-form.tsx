@@ -1,6 +1,7 @@
 "use client";
 
 import { ExactValue } from "@/components/exact-value";
+import { RegistrationBannerStrip, RegistrationLogoTile } from "@/components/registration-branding";
 import { formatCents } from "@/modules/payments/format-cents";
 import { AccountComingSoonNotice } from "@/components/account-coming-soon-notice";
 import { isChurchTickMode, normalizeTickCode, personPromoView, ticksToRewrite } from "@/modules/promo-codes/church-tick";
@@ -3692,8 +3693,10 @@ export function PublicRegistrationForm({
       </header>
       <TranslateHint />
 
+      <RegistrationBannerStrip />
       <section className="public-registration-hero">
         <div>
+          <RegistrationLogoTile />
           <p className="public-registration-eyebrow">{joiningWaitlist ? "Join the event waitlist" : "Now registering"}</p>
           <h1>{event.name}</h1>
           <p>{definition.title}</p>

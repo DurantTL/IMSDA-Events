@@ -12,10 +12,11 @@ import { type PreviewValue, localId } from "./builder-types";
 import { useLoadedBuilder } from "./builder-context";
 import { fieldlessIssues, lastFailedTestReasons, nextContinueBlock, previewStepIssues } from "./preview-continue";
 import { InformationBlock } from "@/components/information-block";
+import { RegistrationBannerStrip, RegistrationBrandingProvider, RegistrationLogoTile } from "@/components/registration-branding";
 import { registrationThemePreviewClassName } from "@/components/registration-theme-scope";
 
 export function BuilderPreview() {
-  const { selectedVersion, definition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, busy, testIssues, setTestIssues, setTestIssuesRaw, continueBlock, setContinueBlock, pricingPreviewDate, setPreviewStepId, previewRef, policyVersions, roster, calculation, previewSteps, previewStepIndex, previewStep, isHistorical, hasValidTest, testRequired, runTest, eventName, information, registrationThemeStyle } = useLoadedBuilder();
+  const { selectedVersion, definition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, busy, testIssues, setTestIssues, setTestIssuesRaw, continueBlock, setContinueBlock, pricingPreviewDate, setPreviewStepId, previewRef, policyVersions, roster, calculation, previewSteps, previewStepIndex, previewStep, isHistorical, hasValidTest, testRequired, runTest, eventName, information, registrationThemeStyle, registrationThemeImages } = useLoadedBuilder();
   const stepIssues = (step: NonNullable<typeof previewStep>) => previewStepIssues({ definition, roster, responses, attendees: previewAttendees, choiceUsage: selectedVersion.choiceUsage ?? {}, step });
   const currentStepId = previewStep?.id ?? null;
   const blockedRef = useRef(continueBlock);
@@ -221,6 +222,10 @@ export function BuilderPreview() {
           <div className="preview-device">
             <div className="preview-browser-bar"><span /><span /><span /></div>
             <div className={registrationThemeStyle ? `preview-form ${registrationThemePreviewClassName}` : "preview-form"} style={registrationThemeStyle}>
+              <RegistrationBrandingProvider images={registrationThemeImages}>
+                <RegistrationBannerStrip compact />
+                <RegistrationLogoTile />
+              </RegistrationBrandingProvider>
               <span className="preview-event">{information ? information.ownerLabel : eventName}</span>
               <h3>{definition.title}</h3>
               <p>{definition.description}</p>

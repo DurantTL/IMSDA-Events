@@ -8,8 +8,9 @@ import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee
 import { PublicRegistrationForm } from "@/components/public-registration-form";
 import { getPublicRegistrationExperience } from "@/modules/forms/public-repository";
 import { RegistrationThemeScope } from "@/components/registration-theme-scope";
+import { publicRegistrationBrandingImages } from "@/components/registration-branding-urls";
 import { getPublishedThemeRowBySlug } from "@/modules/registration-themes/repository";
-import { registrationThemeStyle, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
+import { registrationThemeStyle, resolveRegistrationBranding, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
 
 export const dynamic = "force-dynamic";
 
@@ -33,14 +34,16 @@ export default async function EmbeddedRegistrationPage({
   const experience = await getPublicRegistrationExperience(eventSlug, formSlug);
   if (!experience) notFound();
 
-  const themeStyle = registrationThemeStyle(resolveRegistrationTheme(await getPublishedThemeRowBySlug(eventSlug)));
+  const themeRow = await getPublishedThemeRowBySlug(eventSlug);
+  const themeStyle = registrationThemeStyle(resolveRegistrationTheme(themeRow));
+  const themeImages = publicRegistrationBrandingImages(resolveRegistrationBranding(themeRow), eventSlug);
 
   if (
     experience.lifecycle.phase !== "OPEN"
     || experience.lifecycle.capacityDecision === "FULL"
   ) {
     return (
-      <RegistrationThemeScope style={themeStyle}>
+      <RegistrationThemeScope style={themeStyle} images={themeImages}>
       <main className="public-registration-embed-state">
         <BrandLink target="_top" />
         <p className="public-registration-eyebrow">IMAdventist</p>
@@ -61,7 +64,7 @@ export default async function EmbeddedRegistrationPage({
   const { account } = await getCurrentAttendee();
 
   return (
-    <RegistrationThemeScope style={themeStyle}>
+    <RegistrationThemeScope style={themeStyle} images={themeImages}>
     <div className="public-registration-embed">
       <PublicRegistrationForm
         event={{

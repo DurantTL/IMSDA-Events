@@ -1762,12 +1762,21 @@ model RegistrationThemeVersion {
   publishedAt       DateTime?
   publishedByUserId String?
   archivedAt        DateTime?
+  /// The event logo and banner (#283): uploads of the same event, checked by `modules/registration-themes/assets.ts`. A
+  /// published version's ids can only be cleared (file deleted), never swapped (trigger). Alt text and banner focus are tokens.
+  logoAssetId       String?
+  heroAssetId       String?
 
   event       Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  logoAsset   EventAsset? @relation("RegistrationThemeLogoAsset", fields: [logoAssetId], references: [id], onDelete: SetNull)
+  heroAsset   EventAsset? @relation("RegistrationThemeHeroAsset", fields: [heroAssetId], references: [id], onDelete: SetNull)
+  messages    MessageOutbox[] @relation("MessageOutboxThemeVersion")
   createdBy   User? @relation("RegistrationThemeVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   publishedBy User? @relation("RegistrationThemeVersionPublishedBy", fields: [publishedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([eventId, versionNumber])
+  @@index([logoAssetId])
+  @@index([heroAssetId])
 }
 
 /// An uploaded image a block's `data` points at (#816), derived from `data` on
@@ -1832,6 +1841,8 @@ model EventAsset {
   blockRefs  EventContentSectionAsset[]
   merchandiseArtworkProducts MerchandiseProduct[] @relation("MerchandiseProductArtwork")
   badgeBackgroundEvents      Event[]              @relation("EventBadgeBackground")
+  themeLogoVersions          RegistrationThemeVersion[] @relation("RegistrationThemeLogoAsset")
+  themeHeroVersions          RegistrationThemeVersion[] @relation("RegistrationThemeHeroAsset")
 
   @@index([eventId, createdAt])
   @@index([libraryImageId])
@@ -6071,9 +6082,13 @@ model MessageOutbox {
   /// One file sent with the message (#168: an invoice PDF), stored once in `MessageAttachment` and shared by every
   /// message that carries it, so a resend attaches the very same bytes.
   attachmentId           String?
+  /// The registration look (#283) this message's email layout was rendered with: the event's published version when the
+  /// message was first attempted, stamped once and reused on every retry. Null means the platform layout.
+  registrationThemeVersionId String?
   createdAt              DateTime                       @default(now())
   updatedAt              DateTime                       @updatedAt
 
+  registrationThemeVersion RegistrationThemeVersion? @relation("MessageOutboxThemeVersion", fields: [registrationThemeVersionId], references: [id], onDelete: SetNull)
   attachment      MessageAttachment?       @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
   event           Event?                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
   registration    Registration?            @relation(fields: [registrationId], references: [id], onDelete: SetNull)
@@ -6096,6 +6111,7 @@ model MessageOutbox {
   @@index([accountAttendeeId, createdAt])
   @@index([retryOfMessageId])
   @@index([attachmentId])
+  @@index([registrationThemeVersionId])
   @@index([provider, providerDeliveryStatus, providerStatusAt])
 }
 

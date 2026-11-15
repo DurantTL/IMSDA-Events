@@ -6,7 +6,8 @@ import { listMealPlanPrices } from "@/modules/meals/config-repository";
 import { listFormTemplates, listRegistrationForms } from "@/modules/forms/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { getPublishedThemeRow } from "@/modules/registration-themes/repository";
-import { registrationThemeStyle, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
+import { publicRegistrationBrandingImages, staffRegistrationBrandingImages } from "@/components/registration-branding-urls";
+import { registrationThemeStyle, resolveRegistrationBranding, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
 
 export const metadata: Metadata = { title: staffPageTitles.registrationForm };
 
@@ -17,5 +18,6 @@ export default async function RegistrationBuilderPage({ searchParams }: { search
     return <AccessRestricted title="Registration form access is restricted" detail="Event administrators and registration managers can create, test, and publish event forms." whoToAsk="your event administrator" />;
   }
   // The builder works at every width, phones included (#1071), so there is no phone notice or device hint here.
-  return <RegistrationBuilderWorkspace key={event.id} eventId={event.id} eventSlug={event.slug} eventName={event.name} eventAudience={event.audience} eventBillingMode={event.billingMode} initialForms={await listRegistrationForms(event.id)} registrationThemeStyle={registrationThemeStyle(resolveRegistrationTheme(await getPublishedThemeRow(event.id)))} mealPlanPrices={await listMealPlanPrices(event.id)} templates={await listFormTemplates()} focusTarget={focusForm && focusField ? { formId: focusForm, fieldId: focusField } : null} canEditNotifications={permissions.includes("CONFIGURE_EVENT")} canViewRegistrations={permissions.includes("VIEW_SENSITIVE_DATA")} canSaveAsTemplate={user.globalRole === "SYSTEM_ADMIN"} />;
+  const themeRow = await getPublishedThemeRow(event.id);
+  return <RegistrationBuilderWorkspace key={event.id} eventId={event.id} eventSlug={event.slug} eventName={event.name} eventAudience={event.audience} eventBillingMode={event.billingMode} initialForms={await listRegistrationForms(event.id)} registrationThemeStyle={registrationThemeStyle(resolveRegistrationTheme(themeRow))} registrationThemeImages={(permissions.includes("CONFIGURE_EVENT") ? staffRegistrationBrandingImages(resolveRegistrationBranding(themeRow), event.id) : publicRegistrationBrandingImages(resolveRegistrationBranding(themeRow), event.slug))} mealPlanPrices={await listMealPlanPrices(event.id)} templates={await listFormTemplates()} focusTarget={focusForm && focusField ? { formId: focusForm, fieldId: focusField } : null} canEditNotifications={permissions.includes("CONFIGURE_EVENT")} canViewRegistrations={permissions.includes("VIEW_SENSITIVE_DATA")} canSaveAsTemplate={user.globalRole === "SYSTEM_ADMIN"} />;
 }

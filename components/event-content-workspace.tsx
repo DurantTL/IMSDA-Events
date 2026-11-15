@@ -73,6 +73,9 @@ function usageSummary(usage: EventAssetRecord["usage"]) {
   if (usage.isBadgeBackground) {
     parts.push("badge background");
   }
+  if (usage.isOnPublishedRegistrationLook) {
+    parts.push("registration look");
+  }
   return parts.length > 0 ? parts.join(" · ") : "not used yet";
 }
 

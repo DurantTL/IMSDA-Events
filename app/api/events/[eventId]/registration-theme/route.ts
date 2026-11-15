@@ -18,7 +18,9 @@ type Context = { params: Promise<{ eventId: string }> };
 
 const noStore = { "Cache-Control": "no-store" };
 
-const saveBody = z.object({ tokens: registrationThemeTokensSchema }).strict();
+const assetId = z.string().min(1).max(64).nullable().optional();
+/** `logoAssetId` / `heroAssetId`: an upload of this event, null to clear, or left out to keep the draft's current image. */
+const saveBody = z.object({ tokens: registrationThemeTokensSchema, logoAssetId: assetId, heroAssetId: assetId }).strict();
 const actionBody = z.object({ action: z.enum(["publish", "discard", "revert"]) }).strict();
 
 /** The event's registration look for its editor (#283): the draft, the published version and the history. CONFIGURE_EVENT. */
@@ -39,8 +41,8 @@ async function putHandler(request: Request, context: Context) {
   try {
     const { eventId } = await context.params;
     const access = await requirePermission(await getCurrentSession(), eventId, "CONFIGURE_EVENT", findActiveMembership);
-    const { tokens } = saveBody.parse(await request.json());
-    return Response.json({ theme: await saveRegistrationThemeDraft(eventId, tokens, access.user.id) }, { headers: noStore });
+    const { tokens, logoAssetId, heroAssetId } = saveBody.parse(await request.json());
+    return Response.json({ theme: await saveRegistrationThemeDraft(eventId, tokens, access.user.id, { logoAssetId, heroAssetId }) }, { headers: noStore });
   } catch (error) {
     return registrationThemeApiError(error, "Saving the registration look");
   }
