@@ -43,7 +43,7 @@ export function MerchandiseOrderActions({ eventId, orderId, purchaserName, statu
   useUnsavedChangesGuard(open !== null && dirty);
   // One id per opened form, kept for a retry of the same submission so a second tap cannot apply it twice.
   const requestId = useRef("");
-  const actions = availableMerchandiseOrderActions(status).filter((action) => merchandiseOrderActionAllowed(action, status, permissions));
+  const actions = availableMerchandiseOrderActions(status).filter((action) => merchandiseOrderActionAllowed(action, permissions));
   if (actions.length === 0) return <span className={styles.note}>No actions</span>;
 
   function openForm(action: MerchandiseOrderActionValue) {

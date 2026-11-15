@@ -18,6 +18,7 @@ import {
   beaconBodySchema,
   campaignDimension,
   decideDimension,
+  minimumShownCount,
   normalizeReferrerHost,
   normalizeSearchTerm,
 } from "@/modules/public-metrics/domain";
@@ -127,27 +128,31 @@ describe("pruning", () => {
     expect(text).toContain("DELETE FROM \"PublicMetricDaily\" AS d USING totals AS t");
     expect(text).toContain("t.total < ?");
     expect(text).toContain("d.\"day\" < ?::date");
-    expect(query.values).toContain(3);
+    expect(query.values).toContain(5);
     expect(query.values).toContainEqual(new Date("2026-10-13T00:00:00Z"));
     expect(query.values).toEqual(expect.arrayContaining(["REFERRER_SITE", "CAMPAIGN_VISIT", "SEARCH_NO_RESULTS"]));
   });
 });
 
 describe("the summary", () => {
-  it("rolls up values below 3 and never returns their names", async () => {
+  it("uses a minimum of 5 (Caleb, November 15, 2026)", () => {
+    expect(minimumShownCount).toBe(5);
+  });
+
+  it("rolls up values below 5 and never returns their names", async () => {
     mocks.groupBy.mockImplementation(async (args: { by: string[] }) => (args.by.includes("dimension") ? [
-      { metric: "REFERRER_SITE", dimension: "example.org", _sum: { count: 4 } },
-      { metric: "REFERRER_SITE", dimension: "rare.example", _sum: { count: 2 } },
-      { metric: "CAMPAIGN_VISIT", dimension: "flyer / - / -", _sum: { count: 3 } },
-      { metric: "SEARCH_NO_RESULTS", dimension: "secret term", _sum: { count: 1 } },
-      { metric: "SEARCH_NO_RESULTS", dimension: "another term", _sum: { count: 1 } },
+      { metric: "REFERRER_SITE", dimension: "example.org", _sum: { count: 5 } },
+      { metric: "REFERRER_SITE", dimension: "rare.example", _sum: { count: 4 } },
+      { metric: "CAMPAIGN_VISIT", dimension: "flyer / - / -", _sum: { count: 6 } },
+      { metric: "CAMPAIGN_VISIT", dimension: "almost / - / -", _sum: { count: 4 } },
+      { metric: "SEARCH_NO_RESULTS", dimension: "secret term", _sum: { count: 4 } },
+      { metric: "SEARCH_NO_RESULTS", dimension: "another term", _sum: { count: 3 } },
     ] : []));
     const summary = await getAnalyticsSummary("2026-11-12", 30, { trends: false });
-    expect(summary.referrers).toEqual({ shown: [{ dimension: "example.org", count: 4 }], hiddenCount: 1, hiddenTotal: 2 });
-    expect(summary.campaigns.shown).toEqual([{ dimension: "flyer / - / -", count: 3 }]);
-    expect(summary.noResultSearches).toEqual({ shown: [], hiddenCount: 2, hiddenTotal: 2 });
-    expect(JSON.stringify(summary)).not.toContain("rare.example");
-    expect(JSON.stringify(summary)).not.toContain("secret term");
-    expect(summary.totals.SEARCH_NO_RESULTS).toBe(2);
+    expect(summary.referrers).toEqual({ shown: [{ dimension: "example.org", count: 5 }], hiddenCount: 1, hiddenTotal: 4 });
+    expect(summary.campaigns).toEqual({ shown: [{ dimension: "flyer / - / -", count: 6 }], hiddenCount: 1, hiddenTotal: 4 });
+    expect(summary.noResultSearches).toEqual({ shown: [], hiddenCount: 2, hiddenTotal: 7 });
+    for (const name of ["rare.example", "almost", "secret term", "another term"]) expect(JSON.stringify(summary)).not.toContain(name);
+    expect(summary.totals.SEARCH_NO_RESULTS).toBe(7);
   });
 });

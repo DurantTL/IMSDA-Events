@@ -8,7 +8,6 @@ import { enqueueMerchandiseReceiptMessage } from "@/modules/communications/trans
 import { assertEventOpenForMoney } from "@/modules/events/money-lock";
 import { merchandiseOrderStatusWords, type MerchandiseOrderStatusValue } from "@/modules/merchandise/domain";
 import {
-  COMPED_CANCEL_FINANCE_MESSAGE,
   formatReceiptNumber,
   merchandisePaymentMethodLine,
   planMerchandiseOrderTransition,
@@ -101,8 +100,6 @@ export async function applyMerchandiseOrderAction(
   actorUserId: string,
   input: MerchandiseOrderActionInput,
   now: Date = new Date(),
-  /** Whether the actor has finance access. Cancelling a comped order needs it; the route passes the real answer. */
-  canManageFinance = false,
 ): Promise<MerchandiseOrderActionResult> {
   return getPrisma().$transaction(async (tx) => {
     // Scoped to the event: an order id from another event is the same as no order.
@@ -112,7 +109,6 @@ export async function applyMerchandiseOrderAction(
     const replay = await findReplay(tx, orderId, input);
     if (replay) return toResult(order, true);
 
-    if (input.action === "CANCEL" && order.status === "COMPED" && !canManageFinance) throw new MerchandiseOrderActionError("FINANCE_REQUIRED", COMPED_CANCEL_FINANCE_MESSAGE, 403);
     await assertEventOpenForMoney(tx, eventId, "staff");
 
     const plan = planMerchandiseOrderTransition(input.action, order.status);

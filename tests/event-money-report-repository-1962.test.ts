@@ -53,6 +53,19 @@ describe("event money report repository (#1962)", () => {
     expect(report.check.ok).toBe(true);
   });
 
+  it("totals staff price overrides net of reversals, as a signed change and not a discount (#1509)", async () => {
+    mocks.prisma.registrationAdjustment.findMany.mockResolvedValue([
+      { registrationId: "reg_1", kind: "PRICE_OVERRIDE", amountCents: -2000 },
+      { registrationId: "reg_1", kind: "PRICE_OVERRIDE", amountCents: 1500 },
+      { registrationId: "reg_1", kind: "PRICE_OVERRIDE", amountCents: -1500 },
+      { registrationId: "reg_1", kind: "DISCOUNT", amountCents: -500 },
+    ]);
+    const { report } = await loadEventMoneyReport("event_a");
+    expect(report.charges.priceOverrideCents).toBe(-2000);
+    expect(report.charges.discountCents).toBe(500);
+    expect(mocks.prisma.registrationAdjustment.findMany.mock.calls[0]![0].where.kind.in).toContain("PRICE_OVERRIDE");
+  });
+
   it("audits a download with counts and cents only: no names, codes or event name", async () => {
     await exportEventMoneyReport("event_a", "user_one");
     expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);

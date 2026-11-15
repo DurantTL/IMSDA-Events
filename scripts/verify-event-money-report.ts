@@ -113,6 +113,15 @@ async function main() {
     for (const [kind, amountCents] of [["DISCOUNT", -1000], ["SCHOLARSHIP", -2000]] as const) {
       await prisma.registrationAdjustment.create({ data: { eventId: a, registrationId: r1.id, kind, amountCents, reason: "Synthetic adjustment", createdByNameSnapshot: "Synthetic" } });
     }
+    // Staff price overrides (#1509): a lowered price on R2, a raised one on R4 that was reversed, and one on the cancelled R5.
+    // Registration totals here are set directly, so these lines feed only the price-override figure.
+    const override = (registrationId: string, amountCents: number, reversesAdjustmentId?: string) => prisma.registrationAdjustment.create({
+      data: { eventId: a, registrationId, kind: "PRICE_OVERRIDE", amountCents, reason: "Synthetic price override", createdByNameSnapshot: "Synthetic", reversesAdjustmentId },
+    });
+    await override(r2.id, -300);
+    const raised = await override(r4.id, 500);
+    await override(r4.id, -500, raised.id);
+    await override(r5.id, 1000);
     await pay(a, r1.id, 30, "CARD_REFERENCE");
     await pay(a, r2.id, 50, "CASH");
     const overpaid = await pay(a, r3.id, 80, "CHECK");
@@ -132,6 +141,7 @@ async function main() {
     expect("discounts", report.charges.discountCents, 1000);
     expect("scholarships", report.charges.scholarshipCents, 2000);
     expect("gross charges", report.charges.grossCents, 30_000);
+    expect("staff price overrides", report.charges.priceOverrideCents, -300); // R2 only: R4's was reversed, R5 is cancelled
     expect("paid card", report.paid.byMethod.CARD_REFERENCE, 3000 + 10_000); // R1 and the cancelled R5
     expect("paid total", report.paid.totalCents, 3000 + 5000 + 8000 + 1 + 10_000 + 2000); // R1, R2, R3, R4 manual, R5, R6
     expect("paid other", report.paid.byMethod.MANUAL, 1);

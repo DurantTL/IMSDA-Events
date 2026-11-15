@@ -42,7 +42,7 @@ export const isFreeTextMetric = (metric: PublicMetricName) => (freeTextMetrics a
 /** At most this many different values per day and metric; an already-stored value still counts up, a new one beyond it is dropped. */
 export const freeTextDailyCap = 200;
 /** A term, site or tag is shown on the analytics page only when its total in the period reaches this; rare ones are deleted after 30 days. */
-export const minimumShownCount = 3;
+export const minimumShownCount = 5;
 export const rareFreeTextRetentionDays = 30;
 
 const digitCount = (text: string) => (text.match(/\p{Nd}/gu) ?? []).length;

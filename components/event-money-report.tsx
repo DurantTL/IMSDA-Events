@@ -60,11 +60,12 @@ export function EventMoneyReportView({ eventId, data, canManageFinance, unmatche
         <h3 className={styles.panelHeading} id="money-charges">Charges</h3>
         <p className={styles.note}>Active registrations only (submitted or confirmed). Draft, waitlisted and cancelled registrations are never counted as owing.</p>
         <ul className={styles.lines}>
-          <Line label="Gross charges" cents={charges.grossCents} includes="An estimate, not part of the reconciliation below: net due plus the discounts, promo codes and scholarships recorded on these registrations. Corrections, meal and asset lines stay inside this figure." href={payments("ACTIVE")} />
+          <Line label="Gross charges" cents={charges.grossCents} includes="An estimate, not part of the reconciliation below: net due plus the discounts, promo codes and scholarships recorded on these registrations. Corrections, meal and asset lines and staff price overrides stay inside this figure." href={payments("ACTIVE")} />
           <Line sub label="Promo code discounts" cents={charges.promoCents} includes="The promo code used at registration plus per-person promo codes added by staff, net of reversals." href={page("/more/promo-codes")} linkLabel="Open promo codes" />
           <Line sub label="Discounts" cents={charges.discountCents} includes="Discounts staff added to a registration, net of reversals." href={payments("ACTIVE")} />
           <Line sub label="Scholarships" cents={charges.scholarshipCents} includes="Scholarships, pledged and funded, net of reversals." href={page("/finance/scholarship-fund")} linkLabel="Open the scholarship fund" />
           <Line label="Net due" cents={charges.netDueCents} includes="What these registrations owe in total: the registration totals, including church-billed ones." href={payments("ACTIVE")} />
+          <Line sub label="Staff price overrides" cents={charges.priceOverrideCents} includes="Already inside net due. The net change from staff setting one person's price, net of reversals: a positive amount raised what is owed, a negative one lowered it." href={payments("ACTIVE")} />
         </ul>
       </section>
 

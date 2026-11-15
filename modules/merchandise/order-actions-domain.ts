@@ -67,13 +67,15 @@ export function merchandiseOrderActionPermissions(permissions: ReadonlyArray<str
 }
 export type MerchandiseOrderActionPermissions = ReturnType<typeof merchandiseOrderActionPermissions>;
 
-export const COMPED_CANCEL_FINANCE_MESSAGE = "Cancelling a comped order needs finance access. Ask a finance administrator.";
-
-/** Cancelling a comped order undoes a finance decision, so it needs finance access; cancelling an unpaid one does not. */
-export function merchandiseOrderActionAllowed(action: MerchandiseOrderActionValue, status: MerchandiseOrderStatusValue, permissions: MerchandiseOrderActionPermissions) {
+/**
+ * Mark paid and Comp need finance access. Cancel, on a pending or a comped order, needs only the access to act on
+ * merchandise orders (Caleb, November 15, 2026): undoing a comp still needs a reason and is still audited. The order's
+ * status is not needed to decide this; `planMerchandiseOrderTransition` refuses cancelling a paid order for everyone.
+ */
+export function merchandiseOrderActionAllowed(action: MerchandiseOrderActionValue, permissions: MerchandiseOrderActionPermissions) {
   if (action === "MARK_PAID") return permissions.canMarkPaid;
   if (action === "COMP") return permissions.canComp;
-  return status === "COMPED" ? permissions.canMarkPaid : permissions.canCancel;
+  return permissions.canCancel;
 }
 
 /** Which actions can still be taken on an order in this status, ignoring who is asking. */
