@@ -70,7 +70,9 @@ describe("attendee listing page", () => {
     expect(club).not.toContain("No attendees yet");
     // The default is not a filter: no "Clear filters", and both boxes reset to ticked.
     expect(club).not.toContain("Clear filters");
-    expect(club).toContain('data-default-checked="" name="statuses" checked="" value="SUBMITTED"');
+    const submittedBox = club.match(/<input[^>]*value="SUBMITTED"[^>]*>/)?.[0] ?? "";
+    expect(submittedBox).toContain('data-default-checked=""');
+    expect(submittedBox).toMatch(/\schecked=""/);
     // The CSV link carries no statuses, so the download uses the same club default.
     expect(club).toMatch(/href="\/api\/events\/evt\/exports\/attendees"/);
   });
