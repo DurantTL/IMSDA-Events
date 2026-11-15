@@ -5,6 +5,9 @@ import type { ClubFormSubmissionView as SubmissionView } from "@/modules/club-fo
 import { fieldDisplayLabel, isFieldVisible } from "@/modules/forms/definition";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
+const LOCKED_LABEL = "Locked";
+const LOCKED_NOTE = "Locked: the personal-data key is unavailable right now. Sensitive answers show again when it loads.";
+
 const statusLabel = { DRAFT: "Draft", SUBMITTED: "Submitted" } as const;
 
 function submittedOn(value: string | null) {
@@ -21,6 +24,7 @@ function submittedOn(value: string | null) {
  */
 export function ClubFormSubmissionView({ submission }: { submission: SubmissionView }) {
   const restricted = new Set(submission.restrictedKeys);
+  const locked = new Set(submission.lockedKeys);
   const { definition, sectionNotes } = submission.template;
   const hidden = new Set(submission.template.hiddenFieldKeys ?? []);
   // A field hidden from new forms (#712) shows only when it holds an answer (or may hold one this viewer cannot read).
@@ -44,6 +48,11 @@ export function ClubFormSubmissionView({ submission }: { submission: SubmissionV
             </span>
           )}
         </p>
+        {locked.size > 0 && (
+          <p className="club-form-restricted-note">
+            <LockKeyhole aria-hidden="true" size={13} /> {LOCKED_NOTE}
+          </p>
+        )}
         {restricted.size > 0 && (
           <p className="club-form-restricted-note">
             <LockKeyhole aria-hidden="true" size={13} /> Sensitive answers are shown as {RESTRICTED_LABEL} for your role.
@@ -52,7 +61,7 @@ export function ClubFormSubmissionView({ submission }: { submission: SubmissionV
       </header>
 
       {submission.template.printLayout === "PASSENGER_LIST"
-        ? <PassengerList restricted={restricted} submission={submission} />
+        ? <PassengerList locked={locked} restricted={restricted} submission={submission} />
         : definition.sections.map((section) => {
           const fields = section.fields.filter((field) => isFieldVisible(field, submission.answers) && !holdsNothing(field.key));
           if (fields.length === 0) return null;
@@ -67,7 +76,9 @@ export function ClubFormSubmissionView({ submission }: { submission: SubmissionV
                     <dd translate="no">
                       {restricted.has(field.key)
                         ? <span className="club-form-restricted">{RESTRICTED_LABEL}</span>
-                        : formatClubFormAnswer(field, submission.answers[field.key]) || <span className="club-form-blank">—</span>}
+                        : locked.has(field.key)
+                          ? <span className="club-form-restricted">{LOCKED_LABEL}</span>
+                          : formatClubFormAnswer(field, submission.answers[field.key]) || <span className="club-form-blank">—</span>}
                     </dd>
                   </div>
                 ))}
@@ -81,7 +92,7 @@ export function ClubFormSubmissionView({ submission }: { submission: SubmissionV
 
 const rollCalls = [1, 2, 3, 4, 5] as const;
 
-function PassengerList({ submission, restricted }: { submission: SubmissionView; restricted: Set<string> }) {
+function PassengerList({ submission, restricted, locked }: { submission: SubmissionView; restricted: Set<string>; locked: Set<string> }) {
   const { definition, sectionNotes } = submission.template;
   const answer = (key: string) => {
     const value = submission.answers[key];
@@ -127,7 +138,9 @@ function PassengerList({ submission, restricted }: { submission: SubmissionView;
                 <td translate="no">
                   {restricted.has(`passenger_${n}_emergency_contact`)
                     ? <span className="club-form-restricted">{RESTRICTED_LABEL}</span>
-                    : answer(`passenger_${n}_emergency_contact`)}
+                    : locked.has(`passenger_${n}_emergency_contact`)
+                      ? <span className="club-form-restricted">{LOCKED_LABEL}</span>
+                      : answer(`passenger_${n}_emergency_contact`)}
                 </td>
                 {rollCalls.map((call) => <td className="club-form-roll-cell" key={call}><span className="club-form-roll-box" /></td>)}
               </tr>

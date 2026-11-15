@@ -1,7 +1,6 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
-import { isSecretEncryptionConfigured } from "@/lib/secret-box";
 import {
   fillDefinition,
   sanitizeClubFormAnswers,
@@ -11,7 +10,7 @@ import {
   type ClubFormTemplateRecord,
 } from "@/modules/club-forms/domain";
 import { ClubFormError } from "@/modules/club-forms/errors";
-import { sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
+import { requireSensitiveSealing, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 import { lockClubFormTemplateForWrite } from "@/modules/club-forms/template-lock";
 import { assertAnswersSize } from "@/modules/club-forms/submissions";
 import { withLiveDirectory } from "@/modules/club-forms/templates";
@@ -48,8 +47,6 @@ export async function sealFillerAnswers(
   const keys = await lockClubFormTemplateForWrite(tx, template);
   const { plain, sensitive } = splitAnswers({ sensitiveFieldKeys: keys.sensitiveFieldKeys }, answers);
   const hasSensitive = Object.keys(sensitive).length > 0;
-  if (hasSensitive && !isSecretEncryptionConfigured()) {
-    throw new ClubFormError("ENCRYPTION_NOT_CONFIGURED", "This form can't be saved right now. Please try again later.");
-  }
+  if (hasSensitive) requireSensitiveSealing("This form can't be saved right now. Please try again later.");
   return { plain, sealed: hasSensitive ? sealSensitiveAnswers(submissionId, sensitive) : null, hasSensitive };
 }

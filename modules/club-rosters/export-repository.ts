@@ -13,7 +13,7 @@ import {
   type RosterExportColumn,
 } from "@/modules/club-rosters/export-columns";
 import type { RosterExportFormatInput, RosterExportRequest } from "@/modules/club-rosters/export-schemas";
-import { openBirthDate } from "@/modules/club-rosters/birth-dates";
+import { BIRTH_DATE_LOCKED_ACTION_MESSAGE, openBirthDateOrLocked } from "@/modules/club-rosters/birth-dates";
 import { guardiansForExport } from "@/modules/club-rosters/guardians-repository";
 import { listRoster } from "@/modules/club-rosters/repository";
 import { toCsv } from "@/modules/reporting/csv";
@@ -28,7 +28,7 @@ import { toCsv } from "@/modules/reporting/csv";
 
 type Actor = ReturnType<typeof actorAttribution>;
 
-export type RosterExportErrorCode = "CONFIRMATION_REQUIRED" | "SENSITIVE_ACCESS_DENIED" | "FORMAT_NAME_TAKEN" | "FORMAT_NOT_FOUND" | "CLUBS_NOT_ELIGIBLE";
+export type RosterExportErrorCode = "CONFIRMATION_REQUIRED" | "SENSITIVE_ACCESS_DENIED" | "FORMAT_NAME_TAKEN" | "FORMAT_NOT_FOUND" | "CLUBS_NOT_ELIGIBLE" | "DATA_KEY_UNAVAILABLE";
 
 export class RosterExportError extends Error {
   constructor(public readonly code: RosterExportErrorCode, message: string) {
@@ -241,5 +241,10 @@ async function revealBirthDatesForExport(organizationId: string, clubYear: strin
     },
     select: { id: true, sealedBirthDate: true },
   });
-  return Object.fromEntries(members.map((member) => [member.id, openBirthDate(member.sealedBirthDate!)]));
+  // An export that includes birth dates is refused while they are locked, never exported with blanks.
+  return Object.fromEntries(members.map((member) => {
+    const opened = openBirthDateOrLocked(member.sealedBirthDate!);
+    if (opened.locked) throw new RosterExportError("DATA_KEY_UNAVAILABLE", BIRTH_DATE_LOCKED_ACTION_MESSAGE);
+    return [member.id, opened.birthDate];
+  }));
 }

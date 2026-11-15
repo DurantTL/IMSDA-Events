@@ -1,6 +1,6 @@
 import { ZodError } from "zod";
 import { logError } from "@/lib/logger";
-import { SecretBoxError } from "@/lib/secret-box";
+import { DataKeyUnavailableError, SecretBoxError } from "@/lib/secret-box";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { RosterAccessError } from "@/modules/club-rosters/access";
 import { HEALTH_NOT_FOUND_MESSAGE, HealthRecordError } from "@/modules/health-records/errors";
@@ -87,6 +87,10 @@ export function healthApiError(error: unknown, action: string) {
       { error: error.code, message: error.message, ...(error.issues.length > 0 ? { issues: error.issues } : {}) },
       { status: statusByCode[error.code] },
     );
+  }
+  if (error instanceof DataKeyUnavailableError) {
+    logError(action, error);
+    return healthJson({ error: "DATA_KEY_UNAVAILABLE", message: "Health records are locked right now. Please try again in a few minutes." }, { status: 503 });
   }
   if (error instanceof SecretBoxError) {
     logError(action, error);

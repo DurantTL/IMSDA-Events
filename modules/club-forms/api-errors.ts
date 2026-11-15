@@ -1,6 +1,6 @@
 import { ZodError } from "zod";
 import { logError } from "@/lib/logger";
-import { SecretBoxError } from "@/lib/secret-box";
+import { DataKeyUnavailableError, SecretBoxError } from "@/lib/secret-box";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { ClubFormError, formBusyError, isLockTimeoutError } from "@/modules/club-forms/errors";
 import { RosterAccessError } from "@/modules/club-rosters/access";
@@ -21,6 +21,7 @@ const statusByCode: Record<ClubFormError["code"], number> = {
   ALREADY_SUBMITTED: 409,
   EMAIL_NOT_CONFIGURED: 503,
   ENCRYPTION_NOT_CONFIGURED: 503,
+  DATA_KEY_UNAVAILABLE: 503,
   SENSITIVE_UNREADABLE: 500,
   INVALID_TEMPLATE: 500,
   TEMPLATE_NEEDS_SYNC: 409,
@@ -66,6 +67,13 @@ export function clubFormApiError(error: unknown, action: string) {
     logError(action, error);
     const busy = formBusyError();
     return Response.json({ error: busy.code, message: busy.message }, { status: statusByCode.FORM_BUSY, headers: { "Retry-After": "60" } });
+  }
+  if (error instanceof DataKeyUnavailableError) {
+    logError(action, error);
+    return Response.json(
+      { error: "DATA_KEY_UNAVAILABLE", message: "This can't be saved or shown right now because protected answers are locked. Please try again in a few minutes." },
+      { status: 503, headers: { "Retry-After": "60" } },
+    );
   }
   if (error instanceof SecretBoxError) {
     logError(action, error);

@@ -3,7 +3,7 @@ import "server-only";
 import { teamLabel } from "@/modules/club-teams/domain";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
-import { isSecretEncryptionConfigured, SecretBoxError } from "@/lib/secret-box";
+import { DataKeyUnavailableError, isDataEncryptionAvailable, isDataKeyUnavailable, SecretBoxError } from "@/lib/secret-box";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { HEALTH_ACKNOWLEDGMENT_REQUIRED_MESSAGE, hasAcknowledgedHealthPrivacy } from "@/modules/health-records/acknowledgment";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
@@ -245,13 +245,20 @@ export async function loadEventHealth(
     if (cached) return cached;
     const merged: Record<string, unknown> = pickHealthAnswers(submission.answers as Record<string, unknown>);
     if (submission.sealedSensitiveAnswers) {
-      if (!isSecretEncryptionConfigured()) {
-        throw new HealthViewError("ENCRYPTION_UNAVAILABLE", "Encryption isn't set up on this server, so emergency contacts can't be read.");
+      if (!isDataEncryptionAvailable()) {
+        // Not set up and set up but locked right now are different problems with different fixes.
+        throw new HealthViewError(
+          "ENCRYPTION_UNAVAILABLE",
+          isDataKeyUnavailable()
+            ? "Emergency contacts are locked right now because the personal-data key is unavailable. Try again in a few minutes."
+            : "Encryption isn't set up on this server, so emergency contacts can't be read.",
+        );
       }
       try {
         // Every key this view does not use is dropped here, before anything else can touch it.
         Object.assign(merged, pickHealthAnswers(openSensitiveAnswers(submission.id, submission.sealedSensitiveAnswers)));
       } catch (error) {
+        if (error instanceof DataKeyUnavailableError) throw new HealthViewError("ENCRYPTION_UNAVAILABLE", "Emergency contacts are locked right now because the personal-data key is unavailable. Try again in a few minutes.");
         if (error instanceof SecretBoxError) throw new HealthViewError("SENSITIVE_UNREADABLE", "Emergency contacts can't be read on this server.");
         throw error;
       }

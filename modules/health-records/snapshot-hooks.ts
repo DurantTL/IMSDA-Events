@@ -1,6 +1,6 @@
 import "server-only";
 
-import { logError } from "@/lib/logger";
+import { logError, logWarn } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { deleteExpiredHealthSnapshots, sealHealthSnapshot, sealStartedEventSnapshots } from "@/modules/health-records/snapshot-repository";
@@ -26,7 +26,9 @@ export async function sealHealthSnapshotAfterCheckIn(eventId: string, attendeeId
   try {
     const attendee = await getPrisma().registrationAttendee.findFirst({ where: { id: attendeeId, eventId }, select: { personId: true } });
     if (!attendee) return;
-    await sealHealthSnapshot({ eventId, personId: attendee.personId, trigger: "CHECK_IN" });
+    const result = await sealHealthSnapshot({ eventId, personId: attendee.personId, trigger: "CHECK_IN" });
+    // The check-in stands. The event-start sweep takes the copy once the key is back.
+    if (result.outcome === "DATA_KEY_UNAVAILABLE") logWarn("A health copy was not taken at check-in because the personal-data key is unavailable.");
   } catch (error) {
     const action = "Sealing a health copy at check-in";
     logError(`${action} failed`, error);

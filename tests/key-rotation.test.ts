@@ -97,8 +97,8 @@ describe("key check scan", () => {
     store.put(columns.code, "c7", "not-a-sealed-value");
 
     const [code, health] = await scanSealedColumns(store, { columns: [columns.code, columns.health], batchSize: 2 });
-    expect(code).toEqual({ label: columns.code.label, total: 8, current: 1, older: 5, unreadable: 2 });
-    expect(health).toEqual({ label: columns.health.label, total: 2, current: 0, older: 2, unreadable: 0 });
+    expect(code).toEqual({ label: columns.code.label, total: 8, current: 1, older: 5, onSignInKey: 0, unreadable: 2 });
+    expect(health).toEqual({ label: columns.health.label, total: 2, current: 0, older: 2, onSignInKey: 0, unreadable: 0 });
     expect(JSON.stringify([code, health])).not.toMatch(/c9|rec1|synthetic/);
   });
 

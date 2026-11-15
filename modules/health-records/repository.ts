@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import { getPrisma } from "@/lib/prisma";
-import { isSecretEncryptionConfigured } from "@/lib/secret-box";
+import { DataKeyUnavailableError, isDataEncryptionAvailable, isDataKeyUnavailable } from "@/lib/secret-box";
 import { hashOpaqueToken } from "@/modules/access/tokens";
 import { logError } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -320,7 +320,9 @@ async function withFirstSaveRetry<T>(work: () => Promise<T>): Promise<T> {
 }
 
 function requireEncryption() {
-  if (!isSecretEncryptionConfigured()) {
+  if (!isDataEncryptionAvailable()) {
+    // A key that is configured but not loaded is a different state from no key at all: the API answers it with its own 503.
+    if (isDataKeyUnavailable()) throw new DataKeyUnavailableError();
     throw new HealthRecordError("ENCRYPTION_NOT_CONFIGURED", "Health records can't be saved right now. Please try again later.");
   }
 }

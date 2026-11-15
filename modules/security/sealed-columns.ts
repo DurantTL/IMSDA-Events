@@ -30,6 +30,11 @@ export type SealedRowFields = Record<string, unknown>;
 export type SealedColumn = {
   /** `Model.column`, what the commands print. Never a value. */
   label: string;
+  /**
+   * Which key seals this column (#1652): the sign-in key (`sealSecret`, `openSecret`) or the personal-data key
+   * (`sealData`, `openData`). A guard test checks that the column's source files use only that key's functions.
+   */
+  keyring: "sign-in" | "data";
   model: SealedModel;
   /** The Prisma model name as the schema spells it (used by the schema guard test). */
   schemaModel: string;
@@ -79,6 +84,7 @@ const STEP_UP_PURPOSES: Record<string, string> = {
 export const SEALED_COLUMNS: readonly SealedColumn[] = [
   {
     label: "UserMfaEnrollment.sealedSecret",
+    keyring: "sign-in",
     model: "userMfaEnrollment",
     schemaModel: "UserMfaEnrollment",
     preserve: ["updatedAt"],
@@ -90,6 +96,7 @@ export const SEALED_COLUMNS: readonly SealedColumn[] = [
   },
   {
     label: "AttendeeMfaEnrollment.sealedSecret",
+    keyring: "sign-in",
     model: "attendeeMfaEnrollment",
     schemaModel: "AttendeeMfaEnrollment",
     preserve: ["updatedAt"],
@@ -101,6 +108,7 @@ export const SEALED_COLUMNS: readonly SealedColumn[] = [
   },
   {
     label: "AttendeeAccountToken.sealedCode",
+    keyring: "sign-in",
     model: "attendeeAccountToken",
     schemaModel: "AttendeeAccountToken",
     preserve: [],
@@ -113,6 +121,7 @@ export const SEALED_COLUMNS: readonly SealedColumn[] = [
   {
     // One column, three key purposes, told apart by the row's own `purpose`.
     label: "AttendeeStepUpCode.sealedCode",
+    keyring: "sign-in",
     model: "attendeeStepUpCode",
     schemaModel: "AttendeeStepUpCode",
     preserve: [],
@@ -128,6 +137,7 @@ export const SEALED_COLUMNS: readonly SealedColumn[] = [
   },
   {
     label: "SecurityCheckCode.sealedCode",
+    keyring: "sign-in",
     model: "securityCheckCode",
     schemaModel: "SecurityCheckCode",
     preserve: [],
@@ -139,6 +149,7 @@ export const SEALED_COLUMNS: readonly SealedColumn[] = [
   },
   {
     label: "ClubRosterMember.sealedBirthDate",
+    keyring: "data",
     model: "clubRosterMember",
     schemaModel: "ClubRosterMember",
     preserve: ["updatedAt"],
@@ -151,6 +162,7 @@ export const SEALED_COLUMNS: readonly SealedColumn[] = [
   {
     // The Sterling Volunteers list entries: birth dates are sealed with the same helper as roster birth dates.
     label: "BackgroundCheckEntry.sealedBirthDate",
+    keyring: "data",
     model: "backgroundCheckEntry",
     schemaModel: "BackgroundCheckEntry",
     preserve: ["updatedAt"],
@@ -162,6 +174,7 @@ export const SEALED_COLUMNS: readonly SealedColumn[] = [
   },
   {
     label: "ClubFormSubmission.sealedSensitiveAnswers",
+    keyring: "data",
     model: "clubFormSubmission",
     schemaModel: "ClubFormSubmission",
     preserve: ["updatedAt"],
@@ -173,6 +186,7 @@ export const SEALED_COLUMNS: readonly SealedColumn[] = [
   },
   {
     label: "CalendarFeed.sealedUrl",
+    keyring: "data",
     model: "calendarFeed",
     schemaModel: "CalendarFeed",
     preserve: ["updatedAt"],
@@ -189,6 +203,7 @@ export const SEALED_COLUMNS: readonly SealedColumn[] = [
   },
   {
     label: "HealthRecordField.sealedValue",
+    keyring: "data",
     model: "healthRecordField",
     schemaModel: "HealthRecordField",
     preserve: ["updatedAt"],
@@ -200,6 +215,7 @@ export const SEALED_COLUMNS: readonly SealedColumn[] = [
   },
   {
     label: "HealthRecordSnapshotField.sealedValue",
+    keyring: "data",
     model: "healthRecordSnapshotField",
     schemaModel: "HealthRecordSnapshotField",
     preserve: [],

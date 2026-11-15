@@ -7,7 +7,7 @@ import { getPrisma } from "@/lib/prisma";
 import { sendBaptismFollowUpNotices } from "@/modules/baptism-follow-up/notice";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { assertTeachersMeetRule, ClubTeacherError } from "@/modules/club-teachers/repository";
-import { openBirthDate } from "@/modules/club-rosters/birth-dates";
+import { openBirthDateOrNull } from "@/modules/club-rosters/birth-dates";
 import { ageOn, clubYearFor } from "@/modules/club-rosters/domain";
 import {
   clubAttendeeClientId,
@@ -599,6 +599,10 @@ export async function requireClubEventForClub(organizationId: string, eventId: s
   return requireClubEvent(eventId);
 }
 
+function ageOnOrNull(birthDate: string | null, eventDate: string) {
+  return birthDate ? ageOn(birthDate, eventDate) : null;
+}
+
 function rosterPerson(
   member: { sealedBirthDate: string | null; gender: "FEMALE" | "MALE" | null; person: { firstName: string; lastName: string } | null },
   eventDate: string,
@@ -606,7 +610,8 @@ function rosterPerson(
   return {
     firstName: member.person?.firstName ?? "",
     lastName: member.person?.lastName ?? "",
-    ageOnEventDate: member.sealedBirthDate ? ageOn(openBirthDate(member.sealedBirthDate), eventDate) : null,
+    // A birth date that is locked (the personal-data key is unavailable) counts as unknown: registration carries on.
+    ageOnEventDate: ageOnOrNull(openBirthDateOrNull(member.sealedBirthDate), eventDate),
     gender: member.gender,
   };
 }

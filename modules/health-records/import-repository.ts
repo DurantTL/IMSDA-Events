@@ -4,9 +4,9 @@ import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-mi
 import { randomUUID } from "node:crypto";
 import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
-import { isSecretEncryptionConfigured } from "@/lib/secret-box";
+import { DataKeyUnavailableError, isDataEncryptionAvailable, isDataKeyUnavailable } from "@/lib/secret-box";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { openBirthDate } from "@/modules/club-rosters/birth-dates";
+import { openBirthDateOrNull } from "@/modules/club-rosters/birth-dates";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { requireHealthPrivacyAcknowledgment } from "@/modules/health-records/acknowledgment";
 import { sealHealthFieldRows } from "@/modules/health-records/crypto";
@@ -62,9 +62,9 @@ function readExport(files: Array<{ bytes: Uint8Array }>) {
 }
 
 function openBirthDateSafely(sealed: string | null) {
-  if (!sealed) return null;
   try {
-    return openBirthDate(sealed);
+    // A locked birth date matches like an unknown one: the entry is not matched by birth date.
+    return openBirthDateOrNull(sealed);
   } catch {
     return null;
   }
@@ -228,7 +228,8 @@ export async function applyHealthImport(
 ): Promise<ImportApplyResult> {
   const admin = requireHealthImporter(viewer);
   await requireHealthPrivacyAcknowledgment(admin);
-  if (!isSecretEncryptionConfigured()) {
+  if (!isDataEncryptionAvailable()) {
+    if (isDataKeyUnavailable()) throw new DataKeyUnavailableError();
     throw new HealthRecordError("ENCRYPTION_NOT_CONFIGURED", "Health records can't be saved right now. Please try again later.");
   }
   const matched = await parseAndMatch(files, now);

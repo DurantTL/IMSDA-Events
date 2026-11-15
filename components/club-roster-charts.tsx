@@ -1,5 +1,6 @@
 import { HorizontalBars, StatTiles, TrendChart } from "@/components/analytics-charts";
 import { GetFilterForm } from "@/components/get-filter-form";
+import { BIRTH_DATE_LOCKED_TEXT } from "@/modules/club-rosters/birth-dates-text";
 import { MONTH_NAMES, summarizeAttendance, summarizeCounts } from "@/modules/club-roster-charts/domain";
 import type { RosterChartsView } from "@/modules/club-roster-charts/repository";
 import styles from "./club-roster-charts.module.css";
@@ -17,7 +18,7 @@ export function ClubRosterCharts({ view, action }: { view: RosterChartsView; act
         <HorizontalBars empty="No classes are set on the roster yet." nameLabel="Class" order=", in class order" rows={view.byClassLevel} summary={summarizeCounts("by class", view.byClassLevel)} title="Members by class" valueLabel="People" />
         <HorizontalBars empty="No youth members yet." nameLabel="School grade" order=", in grade order" rows={view.bySchoolGrade} summary={summarizeCounts("by school grade", view.bySchoolGrade)} title="Members by school grade" valueLabel="People" />
         <HorizontalBars empty="Nobody is on the roster yet." nameLabel="Member type" order=", by member type" rows={view.byMemberType} summary={summarizeCounts("by member type", view.byMemberType)} title="Members by type" valueLabel="People" />
-        {birthdayView && (
+        {birthdayView && !birthdayView.locked && (
           <HorizontalBars empty="Nobody is on the roster yet." nameLabel="Age group" order=", in age order" rows={birthdayView.ageBands} summary={summarizeCounts("by age group", birthdayView.ageBands)} title="Members by age group" valueLabel="People" />
         )}
       </div>
@@ -38,7 +39,13 @@ export function ClubRosterCharts({ view, action }: { view: RosterChartsView; act
           />
         )}
       </section>
-      {birthdayView && (
+      {birthdayView?.locked && (
+        <section aria-labelledby="roster-charts-birthdays" className={styles.section}>
+          <h3 id="roster-charts-birthdays">Age groups and birthdays</h3>
+          <p className={styles.empty}>{BIRTH_DATE_LOCKED_TEXT}. They show again when it loads.</p>
+        </section>
+      )}
+      {birthdayView && !birthdayView.locked && (
         <section aria-labelledby="roster-charts-birthdays" className={styles.section}>
           <h3 id="roster-charts-birthdays">{`Birthdays in ${MONTH_NAMES[birthdayView.month - 1]}`}</h3>
           <GetFilterForm action={action} className={styles.filter}>

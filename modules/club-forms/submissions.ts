@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import { getPrisma } from "@/lib/prisma";
-import { isSecretEncryptionConfigured, SecretBoxError } from "@/lib/secret-box";
+import { DataKeyUnavailableError, isDataEncryptionAvailable, SecretBoxError } from "@/lib/secret-box";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import {
@@ -33,7 +33,7 @@ import {
 } from "@/modules/club-forms/domain";
 import { emergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
 import { ClubFormError } from "@/modules/club-forms/errors";
-import { openSensitiveAnswers, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
+import { DATA_KEY_LOCKED_MESSAGE, openSensitiveAnswers, requireSensitiveSealing, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 import { assertClubFormTemplateCurrent, lockClubFormTemplateForWrite } from "@/modules/club-forms/template-lock";
 import { getEnabledClubFormTemplate, withLiveDirectory } from "@/modules/club-forms/templates";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
@@ -112,6 +112,7 @@ function carriedForwardAnswers(
     try {
       opened = openSensitiveAnswers(submissionId, existing.sealedSensitiveAnswers);
     } catch (error) {
+      if (error instanceof DataKeyUnavailableError) throw new ClubFormError("DATA_KEY_UNAVAILABLE", DATA_KEY_LOCKED_MESSAGE);
       if (error instanceof SecretBoxError) {
         throw new ClubFormError("SENSITIVE_UNREADABLE", "The sensitive answers already saved on this draft can't be read on this server, so it can't be saved right now.");
       }
@@ -211,9 +212,7 @@ export async function saveClubFormSubmission(viewer: ClubFormsViewer, input: Sav
     const plain = split.plain;
     const sensitive = { ...split.sensitive, ...carried.sealed };
     const hasSensitive = Object.keys(sensitive).length > 0;
-    if (hasSensitive && !isSecretEncryptionConfigured()) {
-      throw new ClubFormError("ENCRYPTION_NOT_CONFIGURED", "Encryption isn't set up on this server, so this form can't be saved yet.");
-    }
+    if (hasSensitive) requireSensitiveSealing("Encryption isn't set up on this server, so this form can't be saved yet.");
     const sealed = hasSensitive ? sealSensitiveAnswers(id, sensitive) : null;
     const data = {
       rosterMemberId: input.rosterMemberId ?? null,
@@ -488,7 +487,7 @@ export async function getSubmissionForViewer(
     // Only the keys the sealed value really holds are restricted (the values themselves never leave here). When it
     // cannot be opened, every missing one is, so nothing is ever shown as a harmless blank.
     let held: ReadonlySet<string> | null = null;
-    if (missing.length > 0 && row.sealedSensitiveAnswers && isSecretEncryptionConfigured()) {
+    if (missing.length > 0 && row.sealedSensitiveAnswers && isDataEncryptionAvailable()) {
       try {
         held = new Set(Object.keys(openSensitiveAnswers(row.id, row.sealedSensitiveAnswers)));
       } catch {
@@ -539,6 +538,8 @@ export async function getSubmissionForViewer(
   }
 
   const answers: Record<string, unknown> = { ...(row.answers as Record<string, unknown>) };
+  // Sensitive answers shown as locked while the personal-data key is unavailable (the rest of the form still shows).
+  let lockedKeys: string[] = [];
   // Defense in depth: a restricted key never leaves here, even if it was stored in the plain column.
   for (const key of restricted) delete answers[key];
   if ((reveal || revealBirthDates) && row.sealedSensitiveAnswers) {
@@ -549,10 +550,13 @@ export async function getSubmissionForViewer(
         if (!restricted.has(key)) answers[key] = value;
       }
     } catch (error) {
-      if (error instanceof SecretBoxError) {
+      if (error instanceof DataKeyUnavailableError) {
+        lockedKeys = [...new Set([...template.sensitiveFieldKeys, ...emergencyPlainKeys(template.key)])].filter((key) => !restricted.has(key));
+      } else if (error instanceof SecretBoxError) {
         throw new ClubFormError("SENSITIVE_UNREADABLE", "The sensitive answers on this form can't be read on this server.");
+      } else {
+        throw error;
       }
-      throw error;
     }
   }
   // Editing a draft: the form offers only the fields it still shows. Answers to a hidden or removed field stay on
@@ -612,6 +616,8 @@ export async function getSubmissionForViewer(
     sensitiveRevealed: reveal,
     /** Fields shown as "Restricted": every sensitive field this viewer may not read, answered or not, so a blank does not tell. */
     restrictedKeys: [...restricted],
+    /** Sensitive fields shown as "Locked" because the personal-data key is unavailable right now (otherwise empty). */
+    lockedKeys,
   };
 }
 

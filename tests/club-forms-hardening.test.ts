@@ -61,6 +61,7 @@ describe("the passenger list print (#610)", () => {
     rosterAdd: null,
     sensitiveRevealed: restrictedKeys.length === 0,
     restrictedKeys,
+    lockedKeys: [] as string[],
   });
   const render = (value: ReturnType<typeof submission>) => renderToStaticMarkup(createElement(ClubFormSubmissionView, { submission: value }));
 

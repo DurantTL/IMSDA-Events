@@ -1,6 +1,6 @@
 import "server-only";
 
-import { openSecret, sealSecret } from "@/lib/secret-box";
+import { DataKeyUnavailableError, openData, sealData } from "@/lib/secret-box";
 import { HealthRecordError } from "@/modules/health-records/errors";
 
 /**
@@ -14,7 +14,7 @@ function purposeFor(recordId: string, fieldKey: string) {
 }
 
 export function sealHealthField(recordId: string, fieldKey: string, value: unknown) {
-  return sealSecret(JSON.stringify(value), purposeFor(recordId, fieldKey));
+  return sealData(JSON.stringify(value), purposeFor(recordId, fieldKey));
 }
 
 /**
@@ -25,11 +25,12 @@ export function sealHealthFieldRows(recordId: string, values: Record<string, unk
   return Object.entries(values).map(([fieldKey, value]) => ({ fieldKey, sealedValue: sealHealthField(recordId, fieldKey, value) }));
 }
 
-/** An unreadable value is an error with a fixed message, never the ciphertext or a partial value. */
+/** While the personal-data key is unavailable `DataKeyUnavailableError` passes through (the API answers 503). An unreadable value is an error with a fixed message, never the ciphertext or a partial value. */
 export function openHealthField(recordId: string, fieldKey: string, sealed: string): unknown {
   try {
-    return JSON.parse(openSecret(sealed, purposeFor(recordId, fieldKey))) as unknown;
-  } catch {
+    return JSON.parse(openData(sealed, purposeFor(recordId, fieldKey))) as unknown;
+  } catch (error) {
+    if (error instanceof DataKeyUnavailableError) throw error;
     throw new HealthRecordError("UNREADABLE", "A health record could not be read. Ask a system administrator to check the encryption key.");
   }
 }
@@ -44,13 +45,14 @@ function snapshotPurposeFor(snapshotId: string, fieldKey: string) {
 }
 
 export function sealSnapshotField(snapshotId: string, fieldKey: string, value: unknown) {
-  return sealSecret(JSON.stringify(value), snapshotPurposeFor(snapshotId, fieldKey));
+  return sealData(JSON.stringify(value), snapshotPurposeFor(snapshotId, fieldKey));
 }
 
 export function openSnapshotField(snapshotId: string, fieldKey: string, sealed: string): unknown {
   try {
-    return JSON.parse(openSecret(sealed, snapshotPurposeFor(snapshotId, fieldKey))) as unknown;
-  } catch {
+    return JSON.parse(openData(sealed, snapshotPurposeFor(snapshotId, fieldKey))) as unknown;
+  } catch (error) {
+    if (error instanceof DataKeyUnavailableError) throw error;
     throw new HealthRecordError("UNREADABLE", "A sealed health copy could not be read. Ask a system administrator to check the encryption key.");
   }
 }

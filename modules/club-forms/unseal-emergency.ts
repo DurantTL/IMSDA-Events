@@ -2,11 +2,10 @@ import "server-only";
 
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
-import { isSecretEncryptionConfigured } from "@/lib/secret-box";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { EMERGENCY_PLAIN_DECISION_DATE, EMERGENCY_PLAIN_KEYS } from "@/modules/club-forms/plain-emergency";
-import { openSensitiveAnswers, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
+import { openSensitiveAnswers, requireSensitiveSealing, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 import { RESEAL_TRANSACTION } from "@/modules/club-forms/templates";
 import { lockClubFormTemplateForReseal } from "@/modules/club-forms/template-lock";
 
@@ -66,9 +65,7 @@ function emptyReport(templateKey: string, status: UnsealTemplateReport["status"]
 async function unsealOneTemplate(client: Client, templateKey: string, keys: ReadonlySet<string>, execute: boolean, actorUserId?: string): Promise<UnsealTemplateReport> {
   const template = await client.clubFormTemplate.findUnique({ where: { key: templateKey }, select: { id: true } });
   if (!template) return emptyReport(templateKey, "NOT_PRESENT", "No such template here.");
-  if (!isSecretEncryptionConfigured()) {
-    throw new ClubFormError("ENCRYPTION_NOT_CONFIGURED", "Encryption isn't set up, so sealed answers can't be read.");
-  }
+  requireSensitiveSealing("Encryption isn't set up, so sealed answers can't be read.");
   const report = emptyReport(templateKey, execute ? "DONE" : "DRY_RUN");
 
   const apply = async (tx: Prisma.TransactionClient) => {

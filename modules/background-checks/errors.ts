@@ -16,7 +16,8 @@ export type BackgroundCheckOperationErrorCode =
   | "RECENTLY_REMINDED"
   | "REMINDER_EMAIL_NOT_CONFIGURED"
   | "TOO_MANY_PEOPLE"
-  | "NOTHING_TO_SEND";
+  | "NOTHING_TO_SEND"
+  | "DATA_KEY_UNAVAILABLE";
 
 const statusByCode: Record<BackgroundCheckOperationErrorCode, number> = {
   PREVIEW_CHANGED: 409,
@@ -32,6 +33,7 @@ const statusByCode: Record<BackgroundCheckOperationErrorCode, number> = {
   REMINDER_EMAIL_NOT_CONFIGURED: 503,
   TOO_MANY_PEOPLE: 400,
   NOTHING_TO_SEND: 400,
+  DATA_KEY_UNAVAILABLE: 503,
 };
 
 export class BackgroundCheckOperationError extends Error {
