@@ -54,7 +54,7 @@ export async function recordPublicMetric(metric: PublicMetricName, dimension: un
 
 /**
  * Deletes daily rows older than the retention window (400 days), and rows of the three free-text metrics that are older
- * than 30 days and whose value, added up over every stored day, was seen fewer than 3 times. Returns how many went.
+ * than 30 days and whose value, added up over every stored day, was seen fewer than `minimumShownCount` (5) times. Returns how many went.
  */
 export async function prunePublicMetrics(now = new Date()): Promise<number> {
   const today = calendarDateIn(now);
@@ -85,7 +85,7 @@ export type AnalyticsSummary = {
   imageErrors: MetricRow[];
   vitals: Array<{ name: string; good: number; needsImprovement: number; poor: number }>;
   directory: MetricRow[];
-  /** Referring sites and campaign tags (#1560): only values seen at least 3 times in the period; the rest are a count only. */
+  /** Referring sites and campaign tags (#1560): only values seen at least `minimumShownCount` (5) times in the period; the rest are a count only. */
   referrers: MinimumCounted<MetricRow>;
   campaigns: MinimumCounted<MetricRow>;
   /** Searches on the events list that showed nothing (#1560), same rule. */

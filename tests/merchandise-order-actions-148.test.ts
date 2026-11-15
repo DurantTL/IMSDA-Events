@@ -94,12 +94,15 @@ describe("transition rules", () => {
     expect(availableMerchandiseOrderActions("PAID")).toEqual([]);
   });
 
-  it("hides Cancel on a comped order from staff without finance access", () => {
+  it("shows Cancel on a comped order to any staff who can act on orders, but Mark paid and Comp only to finance", () => {
     const registration = merchandiseOrderActionPermissions(["CONFIGURE_EVENT", "MANAGE_REGISTRATION"]);
     const finance = merchandiseOrderActionPermissions(["CONFIGURE_EVENT", "MANAGE_FINANCE"]);
-    expect(merchandiseOrderActionAllowed("CANCEL", "PENDING", registration)).toBe(true);
-    expect(merchandiseOrderActionAllowed("CANCEL", "COMPED", registration)).toBe(false);
-    expect(merchandiseOrderActionAllowed("CANCEL", "COMPED", finance)).toBe(true);
+    const none = merchandiseOrderActionPermissions(["MANAGE_REGISTRATION"]);
+    expect(merchandiseOrderActionAllowed("CANCEL", registration)).toBe(true);
+    expect(merchandiseOrderActionAllowed("CANCEL", finance)).toBe(true);
+    expect(merchandiseOrderActionAllowed("CANCEL", none)).toBe(false);
+    expect(merchandiseOrderActionAllowed("MARK_PAID", registration)).toBe(false);
+    expect(merchandiseOrderActionAllowed("COMP", registration)).toBe(false);
   });
 
   it("maps button visibility from permissions", () => {
@@ -208,12 +211,13 @@ describe("applyMerchandiseOrderAction", () => {
     expect(mocks.enqueueReceipt).not.toHaveBeenCalled();
   });
 
-  it("needs finance access to cancel a comped order, but not a pending one", async () => {
+  it("cancels a comped order with its reason recorded, and still refuses a paid one", async () => {
     const tx = makeDb({ order: { status: "COMPED", receiptNumber: "M-0001" } });
-    await expect(applyMerchandiseOrderAction(eventId, orderId, "usr_1", cancel(), now, false)).rejects.toMatchObject({ code: "FINANCE_REQUIRED", status: 403 });
-    expect(tx.merchandiseOrder.updateMany).not.toHaveBeenCalled();
-    makeDb({ order: { status: "PENDING" } });
-    await expect(applyMerchandiseOrderAction(eventId, orderId, "usr_1", cancel(), now, false)).resolves.toMatchObject({ order: { status: "CANCELLED" } });
+    await expect(applyMerchandiseOrderAction(eventId, orderId, "usr_1", cancel(), now)).resolves.toMatchObject({ order: { status: "CANCELLED" } });
+    expect(tx.merchandiseOrderStatusChange.create.mock.calls[0][0].data).toMatchObject({ action: "CANCEL", fromStatus: "COMPED", toStatus: "CANCELLED", reason: "Ordered by mistake" });
+    const paid = makeDb({ order: { status: "PAID", receiptNumber: "M-0002" } });
+    await expect(applyMerchandiseOrderAction(eventId, orderId, "usr_1", cancel(), now)).rejects.toMatchObject({ code: "PAID_ORDER_NEEDS_REFUND", status: 409 });
+    expect(paid.merchandiseOrder.updateMany).not.toHaveBeenCalled();
   });
 
   it("words a refusal without a raw status", async () => {
@@ -335,10 +339,10 @@ describe("POST route permissions", () => {
     expect((await post(bodies.COMP)).status).toBe(403);
   });
 
-  it("lets only finance staff cancel a comped order", async () => {
+  it("lets registration staff, not only finance staff, cancel a comped order", async () => {
     makeDb({ order: { status: "COMPED" } });
     mocks.findActiveMembership.mockResolvedValue(membership("REGISTRATION_MANAGER", ["CONFIGURE_EVENT"]));
-    expect((await post(bodies.CANCEL)).status).toBe(403);
+    expect((await post(bodies.CANCEL)).status).toBe(201);
     makeDb({ order: { status: "COMPED" } });
     mocks.findActiveMembership.mockResolvedValue(membership("FINANCE_MANAGER", ["CONFIGURE_EVENT"]));
     expect((await post(bodies.CANCEL)).status).toBe(201);

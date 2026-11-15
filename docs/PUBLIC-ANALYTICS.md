@@ -28,10 +28,10 @@ Every other dimension is checked against a fixed list on the server (`modules/pu
 - **Campaign tags:** same landing and opt-out rules, independent of the referrer, and only when `utm_source` is present. Nothing else from the query string is read. Each part is lower-cased, spaces become `-`, only `[a-z0-9._-]` and 1 to 30 characters pass. A part with an `@`, 7 or more digits, or any other character drops the whole hit.
 - **Search with no results:** "no results" means the search words alone match none of the open events (all of them, whichever audience tab is chosen). A list emptied by a category, date, location or audience filter, or an events list with no open events at all, counts nothing. The term is normalized (Unicode NFKC, lower case, trimmed, spaces collapsed, only letters, digits, spaces, hyphens and apostrophes kept) and counted if it is 3 to 40 characters. A term that contained an `@` or 7 or more digits is dropped. The term is never logged. The existing `DIRECTORY_SEARCH` count (that a search was used) is unchanged.
   - **One hit per term per visit, final term only:** as the visitor types, the page only remembers the latest no-result term in memory. It is sent once, when the page is hidden or closed (`pagehide`, or `visibilitychange` to hidden) or when the visitor leaves the events list. A term replaced by a later one, or by a results state, is never sent, and the same term is not sent twice in one document. A reload or back/forward that shows the term the page loaded with sends nothing. Nothing is kept in cookies or browser storage.
-  - **The minimum of 3 counts searches, not people.** Nothing identifies a visitor, so one person searching the same words in three separate visits reaches 3 on their own.
+  - **The minimum of 5 counts searches, not people.** Nothing identifies a visitor, so one person searching the same words in five separate visits reaches 5 on their own.
 - **Abuse cap:** at most 200 different values per day and metric. A value already stored that day still counts up; a new one beyond 200 is dropped. The check is in the same SQL statement as the write; two requests at the same instant can pass it together, so the count can briefly pass 200 by a few.
-- **Shown only from 3:** on the analytics page a site, tag set or search is listed only when its total in the chosen period is at least 3 (`minimumShownCount`, `applyMinimumCount`). The rest appear as one line, "Other sites, tags or searches, each fewer than 3 times: N in total", with a count and no names. The names are removed on the server and never sent to the page.
-- **Deleted when rare:** a term or site seen fewer than 3 times (added up over every stored day) is deleted after 30 days.
+- **Shown only from 5:** on the analytics page a site, tag set or search is listed only when its total in the chosen period is at least 5 (`minimumShownCount`, `applyMinimumCount`; raised from 3 by Caleb on November 15, 2026). The rest appear as one line, "Other sites, tags or searches, each fewer than 5 times: N in total", with a count and no names. The names are removed on the server and never sent to the page.
+- **Deleted when rare:** a term or site seen fewer than 5 times (added up over every stored day) is deleted after 30 days. The 30-day period and the 200-a-day cap are unchanged.
 
 A staff password sign-in that hands off to two-step verification counts nothing at the password step: it counts as worked (`staff-mfa`) only when the code is accepted, and as failed (`staff-mfa`) when the code is refused. A passkey failure counts only when the passkey itself fails verification, not for a malformed request or a server error.
 
@@ -51,7 +51,7 @@ The beacon does nothing when `navigator.globalPrivacyControl` is true or `doNotT
 
 ## Retention
 
-Rows are daily aggregates. The outbox sweep deletes rows older than 400 days on every run (`prunePublicMetrics`). In the same run, a referring site, campaign tag set or no-result search seen fewer than 3 times in total is deleted once its row is older than 30 days.
+Rows are daily aggregates. The outbox sweep deletes rows older than 400 days on every run (`prunePublicMetrics`). In the same run, a referring site, campaign tag set or no-result search seen fewer than 5 times in total is deleted once its row is older than 30 days.
 
 ## Viewing
 
