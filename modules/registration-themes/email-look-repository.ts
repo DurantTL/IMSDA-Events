@@ -5,6 +5,8 @@ import { resolveEmailLook, type EmailLook } from "./email-look";
 export type EmailLookSource = {
   /** The id of the event's PUBLISHED version, or null when it uses the platform look. */
   findPublishedVersionId: (eventId: string) => Promise<string | null>;
+  /** Whether the event's club emails use its registration look. Off by default: club mail keeps the platform header. */
+  clubEmailsUseLook: (eventId: string) => Promise<boolean>;
   /** The look of one stored version, or null when the platform layout applies. */
   loadLook: (versionId: string, appOrigin: string | null) => Promise<EmailLook | null>;
 };
@@ -33,7 +35,13 @@ export async function findPublishedThemeVersionId(eventId: string): Promise<stri
   return row?.id ?? null;
 }
 
+export async function findClubEmailsUseLook(eventId: string): Promise<boolean> {
+  const row = await getPrisma().event.findUnique({ where: { id: eventId }, select: { clubEmailsUseRegistrationLook: true } });
+  return row?.clubEmailsUseRegistrationLook === true;
+}
+
 export const defaultEmailLookSource: EmailLookSource = {
   findPublishedVersionId: findPublishedThemeVersionId,
+  clubEmailsUseLook: findClubEmailsUseLook,
   loadLook: loadEmailLookByVersionId,
 };

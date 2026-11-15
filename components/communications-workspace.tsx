@@ -61,7 +61,7 @@ import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { messageRetryRequestPayload } from "@/modules/communications/message-retry-client";
 import { PREHEADER_MAX_LENGTH, renderEmailHtmlDocument } from "@/modules/communications/email-html";
 import type { EmailLook } from "@/modules/registration-themes/email-look";
-import { emailPreviewLayout, plainTextToEmailBodyHtml } from "@/modules/communications/email-layout";
+import { emailPreviewLayout, plainTextToEmailBodyHtml, previewEmailLookChoice } from "@/modules/communications/email-layout";
 import { DEFAULT_EMAIL_LAYOUT_SETTINGS, type EmailLayoutSettings } from "@/modules/communications/email-layout-domain";
 import { SendCheckPanel, jumpToSendCheckField } from "@/components/send-check-panel";
 import {
@@ -499,9 +499,17 @@ export function CommunicationsWorkspace({
   }
   // A queued message with no stamp yet (never tried, or every earlier try ended before the stamp) gets the look published
   // when delivery next tries it, so it previews as the current one.
-  function messageEmailLook(message: { emailLook?: EmailLook | null; status: string }) {
+  // Club email (#283 follow-up) uses the look only when the event's switch is on; a look already stamped always wins.
+  function messageEmailLook(message: { emailLook?: EmailLook | null; status: string; templateKey: string; clubLinked?: boolean }) {
     const queued = message.status === "PENDING" || message.status === "PROCESSING";
-    return previewEmailLook(message.emailLook ?? (queued ? messaging?.currentEmailLook : null));
+    return previewEmailLook(previewEmailLookChoice({
+      templateKey: message.templateKey,
+      clubLinked: message.clubLinked,
+      stampedLook: message.emailLook,
+      currentLook: messaging?.currentEmailLook,
+      useCurrentWhenUnstamped: queued,
+      clubEmailsUseRegistrationLook: messaging?.clubEmailsUseRegistrationLook,
+    }));
   }
   function withPreviewImages(html: string) {
     return html.replace(/<img src="msgfile:([A-Za-z0-9_-]{8,64})"/g, (match, id: string) => (
@@ -2053,7 +2061,12 @@ export function CommunicationsWorkspace({
                     bodyHtml: withPreviewImages(preview.bodyHtml),
                     ...emailPreviewLayout(emailLayoutSettings, selectedTemplate.key, messaging.settings.replyToEmail, "recipient@example.org"),
                     // The event's published look, as delivery will use it for a message first attempted now (#283).
-                    eventLook: previewEmailLook(messaging.currentEmailLook),
+                    eventLook: previewEmailLook(previewEmailLookChoice({
+                      templateKey: selectedTemplate.key,
+                      currentLook: messaging.currentEmailLook,
+                      useCurrentWhenUnstamped: true,
+                      clubEmailsUseRegistrationLook: messaging.clubEmailsUseRegistrationLook,
+                    })),
                   })}
                 />
                 <div className="message-preview-attachments">

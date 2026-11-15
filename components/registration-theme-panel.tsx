@@ -86,7 +86,7 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
   const [hexText, setHexText] = useState<Record<ThemeColorKey, string>>(() => ({ ...startingTokens(initialState) } as Record<ThemeColorKey, string>));
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   // Which button is working: it reads its "…ing" label and is aria-busy until the answer comes back.
-  const [pending, setPending] = useState<"save" | "publish" | "discard" | "revert" | null>(null);
+  const [pending, setPending] = useState<"save" | "publish" | "discard" | "revert" | "club" | null>(null);
   const busy = pending !== null;
   // One message slot under the buttons (B10): "Saved. ..." or "Not saved: ...".
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
@@ -171,6 +171,31 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
     }
   }
 
+  // The club-email switch saves at once and never touches the draft being edited (so it does not reload the editor).
+  async function setClubEmails(enabled: boolean) {
+    setPending("club");
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/registration-theme`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clubEmailsUseRegistrationLook: enabled }),
+      });
+      const result = await response.json().catch(() => ({})) as { theme?: RegistrationThemeEditorState; message?: string };
+      if (!response.ok || !result.theme) {
+        setMessage({ tone: "error", text: notSavedMessage(result.message ?? "The club email setting couldn't be saved.") });
+        return;
+      }
+      const clubEmailsUseRegistrationLook = result.theme.clubEmailsUseRegistrationLook;
+      setState((current) => ({ ...current, clubEmailsUseRegistrationLook }));
+      setMessage({ tone: "success", text: savedMessage(clubEmailsUseRegistrationLook ? "Club emails now use this look." : "Club emails use the standard club header.") });
+    } catch {
+      setMessage({ tone: "error", text: notSavedMessage("We couldn't reach the server. Nothing was changed.") });
+    } finally {
+      setPending(null);
+    }
+  }
+
   const saveDraft = () => send("save", "PUT", { tokens, ...ids }, savedMessage("The public form still shows the published look."), "The look couldn't be saved.");
   const publish = () => send("publish", "POST", { action: "publish" }, "Saved. Published: the registration form now uses this look.", "The look couldn't be published.");
   async function discard() {
@@ -206,8 +231,8 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
             the finish-registration link and the form builder preview.
           </p>
           <p>
-            The published look (its colors, and its logo or the event name) is also used in this event&apos;s emails. Email already
-            sent keeps the look it was sent with.
+            The published look (its colors, and its logo or the event name) is also used in this event&apos;s emails. Club emails keep
+            the standard club header unless you turn on the switch below. Email already sent keeps the look it was sent with.
           </p>
         </div>
       </div>
@@ -399,6 +424,21 @@ export function RegistrationThemePanel({ eventId, initialState }: { eventId: str
       <FormMessage message={message?.text ?? ""} tone={message?.tone ?? "success"} />
       {publishBlocker && <p className={styles.help} id="registration-theme-publish-reason">Publish is off: {publishBlocker}</p>}
       <p className={styles.help}>Saving a draft never changes what the public sees. Only Publish does.</p>
+
+      <h4 className={styles.subheading}>Club emails</h4>
+      <label className={styles.clubToggle}>
+        <input
+          type="checkbox"
+          checked={state.clubEmailsUseRegistrationLook}
+          disabled={busy}
+          aria-busy={pending === "club" || undefined}
+          aria-describedby="registration-theme-club-help"
+          data-testid="registration-theme-club-emails"
+          onChange={(event) => void setClubEmails(event.target.checked)}
+        />
+        Use this look in club registration emails
+      </label>
+      <p className={styles.help} id="registration-theme-club-help">Off keeps the standard club email header. It applies to club emails sent from now on; email already sent is not changed.</p>
 
       <h4 className={styles.subheading}>Version history</h4>
       {published || state.history.length > 0 ? (

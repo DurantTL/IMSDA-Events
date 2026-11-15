@@ -916,6 +916,17 @@ async function loadPreviewEmailLooks(eventId: string, stampedVersionIds: string[
   return { current, stamped: new Map(stamped) };
 }
 
+/** The staff previews read the same switch delivery does. A failed read means off (the standard club header). */
+async function loadClubEmailsUseRegistrationLook(client: MessagingDatabaseClient, eventId: string) {
+  try {
+    const row = await client.event.findUnique({ where: { id: eventId }, select: { clubEmailsUseRegistrationLook: true } });
+    return row?.clubEmailsUseRegistrationLook === true;
+  } catch (error) {
+    logError("An event's club email look setting could not be read for a staff preview.", error);
+    return false;
+  }
+}
+
 export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryLogQuery = DEFAULT_DELIVERY_QUERY): Promise<MessagingWorkspaceData> {
   await ensureEventMessagingDefaults(eventId);
   const prisma = getPrisma();
@@ -930,6 +941,7 @@ export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryL
     groupedCounts,
     reminderState,
     shirtSizeState,
+    clubEmailsUseRegistrationLook,
   ] = await Promise.all([
     loadEventEmailSettingsOrThrow(prisma, eventId),
     prisma.eventMessageTemplate.findMany({
@@ -963,6 +975,7 @@ export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryL
     }),
     loadBalanceReminderState(eventId, prisma),
     loadShirtSizeRequestState(eventId, prisma),
+    loadClubEmailsUseRegistrationLook(prisma, eventId),
   ]);
 
   const counts = Object.fromEntries(outboxStatuses.map((status) => [status, 0])) as Record<MessageOutboxStatusValue, number>;
@@ -981,6 +994,7 @@ export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryL
   return {
     settings: settingsRecord(settings),
     currentEmailLook: previewLooks.current,
+    clubEmailsUseRegistrationLook,
     templates: templates
       .filter(isEventTemplateRow)
       .map((template) => serializeTemplate(template, filesByVersion))

@@ -23,7 +23,7 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/modules/events/asset-storage", () => ({ readAsset: mocks.readAsset }));
 
-import { GET, POST, PUT } from "@/app/api/events/[eventId]/registration-theme/route";
+import { GET, PATCH, POST, PUT } from "@/app/api/events/[eventId]/registration-theme/route";
 import { PLATFORM_DEFAULT_THEME } from "@/modules/registration-themes/tokens";
 import sharp from "sharp";
 
@@ -45,10 +45,14 @@ type Asset = { id: string; eventId: string; displayName: string; contentType: st
 type Row = { logoAssetId?: string | null; heroAssetId?: string | null; updatedAt?: Date; id: string; eventId: string; versionNumber: number; status: string; tokens: unknown; createdAt: Date; publishedAt: Date | null; archivedAt: Date | null; publishedByUserId?: string | null };
 
 /** An in-memory stand-in for the one table the repository touches. */
-function database(initial: Row[] = [], assets: Asset[] = []) {
+function database(initial: Row[] = [], assets: Asset[] = [], event = { clubEmailsUseRegistrationLook: false }) {
   const rows: Row[] = initial.map((entry) => ({ ...entry, logoAssetId: entry.logoAssetId ?? null, heroAssetId: entry.heroAssetId ?? null }));
   const matches = (row: Row, where: Record<string, unknown> = {}) => Object.entries(where).every(([key, value]) => (row as unknown as Record<string, unknown>)[key] === value);
   const tx = {
+    event: {
+      findUnique: vi.fn(async () => ({ clubEmailsUseRegistrationLook: event.clubEmailsUseRegistrationLook })),
+      update: vi.fn(async ({ data }: { data: { clubEmailsUseRegistrationLook: boolean } }) => { event.clubEmailsUseRegistrationLook = data.clubEmailsUseRegistrationLook; }),
+    },
     eventAsset: {
       findMany: vi.fn(async ({ where }: { where: { id?: { in: string[] }; eventId?: string; contentType?: { in: string[] } } }) => assets.filter((asset) => (
         (!where.id || where.id.in.includes(asset.id)) && (!where.eventId || asset.eventId === where.eventId) && (!where.contentType || where.contentType.in.includes(asset.contentType))
@@ -94,7 +98,7 @@ describe("registration theme route access", () => {
   it.each(["REGISTRATION_MANAGER", "FINANCE_MANAGER", "COMMUNICATIONS_MANAGER", "CHECK_IN_STAFF", "READ_ONLY_STAFF"])("refuses %s on every method", async (role) => {
     mocks.findActiveMembership.mockResolvedValue(membership(role));
     const { prisma } = database();
-    for (const response of [await GET(request("GET"), context), await PUT(request("PUT", { tokens: good }), context), await POST(request("POST", { action: "publish" }), context)]) {
+    for (const response of [await GET(request("GET"), context), await PUT(request("PUT", { tokens: good }), context), await POST(request("POST", { action: "publish" }), context), await PATCH(request("PATCH", { clubEmailsUseRegistrationLook: true }), context)]) {
       expect(response.status).toBe(403);
     }
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -108,6 +112,7 @@ describe("registration theme route access", () => {
     mocks.rejectCrossOriginRequest.mockReturnValue(Response.json({}, { status: 403 }));
     expect((await PUT(request("PUT", { tokens: good }), context)).status).toBe(403);
     expect((await POST(request("POST", { action: "publish" }), context)).status).toBe(403);
+    expect((await PATCH(request("PATCH", { clubEmailsUseRegistrationLook: true }), context)).status).toBe(403);
   });
 
   it("lets an event administrator read the editor state, never cached", async () => {
@@ -359,5 +364,49 @@ describe("registration look logo and banner (#283)", () => {
     database([], [logoAsset, asset({ id: "pdf-1", contentType: "application/pdf" }), asset({ id: "other", eventId: "event-2" })]);
     const body = await (await GET(request("GET"), context)).json() as { theme: { images: { id: string; name: string; contentType: string; byteSize: number }[] } };
     expect(body.theme.images).toEqual([expect.objectContaining({ id: "logo-1", name: "logo.png", contentType: "image/png", byteSize: 4096 })]);
+  });
+});
+
+describe("the club email switch (#283 follow-up)", () => {
+  it("is off by default and shown in the editor state", async () => {
+    database();
+    await expect((await GET(request("GET"), context)).json()).resolves.toMatchObject({ theme: { clubEmailsUseRegistrationLook: false } });
+  });
+
+  it("turns on and off for an event administrator, and audits the old and new value with the actor", async () => {
+    const event = { clubEmailsUseRegistrationLook: false };
+    database([], [], event);
+    const on = await PATCH(request("PATCH", { clubEmailsUseRegistrationLook: true }), context);
+    expect(on.status).toBe(200);
+    await expect(on.json()).resolves.toMatchObject({ theme: { clubEmailsUseRegistrationLook: true } });
+    expect(event.clubEmailsUseRegistrationLook).toBe(true);
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      eventId: "event-1", actorUserId: "staff-1", action: "CLUB_EMAIL_REGISTRATION_LOOK_CHANGED", entityType: "Event", entityId: "event-1",
+      metadata: { oldValue: false, newValue: true },
+    }), expect.anything());
+    await PATCH(request("PATCH", { clubEmailsUseRegistrationLook: false }), context);
+    expect(event.clubEmailsUseRegistrationLook).toBe(false);
+    expect(mocks.writeAuditLog).toHaveBeenLastCalledWith(expect.objectContaining({ metadata: { oldValue: true, newValue: false } }), expect.anything());
+  });
+
+  it("changes nothing and writes no audit row when the value is already set", async () => {
+    const event = { clubEmailsUseRegistrationLook: true };
+    const { tx } = database([], [], event);
+    const response = await PATCH(request("PATCH", { clubEmailsUseRegistrationLook: true }), context);
+    expect(response.status).toBe(200);
+    expect(tx.event.update).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("refuses a body that is not exactly the one boolean, and a cross-origin request", async () => {
+    const { tx } = database();
+    for (const body of [{}, { clubEmailsUseRegistrationLook: "yes" }, { clubEmailsUseRegistrationLook: true, extra: 1 }, { tokens: good }]) {
+      const response = await PATCH(request("PATCH", body), context);
+      expect(response.status).toBeGreaterThanOrEqual(400);
+      expect(response.status).toBeLessThan(500);
+    }
+    mocks.rejectCrossOriginRequest.mockReturnValue(Response.json({}, { status: 403 }));
+    expect((await PATCH(request("PATCH", { clubEmailsUseRegistrationLook: true }), context)).status).toBe(403);
+    expect(tx.event.update).not.toHaveBeenCalled();
   });
 });

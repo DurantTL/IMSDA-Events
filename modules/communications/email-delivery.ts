@@ -36,6 +36,7 @@ import { markdownToPlainText } from "@/modules/communications/email-html";
 import {
   appendEmailPlainTextFooter,
   emailIsClubLinked,
+  emailIsClubEmail,
   emailLayoutContent,
   plainTextToEmailBodyHtml,
   renderEmailLayoutDocument,
@@ -415,7 +416,9 @@ function resolveEmailPartDependencies(
  * attempted: that version's id is written to the row once (only while it is still empty and this worker still holds the
  * lock) and every retry reads it back, so a look published later never restyles a message already attempted. Messages
  * with no event, an event with no published look, or any failure in between use the platform layout; this never throws,
- * so a look problem cannot fail or delay a send.
+ * so a look problem cannot fail or delay a send. Club email (a message whose header context is "club") uses the look only
+ * when the event's switch is on (off by default); with it off the message uses the platform layout and is not stamped.
+ * A message already stamped keeps its stamped look, so retries stay consistent.
  */
 async function resolveMessageEmailLook(
   prisma: DeliveryPrisma,
@@ -427,6 +430,8 @@ async function resolveMessageEmailLook(
   try {
     let versionId = message.registrationThemeVersionId ?? null;
     if (!versionId) {
+      const clubEmail = emailIsClubEmail(message.templateKey, { clubRegistration: Boolean(message.registration?.clubRegistration), recipientKind: message.recipientKind });
+      if (clubEmail && !(await source.clubEmailsUseLook(message.eventId))) return null;
       const published = await source.findPublishedVersionId(message.eventId);
       if (!published) return null;
       const stamped = await prisma.messageOutbox.updateMany({

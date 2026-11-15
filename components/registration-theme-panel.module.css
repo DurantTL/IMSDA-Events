@@ -338,3 +338,18 @@
   gap: 8px;
   margin-top: 4px;
 }
+
+/* The per-event switch for club emails using this look (#283). One checkbox, saved at once. */
+.clubToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.clubToggle input {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
