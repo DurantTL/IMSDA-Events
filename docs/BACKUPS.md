@@ -492,18 +492,29 @@ recent activity first (Square still holds the payments).
    docker stop <app container> imsda-outbox-sweeper
    ```
 
-3. Restore (for a drill, create a scratch database and change `--dbname`):
+3. Restore as the role that **owns** the tables (the app's own
+   `DATABASE_URL`, in `/home/u_events/.xcloud/.env.dburl` or xCloud's `.env`),
+   not a read-mostly backup role. Empty the schema first: `pg_restore --clean`
+   only drops what is in the copy, so tables the bad migration created would
+   survive and make the fixed release's migration fail with "already exists".
+   (For a drill, restore into a scratch database instead.)
 
    ```bash
-   docker run --rm --env-file /home/u_events/.xcloud/.env.backup \
+   docker run --rm --env-file /home/u_events/.xcloud/.env.dburl \
      --network postgresql_9kgaw_239292_xcloud-network \
      -v imsda_events_backups:/backups:ro --entrypoint sh \
-     ghcr.io/duranttl/imsda-events-backup:main -c \
-     'pg_restore --dbname="$PGDATABASE" --clean --if-exists --no-owner --no-privileges /backups/pre-deploy/imsda-predeploy-<stamp>-<sha>.pgdump'
+     ghcr.io/duranttl/imsda-events-backup:main -c '
+       DB="${DATABASE_URL%%\?*}"   # psql refuses Prisma-only options such as ?schema=
+       psql "$DB" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" &&
+       pg_restore --dbname="$DB" --exit-on-error --no-owner --no-privileges \
+         /backups/pre-deploy/imsda-predeploy-<stamp>-<sha>.pgdump &&
+       psql "$DB" -c "SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY started_at DESC LIMIT 5"'
    ```
 
-   (From R2, mount `-v /root/restore:/restore:ro` and use the `/restore/...`
-   path instead.)
+   The last lines should list the migrations of the version you are going
+   back to, and not the bad one. If `DATABASE_URL` needs `sslmode` or other
+   options after the `?`, add them back to `DB`. (From R2, mount
+   `-v /root/restore:/restore:ro` and use the `/restore/...` path instead.)
 
 4. Start the version that ran on that database, which the deploy kept as
    `imsda-events:previous`, without re-running the preparation:

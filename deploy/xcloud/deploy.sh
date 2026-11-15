@@ -93,7 +93,7 @@ stop_standby() {
 
 fail() { # message
   stop_standby
-  docker rm -f imsda-prep >/dev/null 2>&1 || true
+  docker rm -f imsda-prep imsda-predeploy >/dev/null 2>&1 || true
   mkdir -p "$(dirname "$FAILED_FILE")" 2>/dev/null && echo "$SHA" > "$FAILED_FILE" || true
   echo "[deploy] $1" >&2
   exit 1
@@ -117,10 +117,11 @@ pre_deploy_backup() {
   [ -r "$BACKUP_ENV_FILE" ] \
     || fail "No database copy was taken: $BACKUP_ENV_FILE is missing (docs/BACKUPS.md, 'Pre-deploy copies'). Nothing was changed."
   echo "[deploy] Copying the database before deploying $SHA ..."
-  timeout "$PREDEPLOY_TIMEOUT" docker run --rm --network "$PG_NETWORK" --env-file "$BACKUP_ENV_FILE" \
+  docker rm -f imsda-predeploy >/dev/null 2>&1 || true
+  timeout "$PREDEPLOY_TIMEOUT" docker run --rm --name imsda-predeploy --network "$PG_NETWORK" --env-file "$BACKUP_ENV_FILE" \
     -v "$BACKUPS_VOLUME:/backups" --entrypoint sh "$BACKUP_IMAGE" \
     /usr/local/bin/pre-deploy-backup.sh "$SHA" </dev/null \
-    || fail "The database copy before $SHA failed (above). Nothing was changed; the live version is still running."
+    || fail "The database copy before $SHA failed (above). Nothing was changed; the live version is still running. For a commit from before #1790, set IMSDA_BACKUP_IMAGE to the -backup:main image (docs/BACKUPS.md)."
 }
 
 # Images built before #1263 ignore IMSDA_PREP_ONLY (their prep run would start

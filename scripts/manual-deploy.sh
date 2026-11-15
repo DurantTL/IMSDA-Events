@@ -217,10 +217,12 @@ else
   log "Copying the database before deploying $SHORT_SHA (with $PREDEPLOY_IMAGE)"
   docker pull "$PREDEPLOY_IMAGE" >/dev/null \
     || fail "could not pull $PREDEPLOY_IMAGE, so no database copy was taken. Nothing was changed; the current app is still running."
-  timeout "${IMSDA_PREDEPLOY_BACKUP_TIMEOUT_SECONDS:-1800}" docker run --rm --network "$PG_NETWORK" \
+  docker rm -f imsda-predeploy >/dev/null 2>&1 || true
+  timeout "${IMSDA_PREDEPLOY_BACKUP_TIMEOUT_SECONDS:-1800}" docker run --rm --name imsda-predeploy --network "$PG_NETWORK" \
     --env-file "$BACKUP_ENV_FILE" -v imsda_events_backups:/backups \
     --entrypoint sh "$PREDEPLOY_IMAGE" /usr/local/bin/pre-deploy-backup.sh "$SHA" </dev/null \
-    || fail "the database copy failed (above). Nothing was changed; the current app is still running."
+    || { docker rm -f imsda-predeploy >/dev/null 2>&1 || true
+         fail "the database copy failed (above). Nothing was changed; the current app is still running. For a commit from before #1790, set IMSDA_BACKUP_IMAGE to the -backup:main image (docs/BACKUPS.md)."; }
 fi
 
 # --- 4. Swap -----------------------------------------------------------------
