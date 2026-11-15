@@ -3,7 +3,7 @@
 Status: **Accepted.** Approved by Caleb Durant, Communication Director, on
 2026-11-02 ([his approval on #189](https://github.com/DurantTL/IMSDA-Events/issues/189#issuecomment-6580955085)). This is the deliverable GitHub issue #189
 asked for. The human test restore of the key backup is tracked separately.
-Addenda D–F below are still Proposed.
+Addenda D–F below are still Proposed. Addendum H (health records after the site is retired) is Accepted.
 
 Date: 2026-08-09
 
@@ -987,7 +987,8 @@ items that blocked production use. Where they differ from "Still open" or
    `modules/health-records/acknowledgment-domain.ts`. The version is unchanged.
 6. **Coordinator window start:** no start bound is needed. Access follows the
    event's dates only (it ends at the end of the event's last day).
-7. **After the site is retired** (#1550): decided later. Not a gate.
+7. **After the site is retired** (#1550): decided later. Not a gate. Decided
+   2026-11-12 and 2026-11-14: a written shutdown kit (Addendum H).
 8. **Key versioning, rotation and key health check** (#1516): build it now,
    before real records exist, because adding a key version is simplest while
    nothing is sealed. Not a gate for switching on.
@@ -1315,3 +1316,33 @@ Nothing else in this ADR changes.
   runs it in production, after `npm run club-forms:sync`.
 - **Backups.** A database backup taken before the script ran still holds these
   answers sealed; one taken after holds them plain.
+
+## Addendum H: Health records after the site is retired
+
+Status: **Accepted.** Decided by the Communication Director on 2026-11-12, with
+the custodian named on 2026-11-14 (recorded on GitHub issue #1550). It adds to
+the sealed copy rule of 2026-10-14 (#924, Addendum B) and changes nothing else.
+
+- **Why.** Sealed event copies are kept until their keep-until date, or longer
+  under a legal hold. If the site is retired they must still be openable, and
+  the daily retention job that deletes expired copies stops with the site.
+- **Decision: a written shutdown kit, no new software.** The kit is the last
+  site image, the final database backup and the encryption key, kept together
+  as one set but stored apart (the key only in the conference password manager).
+  The runbook is `docs/HEALTH-RECORDS-SHUTDOWN-KIT.md`.
+- **Custodian: the conference IT lead.** The custodian keeps the key and the kit,
+  is the only person who starts the old site, and does so on a computer they
+  control, reachable from that computer only, for a lookup this ADR already
+  allows. The lookup uses the normal permissions, break-glass and access log;
+  a new backup afterwards keeps the access log entry; then the site is shut
+  down and the working copy deleted.
+- **Deletion after shutdown.** The custodian deletes the remaining copies as
+  each keep-until date passes, by starting the old site and running the same
+  retention job (legal holds are still honored), then replacing the kit backup.
+  When no copy and no hold remains, the custodian destroys the whole kit.
+- **Not chosen.** A one-time shutdown export (option 2 on #1550) and a viewer
+  site with a key or passkey (option 3). Either can be decided later if a
+  shutdown becomes real or regular lookups are expected.
+- **Unchanged.** Keep-until periods, legal holds, break-glass and the access
+  rules. No real data is used to test the kit; the practice lookup at shutdown
+  uses the kit itself.
