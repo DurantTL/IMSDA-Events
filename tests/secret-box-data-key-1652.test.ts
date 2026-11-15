@@ -18,6 +18,7 @@ import {
   fingerprintSecret,
   isDataEncryptionAvailable,
   isDataKeyUnavailable,
+  isSealedDataLocked,
   openData,
   openSecret,
   previousDataKeyVersion,
@@ -135,6 +136,38 @@ describe("with a separate data key", () => {
     setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 2, ikm: ikm2 }, previousProblem: "access-denied" } });
     expect(dataKeyStatus()).toMatchObject({ state: "ready", version: 2, previousVersion: null, previousProblem: "access-denied" });
     expect(openData(sealData("ok", purpose), purpose)).toBe("ok");
+  });
+
+  it("treats a value on a version that is not loaded as locked while the previous key failed to load, and as damaged otherwise", () => {
+    ready(1);
+    const old = sealData("2010-04-02", purpose);
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 2, ikm: ikm2 }, previousProblem: "unwrap-failed" } });
+    expect(() => openData(old, purpose)).toThrow(DataKeyUnavailableError);
+    expect(isDataKeyUnavailable()).toBe(true);
+    expect(isSealedDataLocked(old)).toBe(true);
+    // Current values and sign-in values are not locked, and sealing still works.
+    expect(isSealedDataLocked(sealData("x", purpose))).toBe(false);
+    expect(isSealedDataLocked("v1.a.b.c")).toBe(false);
+    expect(isDataEncryptionAvailable()).toBe(true);
+    // No problem recorded: the same value is a plain "not loaded" error, not a lock.
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 2, ikm: ikm2 } } });
+    expect(() => openData(old, purpose)).toThrow(SecretBoxError);
+    expect(() => openData(old, purpose)).not.toThrow(DataKeyUnavailableError);
+    expect(isSealedDataLocked(old)).toBe(false);
+    expect(isDataKeyUnavailable()).toBe(false);
+  });
+
+  it("decides locked without decrypting: not separate, loading, unavailable, previous loaded", () => {
+    ready(1);
+    const v1 = sealData("a", purpose);
+    ready(2, { version: 1, ikm: ikm1 });
+    expect(isSealedDataLocked(v1)).toBe(false);
+    for (const state of [{ kind: "unavailable" as const, reason: "access-denied" as const }, { kind: "loading" as const }]) {
+      setDataKeyStateForTests(state);
+      expect(isSealedDataLocked(v1)).toBe(true);
+    }
+    setDataKeyStateForTests("not-separate");
+    expect(isSealedDataLocked(v1)).toBe(true);
   });
 
   it("is available only when the key is ready, and reports a status without a key", () => {

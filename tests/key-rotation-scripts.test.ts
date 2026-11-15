@@ -77,6 +77,14 @@ describe("key:rotate and key:check with a separate data key (#1652)", () => {
     expect(text()).not.toContain(devData.DATA_ENCRYPTION_KEY);
   });
 
+  it("key:rotate refuses --apply while a previous data key is configured but could not be loaded", async () => {
+    useProcessEnv({ SECRET_ENCRYPTION_KEY: current, ...devData });
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 2, ikm: Buffer.alloc(32, 3) }, previousProblem: "access-denied" } });
+    const { run, text } = harness({ ...base, SECRET_ENCRYPTION_KEY: current, ...devData }, true);
+    expect(await run()).toBe(1);
+    expect(text()).toMatch(/previous personal-data key is configured but could not be loaded/);
+  });
+
   it("key:check fails while the data key is unavailable and prints the reason category", async () => {
     useProcessEnv({ SECRET_ENCRYPTION_KEY: current, ...devData });
     setDataKeyStateForTests({ kind: "unavailable", reason: "vault-unreachable" });

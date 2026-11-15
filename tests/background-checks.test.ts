@@ -752,6 +752,15 @@ describe("list matching while the personal-data key is unavailable (#1652)", () 
     expect(seed.entries.size).toBe(0);
   });
 
+  it("also refuses while only the previous data key failed to load, because some birth dates would read as missing", async () => {
+    const { client, seed } = makeFakeDb();
+    currentClient = client;
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 2, ikm: Buffer.alloc(32, 8) }, previousProblem: "unwrap-failed" } });
+    await expect(applyBackgroundCheckUpload(rows(), "STERLING", "admin-1")).rejects.toMatchObject({ code: "DATA_KEY_UNAVAILABLE", status: 503 });
+    await expect(rematchBackgroundCheckList(new Date("2026-09-28T12:00:00Z"), "admin-1")).rejects.toMatchObject({ code: "DATA_KEY_UNAVAILABLE" });
+    expect(seed.entries.size).toBe(0);
+  });
+
   it("skips the refresh after a save without failing it, and without touching a match", async () => {
     const { client } = makeFakeDb();
     currentClient = client;

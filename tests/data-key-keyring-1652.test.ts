@@ -136,6 +136,37 @@ describe("background loading", () => {
     expect(getDataKeyState().kind).toBe("ready");
   });
 
+  it("keeps retrying a previous key that failed to load, keeps the current key meanwhile, and recovers (#1652)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-15T12:00:00Z"));
+    const current = { version: 2, ikm: Buffer.alloc(32, 5) };
+    const previous = { version: 1, ikm: Buffer.alloc(32, 4) };
+    let answer: "previous-fails" | "vault-down" | "all-good" = "previous-fails";
+    setDataKeySourceForTests({
+      load: async () => {
+        if (answer === "vault-down") throw new DataKeySourceError("vault-unreachable");
+        return answer === "previous-fails" ? { current, previousProblem: "access-denied" as const } : { current, previous };
+      },
+    });
+    await startDataKeyLoading();
+    expect(getDataKeyState()).toMatchObject({ kind: "ready", ring: { previousProblem: "access-denied" } });
+
+    // A retry that finds the vault down must not take the working current key away.
+    answer = "vault-down";
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(getDataKeyState()).toMatchObject({ kind: "ready", ring: { current: { version: 2 } } });
+
+    answer = "all-good";
+    await vi.advanceTimersByTimeAsync(60_000);
+    const recovered = getDataKeyState();
+    expect(recovered.kind === "ready" && recovered.ring.previous?.version).toBe(1);
+    expect(recovered.kind === "ready" && recovered.ring.previousProblem).toBeUndefined();
+    // Once nothing is missing the timer stops asking: a later vault outage is not even noticed until the next start.
+    answer = "vault-down";
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(getDataKeyState()).toMatchObject({ kind: "ready", ring: { previous: { version: 1 } } });
+  });
+
   it("startDataKeyLoading schedules a background retry that does not keep the process alive", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-11-15T12:00:00Z"));

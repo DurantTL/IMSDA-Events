@@ -334,6 +334,44 @@ describe("director entry and viewing", () => {
     }
   });
 
+  it("treats a record on a version not loaded as locked while the previous key failed to load: no audit (#1652)", async () => {
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 1, ikm: Buffer.alloc(32, 97) } } });
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    state.audit = [];
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 2, ikm: Buffer.alloc(32, 98) }, previousProblem: "access-denied" } });
+    try {
+      await expect(viewHealthRecord(leader, "club-a", "member-1", now)).rejects.toBeInstanceOf(HealthRecordLockedError);
+      expect(state.audit).toEqual([]);
+    } finally {
+      resetDataKeyringForTests();
+    }
+  });
+
+  it("audits the view before it opens anything, including a record that turns out to be unreadable but is not locked (ADR 0005)", async () => {
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 1, ikm: Buffer.alloc(32, 97) } } });
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    try {
+      // A normal view: audited, and the audit is written before the values are opened.
+      state.audit = [];
+      const view = await viewHealthRecord(leader, "club-a", "member-1", now);
+      expect(view.values.medications).toBe("Synthetic medication note");
+      expect(state.audit.map((entry) => entry.action)).toEqual(["HEALTH_RECORD_VIEWED"]);
+
+      // A damaged value whose key is loaded is not "locked": the view is audited, then fails as unreadable.
+      state.audit = [];
+      const field = state.fields.find((candidate) => candidate.fieldKey === "medications")!;
+      const parts = (field.sealedValue as string).split(".");
+      parts[4] = "AAAA";
+      field.sealedValue = parts.join(".");
+      const failure = await viewHealthRecord(leader, "club-a", "member-1", now).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(HealthRecordError);
+      expect(failure).not.toBeInstanceOf(HealthRecordLockedError);
+      expect(state.audit.map((entry) => entry.action)).toEqual(["HEALTH_RECORD_VIEWED"]);
+    } finally {
+      resetDataKeyringForTests();
+    }
+  });
+
   it("uses no break-glass grant and writes no audit entry for a locked load by a system administrator (#1652)", async () => {
     setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 1, ikm: Buffer.alloc(32, 97) } } });
     await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);

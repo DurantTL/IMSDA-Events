@@ -57,6 +57,9 @@ export async function runKeyRotate(
   if (signInRotation && status.version !== null && status.previousVersion !== null && status.version <= status.previousVersion) {
     return fail("SECRET_ENCRYPTION_KEY_VERSION must be higher than SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION.");
   }
+  if (options.apply && dataKeySeparate && data.state === "ready" && data.previousProblem) {
+    return fail("the previous personal-data key is configured but could not be loaded, so values on it can't be read or rotated. Fix the key vault access or the previous wrapped key first (docs/DATA-KEY-AZURE-KEY-VAULT.md).");
+  }
   if (options.apply && dataKeySeparate && data.state !== "ready") {
     return fail("the personal-data key is configured but could not be loaded, so personal data can't be moved or rotated. Fix the key vault access first (docs/DATA-KEY-AZURE-KEY-VAULT.md).");
   }

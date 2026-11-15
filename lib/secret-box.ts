@@ -328,6 +328,9 @@ function dataKeyForVersion(version: number): DataKeyMaterial {
   const ring = separateRing();
   if (version === ring.current.version) return ring.current;
   if (ring.previous && version === ring.previous.version) return ring.previous;
+  // A previous key is configured but could not be loaded: a value on any other version may be sealed with it, so it is
+  // locked (retried in the background), not a damaged value.
+  if (ring.previousProblem) throw new DataKeyUnavailableError("The stored value may be sealed with the previous personal-data key, which is not loaded right now.");
   throw new SecretBoxError(`The stored value was sealed with data key version ${version}, which is not loaded.`);
 }
 
@@ -391,9 +394,38 @@ export function isDataEncryptionAvailable() {
   return false;
 }
 
-/** True when a separate data key is configured but not loaded (still loading, or its source failed). */
+/**
+ * True when a separate data key is configured but not fully loaded: still loading, its source failed, or a previous key
+ * could not be loaded (the current key works, but values on the previous one are locked). Whole-list work that needs
+ * every birth date readable refuses while this is true.
+ */
 export function isDataKeyUnavailable() {
-  return dataKeyMode() !== "not-separate" && !readyDataKeys();
+  if (dataKeyMode() === "not-separate") return false;
+  const ring = readyDataKeys();
+  return !ring || Boolean(ring.previousProblem);
+}
+
+/**
+ * Whether opening this stored value is blocked only because a key is not loaded, decided WITHOUT decrypting it. A sign-in
+ * value is never locked here. A damaged or unknown-version value is not "locked" (opening it fails as unreadable).
+ */
+export function isSealedDataLocked(sealed: string): boolean {
+  if (dataSealedKeyring(sealed) === "sign-in") return false;
+  if (dataKeyMode() === "not-separate") return true;
+  const ring = readyDataKeys();
+  if (!ring) {
+    void ensureDataKeyLoaded();
+    return true;
+  }
+  let version: number;
+  try {
+    version = parseData(sealed).version;
+  } catch {
+    return false;
+  }
+  if (version === ring.current.version) return false;
+  if (ring.previous && version === ring.previous.version) return false;
+  return Boolean(ring.previousProblem);
 }
 
 /** The data key version new values are sealed with. Throws `DataKeyUnavailableError` when a separate key is not loaded. */

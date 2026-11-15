@@ -256,7 +256,7 @@ After an outage, three things are not caught up by themselves:
   the copy is not taken later. There is no admin action to take a missed copy.
   The live health record is not affected and opens again once the key loads.
 - **Sterling Volunteers matches.** Matches are not recalculated when the key
-  loads. After an outage, run **Re-match** once on the Sterling Volunteers list
+  loads. After an outage, press **Refresh** once in the Sterling Volunteers "Needs a look" section
   (or upload the next list) so matches that depend on birth dates are current.
 - **Calendar refreshes** skipped while locked run again on their next scheduled
   refresh.
@@ -267,9 +267,15 @@ There is no reverse move: nothing re-seals personal data with the sign-in key.
 From the restart in step 6 on, every new save of personal data is sealed with the
 data key, even before step 7 moves the older values.
 
-- Going back is only safe when `npm run key:check` shows **no** data-key values
-  (no `d1` values), which in practice means nothing was saved since step 6 and
-  step 7 was not run. Then unset `DATA_KEY_SOURCE` and redeploy.
+- Going back is only safe when no value has been sealed with the data key. Read
+  `npm run key:check`: in the lines for the six personal-data columns
+  (`ClubRosterMember.sealedBirthDate`, `BackgroundCheckEntry.sealedBirthDate`,
+  `ClubFormSubmission.sealedSensitiveAnswers`, `CalendarFeed.sealedUrl`,
+  `HealthRecordField.sealedValue`, `HealthRecordSnapshotField.sealedValue`) every
+  line must show `0 current`. A value sealed with the data key counts as
+  "current", and a value still on the sign-in key counts as "older" (and "not
+  moved to the data key yet"). In practice that means nothing was saved since
+  step 6 and step 7 was not run. Then unset `DATA_KEY_SOURCE` and redeploy.
 - In every other case, **keep the vault** and the wrapped key settings. Values
   sealed with the data key can only be opened with it. Do not unset
   `DATA_KEY_SOURCE`, and do not delete the vault key or its backup.

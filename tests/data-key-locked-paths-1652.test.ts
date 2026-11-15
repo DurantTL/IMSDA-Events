@@ -74,6 +74,14 @@ describe("birth dates while the personal-data key is unavailable (#1652)", () =>
     expect(isBirthDateLocked(null)).toBe(false);
   });
 
+  it("reads a birth date on a version that is not loaded as locked while the previous key failed to load, never as a 500", () => {
+    setDataKeyStateForTests({ kind: "ready", ring });
+    const sealed = sealBirthDate("2012-05-17");
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 2, ikm: Buffer.alloc(32, 42) }, previousProblem: "access-denied" } });
+    expect(openBirthDateOrLocked(sealed)).toEqual({ locked: true });
+    expect(openBirthDateOrNull(sealed)).toBeNull();
+  });
+
   it("refuses to seal a new birth date, and reports a value that is simply damaged as a real error", () => {
     locked();
     expect(() => sealBirthDate("2012-05-17")).toThrow(DataKeyUnavailableError);

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import { getPrisma } from "@/lib/prisma";
-import { DataKeyUnavailableError, isDataEncryptionAvailable, isDataKeyUnavailable } from "@/lib/secret-box";
+import { DataKeyUnavailableError, isDataEncryptionAvailable, isDataKeyUnavailable, isSealedDataLocked } from "@/lib/secret-box";
 import { hashOpaqueToken } from "@/modules/access/tokens";
 import { logError } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -254,16 +254,11 @@ export async function viewHealthRecord(
       throw breakGlassRequired();
     }
   }
-  // Opened before the view is recorded: a load that fails because the personal-data key is unavailable shows nothing,
-  // so it records no view and uses no break-glass grant (#1652). Nothing leaves this function until the audit is written.
-  let values: Record<string, unknown>;
-  try {
-    values = record ? openFields(record.id, record.fields) : {};
-  } catch (error) {
-    if (error instanceof DataKeyUnavailableError) {
-      throw new HealthRecordLockedError(`${member.person?.firstName ?? ""} ${member.person?.lastName ?? ""}`.trim(), member.organization.name);
-    }
-    throw error;
+  // The view is audited before any value is decrypted (ADR 0005). The one thing decided first, without decrypting anything,
+  // is whether every field's key is loaded: a record that cannot be opened because the personal-data key is unavailable
+  // shows nothing, so it records no view and uses no break-glass grant (#1652).
+  if (record && record.fields.some((field) => isHealthFieldKey(field.fieldKey) && isSealedDataLocked(field.sealedValue))) {
+    throw new HealthRecordLockedError(`${member.person?.firstName ?? ""} ${member.person?.lastName ?? ""}`.trim(), member.organization.name);
   }
   const viewAudit = {
     // No top-level eventId: that column feeds the event staff audit log, which must not list these views. The event is in the metadata.
@@ -292,6 +287,7 @@ export async function viewHealthRecord(
   } else {
     await writeAuditLog(viewAudit);
   }
+  const values = record ? openFields(record.id, record.fields) : {};
   return {
     member: { id: member.id, firstName: member.person?.firstName ?? "", lastName: member.person?.lastName ?? "" },
     club: { name: member.organization.name, sponsoringChurch: member.organization.parentOrganization?.name ?? null },

@@ -115,11 +115,17 @@ async function attempt(mode: DataKeyMode) {
   try {
     const ring = await sourceFor(mode).load();
     h.state = { kind: "ready", ring };
-    logInfo("The personal-data key is loaded.", { version: ring.current.version });
-    if (ring.previousProblem) {
+    const hadProblem = before?.kind === "ready" && Boolean(before.ring.previousProblem);
+    // One line per change, not one per retry of a previous key that is still failing.
+    if (before?.kind !== "ready" || hadProblem !== Boolean(ring.previousProblem)) {
+      logInfo("The personal-data key is loaded.", { version: ring.current.version, previousLoaded: Boolean(ring.previous) });
+    }
+    if (ring.previousProblem && !hadProblem) {
       logWarn("The previous personal-data key could not be loaded; values sealed with it are locked until it loads.", { reason: ring.previousProblem });
     }
   } catch (error) {
+    // A retry of a previous key that fails outright must not take the working current key away.
+    if (before?.kind === "ready") return;
     const reason = reasonOf(error);
     const since = before?.kind === "unavailable" ? before.since : Date.now();
     h.state = { kind: "unavailable", reason, since };
@@ -148,10 +154,11 @@ function ensure(): Promise<void> {
   const mode = dataKeyMode();
   if (mode === "not-separate") return Promise.resolve();
   const state = getDataKeyState();
-  if (state.kind === "ready") return Promise.resolve();
+  // Ready with a previous key that failed to load still needs retrying (the current key keeps working meanwhile).
+  if (state.kind === "ready" && !state.ring.previousProblem) return Promise.resolve();
   const h = holder();
   if (h.inflight) return h.inflight;
-  if (state.kind === "unavailable" && Date.now() - h.lastAttempt < RETRY_AFTER_MS) return Promise.resolve();
+  if ((state.kind === "unavailable" || state.kind === "ready") && Date.now() - h.lastAttempt < RETRY_AFTER_MS) return Promise.resolve();
   const promise = attempt(mode).finally(() => {
     h.inflight = null;
   });
@@ -169,7 +176,7 @@ export function startDataKeyLoading(): Promise<void> {
   if (dataKeyMode() !== "not-separate" && !h.retryTimer) {
     h.retryTimer = setInterval(() => {
       const state = getDataKeyState();
-      if (state.kind === "ready") {
+      if (state.kind === "ready" && !state.ring.previousProblem) {
         if (h.retryTimer) clearInterval(h.retryTimer);
         h.retryTimer = null;
         return;
