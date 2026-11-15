@@ -92,6 +92,23 @@ describe("kitchen report: conference staff", () => {
     expect(html).not.toMatch(/SYNTH-|Surname|Family|example\.test/);
   });
 
+  it("counts confirmed registrations only on a general event, and submitted ones too on a club event (#2017)", async () => {
+    mocks.resolveEventContext.mockResolvedValue({ event: { id: "evt", name: "Synthetic Retreat" }, permissions: ["VIEW_REPORTS"] });
+    mocks.eventFindUnique.mockResolvedValue({ name: "Synthetic Retreat", audience: "GENERAL", isPublished: true });
+    const general = renderToStaticMarkup(await StaffPage({ searchParams: Promise.resolve({ event: "evt" }) }));
+    expect(mocks.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED"] });
+    expect(general).toContain("Confirmed registrations only.");
+    await staffCsv(request, params);
+    expect(mocks.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED"] });
+
+    mocks.eventFindUnique.mockResolvedValue({ name: "Synthetic Camporee", audience: "CLUB", isPublished: true });
+    const club = renderToStaticMarkup(await StaffPage({ searchParams: Promise.resolve({ event: "evt" }) }));
+    expect(mocks.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
+    expect(club).toContain("Submitted and confirmed registrations.");
+    await staffCsv(request, params);
+    expect(mocks.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
+  });
+
   it("page is restricted without VIEW_REPORTS and reads nothing", async () => {
     mocks.resolveEventContext.mockResolvedValue({ event: { id: "evt", name: "Synthetic Retreat" }, permissions: ["VIEW_EVENT", "VIEW_SENSITIVE_DATA"] });
     const html = renderToStaticMarkup(await StaffPage({ searchParams: Promise.resolve({ event: "evt" }) }));

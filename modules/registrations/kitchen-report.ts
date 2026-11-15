@@ -60,9 +60,9 @@ export function normalizeNeed(answer: string): string {
 
 export function buildKitchenReport(registrations: readonly RegistrationRecord[], conferenceMealServices: readonly StaffMealServiceCount[] = [], options: { clubEvent?: boolean } = {}): KitchenReport {
   const statuses = kitchenReportStatuses(Boolean(options.clubEvent));
-  const confirmed = registrations.filter((registration) => statuses.includes(registration.status as never));
+  const counted = registrations.filter((registration) => statuses.includes(registration.status as never));
   // Full answer text is needed to count it; it is reduced to anonymous counts below and never returned per row.
-  const rows = buildAttendeeListingRows(confirmed, { showDietaryDetails: true });
+  const rows = buildAttendeeListingRows(counted, { showDietaryDetails: true });
   const groups = new Map<string, { count: number; wordings: Map<string, number> }>();
   let peopleWithNeeds = 0;
   for (const row of rows) {
