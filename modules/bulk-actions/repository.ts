@@ -721,6 +721,8 @@ export async function confirmBulkAction(
     await runCleanup(action, viewer.eventId, run.id, viewer.userId);
   }
   const { summary, won } = await finishRun(prisma, run, viewer.userId, params, extras, missingReason);
+  // Ended under this request by a recovery that recorded nothing as done: nothing this request left behind may stay actionable.
+  if (!won && summary.counts.completed === 0) await runCleanup(action, viewer.eventId, run.id, viewer.userId);
   // A run that was ended under this request (a recovery) has already been accounted for; its file is not handed out.
   return { summary, file: won ? extras.file ?? null : null };
 }

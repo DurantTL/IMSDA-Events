@@ -51,6 +51,8 @@ Bulk communications are human-gated (Caleb, Oct 27): **confirming a message acti
 
 - **Approve** takes the fingerprint the person was shown. The claim from PENDING_APPROVAL to SENDING is one conditional update; the send is `enqueueSelectedAudienceBatch` with the approval id as the batch id. If the review changed (a balance paid, a template republished, delivery switched off) the approval goes back to PENDING_APPROVAL, nothing is marked sent, and the person reviews again. Approving a SENT one returns the stored counts; a SENDING one older than 10 minutes may be tried again with the same batch id, which the send treats as a replay.
 - **Decline** moves PENDING_APPROVAL to DECLINED. Nothing is sent.
+- **Withdrawn.** When a run that queued a message does not finish (the handler or saving its outcomes fails, or a recovery ends it with nothing recorded as done), the waiting approval is removed and a `BULK_MESSAGE_WITHDRAWN` audit row says so.
+- **Reserved batch ids.** A queued message's id is the batch id its approval sends with, so the direct selected-registration send refuses that id (409 `BATCH_ID_IN_USE`).
 
 ## Ticked rows
 

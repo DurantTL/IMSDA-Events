@@ -241,6 +241,8 @@ export async function approveMessage(viewer: ApprovalViewer, approvalId: string,
     // Someone else recorded it in the meantime: return what is stored and write no second audit row.
     const stored = await loadApproval(viewer.eventId, approvalId);
     if (!stored) throw new BulkActionError("NOT_FOUND", "This message is no longer waiting for approval.", 404);
+    // This request's batch was written, so a row that is not SENT is recorded as sent from that batch.
+    if (stored.status !== "SENT") return (await recordIfAlreadySent(viewer, stored, now)) ?? decision(stored, true);
     return decision(stored, true);
   }
   await writeAuditLog({

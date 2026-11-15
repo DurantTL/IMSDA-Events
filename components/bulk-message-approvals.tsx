@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { cardCell } from "@/components/table-card-labels";
@@ -25,6 +25,7 @@ const STATUS_WORDS = { PENDING_APPROVAL: "Waiting for approval", SENDING: "Being
  */
 export function BulkMessageApprovals({ eventId, pending, decided }: Props) {
   const router = useRouter();
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [review, setReview] = useState<MessageApprovalReview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -88,6 +89,8 @@ export function BulkMessageApprovals({ eventId, pending, decided }: Props) {
       setNotice(`Approved. ${plural(data.approval?.sendResult?.included ?? 0, "message")} written for sending.`);
       setOpenId(null);
       setReview(null);
+      // The row that opened the review is gone, so focus goes to the section heading (the notice is announced).
+      requestAnimationFrame(() => headingRef.current?.focus());
       router.refresh();
     } catch {
       setError("The answer was lost. Reload this page to see whether the message was sent. Approving again never sends it twice.");
@@ -112,6 +115,8 @@ export function BulkMessageApprovals({ eventId, pending, decided }: Props) {
       setConfirmingDecline(false);
       setOpenId(null);
       setReview(null);
+      // The row that opened the review is gone, so focus goes to the section heading (the notice is announced).
+      requestAnimationFrame(() => headingRef.current?.focus());
       router.refresh();
     } catch {
       setError("The answer was lost. Reload this page to see whether the message was declined.");
@@ -127,7 +132,7 @@ export function BulkMessageApprovals({ eventId, pending, decided }: Props) {
 
   return (
     <section className={styles.card} aria-labelledby="bulk-messages-title">
-      <h2 className={styles.title} id="bulk-messages-title">Messages waiting for approval</h2>
+      <h2 className={styles.title} id="bulk-messages-title" ref={headingRef} tabIndex={-1}>Messages waiting for approval</h2>
       <p className={styles.sub}>A bulk message is never sent when it is queued. It goes out only when someone with communications access approves it here, after reading a fresh review.</p>
       {notice && <p className={styles.notice} role="status">{notice}</p>}
       {pending.length === 0 ? <p className={styles.empty}>No messages are waiting for approval.</p> : (
