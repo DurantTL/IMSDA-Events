@@ -1,6 +1,8 @@
 import "server-only";
 
+import { DATA_KEY_REASON_TEXT, type DataKeyUnavailableReason } from "@/lib/data-key/types";
 import { getEncryptionKeyStatus } from "@/lib/env";
+import { dataKeyStatus, type DataKeyStatus } from "@/lib/secret-box";
 import { getEmailAvailability } from "@/integrations/email/provider";
 import { getSquareConfiguration } from "@/modules/payments/square-config-domain";
 
@@ -23,6 +25,7 @@ export type EnvironmentServiceId =
   | "payment-webhook"
   | "google-sign-in"
   | "encryption-key"
+  | "data-key"
   | "outbox-sweep"
   | "alert-webhook";
 
@@ -88,6 +91,19 @@ function squareServices(source: Source): EnvironmentServiceStatus[] {
   ];
 }
 
+/** The personal-data key (#1652): ready, not separate yet, or unavailable with a reason in plain words. Never a value. */
+function dataKeyService(status: Pick<DataKeyStatus, "mode" | "state" | "version" | "reason">): EnvironmentServiceStatus {
+  const label = "Personal-data key";
+  if (status.mode === "not-separate") {
+    return { id: "data-key", label, status: "not-configured", missing: [], note: "Not separate yet: personal data uses the sign-in key. Set up the vault (docs/DATA-KEY-AZURE-KEY-VAULT.md)." };
+  }
+  if (status.state === "ready") {
+    return { id: "data-key", label, status: "configured", missing: [], note: status.version === null ? null : `Loaded, version ${status.version}.` };
+  }
+  const reason = status.reason ? DATA_KEY_REASON_TEXT[status.reason as DataKeyUnavailableReason] : "it is still loading";
+  return { id: "data-key", label, status: "not-configured", missing: [], note: `Unavailable: ${reason}. Protected fields are locked until it loads; the server keeps retrying.` };
+}
+
 export type EmailAvailabilityReader = () => { deliveryConfigured: boolean; webhookConfigured: boolean };
 
 /**
@@ -99,6 +115,7 @@ export function buildEnvironmentStatus(
   readers: {
     emailAvailability?: EmailAvailabilityReader;
     encryptionKey?: (source: Source) => { configured: boolean };
+    dataKey?: () => Pick<DataKeyStatus, "mode" | "state" | "version" | "reason">;
   } = {},
 ): EnvironmentStatus {
   const readEmail = readers.emailAvailability ?? getEmailAvailability;
@@ -123,9 +140,14 @@ export function buildEnvironmentStatus(
   );
 
   try {
-    services.push({ id: "encryption-key", label: "Secret encryption key", status: readKey(source).configured ? "configured" : "not-configured", missing: [], note: null });
+    services.push({ id: "encryption-key", label: "Sign-in encryption key", status: readKey(source).configured ? "configured" : "not-configured", missing: [], note: null });
   } catch {
-    services.push(unknownService("encryption-key", "Secret encryption key"));
+    services.push(unknownService("encryption-key", "Sign-in encryption key"));
+  }
+  try {
+    services.push(dataKeyService((readers.dataKey ?? dataKeyStatus)()));
+  } catch {
+    services.push(unknownService("data-key", "Personal-data key"));
   }
   services.push(
     allOf(source, "outbox-sweep", "Scheduled message sweep token", ["OUTBOX_SWEEP_TOKEN"]),

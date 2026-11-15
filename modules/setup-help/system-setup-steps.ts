@@ -24,6 +24,7 @@ export type SystemSetupId =
   | "account-email"
   | "google-sign-in"
   | "encryption-key"
+  | "data-key"
   | "outbox-sweep"
   | "breach-service"
   | "email-backup";
@@ -195,6 +196,27 @@ export const SYSTEM_SETUP_STEPS: Record<SystemSetupId, SetupHelp> = {
     docsLink: "docs/SERVER-SECURITY-CHECKLIST.md",
     whenDone: "Encryption key reads Yes. The value is never shown.",
   },
+  "data-key": {
+    steps: [
+      "This is a person's job with the organization's Microsoft 365 administrator: follow docs/DATA-KEY-AZURE-KEY-VAULT.md from the top. Nothing here is changed from this page.",
+      "Create the key vault and its key, register the app, wrap a new data key with npm run data-key:wrap, and keep the vault key backup with the offline key backup.",
+      `${ADD_IN_XCLOUD} the settings listed below. Keep the client secret in a protected file and name the file in AZURE_CLIENT_SECRET_FILE. ${NEVER_SHARE}`,
+      REDEPLOY,
+      "Run npm run key:check, take a fresh backup, then move existing personal data with npm run key:rotate (a dry run first). The runbook has each command.",
+    ],
+    settingNames: [
+      "DATA_KEY_SOURCE",
+      "AZURE_KEY_VAULT_URL",
+      "AZURE_KEY_VAULT_KEY_NAME",
+      "AZURE_TENANT_ID",
+      "AZURE_CLIENT_ID",
+      "AZURE_CLIENT_SECRET_FILE",
+      "DATA_ENCRYPTION_KEY_WRAPPED",
+      "DATA_ENCRYPTION_KEY_VERSION",
+    ],
+    docsLink: "docs/DATA-KEY-AZURE-KEY-VAULT.md",
+    whenDone: "Personal-data key reads Loaded with its version, and npm run key:check passes. The value is never shown.",
+  },
   "outbox-sweep": {
     steps: [
       "Make a long random token (at least 32 characters) on the server, for example by running openssl rand -base64 48.",
@@ -250,6 +272,7 @@ export const ENVIRONMENT_SERVICE_SETUP: Record<EnvironmentServiceId, SystemSetup
   "payment-webhook": "square-webhook",
   "google-sign-in": "google-sign-in",
   "encryption-key": "encryption-key",
+  "data-key": "data-key",
   "outbox-sweep": "outbox-sweep",
   "alert-webhook": "alert-webhook",
 };

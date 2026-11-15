@@ -77,6 +77,7 @@ beforeEach(() => {
 const nothingSet = () => buildEnvironmentStatus({}, {
   emailAvailability: () => ({ deliveryConfigured: false, webhookConfigured: false }),
   encryptionKey: () => ({ configured: false }),
+  dataKey: () => ({ mode: "not-separate" as const, state: "not-separate" as const, version: null, reason: null }),
 });
 
 const never = () => ({ ...assessSweepHeartbeat(null, now), summary: null });

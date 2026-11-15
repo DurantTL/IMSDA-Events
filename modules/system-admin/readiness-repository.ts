@@ -5,6 +5,7 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { getServerEnv } from "@/lib/env";
 import { logError } from "@/lib/logger";
+import { dataKeyStatus } from "@/lib/secret-box";
 import { getPrisma } from "@/lib/prisma";
 import { getEmailAvailability } from "@/integrations/email/provider";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -116,6 +117,7 @@ async function gatherFacts(now: Date): Promise<ReadinessFacts> {
     pendingMigrations,
     sweep,
     encryptionKeyConfigured: Boolean(env.SECRET_ENCRYPTION_KEY),
+    dataKey: (({ mode, state, version, reason }) => ({ mode, state, version, reason }))(dataKeyStatus()),
     email: {
       deliveryConfigured: getEmailAvailability().deliveryConfigured,
       senderConfigured: senders.length > 0,

@@ -58,6 +58,10 @@ Ticking only records that someone did the work. This sheet remains the full inst
   machine that can read them. If a copy is also kept on the backup server
   (item 1), it goes in a separate, access-restricted place from the dumps. The
   steps are in "Keeping and testing the key backup" in `docs/DEPLOY-DOCKER.md`.
+  Once the personal-data key is set up (#1652), the same custodian also holds
+  the vault key backup and the record of wrapped data keys; the steps are in
+  `docs/DATA-KEY-AZURE-KEY-VAULT.md`, step 9. Losing the vault key and its
+  backup loses the personal data for good, like losing the sign-in key.
   Record *where* each copy is, never the value.
 - **Proof:** the custodian confirms the copy exists and matches (compare a
   checksum, never the key itself on screen or in chat).

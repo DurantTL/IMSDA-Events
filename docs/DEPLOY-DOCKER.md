@@ -1953,6 +1953,14 @@ shred -u /root/keytest/backup-key /root/keytest/db.env && rmdir /root/keytest
 
 ### Rotating the encryption key (#1516)
 
+> **Two keys (#1652).** Health records, birth dates, sensitive club form answers
+> and calendar addresses can have their own key, the personal-data key, kept in
+> Azure Key Vault. This section is the **sign-in key**: it covers sign-in
+> secrets and codes, and (until the personal-data key is set up) everything
+> else. The vault setup, the one-time move and rotating the data key are in
+> `docs/DATA-KEY-AZURE-KEY-VAULT.md`. After the move, rotate the sign-in key with
+> this procedure so the key file on the server covers only sign-in values.
+
 Every sealed value records the key version that sealed it. While the key
 version is 1, values keep the original `v1.…` format (version 1 is implied);
 from version 2 they are written as `v2.<version>.…`, with the version
