@@ -88,6 +88,21 @@ services:
       # stops startup). See docs/DEPLOY-DOCKER.md.
       SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
       # SECRET_ENCRYPTION_KEY_FILE: /run/secrets/encryption-key
+      # The separate personal-data key (#1652). Leave DATA_KEY_SOURCE blank until the key vault is
+      # ready: personal data then keeps using the sign-in key above. The client secret can be loaded from
+      # a file like the sign-in key: set AZURE_CLIENT_SECRET_FILE below and mount it (see the volumes).
+      # See docs/DATA-KEY-AZURE-KEY-VAULT.md.
+      DATA_KEY_SOURCE: ${DATA_KEY_SOURCE:-}
+      DATA_ENCRYPTION_KEY_VERSION: ${DATA_ENCRYPTION_KEY_VERSION:-}
+      DATA_ENCRYPTION_KEY_WRAPPED: ${DATA_ENCRYPTION_KEY_WRAPPED:-}
+      DATA_ENCRYPTION_PREVIOUS_KEY_WRAPPED: ${DATA_ENCRYPTION_PREVIOUS_KEY_WRAPPED:-}
+      DATA_ENCRYPTION_PREVIOUS_KEY_VERSION: ${DATA_ENCRYPTION_PREVIOUS_KEY_VERSION:-}
+      AZURE_KEY_VAULT_URL: ${AZURE_KEY_VAULT_URL:-}
+      AZURE_KEY_VAULT_KEY_NAME: ${AZURE_KEY_VAULT_KEY_NAME:-}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID:-}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+      AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET:-}
+      # AZURE_CLIENT_SECRET_FILE: /run/secrets/azure-client-secret
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
       ALERT_REPEAT_MINUTES: ${ALERT_REPEAT_MINUTES:-60}
       # Message files (#845): blank keeps the defaults (200 MB per event, 72 hour grace, sweep reports only).
@@ -121,6 +136,11 @@ services:
       # - type: bind
       #   source: /etc/imsda/secret-encryption-key
       #   target: /run/secrets/encryption-key
+      #   read_only: true
+      # Vault client secret file (with AZURE_CLIENT_SECRET_FILE above).
+      # - type: bind
+      #   source: /etc/imsda/azure-client-secret
+      #   target: /run/secrets/azure-client-secret
       #   read_only: true
     ports:
       - "${APP_PORT:-3100}:3000"

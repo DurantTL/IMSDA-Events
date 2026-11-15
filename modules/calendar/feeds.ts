@@ -3,7 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
-import { fingerprintSecret, fingerprintSecretCandidates, isSecretEncryptionConfigured, openSecret, previousSecretKeyVersion, SecretBoxError, sealSecret } from "@/lib/secret-box";
+import { DataKeyUnavailableError, dataKeyStatus, fingerprintData, fingerprintDataCandidates, isDataEncryptionAvailable, isDataKeyUnavailable, openData, previousDataKeyVersion, SecretBoxError, sealData } from "@/lib/secret-box";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { FeedFetchError, feedUrlHint, fetchFeedText, normalizeFeedUrl, type FeedTransport, type HostResolver } from "@/modules/calendar/feed-fetch";
 import { entryTypeEditMark } from "@/modules/calendar/deadlines";
@@ -78,13 +78,16 @@ async function sealedAddress(rawUrl: string, exceptFeedId?: string) {
     if (error instanceof FeedFetchError) throw new CalendarError("INVALID_FEED", error.message);
     throw error;
   }
-  if (!isSecretEncryptionConfigured()) {
+  if (!isDataEncryptionAvailable()) {
+    if (isDataKeyUnavailable()) {
+      throw new CalendarError("FEED_SECRET_MISSING", "Calendar addresses can't be saved right now because the personal-data key is unavailable. Try again in a few minutes.");
+    }
     throw new CalendarError("FEED_SECRET_MISSING", "Saving calendar addresses needs the encryption key (SECRET_ENCRYPTION_KEY, or SECRET_ENCRYPTION_KEY_FILE) to be set on the server.");
   }
-  const urlFingerprint = fingerprintSecret(url.toString(), feedSecretPurpose);
+  const urlFingerprint = fingerprintData(url.toString(), feedSecretPurpose);
   // While a key rotation has the previous key loaded, a feed not yet re-fingerprinted still counts as a duplicate (#1516).
-  await assertNotConnected(fingerprintSecretCandidates(url.toString(), feedSecretPurpose), exceptFeedId);
-  return { sealedUrl: sealSecret(url.toString(), feedSecretPurpose), urlHint: feedUrlHint(url), urlFingerprint };
+  await assertNotConnected(fingerprintDataCandidates(url.toString(), feedSecretPurpose), exceptFeedId);
+  return { sealedUrl: sealData(url.toString(), feedSecretPurpose), urlHint: feedUrlHint(url), urlFingerprint };
 }
 
 export async function createCalendarFeed(input: CalendarFeedInput, actorUserId: string) {
@@ -151,16 +154,20 @@ export async function deleteCalendarFeed(feedId: string, actorUserId: string) {
   return listCalendarFeeds();
 }
 
+/** Shown instead of a failure while the personal-data key is unavailable: the refresh is skipped and nothing is recorded as failed. */
+const CALENDAR_LOCKED_MESSAGE = "The saved address is locked right now because the personal-data key is unavailable. The refresh was skipped and will work again when it loads.";
+
 /** The message staff see for any failure; it never contains the address. */
 function failureMessage(error: unknown) {
   if (error instanceof FeedFetchError || error instanceof IcsParseError) return error.message;
+  if (error instanceof DataKeyUnavailableError) return CALENDAR_LOCKED_MESSAGE;
   if (error instanceof SecretBoxError) return "The saved address could not be read. Edit the calendar and enter its address again.";
   logError("A calendar feed could not be read", error);
   return "The feed could not be imported.";
 }
 
 async function loadAndParse(feed: { sealedUrl: string }, deps: Deps): Promise<ParsedIcsFeed> {
-  const text = await fetchFeedText(openSecret(feed.sealedUrl, feedSecretPurpose), deps);
+  const text = await fetchFeedText(openData(feed.sealedUrl, feedSecretPurpose), deps);
   return parseIcsFeed(text);
 }
 
@@ -187,9 +194,11 @@ async function findFeed(feedId: string) {
  * also the previous key's, because an item a deleted feed left behind keeps the fingerprint it was given until it is rotated (#1516).
  */
 function feedFingerprints(feed: { sealedUrl: string; urlFingerprint: string }) {
-  if (previousSecretKeyVersion() === null) return [feed.urlFingerprint];
+  // Only worth the work while another key could have fingerprinted a left-behind item: a rotation has the previous
+  // key loaded, or the personal-data key is separate from the sign-in key (#1652).
+  if (previousDataKeyVersion() === null && dataKeyStatus().mode === "not-separate") return [feed.urlFingerprint];
   try {
-    return [...new Set([feed.urlFingerprint, ...fingerprintSecretCandidates(openSecret(feed.sealedUrl, feedSecretPurpose), feedSecretPurpose)])];
+    return [...new Set([feed.urlFingerprint, ...fingerprintDataCandidates(openData(feed.sealedUrl, feedSecretPurpose), feedSecretPurpose)])];
   } catch {
     return [feed.urlFingerprint];
   }
@@ -255,7 +264,8 @@ export async function syncCalendarFeed(
     parsed = await loadAndParse(feed, options);
   } catch (error) {
     const message = failureMessage(error);
-    await recordFailure(feedId, message, now);
+    // A locked address is not a feed fault: leave the feed's own status alone.
+    if (!(error instanceof DataKeyUnavailableError)) await recordFailure(feedId, message, now);
     throw new CalendarError("FEED_FETCH_FAILED", message);
   }
 
@@ -322,7 +332,8 @@ export async function syncCalendarFeed(
     }, { timeout: 60_000, maxWait: 10_000 });
   } catch (error) {
     const message = failureMessage(error);
-    await recordFailure(feedId, message, now);
+    // A locked address is not a feed fault: leave the feed's own status alone.
+    if (!(error instanceof DataKeyUnavailableError)) await recordFailure(feedId, message, now);
     throw new CalendarError("FEED_FETCH_FAILED", message);
   }
 

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { logError } from "@/lib/logger";
+import { logError, logWarn } from "@/lib/logger";
+import { DataKeyUnavailableError } from "@/lib/secret-box";
 import { isBusyDatabaseError, logExpiredTransaction } from "@/modules/event-locations/api-errors";
 import { EventLocationError, eventLocationErrorStatus, locationBusyMessage } from "@/modules/event-locations/errors";
 import { RosterAccessError } from "@/modules/club-rosters/access";
@@ -22,6 +23,14 @@ export function clubRegistrationApiError(error: unknown, action: string) {
   }
   if (error instanceof SyntaxError) {
     return Response.json({ error: "INVALID_JSON", message: "The request is not valid JSON." }, { status: 400, headers: noStore });
+  }
+  if (error instanceof DataKeyUnavailableError) {
+    // A registration that needs a locked birth date is refused and stores no substitute age (#1652).
+    logWarn(`${action} needs a birth date: the personal-data key is unavailable`);
+    return Response.json(
+      { error: "DATA_KEY_UNAVAILABLE", message: "This can't be submitted right now because birth dates are locked. Try again in a few minutes." },
+      { status: 503, headers: { ...noStore, "Retry-After": "60" } },
+    );
   }
   if (error instanceof RosterAccessError) {
     return Response.json({ error: error.code, message: error.message }, { status: error.status, headers: noStore });

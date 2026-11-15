@@ -4,7 +4,7 @@ import type { ClubRosterBaptized, ClubRosterChurchMember, ClubRosterSchoolGrade,
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { lockClubOrders } from "@/modules/club-orders/repository";
-import { openBirthDate, sealBirthDate } from "@/modules/club-rosters/birth-dates";
+import { BIRTH_DATE_LOCKED_ACTION_MESSAGE, openBirthDateOrLocked, openBirthDateOrNull, sealBirthDate } from "@/modules/club-rosters/birth-dates";
 import { ageOn, birthDateProblem, calendarDateOf, clubYearFor, defaultRosterRole, guardianEditableYears, isDefaultYouthRole, rosterIsTltFor } from "@/modules/club-rosters/domain";
 import { guardianSetEmailProblem, guardianSetPhoneProblem } from "@/modules/club-rosters/guardians-domain";
 import { deleteGuardiansForMember, replaceGuardians } from "@/modules/club-rosters/guardians-repository";
@@ -28,7 +28,8 @@ export type RosterErrorCode =
   | "GUARDIAN_PHONE_INVALID"
   | "GUARDIAN_EMAIL_INVALID"
   | "CARRY_FORWARD_DONE"
-  | "CARRY_FORWARD_BUSY";
+  | "CARRY_FORWARD_BUSY"
+  | "DATA_KEY_UNAVAILABLE";
 
 export class RosterOperationError extends Error {
   constructor(public readonly code: RosterErrorCode, message: string) {
@@ -72,7 +73,9 @@ type StoredMember = Prisma.ClubRosterMemberGetPayload<{ select: typeof memberSel
 
 /** Whole years on a date from the sealed birth date, opened here and never returned; null without one (also used by the TLT directory, #1686). */
 export function ageFrom(member: Pick<StoredMember, "sealedBirthDate">, onDate: string) {
-  return member.sealedBirthDate ? ageOn(openBirthDate(member.sealedBirthDate), onDate) : null;
+  // A locked birth date (the personal-data key is unavailable) counts as unknown (#1652).
+  const birthDate = openBirthDateOrNull(member.sealedBirthDate);
+  return birthDate ? ageOn(birthDate, onDate) : null;
 }
 
 /** `includeSchoolDetails` (#1668, #1758): school type and church membership go only to the club's leaders, system administrators, Clubs Administrators and Area Coordinators (the last two view only), never event managers. Left out, the keys are absent, not null. */
@@ -198,10 +201,13 @@ async function findDuplicateMembers(
     where: { organizationId, clubYear, status: { not: "REMOVED" }, id: exceptMemberId ? { not: exceptMemberId } : undefined },
     select: memberSelect,
   });
-  return others.filter((member) => member.person
-    && nameKey(member.person.firstName, member.person.lastName) === key
-    && member.sealedBirthDate
-    && openBirthDate(member.sealedBirthDate) === birthDate);
+  return others.filter((member) => {
+    if (!member.person || nameKey(member.person.firstName, member.person.lastName) !== key || !member.sealedBirthDate) return false;
+    const opened = openBirthDateOrLocked(member.sealedBirthDate);
+    // The comparison needs the birth date: refuse rather than let a duplicate through unchecked.
+    if (opened.locked) throw new RosterOperationError("DATA_KEY_UNAVAILABLE", BIRTH_DATE_LOCKED_ACTION_MESSAGE);
+    return opened.birthDate === birthDate;
+  });
 }
 
 async function assertNotDuplicate(
@@ -369,8 +375,15 @@ export async function updateRosterMember(
     }
     const firstName = input.firstName ?? member.person?.firstName ?? "";
     const lastName = input.lastName ?? member.person?.lastName ?? "";
-    const birthDate = input.birthDate ?? (member.sealedBirthDate ? openBirthDate(member.sealedBirthDate) : "");
     if (input.firstName !== undefined || input.lastName !== undefined || input.birthDate !== undefined) {
+      // The stored birth date is opened only when the duplicate check needs it; a save that changes neither the
+      // name nor the date never touches it, so it keeps working while the personal-data key is unavailable.
+      let birthDate = input.birthDate ?? "";
+      if (input.birthDate === undefined && member.sealedBirthDate) {
+        const opened = openBirthDateOrLocked(member.sealedBirthDate);
+        if (opened.locked) throw new RosterOperationError("DATA_KEY_UNAVAILABLE", BIRTH_DATE_LOCKED_ACTION_MESSAGE);
+        birthDate = opened.birthDate;
+      }
       await assertNotDuplicate(tx, organizationId, member.clubYear, firstName, lastName, birthDate, memberId);
     }
     if ((input.firstName !== undefined || input.lastName !== undefined) && member.personId) {
@@ -676,7 +689,12 @@ export async function revealRosterBirthDates(organizationId: string, clubYear: s
     where: { organizationId, clubYear, status: { not: "REMOVED" }, sealedBirthDate: { not: null } },
     select: { id: true, sealedBirthDate: true },
   });
-  const birthDates = Object.fromEntries(members.map((member) => [member.id, openBirthDate(member.sealedBirthDate!)]));
+  // Showing birth dates needs the key: refuse rather than show blanks.
+  const birthDates = Object.fromEntries(members.map((member) => {
+    const opened = openBirthDateOrLocked(member.sealedBirthDate!);
+    if (opened.locked) throw new RosterOperationError("DATA_KEY_UNAVAILABLE", BIRTH_DATE_LOCKED_ACTION_MESSAGE);
+    return [member.id, opened.birthDate];
+  }));
   await writeAuditLog({
     ...("userId" in actor ? { actorUserId: actor.userId } : {}),
     action: "CLUB_ROSTER_BIRTH_DATES_REVEALED",

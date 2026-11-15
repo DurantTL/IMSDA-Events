@@ -22,7 +22,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAudi
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/lib/request-context", () => ({ withRequestContext: (handler: unknown) => handler }));
 // The birth date is sealed in storage; the test stores a plain date and the fake "opens" it as it is.
-vi.mock("@/modules/club-rosters/birth-dates", () => ({ openBirthDate: (value: string) => value }));
+vi.mock("@/modules/club-rosters/birth-dates", () => ({ openBirthDate: (value: string) => value, openBirthDateOrNull: (value: string | null) => value }));
 
 import { GET } from "@/app/api/admin/youth-directory/export/route";
 import { requireYouthDirectoryAccess, youthDirectoryViewerFor } from "@/modules/youth-directory/access";

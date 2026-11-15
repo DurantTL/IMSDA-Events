@@ -53,6 +53,8 @@ async function countStillSealed(
 }
 
 async function main() {
+  // Re-sealing may need the personal-data key (#1652); load it before the first sealed value is touched.
+  await (await import("../lib/data-key/keyring")).ensureDataKeyLoaded();
   const { getPrisma } = await import("../lib/prisma");
   const { syncClubFormTemplates } = await import("../modules/club-forms/templates");
   const prisma = getPrisma();

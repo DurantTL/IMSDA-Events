@@ -6,7 +6,7 @@ const prisma = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => prisma }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
-vi.mock("@/lib/secret-box", () => ({ isSecretEncryptionConfigured: () => true, SecretBoxError: class extends Error {} }));
+vi.mock("@/lib/secret-box", () => ({ isDataEncryptionAvailable: () => true, SecretBoxError: class extends Error {}, DataKeyUnavailableError: class extends Error {} }));
 
 import { listSubmissionsForViewer, pageSubmissionsForViewer } from "@/modules/club-forms/submissions";
 import type { ClubFormsViewer } from "@/modules/club-forms/domain";

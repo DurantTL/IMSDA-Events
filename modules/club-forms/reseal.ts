@@ -1,10 +1,8 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
-import { isSecretEncryptionConfigured } from "@/lib/secret-box";
-import { ClubFormError } from "@/modules/club-forms/errors";
 import { lockClubFormTemplateForReseal } from "@/modules/club-forms/template-lock";
-import { openSensitiveAnswers, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
+import { openSensitiveAnswers, requireSensitiveSealing, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 
 /**
  * Re-sealing (#610). A template's `sensitiveFieldKeys` decide which answers
@@ -40,9 +38,7 @@ export async function resealClubFormSubmissions(
       const plain = { ...(row.answers as Record<string, unknown>) };
       const toMove = Object.keys(plain).filter((key) => moving.has(key));
       if (toMove.length === 0) continue;
-      if (!isSecretEncryptionConfigured()) {
-        throw new ClubFormError("ENCRYPTION_NOT_CONFIGURED", "Encryption isn't set up, so existing forms can't be re-sealed.");
-      }
+      requireSensitiveSealing("Encryption isn't set up, so existing forms can't be re-sealed.");
       const sealed = row.sealedSensitiveAnswers ? openSensitiveAnswers(row.id, row.sealedSensitiveAnswers) : {};
       for (const key of toMove) {
         sealed[key] = plain[key];

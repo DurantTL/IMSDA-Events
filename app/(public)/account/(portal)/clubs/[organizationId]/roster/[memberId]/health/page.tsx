@@ -1,3 +1,6 @@
+import { HealthRecordLockedError } from "@/modules/health-records/locked-error";
+import { HealthRecordLocked } from "@/components/health-record-locked";
+import { DataKeyUnavailableError } from "@/lib/secret-box";
 import { ExactValue } from "@/components/exact-value";
 import type { Metadata } from "next";
 import { ClubSetupHelp } from "@/components/role-setup-help";
@@ -90,9 +93,14 @@ export default async function ClubMemberHealthPage({ params }: { params: Promise
     if (needsAck(error)) return null;
     // A system administrator acting as the director still needs break-glass for a live record (#929).
     if (error instanceof HealthRecordError && error.code === "BREAK_GLASS_REQUIRED") return "BREAK_GLASS" as const;
+    // The personal-data key is unavailable (#1652): say so instead of failing the page.
+    if (error instanceof DataKeyUnavailableError) return error;
     if (error instanceof HealthRecordError) notFound();
     throw error;
   });
+  if (health instanceof DataKeyUnavailableError) {
+    return <HealthRecordLocked back={{ href: rosterHref, label: "Back to roster" }} memberName={health instanceof HealthRecordLockedError ? health.memberName : undefined} />;
+  }
   if (health === "BREAK_GLASS") {
     // A system administrator or Clubs Administrator acting as the director (any viewer the break-glass route accepts) can start break-glass here (#1617).
     const personId = canStartBreakGlassInline(viewer) ? await rosterMemberPersonId(organizationId, memberId) : null;

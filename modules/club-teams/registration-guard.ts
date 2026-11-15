@@ -7,7 +7,7 @@ import { ALTERNATE_FIELD_KEY, ROLE_FIELD_KEY, isAlternateAnswer, formAsksRole, t
 import { syncTeamMemberPermissions } from "@/modules/club-teams/permission-repository";
 import { permissionDeclinedGenericProblem, permissionDeclinedProblem } from "@/modules/club-teams/permission-domain";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { openBirthDate } from "@/modules/club-rosters/birth-dates";
+import { openBirthDateOrNull } from "@/modules/club-rosters/birth-dates";
 import { ageOn } from "@/modules/club-rosters/domain";
 import { getTeamSettings } from "@/modules/club-teams/settings-repository";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
@@ -164,8 +164,10 @@ export async function enforceTeamRegistrationRules(
     // A birth date on the roster gives the age on the age date. Otherwise the age stored by the director's edit; the form's
     // age answer is only the fallback, for a person staff typed in.
     const answeredAge = Object.entries(responses).find(([key, value]) => isAgeFieldKey(key) && typeof value !== "boolean" && value !== "" && Number.isInteger(Number(value)));
-    const age = rosterMember?.sealedBirthDate
-      ? ageOn(openBirthDate(rosterMember.sealedBirthDate), ageDate)
+    // A locked birth date (the personal-data key is unavailable) counts as unknown, so the stored age is used.
+    const rosterBirthDate = openBirthDateOrNull(rosterMember?.sealedBirthDate);
+    const age = rosterBirthDate
+      ? ageOn(rosterBirthDate, ageDate)
       : typeof snapshot.ageOnEventDate === "number" ? snapshot.ageOnEventDate : answeredAge ? Number(answeredAge[1]) : null;
     const role = teamRoleFor({
       responses,

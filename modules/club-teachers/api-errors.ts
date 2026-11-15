@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { logError } from "@/lib/logger";
+import { logError, logWarn } from "@/lib/logger";
+import { DataKeyUnavailableError } from "@/lib/secret-box";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { RosterAccessError } from "@/modules/club-rosters/access";
 import { ClubTeacherError } from "@/modules/club-teachers/repository";
@@ -14,6 +15,10 @@ export function clubTeacherApiError(error: unknown, action: string) {
   if (error instanceof SyntaxError) return Response.json({ error: "INVALID_JSON", message: "The request is not valid JSON." }, { status: 400, headers: noStore });
   if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status, headers: noStore });
   if (error instanceof RosterAccessError) return Response.json({ error: error.code, message: error.message }, { status: error.status, headers: noStore });
+  if (error instanceof DataKeyUnavailableError) {
+    logWarn(`${action} could not read a birth date: the personal-data key is unavailable`);
+    return Response.json({ error: "DATA_KEY_UNAVAILABLE", message: "This can't be saved right now because birth dates are locked. Try again in a few minutes." }, { status: 503, headers: { ...noStore, "Retry-After": "60" } });
+  }
   if (error instanceof ClubTeacherError && error.code === "NOT_PERMITTED") {
     return Response.json({ error: error.code, message: error.message }, { status: 403, headers: noStore });
   }

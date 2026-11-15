@@ -7,7 +7,7 @@ import { getPrisma } from "@/lib/prisma";
 import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { lockClubOrders } from "@/modules/club-orders/repository";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { openBirthDate } from "@/modules/club-rosters/birth-dates";
+import { openBirthDateOrNull } from "@/modules/club-rosters/birth-dates";
 import {
   carriedClassLevel,
   carriedIsTlt,
@@ -126,7 +126,11 @@ export async function getCarryForwardOffer(organizationId: string, now = new Dat
       schoolGrade: member.schoolGrade,
       transferring: member.personId ? transferring.has(member.personId) : false,
       transferWithStaff: member.personId ? withStaff.has(member.personId) : false,
-      age: member.sealedBirthDate ? ageOn(openBirthDate(member.sealedBirthDate), today) : null,
+      // Locked (the personal-data key is unavailable) counts as unknown.
+      age: (() => {
+        const birthDate = openBirthDateOrNull(member.sealedBirthDate);
+        return birthDate ? ageOn(birthDate, today) : null;
+      })(),
     }))
     .sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName) || a.memberId.localeCompare(b.memberId));
   if (candidates.length === 0) return { state: "NOTHING_TO_CARRY", fromClubYear, toClubYear };

@@ -1,3 +1,5 @@
+import { DataKeyUnavailableError } from "@/lib/secret-box";
+import { BIRTH_DATE_LOCKED_TEXT } from "@/modules/club-rosters/birth-dates-text";
 import type { Metadata } from "next";
 import { ClubSetupHelp } from "@/components/role-setup-help";
 import { notFound } from "next/navigation";
@@ -32,7 +34,21 @@ export default async function ClubYearEndReportPage({ params }: { params: Promis
   }
   const now = new Date();
   if (!isReportYearReportable(year, now)) notFound();
-  const view = await getYearEndView(organizationId, year, now);
+  // The pre-filled counts need the roster's birth dates: while the personal-data key is unavailable the report is not shown
+  // with numbers that would look right and not be (#1652).
+  const loaded = await getYearEndView(organizationId, year, now).catch((error: unknown) => {
+    if (error instanceof DataKeyUnavailableError) return "LOCKED" as const;
+    throw error;
+  });
+  if (loaded === "LOCKED") {
+    return (
+      <>
+        <BackLink href={backHref}>Back to Monthly Records</BackLink>
+        <p className="public-manage-empty">The Year-End Report can&apos;t be shown right now because birth dates are locked. {BIRTH_DATE_LOCKED_TEXT}. Try again in a few minutes.</p>
+      </>
+    );
+  }
+  const view = loaded;
   const report = view.report;
   const status = report?.status ?? null;
 

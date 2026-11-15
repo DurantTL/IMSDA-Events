@@ -63,6 +63,7 @@ function facts(overrides: Partial<ReadinessFacts> = {}): ReadinessFacts {
     pendingMigrations: [],
     sweep: { status: "ok", lastSucceededAt: now.toISOString(), lastFailedAt: null, ageMs: 1000 },
     encryptionKeyConfigured: true,
+    dataKey: { mode: "not-separate", state: "not-separate", version: null, reason: null },
     email: { deliveryConfigured: true, senderConfigured: true, senderReadable: true, senderDeliverable: true },
     square: { environment: "sandbox", productionUnlocked: false },
     backup: { readable: false },
@@ -132,6 +133,26 @@ describe("automatic readiness checks", () => {
     expect(row(evaluateAutomaticChecks(facts({ sweep: { ...base, status: "never" } }), now), "outbox-sweeper").status).toBe("attention");
     expect(row(evaluateAutomaticChecks(facts({ sweep: null }), now), "outbox-sweeper").status).toBe("unknown");
     expect(row(evaluateAutomaticChecks(facts(), now), "outbox-sweeper").status).toBe("ok");
+  });
+
+  it("shows the personal-data key as not separate, ready or unavailable, with a version or a reason category only (#1652)", () => {
+    const text = (dataKey: ReadinessFacts["dataKey"]) => {
+      const found = row(evaluateAutomaticChecks(facts({ dataKey }), now), "data-key");
+      return { status: found.status, summary: found.summary };
+    };
+    expect(text({ mode: "not-separate", state: "not-separate", version: null, reason: null })).toMatchObject({
+      status: "attention",
+      summary: expect.stringContaining("docs/DATA-KEY-AZURE-KEY-VAULT.md"),
+    });
+    expect(text({ mode: "azure-key-vault", state: "ready", version: 3, reason: null })).toEqual({
+      status: "ok",
+      summary: "Yes, version 3. The value is never shown.",
+    });
+    const locked = text({ mode: "azure-key-vault", state: "unavailable", version: null, reason: "access-denied" });
+    expect(locked.status).toBe("attention");
+    expect(locked.summary).toContain("the key vault refused access");
+    expect(locked.summary).not.toContain("access-denied");
+    expect(text({ mode: "azure-key-vault", state: "loading", version: null, reason: null }).summary).toContain("still loading");
   });
 
   it("shows encryption key, email and Square as yes/no and state only", () => {

@@ -11,20 +11,35 @@ const state = vi.hoisted(() => ({
   nextId: 1,
   missFingerprintOnce: false,
   previousFingerprints: [] as string[],
+  dataKeyLocked: false,
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 // A reversible stand-in; the real box needs an environment key. What matters here is that only the sealed form is stored.
-vi.mock("@/lib/secret-box", () => ({
-  SecretBoxError: class SecretBoxError extends Error {},
-  isSecretEncryptionConfigured: () => true,
-  sealSecret: (value: string) => `v1.${Buffer.from(value).toString("base64url")}`,
-  fingerprintSecret: (value: string, purpose: string) => `fp.${purpose}.${Buffer.from(value).toString("base64url")}`,
-  fingerprintSecretCandidates: (value: string, purpose: string) => [`fp.${purpose}.${Buffer.from(value).toString("base64url")}`, ...state.previousFingerprints],
-  previousSecretKeyVersion: () => (state.previousFingerprints.length > 0 ? 1 : null),
-  openSecret: (sealed: string) => Buffer.from(String(sealed).slice(3), "base64url").toString("utf8"),
-}));
+vi.mock("@/lib/secret-box", () => {
+  class SecretBoxError extends Error {}
+  class DataKeyUnavailableError extends SecretBoxError {}
+  return {
+    SecretBoxError,
+    DataKeyUnavailableError,
+    isDataEncryptionAvailable: () => !state.dataKeyLocked,
+    isDataKeyUnavailable: () => state.dataKeyLocked,
+    sealData: (value: string) => {
+      if (state.dataKeyLocked) throw new DataKeyUnavailableError("locked");
+      return `v1.${Buffer.from(value).toString("base64url")}`;
+    },
+    fingerprintData: (value: string, purpose: string) => `fp.${purpose}.${Buffer.from(value).toString("base64url")}`,
+    fingerprintDataCandidates: (value: string, purpose: string) => [`fp.${purpose}.${Buffer.from(value).toString("base64url")}`, ...state.previousFingerprints],
+    previousDataKeyVersion: () => (state.previousFingerprints.length > 0 ? 1 : null),
+    dataKeyStatus: () => ({ mode: "not-separate" }),
+    openData: (sealed: string) => {
+      if (state.dataKeyLocked) throw new DataKeyUnavailableError("locked");
+      return Buffer.from(String(sealed).slice(3), "base64url").toString("utf8");
+    },
+  };
+});
+
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: async (entry: Record<string, unknown>) => { state.audits.push(entry); } }));
 vi.mock("@/lib/prisma", () => {
   const matches = (row: Record<string, unknown>, where: Record<string, unknown> = {}): boolean => Object.entries(where).every(([key, condition]) => {
@@ -116,6 +131,7 @@ beforeEach(() => {
   state.audits = [];
   state.nextId = 1;
   state.previousFingerprints = [];
+  state.dataKeyLocked = false;
   body = ics;
 });
 
@@ -331,6 +347,27 @@ describe("imported calendar feeds", () => {
       message: "This calendar is already connected as Synthetic Google calendar.",
     });
     expect(state.feeds).toHaveLength(1);
+  });
+
+  it("refuses to save an address while the personal-data key is unavailable, with its own message (#1652)", async () => {
+    state.dataKeyLocked = true;
+    await expect(createCalendarFeed(input, "admin-1")).rejects.toMatchObject({
+      code: "FEED_SECRET_MISSING",
+      message: expect.stringContaining("personal-data key is unavailable"),
+    });
+    expect(state.feeds).toHaveLength(0);
+  });
+
+  it("skips a refresh while the personal-data key is unavailable and does not mark the feed failed (#1652)", async () => {
+    const feedId = await addFeed();
+    const before = JSON.stringify(state.feeds[0]);
+    state.dataKeyLocked = true;
+    await expect(syncCalendarFeed(feedId, deps)).rejects.toMatchObject({
+      code: "FEED_FETCH_FAILED",
+      message: expect.stringContaining("locked right now"),
+    });
+    expect(JSON.stringify(state.feeds[0])).toBe(before);
+    expect(state.entries).toHaveLength(0);
   });
 
   it("answers a save that loses the unique-constraint race with the same friendly message", async () => {

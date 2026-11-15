@@ -77,6 +77,7 @@ beforeEach(() => {
 const nothingSet = () => buildEnvironmentStatus({}, {
   emailAvailability: () => ({ deliveryConfigured: false, webhookConfigured: false }),
   encryptionKey: () => ({ configured: false }),
+  dataKey: () => ({ mode: "not-separate" as const, state: "not-separate" as const, version: null, reason: null }),
 });
 
 const never = () => ({ ...assessSweepHeartbeat(null, now), summary: null });
@@ -100,7 +101,7 @@ describe("environment services", () => {
     const { services } = nothingSet();
     expect(services.length).toBeGreaterThan(8);
     // If a service could read configured with nothing set, this guard would silently stop covering it.
-    expect(services.filter((service) => service.status !== "not-configured")).toEqual([]);
+    expect(services.filter((service) => service.status !== "not-configured" && service.status !== "not-separate")).toEqual([]);
     for (const service of services) {
       const id = ENVIRONMENT_SERVICE_SETUP[service.id];
       expect(id, `${service.id} has no setup entry in ENVIRONMENT_SERVICE_SETUP`).toBeDefined();
@@ -116,6 +117,17 @@ describe("environment services", () => {
       expect(row).toMatchObject({ needsSetup: true, state: "watch" });
       expect(row.serviceSetup?.map((service) => service.id)).toEqual(listed.map((service) => service.id));
       for (const service of row.serviceSetup ?? []) expect(service.setup).toBe(systemSetupFor(ENVIRONMENT_SERVICE_SETUP[service.id as keyof typeof ENVIRONMENT_SERVICE_SETUP]));
+    }
+  });
+
+  it("words the personal-data key as needing attention, never as not set up (#1652)", () => {
+    const key = (status: "not-separate" | "unavailable") => ({ id: "data-key" as const, label: "Personal-data key", status, missing: [], note: null });
+    for (const status of ["not-separate", "unavailable"] as const) {
+      const row = summarizeServices("connected-services", [key(status)], now);
+      expect(row).toMatchObject({ state: "watch", needsSetup: true });
+      expect(row.resultText).toContain("Needs attention: Personal-data key.");
+      expect(row.resultText).not.toContain("Not set up");
+      expect(row.serviceSetup?.map((service) => service.id)).toEqual(["data-key"]);
     }
   });
 

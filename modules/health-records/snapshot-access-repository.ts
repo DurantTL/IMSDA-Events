@@ -2,6 +2,7 @@ import "server-only";
 
 import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
 import { getPrisma } from "@/lib/prisma";
+import { DataKeyUnavailableError, isSealedDataLocked } from "@/lib/secret-box";
 import { logError } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { AccessDeniedError } from "@/modules/access/authorization";
@@ -168,7 +169,8 @@ export type SealedSnapshotView = {
 /**
  * Opens a person's sealed copies. Needs a system administrator with an
  * unexpired break-glass grant for that person. The view is audited (ids and
- * counts) before any value is decrypted; a refusal is audited too.
+ * counts) before any value is decrypted; a refusal is audited too. A locked refusal (the personal-data key is not loaded)
+ * is neither a view nor an access refusal: it writes nothing, records no break-glass use and shows no value (#1652).
  */
 export async function viewSealedSnapshots(viewer: HealthViewer, personId: string, now = new Date()): Promise<{ grantId: string; snapshots: SealedSnapshotView[] }> {
   const admin = await requireSystemAdmin(viewer, "VIEW_SEALED_COPIES", personId);
@@ -197,6 +199,11 @@ export async function viewSealedSnapshots(viewer: HealthViewer, personId: string
       fields: { select: { fieldKey: true, sealedValue: true } },
     },
   });
+  // A copy whose key is not loaded is refused before anything is recorded, as for the live record: no break-glass use
+  // and no view entry for copies that could not be shown.
+  if (rows.some((row) => row.fields.some((field) => isHealthFieldKey(field.fieldKey) && isSealedDataLocked(field.sealedValue)))) {
+    throw new DataKeyUnavailableError("The sealed health copies are locked because the personal-data key is not loaded right now.");
+  }
   const kind: BreakGlassUseKind = "SEALED_COPIES";
   await prisma.$transaction(async (tx) => {
     await recordBreakGlassUse(tx, { grantId: grant.id, userId: admin.userId, personId, kind });

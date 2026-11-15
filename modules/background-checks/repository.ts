@@ -6,7 +6,8 @@ import { getPrisma } from "@/lib/prisma";
 import { clampPage, paginate } from "@/lib/pagination";
 import { logError, logInfo } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { openBirthDate, sealBirthDate } from "@/modules/club-rosters/birth-dates";
+import { isDataKeyUnavailable } from "@/lib/secret-box";
+import { openBirthDateOrNull, sealBirthDate } from "@/modules/club-rosters/birth-dates";
 import { ageOn, clubYearChoices, clubYearFor } from "@/modules/club-rosters/domain";
 import { SPONSOR_ORGANIZATION_TYPES } from "@/modules/organizations/domain";
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
@@ -70,11 +71,22 @@ const DERIVED_SOURCES = ["AUTO", "IDENTITY", "NAME_ONLY"] as const;
 const LOCKED_SOURCES = new Set(["MANUAL", "MIGRATED"]);
 
 function openEntryBirthDate(sealed: string | null) {
-  if (!sealed) return null;
   try {
-    return openBirthDate(sealed);
+    return openBirthDateOrNull(sealed);
   } catch {
     return null;
+  }
+}
+
+/**
+ * Matching reads birth dates, so a list upload or a full re-match while the personal-data key is unavailable would
+ * work from missing dates and could change matches wrongly. Those are refused (#1652). The refresh after a save is
+ * skipped, and nothing recalculates it when the key loads again: the next list upload or the Refresh button (a full re-match) does, so an
+ * administrator presses Refresh once the key is back (docs/DATA-KEY-AZURE-KEY-VAULT.md, step 11).
+ */
+function requireBirthDatesReadable() {
+  if (isDataKeyUnavailable()) {
+    throw new BackgroundCheckOperationError("DATA_KEY_UNAVAILABLE", "Birth dates are locked because the personal-data key is unavailable right now, so the list can't be matched. Try again in a few minutes.");
   }
 }
 
@@ -197,6 +209,7 @@ export function backgroundCheckUploadFingerprint(latestUploadId: string | null, 
 
 /** What an upload would do to the list (#527): the counts staff confirm before saving, and the preview's fingerprint. */
 export async function planBackgroundCheckUpload(rows: BackgroundCheckListRow[]): Promise<BackgroundCheckUploadPreview> {
+  requireBirthDatesReadable();
   const { rows: deduped } = dedupeListRows(rows);
   const prisma = getPrisma();
   const latest = await prisma.backgroundCheckUpload.findFirst({ orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true, format: true } });
@@ -1024,6 +1037,10 @@ const REFRESH_CHUNK = 100;
 export async function refreshBackgroundCheckMatches(personIds: Iterable<string>, now = new Date()) {
   const ids = [...new Set([...personIds].filter(Boolean))];
   if (ids.length === 0) return;
+  if (isDataKeyUnavailable()) {
+    logInfo("Sterling Volunteers match refresh skipped while the personal-data key is unavailable", { people: ids.length });
+    return;
+  }
   const prisma = getPrisma();
   if (!(await latestUpload(prisma))) return;
   for (let start = 0; start < ids.length; start += REFRESH_CHUNK) {
@@ -1104,6 +1121,7 @@ export async function applyBackgroundCheckUpload(
   now = new Date(),
   options: { expectedFingerprint?: string } = {},
 ): Promise<BackgroundCheckUploadCounts> {
+  requireBirthDatesReadable();
   const { rows: deduped } = dedupeListRows(rows);
   return getPrisma().$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${BACKGROUND_CHECK_LOCK_KEY}::bigint)`;
@@ -1426,6 +1444,7 @@ export async function undoManualBackgroundCheckMatch(matchId: string, actorUserI
  * 409) and nothing changes.
  */
 export async function rematchBackgroundCheckList(now = new Date(), actorUserId?: string) {
+  requireBirthDatesReadable();
   await getPrisma().$transaction(async (tx) => {
     if (!(await tryExclusiveListLock(tx))) {
       throw listBusy();

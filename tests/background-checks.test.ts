@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // --- A small in-memory fake Prisma, just enough for the background-checks
 // repository's own queries (#527). The real-database behaviour (the
@@ -473,6 +473,11 @@ vi.mock("@/modules/club-rosters/birth-dates", () => ({
     if (!sealed.startsWith("sealed:")) throw new Error("not sealed");
     return sealed.slice("sealed:".length);
   },
+  openBirthDateOrNull: (sealed: string | null) => {
+    if (!sealed) return null;
+    if (!sealed.startsWith("sealed:")) throw new Error("not sealed");
+    return sealed.slice("sealed:".length);
+  },
 }));
 
 import {
@@ -502,6 +507,7 @@ import {
   sterlingRowToListRow,
   SterlingCsvError,
 } from "@/modules/background-checks/domain";
+import { resetDataKeyringForTests, setDataKeyStateForTests } from "@/lib/data-key/keyring";
 import {
   applyBackgroundCheckUpload,
   backgroundCheckSummary,
@@ -728,6 +734,38 @@ describe("planBackgroundCheckUpload: the confirm counts (#527)", () => {
     expect(backgroundCheckUploadFingerprint("u-1", rows)).not.toBe(backgroundCheckUploadFingerprint("u-2", rows));
     expect(backgroundCheckUploadFingerprint("u-1", rows)).not.toBe(backgroundCheckUploadFingerprint("u-1", changedRows));
     expect(backgroundCheckUploadFingerprint("u-1", rows)).not.toContain("Rivera");
+  });
+});
+
+describe("list matching while the personal-data key is unavailable (#1652)", () => {
+  const rows = () => [sterlingRowToListRow(parseSterlingCsv("First name,Last name,Email,Expiration date\nAna,Rivera,ana@example.test,2029-01-01")[0]!)];
+
+  afterEach(() => resetDataKeyringForTests());
+
+  it("refuses an upload, its preview and a full re-match, writing nothing, because matching needs birth dates", async () => {
+    const { client, seed } = makeFakeDb();
+    currentClient = client;
+    setDataKeyStateForTests({ kind: "unavailable", reason: "vault-unreachable" });
+    await expect(applyBackgroundCheckUpload(rows(), "STERLING", "admin-1")).rejects.toMatchObject({ code: "DATA_KEY_UNAVAILABLE", status: 503 });
+    await expect(planBackgroundCheckUpload(rows())).rejects.toMatchObject({ code: "DATA_KEY_UNAVAILABLE" });
+    await expect(rematchBackgroundCheckList(new Date("2026-09-28T12:00:00Z"), "admin-1")).rejects.toMatchObject({ code: "DATA_KEY_UNAVAILABLE" });
+    expect(seed.entries.size).toBe(0);
+  });
+
+  it("also refuses while only the previous data key failed to load, because some birth dates would read as missing", async () => {
+    const { client, seed } = makeFakeDb();
+    currentClient = client;
+    setDataKeyStateForTests({ kind: "ready", ring: { current: { version: 2, ikm: Buffer.alloc(32, 8) }, previousProblem: "unwrap-failed" } });
+    await expect(applyBackgroundCheckUpload(rows(), "STERLING", "admin-1")).rejects.toMatchObject({ code: "DATA_KEY_UNAVAILABLE", status: 503 });
+    await expect(rematchBackgroundCheckList(new Date("2026-09-28T12:00:00Z"), "admin-1")).rejects.toMatchObject({ code: "DATA_KEY_UNAVAILABLE" });
+    expect(seed.entries.size).toBe(0);
+  });
+
+  it("skips the refresh after a save without failing it, and without touching a match", async () => {
+    const { client } = makeFakeDb();
+    currentClient = client;
+    setDataKeyStateForTests({ kind: "unavailable", reason: "access-denied" });
+    await expect(refreshBackgroundCheckMatchForPerson("p-ana")).resolves.toBeUndefined();
   });
 });
 

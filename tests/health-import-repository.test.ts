@@ -56,7 +56,10 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: () => client }));
 vi.mock("@/lib/env", () => ({ getServerEnv: () => state.env }));
 vi.mock("@/lib/logger", () => ({ logError: (...args: unknown[]) => state.logged.push(args) }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: async (entry: Record<string, unknown>) => { state.audit.push(entry); } }));
-vi.mock("@/modules/club-rosters/birth-dates", () => ({ openBirthDate: (sealed: string) => sealed.replace(/^sealed:/, "") }));
+vi.mock("@/modules/club-rosters/birth-dates", () => ({
+  openBirthDate: (sealed: string) => sealed.replace(/^sealed:/, ""),
+  openBirthDateOrNull: (sealed: string | null) => (sealed ? sealed.replace(/^sealed:/, "") : null),
+}));
 
 import { openHealthField } from "@/modules/health-records/crypto";
 import type { HealthViewer } from "@/modules/health-records/domain";

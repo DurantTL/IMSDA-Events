@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   writeAuditLog: vi.fn(),
@@ -40,6 +40,7 @@ vi.mock("@/lib/env", () => ({
 }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 
+import { resetDataKeyringForTests, setDataKeyStateForTests } from "@/lib/data-key/keyring";
 import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
 import type { ClubFormsViewer } from "@/modules/club-forms/domain";
 import { openSensitiveAnswers, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
@@ -609,5 +610,52 @@ describe("saving a Membership Application draft without seeing school details (#
     await saveClubFormSubmission(clubsAdminActingAsLeader, { organizationId: "club-a", templateKey: membership.key, answers: { full_name: "Riley Sample", school_type: "Homeschool" }, submit: false }, now);
     const created = (mocks.submissionCreate.mock.calls[0]![0] as { data: { answers: Record<string, unknown> } }).data.answers;
     expect(created).not.toHaveProperty("school_type");
+  });
+});
+
+describe("sensitive answers while the personal-data key is unavailable (#1652)", () => {
+  const submissionId = "sub-locked";
+  const ring = { current: { version: 1, ikm: Buffer.alloc(32, 81) } };
+  const lockedRow = () => ({
+    id: submissionId, organizationId: "club-a", clubYear: "2026-27", rosterMemberId: "member-1", subjectName: "Riley Sample",
+    status: "SUBMITTED", submittedAt: now, enteredVia: "ATTENDEE", answers: { child_name: "Riley Sample", activity: "Canoe trip" },
+    sealedSensitiveAnswers: sealSensitiveAnswers(submissionId, { physician_name: SECRET_PHYSICIAN, emergency_contact_phone: SECRET_PHONE }),
+    hasSensitiveAnswers: true, templateVersion: slipTemplateRow().version, organization: { name: "Example Pathfinders" }, template: slipTemplateRow(),
+  });
+
+  afterEach(() => resetDataKeyringForTests());
+
+  it("shows the plain answers and marks the sensitive ones locked, instead of failing the whole view", async () => {
+    setDataKeyStateForTests({ kind: "ready", ring });
+    const stored = lockedRow();
+    expect(stored.sealedSensitiveAnswers.startsWith("d1.")).toBe(true);
+    mocks.submissionFindFirst.mockResolvedValue(stored);
+    setDataKeyStateForTests({ kind: "unavailable", reason: "access-denied" });
+    const view = await getSubmissionForViewer(director, submissionId);
+    expect(view.answers).toMatchObject({ activity: "Canoe trip" });
+    expect(view.lockedKeys.length).toBeGreaterThan(0);
+    expect(view.lockedKeys).toEqual(expect.arrayContaining(slipTemplateRow().sensitiveFieldKeys));
+    expect(view.answers).not.toHaveProperty("physician_name");
+    expect(JSON.stringify(view)).not.toContain(SECRET_PHYSICIAN);
+    expect(JSON.stringify(view)).not.toContain(SECRET_PHONE);
+  });
+
+  it("leaves lockedKeys empty when the key is available", async () => {
+    setDataKeyStateForTests({ kind: "ready", ring });
+    mocks.submissionFindFirst.mockResolvedValue(lockedRow());
+    const view = await getSubmissionForViewer(director, submissionId);
+    expect(view.lockedKeys).toEqual([]);
+    expect(view.answers).toMatchObject({ physician_name: SECRET_PHYSICIAN });
+  });
+
+  it("refuses a save that has to seal answers, with a clear message, and writes nothing", async () => {
+    setDataKeyStateForTests({ kind: "unavailable", reason: "vault-unreachable" });
+    await expect(saveClubFormSubmission(director, {
+      organizationId: "club-a", templateKey: "off_premises_permission_slip", rosterMemberId: "member-1", answers: { ...slipAnswers }, submit: true,
+    }, now)).rejects.toMatchObject({
+      code: "DATA_KEY_UNAVAILABLE",
+      message: expect.stringContaining("locked right now"),
+    });
+    expect(mocks.submissionCreate).not.toHaveBeenCalled();
   });
 });

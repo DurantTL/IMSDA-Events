@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import { logError } from "@/lib/logger";
 import { isLockTimeoutError } from "@/lib/prisma-errors";
+import { DataKeyUnavailableError } from "@/lib/secret-box";
 import { AttendeeMfaError } from "@/modules/attendee-accounts/mfa-service";
 import { ClubInviteError } from "@/modules/club-imports/invites";
 import { RosterAccessError } from "@/modules/club-rosters/access";
@@ -39,10 +40,14 @@ export function rosterApiError(error: unknown, action: string) {
   if (error instanceof RosterAccessError) {
     return Response.json({ error: error.code, message: error.message }, { status: error.status });
   }
+  if (error instanceof DataKeyUnavailableError) {
+    // Saving a birth date needs the personal-data key; nothing else about the roster does.
+    return Response.json({ error: "DATA_KEY_UNAVAILABLE", message: "Birth dates can't be saved right now because they are locked. Try again in a few minutes." }, { status: 503 });
+  }
   if (error instanceof RosterOperationError) {
     const status = error.code === "MEMBER_NOT_FOUND"
       ? 404
-      : error.code === "CARRY_FORWARD_BUSY"
+      : error.code === "CARRY_FORWARD_BUSY" || error.code === "DATA_KEY_UNAVAILABLE"
         ? 503
       : error.code === "BIRTH_DATE_INVALID" || error.code === "GENDER_REQUIRED" || error.code === "GUARDIAN_PHONE_INVALID" || error.code === "GUARDIAN_EMAIL_INVALID"
         ? 400
@@ -52,6 +57,7 @@ export function rosterApiError(error: unknown, action: string) {
   if (error instanceof RosterExportError) {
     const status = error.code === "FORMAT_NOT_FOUND" ? 404
       : error.code === "SENSITIVE_ACCESS_DENIED" ? 403
+      : error.code === "DATA_KEY_UNAVAILABLE" ? 503
       : error.code === "FORMAT_NAME_TAKEN" ? 409
       : 400;
     return Response.json({ error: error.code, message: error.message }, { status });

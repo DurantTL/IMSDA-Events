@@ -6,6 +6,7 @@ import { formatPersonName } from "@/lib/person-name";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { isClubFeatureEnabled } from "@/modules/club-features/repository";
+import { DataKeyUnavailableError } from "@/lib/secret-box";
 import { openBirthDate } from "@/modules/club-rosters/birth-dates";
 import { ageOn, calendarDateOf, clubYearFor } from "@/modules/club-rosters/domain";
 import type { MasterGuideAreaActor, MasterGuideClubActor } from "@/modules/master-guide/access";
@@ -83,7 +84,8 @@ function openBirthDateOrFlag(sealed: string | null): RosterBirthDate {
   try {
     return openBirthDate(sealed);
   } catch (error) {
-    logError("A roster birth date could not be opened for Master Guide tracking", error);
+    // Locked while the personal-data key is unavailable: shown as unreadable, without a log line per row (the keyring logs once).
+    if (!(error instanceof DataKeyUnavailableError)) logError("A roster birth date could not be opened for Master Guide tracking", error);
     return BIRTH_DATE_UNREADABLE;
   }
 }

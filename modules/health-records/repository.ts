@@ -1,10 +1,12 @@
+import { formatPersonName } from "@/lib/person-name";
+import { HealthRecordLockedError } from "@/modules/health-records/locked-error";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import { getPrisma } from "@/lib/prisma";
-import { isSecretEncryptionConfigured } from "@/lib/secret-box";
+import { DataKeyUnavailableError, isDataEncryptionAvailable, isDataKeyUnavailable, isSealedDataLocked } from "@/lib/secret-box";
 import { hashOpaqueToken } from "@/modules/access/tokens";
 import { logError } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -254,6 +256,12 @@ export async function viewHealthRecord(
       throw breakGlassRequired();
     }
   }
+  // The view is audited before any value is decrypted (ADR 0005). The one thing decided first, without decrypting anything,
+  // is whether every field's key is loaded: a record that cannot be opened because the personal-data key is unavailable
+  // shows nothing, so it records no view and uses no break-glass grant (#1652).
+  if (record && record.fields.some((field) => isHealthFieldKey(field.fieldKey) && isSealedDataLocked(field.sealedValue))) {
+    throw new HealthRecordLockedError(formatPersonName({ firstName: member.person?.firstName, lastName: member.person?.lastName }), member.organization.name);
+  }
   const viewAudit = {
     // No top-level eventId: that column feeds the event staff audit log, which must not list these views. The event is in the metadata.
     actorUserId: who.actorUserId,
@@ -320,7 +328,9 @@ async function withFirstSaveRetry<T>(work: () => Promise<T>): Promise<T> {
 }
 
 function requireEncryption() {
-  if (!isSecretEncryptionConfigured()) {
+  if (!isDataEncryptionAvailable()) {
+    // A key that is configured but not loaded is a different state from no key at all: the API answers it with its own 503.
+    if (isDataKeyUnavailable()) throw new DataKeyUnavailableError();
     throw new HealthRecordError("ENCRYPTION_NOT_CONFIGURED", "Health records can't be saved right now. Please try again later.");
   }
 }

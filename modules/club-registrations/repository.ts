@@ -7,7 +7,8 @@ import { getPrisma } from "@/lib/prisma";
 import { sendBaptismFollowUpNotices } from "@/modules/baptism-follow-up/notice";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { assertTeachersMeetRule, ClubTeacherError } from "@/modules/club-teachers/repository";
-import { openBirthDate } from "@/modules/club-rosters/birth-dates";
+import { DataKeyUnavailableError } from "@/lib/secret-box";
+import { openBirthDateOrLocked, openBirthDateOrNull } from "@/modules/club-rosters/birth-dates";
 import { ageOn, clubYearFor } from "@/modules/club-rosters/domain";
 import {
   clubAttendeeClientId,
@@ -599,6 +600,10 @@ export async function requireClubEventForClub(organizationId: string, eventId: s
   return requireClubEvent(eventId);
 }
 
+function ageOnOrNull(birthDate: string | null, eventDate: string) {
+  return birthDate ? ageOn(birthDate, eventDate) : null;
+}
+
 function rosterPerson(
   member: { sealedBirthDate: string | null; gender: "FEMALE" | "MALE" | null; person: { firstName: string; lastName: string } | null },
   eventDate: string,
@@ -606,9 +611,20 @@ function rosterPerson(
   return {
     firstName: member.person?.firstName ?? "",
     lastName: member.person?.lastName ?? "",
-    ageOnEventDate: member.sealedBirthDate ? ageOn(openBirthDate(member.sealedBirthDate), eventDate) : null,
+    // A birth date that is locked (the personal-data key is unavailable) counts as unknown: registration carries on.
+    ageOnEventDate: ageOnOrNull(openBirthDateOrNull(member.sealedBirthDate), eventDate),
     gender: member.gender,
   };
+}
+
+/**
+ * `rosterPerson` for a write: a registration that is submitted or changed stores ages, so a birth date that is locked
+ * (the personal-data key is unavailable) refuses the request with `DataKeyUnavailableError` (503, retry later) and
+ * never stores a substitute age (#1652). Someone with no birth date on file is unaffected.
+ */
+function rosterPersonForWrite(member: Parameters<typeof rosterPerson>[0], eventDate: string): RosterPerson {
+  if (member.sealedBirthDate && openBirthDateOrLocked(member.sealedBirthDate).locked) throw new DataKeyUnavailableError();
+  return rosterPerson(member, eventDate);
 }
 
 async function activeRosterFor(client: Prisma.TransactionClient, organizationId: string, event: Pick<ClubEvent, "startsAt">) {
@@ -1283,7 +1299,7 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
           "Everyone going must be active on your club roster. Refresh the page and choose again.",
         );
       }
-      const rosterOnly = rosterPerson(member, ageDate);
+      const rosterOnly = rosterPersonForWrite(member, ageDate);
       // A roster person with no birth date takes the age typed in for this
       // registration (#639), else the roster's reported age; a birth date on file always wins.
       const typedAge = rosterOnly.ageOnEventDate === null ? draftRosterAges[member.id] : undefined;
@@ -1652,7 +1668,7 @@ export async function amendClubRegistration(
 
   for (const memberId of input.selectedMemberIds) {
     const member = membersById.get(memberId)!;
-    const rosterOnly = rosterPerson(member, ageDate);
+    const rosterOnly = rosterPersonForWrite(member, ageDate);
     const clientId = clubAttendeeClientId(memberId);
     const current = currentByMemberId.get(memberId);
     // A roster person with no birth date needs an age entered for this

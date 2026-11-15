@@ -18,7 +18,9 @@ function sourceFiles(directory: string): string[] {
 }
 
 // `sealSecret(` does not match `sealSecretWithKey(`: operator tools are not sealing call sites.
-const SEALING_CALL = /\b(sealSecret|fingerprintSecret)\(/;
+const SIGN_IN_CALL = /\b(sealSecret|openSecret|fingerprintSecret|fingerprintSecretCandidates)\(/;
+const DATA_CALL = /\b(sealData|openData|fingerprintData|fingerprintDataCandidates)\(/;
+const SEALING_CALL = /\b(sealSecret|fingerprintSecret|sealData|fingerprintData)\(/;
 
 describe("sealed column registry (#1516)", () => {
   const registeredFiles = new Set<string>([
@@ -34,6 +36,35 @@ describe("sealed column registry (#1516)", () => {
       missing,
       "These files call sealSecret/fingerprintSecret but are not in modules/security/sealed-columns.ts. Add their column there so key rotation and key:check cover it.",
     ).toEqual([]);
+  });
+
+  it("keeps each column's source files on that column's own key (#1652)", () => {
+    for (const column of SEALED_COLUMNS) {
+      for (const file of column.sourceFiles) {
+        const text = readFileSync(path.join(root, file), "utf8");
+        const code = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+        if (column.keyring === "data") {
+          expect(SIGN_IN_CALL.test(code), `${file} seals ${column.label} with the sign-in API`).toBe(false);
+          expect(DATA_CALL.test(code), `${file} should use the data API for ${column.label}`).toBe(true);
+        } else {
+          expect(DATA_CALL.test(code), `${file} seals ${column.label} with the data API`).toBe(false);
+          expect(SIGN_IN_CALL.test(code), `${file} should use the sign-in API for ${column.label}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("puts the personal-data columns on the data key and every other column on the sign-in key", () => {
+    const data = SEALED_COLUMNS.filter((column) => column.keyring === "data").map((column) => column.label).sort();
+    expect(data).toEqual([
+      "BackgroundCheckEntry.sealedBirthDate",
+      "CalendarFeed.sealedUrl",
+      "ClubFormSubmission.sealedSensitiveAnswers",
+      "ClubRosterMember.sealedBirthDate",
+      "HealthRecordField.sealedValue",
+      "HealthRecordSnapshotField.sealedValue",
+    ]);
+    expect(SEALED_COLUMNS.filter((column) => column.keyring === "sign-in")).toHaveLength(SEALED_COLUMNS.length - data.length);
   });
 
   it("names only files that exist and still seal something", () => {

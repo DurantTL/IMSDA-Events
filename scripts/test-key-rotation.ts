@@ -19,6 +19,12 @@
  * - the sealed health copy trigger still refuses every UPDATE except rotation's own (only "sealedValue",
  *   only with the rotation setting on, only on a copy's field row).
  *
+ * The one-time move to the separate personal-data key (#1652) is proved in a second part: with every value
+ * sealed by the sign-in key, DATA_KEY_SOURCE=dev-env turns the data key on, the scan counts each
+ * personal-data value as "not moved yet", the rotation re-seals exactly the personal-data columns as `d1.`
+ * values (recomputing the calendar fingerprint and the copy on the left-behind item) and leaves every
+ * sign-in column untouched, and a second run changes nothing.
+ *
  * Uses fictitious rows with a reserved id prefix, created and removed here, and
  * synthetic keys. Reads and writes nothing else. Seeding the rows (which have parents this check does not
  * create) switches foreign key and trigger checks off for that one transaction, so it needs a database
@@ -40,6 +46,7 @@ fillBlankSyntheticEnv("ACCOUNT_EMAIL_SENDER_ADDRESS", "events@rotation.example.t
 const OLD_KEY = "verify-rotation-old-key-0123456789-abcdefghijkl";
 const NEW_KEY = "verify-rotation-new-key-0123456789-abcdefghijkl";
 const OTHER_KEY = "verify-rotation-lost-key-0123456789-abcdefghijk";
+const DATA_KEY = "verify-rotation-data-key-0123456789-abcdefghijkl";
 
 const P = "kr1516_";
 const prisma = new PrismaClient();
@@ -50,6 +57,9 @@ function setKeys(keys: { current: string; version: number; previous?: { key: str
     "SECRET_ENCRYPTION_PREVIOUS_KEY",
     "SECRET_ENCRYPTION_PREVIOUS_KEY_FILE",
     "SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION",
+    "DATA_KEY_SOURCE",
+    "DATA_ENCRYPTION_KEY",
+    "DATA_ENCRYPTION_KEY_VERSION",
   ]) delete process.env[name];
   process.env.SECRET_ENCRYPTION_KEY = keys.current;
   process.env.SECRET_ENCRYPTION_KEY_VERSION = String(keys.version);
@@ -373,6 +383,65 @@ async function main() {
     const feed2 = await prisma.calendarFeed.findUniqueOrThrow({ where: { id: `${P}feed_2` } });
     assert.equal(secretBox.openSecret(feed2.sealedUrl, "calendar-feed-url"), feedUrls[2]);
     assert.ok(feed2.sealedUrl.startsWith("v2.2."), "rotated values are v2 with the current version");
+
+    // Part two (#1652): turn the separate data key on. Every value is still sealed with the sign-in key (version 2).
+    const { resetDataKeyringForTests, ensureDataKeyLoaded } = await import("../lib/data-key/keyring");
+    const dataColumns = SEALED_COLUMNS.filter((entry) => entry.keyring === "data");
+    const signInColumns = SEALED_COLUMNS.filter((entry) => entry.keyring === "sign-in");
+    assert.equal(dataColumns.length, 6, "six personal-data columns");
+    const signInBefore = await prisma.userMfaEnrollment.findUniqueOrThrow({ where: { id: `${P}user_mfa` } });
+    const stepUpBefore = await prisma.attendeeStepUpCode.findUniqueOrThrow({ where: { id: `${P}step_SIGN_IN` } });
+    process.env.DATA_KEY_SOURCE = "dev-env";
+    process.env.DATA_ENCRYPTION_KEY = DATA_KEY;
+    process.env.DATA_ENCRYPTION_KEY_VERSION = "1";
+    resetServerEnvCache();
+    resetDataKeyringForTests();
+    await ensureDataKeyLoaded();
+    assert.equal(secretBox.dataKeyStatus().state, "ready", "the data key is loaded");
+
+    const moveScan = await scanSealedColumns(store, { columns: dataColumns, batchSize: 2 });
+    for (const scan of moveScan) {
+      assert.ok(scan.onSignInKey >= 1, `${scan.label}: personal-data values still on the sign-in key are counted`);
+      assert.equal(scan.current, 0, `${scan.label}: nothing is on the data key yet`);
+      assert.equal(scan.older, scan.onSignInKey, `${scan.label}: not moved counts as older`);
+    }
+    const signInScan = await scanSealedColumns(store, { columns: signInColumns, batchSize: 2 });
+    for (const scan of signInScan) assert.equal(scan.onSignInKey, 0, `${scan.label}: sign-in columns are never counted as not moved`);
+
+    const moved = await rotateSealedColumns(store, { apply: true, batchSize: 2 });
+    for (const result of moved) {
+      assert.equal(result.skipped, 0, `${result.label}: nothing skipped`);
+      const isData = dataColumns.some((entry) => entry.label === result.label);
+      if (isData) assert.ok(result.rotated >= 1, `${result.label}: moved to the data key`);
+      else assert.equal(result.rotated, 0, `${result.label}: a sign-in column is left alone`);
+    }
+    const movedCounts = await scanSealedColumns(store, { columns: dataColumns, batchSize: 2 });
+    for (const scan of movedCounts) {
+      assert.equal(scan.older, 0, `${scan.label}: nothing left on the sign-in key`);
+      assert.equal(scan.onSignInKey, 0);
+      assert.ok(scan.current >= 1, `${scan.label}: opens with the data key`);
+    }
+
+    const movedFeed = await prisma.calendarFeed.findUniqueOrThrow({ where: { id: `${P}feed_0` } });
+    assert.ok(movedFeed.sealedUrl.startsWith("d1.1."), "a feed address is now a data-key value");
+    assert.equal(secretBox.openData(movedFeed.sealedUrl, "calendar-feed-url"), feedUrls[0]);
+    const dataFingerprint0 = secretBox.fingerprintData(feedUrls[0], "calendar-feed-url");
+    assert.equal(movedFeed.urlFingerprint, dataFingerprint0, "the feed fingerprint moved to the data key");
+    assert.notEqual(dataFingerprint0, newFingerprint0);
+    const movedEntry0 = await prisma.calendarEntry.findUniqueOrThrow({ where: { id: `${P}entry_0` } });
+    assert.equal(movedEntry0.sourceUrlFingerprint, dataFingerprint0, "the left-behind item's fingerprint moved with it");
+    assert.equal(movedEntry0.updatedAt.getTime(), entryBefore.updatedAt.getTime());
+    const movedHealth = await prisma.healthRecordSnapshotField.findUniqueOrThrow({ where: { id: `${P}sfield` } });
+    assert.ok(movedHealth.sealedValue.startsWith("d1.1."), "the sealed health copy moved too");
+    const movedBirth = await prisma.clubRosterMember.findUniqueOrThrow({ where: { id: `${P}roster` } });
+    assert.equal(secretBox.openData(movedBirth.sealedBirthDate ?? "", "club-roster:birth-date"), "2012-05-17");
+
+    const signInAfter = await prisma.userMfaEnrollment.findUniqueOrThrow({ where: { id: `${P}user_mfa` } });
+    assert.equal(signInAfter.sealedSecret, signInBefore.sealedSecret, "a sign-in value is untouched");
+    assert.equal((await prisma.attendeeStepUpCode.findUniqueOrThrow({ where: { id: `${P}step_SIGN_IN` } })).sealedCode, stepUpBefore.sealedCode);
+
+    const again = await rotateSealedColumns(store, { apply: true, batchSize: 2 });
+    assert.equal(again.reduce((sum, row) => sum + row.rotated, 0), 0, "a second run after the move changes nothing");
 
     console.log("key rotation checks passed");
   } finally {

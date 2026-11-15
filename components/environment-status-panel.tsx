@@ -5,6 +5,8 @@ const statusText: Record<EnvironmentStatusValue, string> = {
   configured: "Configured",
   "not-configured": "Not configured",
   unknown: "Unknown",
+  "not-separate": "Not separate yet",
+  unavailable: "Unavailable right now",
 };
 
 /**
@@ -24,7 +26,7 @@ export function EnvironmentStatusPanel({ status }: { status: EnvironmentStatus }
         {status.services.map((service) => (
           <li key={service.id} data-environment-service={service.id} data-status={service.status}>
             <span className="environment-status-name">{service.label}</span>
-            <span className={`environment-status-badge is-${service.status}`}>{statusText[service.status]}</span>
+            <span className={`environment-status-badge is-${service.status === "not-separate" || service.status === "unavailable" ? "not-configured" : service.status}`}>{statusText[service.status]}</span>
             {service.status === "not-configured" && service.missing.length > 0 && (
               <small className="environment-status-missing">Blank: {service.missing.join(", ")}</small>
             )}

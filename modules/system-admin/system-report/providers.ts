@@ -642,7 +642,8 @@ export const systemReportProviders: readonly SignalProvider[] = [
   }),
 
   defineProvider("setup", [
-    m("encryption-key", "Encryption key", "The key that protects stored private data is set (the value is never shown).", "/admin/settings", "Platform settings", systemSetupFor("encryption-key")),
+    m("encryption-key", "Sign-in encryption key", "The key that protects sign-in secrets is set (the value is never shown).", "/admin/settings", "Platform settings", systemSetupFor("encryption-key")),
+    m("data-key", "Personal-data key", "The separate key that protects health records, birth dates, sensitive form answers and calendar addresses is loaded (the value is never shown).", "/admin/settings", "Platform settings", systemSetupFor("data-key")),
     m("admin-protection", "Administrator sign-in protection", "System administrators use two-step sign-in or a passkey.", "/admin/readiness", "Open readiness"),
     m("connected-services", "Connected services", "Payments, email, Google sign-in, alerts and the email sweep are set up (this does not prove they work).", "/admin/settings", "Platform settings"),
     m("google-keys-reachable", "Google sign-in keys", "A read-only test that Google's public sign-in keys can be fetched. It sends and changes nothing.", null, "Press Test connections", systemSetupFor("google-sign-in")),
@@ -652,6 +653,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     const env = await environment(ctx);
     return [
       await readinessRow(ctx, "encryption-key", "encryption-key", true),
+      await readinessRow(ctx, "data-key", "data-key", true),
       await readinessRow(ctx, "admins-mfa", "admin-protection"),
       !env.ok ? { key: "connected-services", ...tried(env) } : connectedServices(env.value, env.readAt),
       await reachabilityRow(ctx, "google-keys", "google-keys-reachable", GOOGLE_KEYS_REACHABILITY_JOB, isGoogleSignInConfigured),

@@ -22,7 +22,7 @@ import {
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { clubYearDateBounds } from "@/modules/club-meeting-notes/domain";
-import { openBirthDate } from "@/modules/club-rosters/birth-dates";
+import { openBirthDateOrLocked } from "@/modules/club-rosters/birth-dates";
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
 /**
@@ -62,7 +62,7 @@ export type RosterChartsView = {
   byMemberType: CountRow[];
   attendance: AttendanceMonth[];
   /** Null for a viewer who does not see birth dates (registrar): the page then has no age or birthday section at all. */
-  birthdayView: { month: number; ageBands: CountRow[]; birthdays: Birthday[] } | null;
+  birthdayView: { month: number; ageBands: CountRow[]; birthdays: Birthday[]; locked: boolean } | null;
 };
 
 /** Whether this viewer and club may open the charts: the one check the page and its links share. */
@@ -109,11 +109,19 @@ export async function loadRosterCharts(
       where: { organizationId, clubYear, status: "ACTIVE" },
       select: { sealedBirthDate: true, person: { select: { firstName: true, lastName: true } } },
     });
-    const opened = withDates.map((member) => ({
-      birthDate: member.sealedBirthDate ? openBirthDate(member.sealedBirthDate) : null,
-      name: member.person ? formatPersonName(member.person) : null,
-    }));
+    // While the personal-data key is unavailable the birth dates stay locked: no age groups or birthdays are shown.
+    let locked = false;
+    const opened = withDates.map((member) => {
+      let birthDate: string | null = null;
+      if (member.sealedBirthDate) {
+        const result = openBirthDateOrLocked(member.sealedBirthDate);
+        if (result.locked) locked = true;
+        else birthDate = result.birthDate;
+      }
+      return { birthDate, name: member.person ? formatPersonName(member.person) : null };
+    });
     birthdayView = {
+      locked,
       month,
       ageBands: countByAgeBand(opened.map((person) => person.birthDate), conferenceToday(now)),
       birthdays: birthdaysInMonth(
@@ -123,7 +131,7 @@ export async function loadRosterCharts(
     };
     // Age groups and month/day together can rebuild a full birth date, so each view that shows birthdays is audited
     // (ADR 0005 Addendum A). The entry holds counts and ids only: no name and no date.
-    await auditBirthdaysViewed(organizationId, clubYear, month, birthdayView.birthdays.length, options.actor);
+    if (!birthdayView.locked) await auditBirthdaysViewed(organizationId, clubYear, month, birthdayView.birthdays.length, options.actor);
   }
 
   return {

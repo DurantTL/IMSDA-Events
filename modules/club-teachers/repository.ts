@@ -7,7 +7,8 @@ import { logError } from "@/lib/logger";
 import { formatPersonName } from "@/lib/person-name";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { ageOn, clubYearFor } from "@/modules/club-rosters/domain";
-import { openBirthDate } from "@/modules/club-rosters/birth-dates";
+import { DataKeyUnavailableError } from "@/lib/secret-box";
+import { openBirthDate, openBirthDateOrLocked } from "@/modules/club-rosters/birth-dates";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { isModuleEnabled } from "@/modules/event-modules/service";
 import {
@@ -82,6 +83,16 @@ export function rosterAgeOn(member: { sealedBirthDate: string | null; reportedAg
     }
   }
   return member.reportedAge;
+}
+
+/**
+ * Like `rosterAgeOn`, for a decision that is recorded (a teacher named, a registration submitted): a birth date that
+ * is locked because the personal-data key is unavailable is not "age unknown". It throws `DataKeyUnavailableError`
+ * (answered 503, retry later), so nothing is refused for a wrong reason and no substitute age is used (#1652).
+ */
+export function rosterAgeOnStrict(member: { sealedBirthDate: string | null; reportedAge: number | null }, eventDate: string): number | null {
+  if (member.sealedBirthDate && openBirthDateOrLocked(member.sealedBirthDate).locked) throw new DataKeyUnavailableError();
+  return rosterAgeOn(member, eventDate);
 }
 
 const ageFields = { sealedBirthDate: true, reportedAge: true } as const;
@@ -208,7 +219,7 @@ export async function setClubTeachers(organizationId: string, eventId: string, a
   }
   // Teachers must be 18 or older (#1727), on the event's first day. Anyone under 18, or with no known age, is refused.
   const ageDate = teacherAgeDate(event);
-  const eligibilities = members.map((member) => teacherEligibility(rosterAgeOn(member, ageDate)));
+  const eligibilities = members.map((member) => teacherEligibility(rosterAgeOnStrict(member, ageDate)));
   if (eligibilities.includes("under-18")) throw new ClubTeacherError("TEACHER_UNDER_18", teacherUnderAgeMessage);
   if (eligibilities.includes("age-unknown")) throw new ClubTeacherError("TEACHER_AGE_UNKNOWN", teacherAgeUnknownMessage);
   const locationIds = [...new Set(input.teachers.flatMap((teacher) => (teacher.locationId ? [teacher.locationId] : [])))];
@@ -249,7 +260,7 @@ export async function assertTeachersMeetRule(eventId: string, organizationId: st
   const rows = await getPrisma().clubEventTeacher.findMany({ where: { eventId, organizationId }, select: { rosterMember: { select: ageFields } } });
   // Only teachers who are 18 or older count toward the number (#1727).
   const ageDate = teacherAgeDate(event);
-  const named = rows.filter((row) => teacherEligibility(rosterAgeOn(row.rosterMember, ageDate)) === "ok").length;
+  const named = rows.filter((row) => teacherEligibility(rosterAgeOnStrict(row.rosterMember, ageDate)) === "ok").length;
   const status = teacherStatus(rule, headcount, named);
   if (!status.met) throw new ClubTeacherError("TEACHERS_REQUIRED", teacherWarning(status, true)!);
 }

@@ -3,9 +3,9 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
-import { isSecretEncryptionConfigured } from "@/lib/secret-box";
+import { isDataEncryptionAvailable, isDataKeyUnavailable } from "@/lib/secret-box";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { openBirthDate } from "@/modules/club-rosters/birth-dates";
+import { openBirthDateOrLocked } from "@/modules/club-rosters/birth-dates";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { openHealthField, sealSnapshotField } from "@/modules/health-records/crypto";
@@ -42,7 +42,9 @@ export type SnapshotOutcome =
   | "NOT_ELIGIBLE"
   | "ALREADY_EXPIRED"
   | "DISABLED"
-  | "ENCRYPTION_NOT_CONFIGURED";
+  | "ENCRYPTION_NOT_CONFIGURED"
+  /** The personal-data key is configured but not loaded right now: no copy is taken. */
+  | "DATA_KEY_UNAVAILABLE";
 
 const CHECK_IN_STATUSES = ["SUBMITTED", "CONFIRMED"] as const;
 const EVENT_START_STATUSES = ["CONFIRMED"] as const;
@@ -64,7 +66,7 @@ export async function sealHealthSnapshot(
   input: { eventId: string; personId: string; trigger: SnapshotTrigger; now?: Date },
 ): Promise<{ outcome: SnapshotOutcome; snapshotId?: string }> {
   if (!healthRecordsEnabled()) return { outcome: "DISABLED" };
-  if (!isSecretEncryptionConfigured()) return { outcome: "ENCRYPTION_NOT_CONFIGURED" };
+  if (!isDataEncryptionAvailable()) return { outcome: isDataKeyUnavailable() ? "DATA_KEY_UNAVAILABLE" : "ENCRYPTION_NOT_CONFIGURED" };
   const now = input.now ?? new Date();
   const prisma = getPrisma();
   const statuses = input.trigger === "CHECK_IN" ? CHECK_IN_STATUSES : EVENT_START_STATUSES;
@@ -109,12 +111,15 @@ export async function sealHealthSnapshot(
       const eventStartDate = calendarDateInEventTimeZone(attendee.event.startsAt, attendee.event.timezone);
       const eventEndDate = calendarDateInEventTimeZone(attendee.event.endsAt, attendee.event.timezone);
       const eventClubYear = clubYearFor(attendee.event.startsAt);
-            const member = members.find((row) => row.sealedBirthDate !== null);
+      const member = members.find((row) => row.sealedBirthDate !== null);
+      const opened = member?.sealedBirthDate ? openBirthDateOrLocked(member.sealedBirthDate) : null;
+      // Without the birth date the keep-until date would be a guess: take no copy now.
+      if (opened?.locked) return { outcome: "DATA_KEY_UNAVAILABLE" as const };
       const typeRow = members.find((row) => row.clubYear === eventClubYear) ?? members[0];
       const expiry = computeSnapshotExpiry({
         eventStartDate,
         eventEndDate,
-        birthDate: member?.sealedBirthDate ? openBirthDate(member.sealedBirthDate) : null,
+        birthDate: opened && !opened.locked ? opened.birthDate : null,
         reportedAge: reportedAgeAtEvent(members, eventClubYear),
         attendeeType: typeRow?.attendeeType ?? null,
       });

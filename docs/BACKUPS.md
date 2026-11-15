@@ -556,7 +556,12 @@ name here:
 `SECRET_ENCRYPTION_KEY` is **not** included in these backups, is **never**
 uploaded to this R2 bucket, and must not share its credentials. The dumps hold
 the encrypted values; without the key they cannot be read, and with the key in
-the same place as the dumps the encryption would protect nothing. Its backup
+the same place as the dumps the encryption would protect nothing. Once the
+personal-data key is set up (#1652, `docs/DATA-KEY-AZURE-KEY-VAULT.md`), health
+records, birth dates, sensitive form answers and calendar addresses need that key
+instead: back up the vault key (`az keyvault key backup`) with the offline key
+backup, and record the wrapped data key with the deployment settings. A dump
+restored without them cannot read those values. Its backup
 and one-time test restore are tracked separately in #876. Until that exists,
 these backups are not a complete recovery.
 

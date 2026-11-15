@@ -2,7 +2,7 @@ import "server-only";
 
 import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { getPrisma } from "@/lib/prisma";
-import { openBirthDate } from "@/modules/club-rosters/birth-dates";
+import { openBirthDateOrNull } from "@/modules/club-rosters/birth-dates";
 import { ageOn, calendarDateOf, clubYearFor, effectiveClassLevel } from "@/modules/club-rosters/domain";
 import { formatPersonName } from "@/lib/person-name";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -33,7 +33,9 @@ export async function listYouthDirectoryRows(now = new Date()): Promise<{ clubYe
     },
   });
   const rows = members.map((member): YouthDirectoryRow => {
-    const birthAge = member.sealedBirthDate ? ageOn(openBirthDate(member.sealedBirthDate), today) : null;
+    // Locked (the personal-data key is unavailable) counts as unknown.
+    const openedBirthDate = openBirthDateOrNull(member.sealedBirthDate);
+    const birthAge = openedBirthDate ? ageOn(openedBirthDate, today) : null;
     return {
       id: member.id,
       name: formatPersonName({ firstName: member.person?.firstName, lastName: member.person?.lastName }, "sorted"),

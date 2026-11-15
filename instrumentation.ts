@@ -14,6 +14,19 @@ export async function register() {
 
   const { assertServerEnvAtStartup } = await import("@/lib/env");
   assertServerEnvAtStartup();
+
+  // The personal-data key (#1652): start loading it and keep retrying in the background if the vault does not
+  // answer. Startup waits only a few seconds for it, so a slow or unreachable vault never fails or hangs a deploy;
+  // protected fields stay locked until the key loads.
+  const { startDataKeyLoading } = await import("@/lib/data-key/keyring");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    (async () => startDataKeyLoading())().catch(() => undefined),
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, 5_000);
+    }),
+  ]);
+  clearTimeout(timer);
 }
 
 /**
