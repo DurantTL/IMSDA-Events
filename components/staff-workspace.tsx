@@ -174,7 +174,7 @@ export function StaffWorkspace({ eventId, eventName, initialMemberships, current
 
   return <section className="page-stack">
     <PageHeader description={<>Choose who can work in {eventName} and the event role each person has.</>} extra={<span className="count-badge"><ShieldCheck size={16} aria-hidden="true" /> {activeCount} active</span>} primary={canAddStaff ? <button className="primary-button" type="button" onClick={openAdd}><Plus size={17} aria-hidden="true" /> Add staff</button> : undefined} title={staffPageTitles.team} />
-    <p className="quiet-copy" data-testid="team-ownership-note">This page is the team that runs {eventName}. Add the people who work on it, choose each person&apos;s event role, and remove their access when they are done. It is not for participant staff registrations (in Registrations) or for System account access (see Admin).</p>
+    <p className="quiet-copy" data-testid="team-ownership-note">Remove someone&apos;s access here when their work on this event is done. This page is not for participant staff registrations (in Registrations) or for System account access (see Admin).</p>
     <div className="toolbar panel"><label className="search-field"><Search size={18} /><span className="sr-only">Search staff</span><input {...search.inputProps} placeholder="Search staff name, email, or role" /></label><SearchResultStatus message={`${visible.length} staff ${visible.length === 1 ? "member" : "members"} shown.`} /></div>
     <div className="staff-list panel"><div className="staff-row staff-head"><span>Staff member</span><span>Event role</span><span>Status</span><span>Access</span></div>{visible.map((membership) => {
       const pendingActivation = membership.user.accountStatus === "PENDING_ACTIVATION";
