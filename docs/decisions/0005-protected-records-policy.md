@@ -1203,7 +1203,10 @@ issue #787, from the Communication Director's decision of 2026-10-05.
 - **What it shows.** Meal-type counts and the dietary-needs answers as people
   typed them, grouped (trim, ignore case, collapse spaces) and counted, plus the
   number of people with any need. "No needs" answers such as None or N/A are
-  left out. Confirmed registrations only. There are no names, confirmation
+  left out. Confirmed registrations only, except on a club-audience event,
+  where Submitted and Confirmed registrations are counted (Caleb, Nov 15, 2026,
+  #2017): club registrations are billed to the church and stay Submitted. The
+  Attendee list uses the same rule. There are no names, confirmation
   codes, contact details, churches or clubs, and no answer links to a person.
 - **Who sees it.** Event staff holding `VIEW_REPORTS`, without needing
   `VIEW_SENSITIVE_DATA` or `VIEW_HEALTH_INFORMATION`, and Area Coordinators on

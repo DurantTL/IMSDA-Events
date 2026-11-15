@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { formTemplates } from "@/modules/forms/definition";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
-import { buildKitchenReport, kitchenReportCsv, normalizeNeed } from "@/modules/registrations/kitchen-report";
+import { buildKitchenReport, kitchenReportCsv, kitchenReportScopeText, kitchenReportStatuses, normalizeNeed } from "@/modules/registrations/kitchen-report";
 
 const definition = formTemplates.find((template) => template.key === "womens_retreat_export")!.definition as unknown as Record<string, unknown>;
 
@@ -84,7 +84,7 @@ describe("kitchen report (#787)", () => {
     for (const text of [JSON.stringify(report), csv]) {
       expect(text).not.toMatch(/SYNTH-|Surname|Family|holder-|example\.test|5550100|Holder|Guest|at-/);
     }
-    expect(Object.keys(report).sort()).toEqual(["conferenceCovered", "conferenceMealServices", "meals", "needs", "peopleWithNeeds", "totalPeople"]);
+    expect(Object.keys(report).sort()).toEqual(["conferenceCovered", "conferenceMealServices", "includesSubmitted", "meals", "needs", "peopleWithNeeds", "totalPeople"]);
     for (const need of report.needs) expect(Object.keys(need).sort()).toEqual(["answer", "count"]);
   });
 
@@ -116,6 +116,23 @@ describe("kitchen report (#787)", () => {
     expect(result.totalPeople).toBe(3);
     expect(result.peopleWithNeeds).toBe(1);
     expect(result.needs).toEqual([{ answer: "Shellfish allergy", count: 1 }]);
+  });
+});
+
+describe("kitchen report statuses on a club event (#2017)", () => {
+  it("counts submitted registrations too on a club event, and only confirmed ones elsewhere", () => {
+    const rows = [registration("C", "CONFIRMED", [{ dietary_needs: "Vegan" }]), registration("S", "SUBMITTED", [{ dietary_needs: "Vegan" }, {}]), registration("X", "CANCELLED", [{}])];
+    const general = buildKitchenReport(rows);
+    expect(general.totalPeople).toBe(1);
+    expect(general.includesSubmitted).toBe(false);
+    expect(kitchenReportScopeText(general)).toBe("Confirmed registrations only.");
+    const club = buildKitchenReport(rows, [], { clubEvent: true });
+    expect(club.totalPeople).toBe(3);
+    expect(club.peopleWithNeeds).toBe(2);
+    expect(club.includesSubmitted).toBe(true);
+    expect(kitchenReportScopeText(club)).toBe("Submitted and confirmed registrations.");
+    expect(kitchenReportStatuses(true)).toEqual(["CONFIRMED", "SUBMITTED"]);
+    expect(kitchenReportStatuses(false)).toEqual(["CONFIRMED"]);
   });
 });
 

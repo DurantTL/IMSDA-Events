@@ -30,7 +30,7 @@ vi.mock("@/modules/access/authorization", async (importOriginal) => {
   return { ...actual, requirePermission: mocks.requirePermission };
 });
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: vi.fn(async () => ({ user: { id: "user_one" } })) }));
-vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn() }));
+vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn(), isClubAudienceEvent: async (id: string) => (await mocks.eventFindUnique({ where: { id } }))?.audience === "CLUB" }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: mocks.resolveEventContext }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: mocks.listRegistrations }));
 vi.mock("@/modules/meals/scanner-import-repository", () => ({
@@ -92,6 +92,23 @@ describe("kitchen report: conference staff", () => {
     expect(html).not.toMatch(/SYNTH-|Surname|Family|example\.test/);
   });
 
+  it("counts confirmed registrations only on a general event, and submitted ones too on a club event (#2017)", async () => {
+    mocks.resolveEventContext.mockResolvedValue({ event: { id: "evt", name: "Synthetic Retreat" }, permissions: ["VIEW_REPORTS"] });
+    mocks.eventFindUnique.mockResolvedValue({ name: "Synthetic Retreat", audience: "GENERAL", isPublished: true });
+    const general = renderToStaticMarkup(await StaffPage({ searchParams: Promise.resolve({ event: "evt" }) }));
+    expect(mocks.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED"] });
+    expect(general).toContain("Confirmed registrations only.");
+    await staffCsv(request, params);
+    expect(mocks.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED"] });
+
+    mocks.eventFindUnique.mockResolvedValue({ name: "Synthetic Camporee", audience: "CLUB", isPublished: true });
+    const club = renderToStaticMarkup(await StaffPage({ searchParams: Promise.resolve({ event: "evt" }) }));
+    expect(mocks.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
+    expect(club).toContain("Submitted and confirmed registrations.");
+    await staffCsv(request, params);
+    expect(mocks.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
+  });
+
   it("page is restricted without VIEW_REPORTS and reads nothing", async () => {
     mocks.resolveEventContext.mockResolvedValue({ event: { id: "evt", name: "Synthetic Retreat" }, permissions: ["VIEW_EVENT", "VIEW_SENSITIVE_DATA"] });
     const html = renderToStaticMarkup(await StaffPage({ searchParams: Promise.resolve({ event: "evt" }) }));
@@ -106,6 +123,8 @@ describe("kitchen report: Area Coordinator path", () => {
     const html = renderToStaticMarkup(await AreaPage(params));
     expect(html).toContain("Synthetic Camporee");
     expect(html).toContain("Peanut allergy");
+    // A club event: the report says it counts submitted registrations too (#2017).
+    expect(html).toContain("Submitted and confirmed registrations.");
     expect(html).not.toMatch(/SYNTH-|Surname|Family|example\.test/);
     const response = await areaCsv(request, params);
     expect(response.status).toBe(200);

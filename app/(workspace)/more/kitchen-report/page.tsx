@@ -9,6 +9,7 @@ import { resolveEventContext } from "@/modules/events/selection";
 import { loadKitchenCountsReport } from "@/modules/meals/kitchen-counts-repository";
 import { loadServedReport } from "@/modules/meals/scanner-import-repository";
 import { loadKitchenReport } from "@/modules/registrations/kitchen-report-loader";
+import { kitchenReportScopeText } from "@/modules/registrations/kitchen-report";
 import { Download } from "lucide-react";
 import { ExportLink } from "@/components/export-link";
 import { MealsViewsStrip } from "@/components/meals-views-strip";
@@ -41,7 +42,7 @@ export default async function KitchenReportPage({ searchParams }: { searchParams
       <div className="page-stack">
       <div className={styles.printHide}>
         <StaffPageHeader
-          description={`Confirmed registrations only. ${report.totalPeople} ${report.totalPeople === 1 ? "person" : "people"} counted, ${report.peopleWithNeeds} with a dietary need. Answers are shown as typed and are not linked to anyone.`}
+          description={`${kitchenReportScopeText(report)} ${report.totalPeople} ${report.totalPeople === 1 ? "person" : "people"} counted, ${report.peopleWithNeeds} with a dietary need. Answers are shown as typed and are not linked to anyone.`}
           extra={<>
             <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(event.id)}/exports/kitchen`}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink>
             <PrintReportButton label="Print" />
