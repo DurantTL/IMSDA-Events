@@ -10,10 +10,12 @@ import { StaffWorkspace } from "@/components/staff-workspace";
 describe("Team page ownership line (#1586)", () => {
   const html = renderToStaticMarkup(createElement(StaffWorkspace, { eventId: "event_1", eventName: "Synthetic Camporee", initialMemberships: [], currentUserId: "user-1", currentUserIsSystemAdmin: false, canAddStaff: true }));
 
-  it("says the page is the event's staff team and what each person can do", () => {
+  it("says what the page is for once, in the header, and keeps the note to what the header does not say", () => {
+    expect(html).toContain("Choose who can work in Synthetic Camporee and the event role each person has.");
     expect(html).toContain('data-testid="team-ownership-note"');
-    expect(html).toContain("This page is the team that runs Synthetic Camporee.");
-    expect(html).toContain("choose each person");
+    expect(html).toContain("Remove someone&#x27;s access here when their work on this event is done.");
+    expect(html).not.toContain("This page is the team that runs");
+    expect(html).not.toContain("choose each person");
   });
 
   it("says it is not participant staff invitations or System account access", () => {
