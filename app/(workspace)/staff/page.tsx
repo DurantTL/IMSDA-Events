@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
+import { PageHeader } from "@/components/page-header";
 import { StaffWorkspace } from "@/components/staff-workspace";
 import { listStaffMemberships } from "@/modules/access/membership-repository";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
@@ -12,7 +13,12 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   const { event: requested } = await searchParams;
   const { event, permissions, user } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_STAFF")) {
-    return <AccessRestricted title="Staff access is restricted" detail="Your event role can use its assigned operational tools, but only event administrators can manage staff assignments." whoToAsk="your event administrator" />;
+    return (
+      <>
+        <PageHeader title={staffPageTitles.team} />
+        <AccessRestricted title="Staff access is restricted" detail="Your event role can use its assigned operational tools, but only event administrators can manage staff assignments." whoToAsk="your event administrator" />
+      </>
+    );
   }
   // A Clubs Administrator opens club people only (#1804), and event staff are mostly not, so only a system administrator gets the link.
   const canOpenPeople = (await resolvePeopleViewer()).scope === "full";
