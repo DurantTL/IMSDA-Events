@@ -310,7 +310,7 @@ export function AppShell({
     </span>
   );
   const openPicker = pickerEvents.length > 0 && place.area === "events" && !place.inEvent ? (
-    <span className={styles.pickerShell}>
+    <span className={`${styles.pickerShell} ${styles.openerShell}`}>
       <select id="event-opener" aria-label="Open an event" value="" onChange={(event) => { if (event.target.value) openEvent(event.target.value); }}>
         <option value="" disabled>Open an event</option>
         {pickerEvents.map((event) => <option value={event.id} key={event.id}>{event.archived ? `${event.name} (archived)` : event.name}</option>)}
