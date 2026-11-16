@@ -21,16 +21,22 @@ export default async function StaffInvitationsPage({ searchParams }: { searchPar
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_REGISTRATION")) {
     return (
-      <AccessRestricted
+      <>
+        <PageHeader title="Staff invitations" />
+        <AccessRestricted
         title="Staff invitations are restricted"
         detail="Only event administrators and registration managers can create and manage personal registration links."
         whoToAsk="your event administrator"
       />
+      </>
     );
   }
   if (event.audience !== "GENERAL") {
     return (
-      <NotAvailableForEvent reason="Personal staff, pastor and volunteer links are for events that are open to everyone." />
+      <>
+        <PageHeader title="Staff invitations" />
+        <NotAvailableForEvent reason="Personal staff, pastor and volunteer links are for events that are open to everyone." />
+      </>
     );
   }
   // Searched, filtered, ordered and paged in the database from the address (#1492).

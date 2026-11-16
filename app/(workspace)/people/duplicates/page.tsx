@@ -45,11 +45,14 @@ export default async function DuplicateFinderPage({
   const { event, permissions } = await resolveEventContext(query.event);
   if (!permissions.includes("VIEW_SENSITIVE_DATA")) {
     return (
-      <AccessRestricted
+      <>
+        <PageHeader title="Find duplicates" />
+        <AccessRestricted
         title="The duplicate finder is restricted"
         detail="Reviewing possible duplicates means reading attendee names and contact details, which your event role does not include."
         whoToAsk="your event administrator"
       />
+      </>
     );
   }
 

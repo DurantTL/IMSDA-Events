@@ -18,16 +18,22 @@ export default async function StaffApprovalsPage({ searchParams }: { searchParam
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_REGISTRATION")) {
     return (
-      <AccessRestricted
+      <>
+        <PageHeader title="Staff approvals" />
+        <AccessRestricted
         title="Staff registrations are restricted"
         detail="Only event administrators and registration managers can approve staff, pastor and volunteer registrations."
         whoToAsk="your event administrator"
       />
+      </>
     );
   }
   if (event.audience !== "GENERAL") {
     return (
-      <NotAvailableForEvent reason="Personal staff, pastor and volunteer links are for events that are open to everyone." />
+      <>
+        <PageHeader title="Staff approvals" />
+        <NotAvailableForEvent reason="Personal staff, pastor and volunteer links are for events that are open to everyone." />
+      </>
     );
   }
   const approvals = await listApprovals(event.id);

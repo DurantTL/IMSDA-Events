@@ -21,7 +21,8 @@ describe("review pages draw one titled header (#1574)", () => {
   for (const { route, files, title } of pages) {
     it(`${route} has one PageHeader titled like its hub card`, () => {
       const text = files.map((file) => source(file)).join("\n");
-      expect((text.match(/<PageHeader\b/g) ?? []).length).toBe(1);
+      // The bare `<PageHeader title=... />` above a restricted or not-available state is checked below.
+      expect((text.replace(/<PageHeader title=(?:"[^"]*"|\{[^}]*\}) \/>/g, "").match(/<PageHeader\b/g) ?? []).length).toBe(1);
       expect(text).toContain(`title="${title}"`);
       expect(text).not.toContain("page-intro");
       expect(text).not.toContain("duplicate-page-title");
@@ -33,10 +34,12 @@ describe("review pages draw one titled header (#1574)", () => {
 
   it("/imports draws its header from the staff page title, with help in the header and no stale eyebrow", () => {
     const text = source("components/import-workspace.tsx");
-    expect(text).toContain("<PageHeader title={staffPageTitles.imports}");
+    const page = source("app/(workspace)/imports/page.tsx");
+    expect(text).not.toContain("<PageHeader");
     expect(text).not.toContain("Build 5 staging");
     expect(text).not.toContain("duplicate-page-title");
-    expect(source("app/(workspace)/imports/page.tsx")).toContain("help={<StaffContextualHelp");
+    expect(page).toContain("<PageHeader title={staffPageTitles.imports} description=");
+    expect(page).toMatch(/extra=\{<div className=\{styles\.helpSlot\}><StaffContextualHelp/);
     expect(pageOwnsHeader("/imports")).toBe(true);
     expect(staffPageTitles.imports).toBe("Imports");
   });
@@ -55,4 +58,30 @@ describe("review pages draw one titled header (#1574)", () => {
     expect(text).toContain("attendee match");
     expect(text).toContain("contact match");
   });
+
+  // The shell draws no h1 on these routes, so a restricted or not-available return carries the titled header too.
+  const guarded = [
+    { file: "app/(workspace)/people/responsible-adults/page.tsx", title: '"Responsible adults"', restricted: 1, unavailable: 0 },
+    { file: "app/(workspace)/people/duplicates/page.tsx", title: '"Find duplicates"', restricted: 1, unavailable: 0 },
+    { file: "app/(workspace)/people/directory-review/page.tsx", title: '"Directory review"', restricted: 1, unavailable: 0 },
+    { file: "app/(workspace)/people/pending-teams/page.tsx", title: '"Teams waiting for a club"', restricted: 1, unavailable: 0 },
+    { file: "app/(workspace)/people/staff-invitations/page.tsx", title: '"Staff invitations"', restricted: 1, unavailable: 1 },
+    { file: "app/(workspace)/people/staff-invitations/approvals/page.tsx", title: '"Staff approvals"', restricted: 1, unavailable: 1 },
+    { file: "app/(workspace)/imports/page.tsx", title: "{staffPageTitles.imports}", restricted: 1, unavailable: 0 },
+    { file: "app/(workspace)/people/attendees/page.tsx", title: "{staffPageTitles.attendeeList}", restricted: 1, unavailable: 0 },
+    { file: "app/(workspace)/people/page.tsx", title: "{staffPageTitles.registrations}", restricted: 1, unavailable: 0 },
+  ];
+  for (const { file, title, restricted, unavailable } of guarded) {
+    it(`${file} puts the titled header above every restricted and not-available state`, () => {
+      const text = source(file);
+      const header = `<PageHeader title=${title} />`;
+      const states = [...text.matchAll(/<(AccessRestricted|NotAvailableForEvent)\b/g)].map((match) => match[1]);
+      expect(states.filter((name) => name === "AccessRestricted")).toHaveLength(restricted);
+      expect(states.filter((name) => name === "NotAvailableForEvent")).toHaveLength(unavailable);
+      expect(text.split(header).length - 1, "one bare header before each state").toBe(restricted + unavailable);
+      for (const match of text.matchAll(/<(AccessRestricted|NotAvailableForEvent)\b/g)) {
+        expect(text.slice(0, match.index).trimEnd().endsWith(header), `${match[1]} follows the header`).toBe(true);
+      }
+    });
+  }
 });

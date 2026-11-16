@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PageHeader } from "@/components/page-header";
 import { AccessRestricted } from "@/components/access-restricted";
 import { ResponsibleAdultReview } from "@/components/responsible-adult-review";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -15,7 +16,12 @@ export default async function ResponsibleAdultsPage({ searchParams }: { searchPa
   const { event: requested } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("VIEW_SENSITIVE_DATA")) {
-    return <AccessRestricted title="People records are restricted" detail="Your event role does not include access to attendee names, so the responsible-adult review is not available." whoToAsk="your event administrator" />;
+    return (
+      <>
+        <PageHeader title="Responsible adults" />
+        <AccessRestricted title="People records are restricted" detail="Your event role does not include access to attendee names, so the responsible-adult review is not available." whoToAsk="your event administrator" />
+      </>
+    );
   }
   const review = await getGuardianReview(event.id);
   return <ResponsibleAdultReview eventId={event.id} review={review} canEdit={permissions.includes("MANAGE_REGISTRATION")} canExport={permissions.includes("VIEW_REPORTS")} />;

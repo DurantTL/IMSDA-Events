@@ -15,11 +15,14 @@ export default async function PendingTeamsPage({ searchParams }: { searchParams:
   const { event, permissions, user } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_REGISTRATION")) {
     return (
-      <AccessRestricted
+      <>
+        <PageHeader title="Teams waiting for a club" />
+        <AccessRestricted
         title="Teams waiting for a club are restricted"
         detail="Only event administrators and registration managers can confirm which club a team belongs to."
         whoToAsk="your event administrator"
       />
+      </>
     );
   }
   // Adding a club to the directory is the directory's own rule: system administrators (#1031).

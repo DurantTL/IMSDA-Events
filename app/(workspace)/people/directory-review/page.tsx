@@ -16,11 +16,14 @@ export default async function DirectoryReviewPage({ searchParams }: { searchPara
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_REGISTRATION")) {
     return (
-      <AccessRestricted
+      <>
+        <PageHeader title="Directory review" />
+        <AccessRestricted
         title="Directory review is restricted"
         detail="Only event administrators and registration managers can review clubs and churches that weren't found in the directory."
         whoToAsk="your event administrator"
       />
+      </>
     );
   }
 

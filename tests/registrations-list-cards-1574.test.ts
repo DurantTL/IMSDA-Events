@@ -57,7 +57,8 @@ describe("Registrations header (#1574)", () => {
 
   it("draws one titled header above the list, and the list draws no h1 or duplicate title", () => {
     expect(page).toContain("title={staffPageTitles.registrations}");
-    expect(page.match(/<PageHeader\b/g)).toHaveLength(1);
+    // The restricted return carries a bare titled header too, so the shell's h1 is not missed (#1574).
+    expect(page.replace(/<PageHeader title=\{staffPageTitles\.registrations\} \/>/g, "").match(/<PageHeader\b/g)).toHaveLength(1);
     const html = render();
     expect(html).not.toContain("<h1");
     expect(html).not.toContain("duplicate-page-title");
