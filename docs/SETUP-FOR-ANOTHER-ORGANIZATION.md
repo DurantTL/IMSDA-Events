@@ -17,8 +17,8 @@ the conference's own host, so skip anything in it that names xCloud or
 ## Before you start (what you need)
 
 - A Linux server you control, with Docker Engine and the Docker Compose plugin.
-  The conference's server has 4 GB of memory. Building the image there takes a
-  long time, so give yours more if you can.
+  Building the image needs several gigabytes of memory and can take a while on
+  a small server.
 - A domain name and a way to serve it over HTTPS. The app does not do HTTPS
   itself. A reverse proxy (nginx, Caddy or similar) must forward your domain to
   the app's port (`APP_PORT`, default `3100`).
@@ -123,7 +123,8 @@ docker compose exec -e IMSDA_ADMIN_PASSWORD='<a long passphrase>' app \
 
 This account can sign in at once. Change the password later and clear the
 variable. System administrators must also enrol a second factor (an
-authenticator app) the first time they sign in.
+authenticator app) the first time they sign in. Save the recovery codes it
+shows; each one signs you in once if you lose the authenticator.
 
 Invite colleagues from **People & access** (`/admin/people`). If an administrator
 loses their authenticator and recovery codes, use
@@ -134,8 +135,9 @@ loses their authenticator and recovery codes, use
 Sign in and open **Platform settings** (`/admin/settings`). Only system
 administrators can see it. Set:
 
-1. **Organization**: name, logo URL and public website.
-2. **New event defaults**: default timezone, for example `America/Chicago`.
+1. **Who this platform belongs to**: name, logo URL and public website.
+2. **What a new event starts from**: default timezone, for example
+   `America/Chicago`.
 3. **Homepage help contact**: help phone and email.
 4. **Email header and footer**: header names and footer help email and phone.
 5. **Invoice PDF header**: the lines at the top of invoices.
