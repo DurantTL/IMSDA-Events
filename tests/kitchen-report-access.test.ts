@@ -30,7 +30,7 @@ vi.mock("@/modules/access/authorization", async (importOriginal) => {
   return { ...actual, requirePermission: mocks.requirePermission };
 });
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: vi.fn(async () => ({ user: { id: "user_one" } })) }));
-vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn(), isClubAudienceEvent: async (id: string) => (await mocks.eventFindUnique({ where: { id } }))?.audience === "CLUB" }));
+vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn(), isClubAudienceEvent: async (id: string) => (await mocks.eventFindUnique({ where: { id } }))?.audience === "CLUB", isBilledLaterEvent: async (id: string) => { const event = await mocks.eventFindUnique({ where: { id } }); return event?.audience === "CLUB" || event?.billingMode === "DEFERRED_ORGANIZATION_INVOICE"; } }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: mocks.resolveEventContext }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: mocks.listRegistrations }));
 vi.mock("@/modules/meals/scanner-import-repository", () => ({
@@ -107,6 +107,12 @@ describe("kitchen report: conference staff", () => {
     expect(club).toContain("Submitted and confirmed registrations.");
     await staffCsv(request, params);
     expect(mocks.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
+
+    // A school-billed general event (#2031, the Music Festival) is billed later too, so it counts Submitted as well.
+    mocks.eventFindUnique.mockResolvedValue({ name: "Synthetic Festival", audience: "GENERAL", billingMode: "DEFERRED_ORGANIZATION_INVOICE", isPublished: true });
+    const school = renderToStaticMarkup(await StaffPage({ searchParams: Promise.resolve({ event: "evt" }) }));
+    expect(mocks.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
+    expect(school).toContain("Submitted and confirmed registrations.");
   });
 
   it("page is restricted without VIEW_REPORTS and reads nothing", async () => {

@@ -4,7 +4,7 @@ import { formTemplates } from "@/modules/forms/definition";
 const dependencies = vi.hoisted(() => ({
   requirePermission: vi.fn(),
   listRegistrations: vi.fn(),
-  isClubAudienceEvent: vi.fn(),
+  isClubAudienceEvent: vi.fn(), isBilledLaterEvent: vi.fn(),
 }));
 
 vi.mock("@/modules/access/authorization", async (importOriginal) => {
@@ -12,7 +12,7 @@ vi.mock("@/modules/access/authorization", async (importOriginal) => {
   return { ...actual, requirePermission: dependencies.requirePermission };
 });
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: vi.fn(async () => ({ user: { id: "user_one" } })) }));
-vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn(), isClubAudienceEvent: dependencies.isClubAudienceEvent }));
+vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn(), isClubAudienceEvent: dependencies.isClubAudienceEvent, isBilledLaterEvent: dependencies.isBilledLaterEvent }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: dependencies.listRegistrations }));
 
 import { GET } from "@/app/api/events/[eventId]/exports/attendees/route";
@@ -43,6 +43,7 @@ function call(search = "") {
 beforeEach(() => {
   vi.clearAllMocks();
   dependencies.isClubAudienceEvent.mockResolvedValue(false);
+  dependencies.isBilledLaterEvent.mockResolvedValue(false);
   dependencies.requirePermission.mockResolvedValue({ user: { globalRole: "SYSTEM_ADMIN" }, membership: null });
   dependencies.listRegistrations.mockResolvedValue([registration("X1", "Vegan"), registration("X2", "Standard"), registration("X3", "Vegan", "CANCELLED")]);
 });
@@ -81,12 +82,23 @@ describe("attendees export route", () => {
 
   it("includes submitted registrations by default on a club event, where they are billed to the church (#2017)", async () => {
     dependencies.isClubAudienceEvent.mockResolvedValue(true);
+    dependencies.isBilledLaterEvent.mockResolvedValue(true);
     dependencies.listRegistrations.mockResolvedValue([registration("C1", "Standard", "SUBMITTED"), registration("C2", "Vegan"), registration("C3", "Vegan", "CANCELLED")]);
     const lines = (await rawBody(await call())).text.trim().split("\r\n");
     expect(dependencies.listRegistrations).toHaveBeenCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
     expect(lines).toHaveLength(3);
     expect(lines.join("\n")).toContain("WR26-C1");
     expect(lines.join("\n")).not.toContain("WR26-C3");
+  });
+
+  it("includes submitted registrations by default on a school-billed general event (#2031)", async () => {
+    dependencies.isBilledLaterEvent.mockResolvedValue(true);
+    dependencies.listRegistrations.mockResolvedValue([registration("S1", "Standard", "SUBMITTED"), registration("S2", "Vegan")]);
+    const { text } = await rawBody(await call());
+    expect(dependencies.listRegistrations).toHaveBeenCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
+    expect(text).toContain("WR26-S1");
+    // Dietary access still follows the club rule, not billing: a general event shows the text to reports plus sensitive staff.
+    expect(text).toContain("synthetic note");
   });
 
   it("honours the active filters", async () => {

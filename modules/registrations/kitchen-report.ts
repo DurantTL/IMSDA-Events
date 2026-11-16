@@ -17,14 +17,14 @@ import { toCsv } from "@/modules/reporting/csv";
  * keys, same no-needs set, same once-per-registration rule for registration-wide
  * answers) and then keeps ONLY counts and answer text. No name, confirmation
  * code, contact detail, church or club is copied into the result, and an answer
- * carries no link back to a person. Confirmed registrations only, or on a club
- * event Submitted and Confirmed (#2017): club registrations are billed to the
- * church and stay Submitted, the same rule as the Attendee list.
+ * carries no link back to a person. Confirmed registrations only, or on a
+ * billed-later event Submitted and Confirmed (#2017, #2031): club, church- and
+ * school-billed registrations stay Submitted, the same rule as the Attendee list.
  */
 
 /** The registration statuses the report counts on this kind of event. */
-export function kitchenReportStatuses(clubEvent: boolean) {
-  return defaultListingStatuses(clubEvent);
+export function kitchenReportStatuses(billedLater: boolean) {
+  return defaultListingStatuses(billedLater);
 }
 
 /** The opening words of the report's description, naming what it counts. */
@@ -58,8 +58,8 @@ export function normalizeNeed(answer: string): string {
   return answer.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-export function buildKitchenReport(registrations: readonly RegistrationRecord[], conferenceMealServices: readonly StaffMealServiceCount[] = [], options: { clubEvent?: boolean } = {}): KitchenReport {
-  const statuses = kitchenReportStatuses(Boolean(options.clubEvent));
+export function buildKitchenReport(registrations: readonly RegistrationRecord[], conferenceMealServices: readonly StaffMealServiceCount[] = [], options: { billedLater?: boolean } = {}): KitchenReport {
+  const statuses = kitchenReportStatuses(Boolean(options.billedLater));
   const counted = registrations.filter((registration) => statuses.includes(registration.status as never));
   // Full answer text is needed to count it; it is reduced to anonymous counts below and never returned per row.
   const rows = buildAttendeeListingRows(counted, { showDietaryDetails: true });

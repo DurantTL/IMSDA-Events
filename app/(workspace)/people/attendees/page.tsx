@@ -13,7 +13,7 @@ import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import { sortOrderText } from "@/lib/list-sort";
 import { paginate, parsePageParam } from "@/lib/pagination";
-import { isClubAudienceEvent } from "@/modules/events/repository";
+import { isBilledLaterEvent, isClubAudienceEvent } from "@/modules/events/repository";
 import { listRegistrations } from "@/modules/registrations/repository";
 import {
   defaultListingStatuses,
@@ -54,8 +54,8 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
     );
   }
   const clubEvent = await isClubAudienceEvent(event.id);
-  // Club registrations stay Submitted (billed to the church), so a club event starts with Submitted too (#2017).
-  const defaultStatuses = defaultListingStatuses(clubEvent);
+  // Billed-later registrations stay Submitted (billed to the church or school), so those events start with Submitted too (#2017, #2031).
+  const defaultStatuses = defaultListingStatuses(await isBilledLaterEvent(event.id));
   const query = parseAttendeeListingQuery(params, defaultStatuses);
   const registrations = await listRegistrations(event.id, { statuses: query.statuses });
   // Free-text dietary answers are health-type: the same function gates the CSV.

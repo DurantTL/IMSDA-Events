@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
-import { isClubAudienceEvent } from "@/modules/events/repository";
+import { isBilledLaterEvent } from "@/modules/events/repository";
 import { loadStaffMealServiceCounts } from "@/modules/meals/staff-coverage";
 import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
 import { listRegistrations } from "@/modules/registrations/repository";
@@ -9,10 +9,10 @@ import { buildKitchenReport, kitchenReportStatuses, type KitchenReport } from "@
 
 /** The whole-event report for an event the caller has already been authorized for. */
 export async function loadKitchenReport(eventId: string): Promise<KitchenReport> {
-  // A club event counts Submitted registrations too: they are billed to the church and stay Submitted (#2017).
-  const clubEvent = await isClubAudienceEvent(eventId);
-  const registrations = await listRegistrations(eventId, { statuses: [...kitchenReportStatuses(clubEvent)] });
-  return buildKitchenReport(registrations, await loadStaffMealServiceCounts(eventId), { clubEvent });
+  // A billed-later event counts Submitted registrations too: they are billed to the church or school and stay Submitted (#2017, #2031).
+  const billedLater = await isBilledLaterEvent(eventId);
+  const registrations = await listRegistrations(eventId, { statuses: [...kitchenReportStatuses(billedLater)] });
+  return buildKitchenReport(registrations, await loadStaffMealServiceCounts(eventId), { billedLater });
 }
 
 /**

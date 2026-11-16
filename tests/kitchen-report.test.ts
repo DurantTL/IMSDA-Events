@@ -126,7 +126,7 @@ describe("kitchen report statuses on a club event (#2017)", () => {
     expect(general.totalPeople).toBe(1);
     expect(general.includesSubmitted).toBe(false);
     expect(kitchenReportScopeText(general)).toBe("Confirmed registrations only.");
-    const club = buildKitchenReport(rows, [], { clubEvent: true });
+    const club = buildKitchenReport(rows, [], { billedLater: true });
     expect(club.totalPeople).toBe(3);
     expect(club.peopleWithNeeds).toBe(2);
     expect(club.includesSubmitted).toBe(true);

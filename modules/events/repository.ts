@@ -844,6 +844,20 @@ export async function findEventSlug(eventId: string) {
 }
 
 /** Whether the event is for clubs (CLUB audience). Unknown events read as not a club event. */
+/**
+ * Whether the event's registrations are billed after the event (#2017, #2031): a club event, or a general event billed to
+ * a church or school (`DEFERRED_ORGANIZATION_INVOICE`, such as Outdoor School or the Music Festival). Nothing is paid
+ * when they register, so their registrations stay Submitted, and the Attendee list, its exports and the kitchen report
+ * start with Submitted and Confirmed. Only the default statuses read this; access rules still ask `isClubAudienceEvent`.
+ */
+export async function isBilledLaterEvent(eventId: string) {
+  const event = await getPrisma().event.findUnique({
+    where: { id: eventId },
+    select: { audience: true, billingMode: true },
+  });
+  return event?.audience === "CLUB" || event?.billingMode === "DEFERRED_ORGANIZATION_INVOICE";
+}
+
 export async function isClubAudienceEvent(eventId: string) {
   const event = await getPrisma().event.findUnique({
     where: { id: eventId },

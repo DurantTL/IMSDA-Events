@@ -16,7 +16,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), use
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => mocks.db }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: vi.fn(async () => ({ user: { id: "user_k", email: "k@example.test", displayName: "Kim Kitchen", globalRole: null } })) }));
-vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership, isClubAudienceEvent: vi.fn() }));
+vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership, isClubAudienceEvent: vi.fn(), isBilledLaterEvent: vi.fn() }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: mocks.resolveEventContext }));
 vi.mock("@/modules/meals/scanner-import-repository", () => ({ loadServedReport: mocks.loadServedReport, loadServedDrillDown: vi.fn() }));
 

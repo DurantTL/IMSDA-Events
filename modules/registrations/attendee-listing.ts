@@ -25,14 +25,15 @@ export type ListingStatus = "CONFIRMED" | "SUBMITTED" | "CANCELLED";
 export const LISTING_STATUSES: readonly ListingStatus[] = ["CONFIRMED", "SUBMITTED", "CANCELLED"];
 export const DEFAULT_LISTING_STATUSES: readonly ListingStatus[] = ["CONFIRMED"];
 /**
- * Club events (#2017): a club registration is billed to its church after the event, so it stays Submitted. Their list
- * starts with Submitted and Confirmed, the same registrations the club event reports count.
+ * Billed-later events (#2017, #2031): a club registration is billed to its church, and a church- or school-billed general
+ * event's registration to its church or school, after the event, so it stays Submitted. Their list starts with Submitted
+ * and Confirmed, the same registrations the club event reports count. See `isBilledLaterEvent`.
  */
 export const CLUB_DEFAULT_LISTING_STATUSES: readonly ListingStatus[] = ["CONFIRMED", "SUBMITTED"];
 
 /** The statuses the list, its CSV and the event archive start with on this kind of event. */
-export function defaultListingStatuses(clubEvent: boolean): readonly ListingStatus[] {
-  return clubEvent ? CLUB_DEFAULT_LISTING_STATUSES : DEFAULT_LISTING_STATUSES;
+export function defaultListingStatuses(billedLater: boolean): readonly ListingStatus[] {
+  return billedLater ? CLUB_DEFAULT_LISTING_STATUSES : DEFAULT_LISTING_STATUSES;
 }
 
 function sameStatuses(statuses: readonly ListingStatus[], defaults: readonly ListingStatus[]) {
