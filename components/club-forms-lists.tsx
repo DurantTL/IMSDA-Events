@@ -9,6 +9,7 @@ import type { PastYearGroup } from "@/modules/club-forms/past-years-domain";
 import type { ClubFormLinkRow } from "@/modules/club-forms/links";
 import type { ClubFormSubmissionListRow } from "@/modules/club-forms/submissions";
 import type { StatusWord } from "@/modules/registrations/status-words";
+import { cardCell } from "@/components/table-card-labels";
 import styles from "./club-forms-lists.module.css";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
@@ -98,23 +99,24 @@ export function ClubFormLinksTable({ links, organizationId, base, caption = "Pri
 export function FilledFormsTable({ submissions, base, caption = "Filled forms", sortPrefix }: { submissions: ClubFormSubmissionListRow[]; base: string; caption?: string; sortPrefix?: string }) {
   const sort = useAddressSort(FILLED_SORT_COLUMNS, NO_SORT_FILLED, undefined, prefixFor(sortPrefix, "filled"));
   const rows = sort.key ? sortRows(submissions, sort.key, sort.dir, filledAccessors) : submissions;
-  const header = (column: FilledSortColumn, label: string) => <SortableHeader active={sort.key === column} direction={sort.dir} label={label} onSort={() => sort.toggle(column)} />;
+  // Called as `columns.header("key", "Label")`, the form tests/table-data-labels.test.ts reads to match each card label to its column.
+  const columns = { header: (column: FilledSortColumn, label: string) => <SortableHeader active={sort.key === column} direction={sort.dir} label={label} onSort={() => sort.toggle(column)} /> };
   return (
     <div className="report-table-wrap">
       {sort.key && <SortOrderNote>{sortOrderText(FILLED_SORT_LABELS[sort.key].label, sort.dir, FILLED_SORT_LABELS[sort.key].kind)}</SortOrderNote>}
-      <table className="report-table">
+      <table className="report-table table-cards" role="table">
         <caption className="sr-only">{caption}</caption>
-        <thead>
-          <tr>{header("form", "Form")}{header("subject", "Member or subject")}{header("status", "Status")}{header("date", "Date")}<th scope="col"><span className="sr-only">Open</span></th></tr>
+        <thead role="rowgroup">
+          <tr role="row">{columns.header("form", "Form")}{columns.header("subject", "Member or subject")}{columns.header("status", "Status")}{columns.header("date", "Date")}<th role="columnheader" scope="col"><span className="sr-only">Open</span></th></tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
           {rows.map((row) => (
-            <tr key={row.id}>
-              <th scope="row">{row.templateName}</th>
-              <td translate={row.subjectName ? "no" : undefined}>{row.subjectName || "Not named"}</td>
-              <td>{row.status === "DRAFT" ? "Draft" : "Submitted"}{row.enteredVia === "LINK" ? " · private link" : row.enteredVia === "OPEN_APPLICATION" ? " · open application" : ""}</td>
-              <td>{formatDate(row.submittedAt ?? row.updatedAt)}</td>
-              <td>
+            <tr key={row.id} role="row">
+              <th role="rowheader" scope="row">{row.templateName}</th>
+              <td translate={row.subjectName ? "no" : undefined} {...cardCell("Member or subject")}>{row.subjectName || "Not named"}</td>
+              <td {...cardCell("Status")}>{row.status === "DRAFT" ? "Draft" : "Submitted"}{row.enteredVia === "LINK" ? " · private link" : row.enteredVia === "OPEN_APPLICATION" ? " · open application" : ""}</td>
+              <td {...cardCell("Date")}>{formatDate(row.submittedAt ?? row.updatedAt)}</td>
+              <td {...cardCell(null)}>
                 <Link className="secondary-button" href={`${base}/submissions/${row.id}`}>
                   {row.status === "DRAFT" ? "Open" : <><Printer aria-hidden="true" size={13} /> View and print</>}
                 </Link>

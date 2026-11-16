@@ -9,6 +9,7 @@ import { SortOrderNote } from "@/components/list-sort";
 import { serverSort, sortRows } from "@/lib/list-sort";
 import { getPrisma } from "@/lib/prisma";
 import { AREA_CLUB_FORMS_SORT_COLUMNS, UNSORTED, sortLine } from "@/lib/staff-sort-columns";
+import { cardCell } from "@/components/table-card-labels";
 import { SendClubFormLink } from "@/components/club-forms-actions";
 import { resolveAreaCoordinatorViewerForClub } from "@/modules/club-forms/access";
 import { CLUB_FORM_LINK_DEFAULT_DAYS, viewerCanSendLinkForClub } from "@/modules/club-forms/domain";
@@ -83,16 +84,16 @@ export default async function AreaClubFormsPage({ params, searchParams }: { para
       ) : (
         <div className="report-table-wrap">
           {sorting.order.key && <SortOrderNote>{sortLine(sorting.order)}</SortOrderNote>}
-          <table className="report-table">
+          <table className="report-table table-cards" role="table">
             <caption className="sr-only">Submitted forms</caption>
-            <thead><tr><ColumnHeader column="form" label="Form" sorting={sorting} /><ColumnHeader column="subject" label="Member or subject" sorting={sorting} /><ColumnHeader column="submitted" label="Submitted" sorting={sorting} /><th scope="col"><span className="sr-only">Open</span></th></tr></thead>
-            <tbody>
+            <thead role="rowgroup"><tr role="row"><ColumnHeader column="form" label="Form" sorting={sorting} /><ColumnHeader column="subject" label="Member or subject" sorting={sorting} /><ColumnHeader column="submitted" label="Submitted" sorting={sorting} /><th role="columnheader" scope="col"><span className="sr-only">Open</span></th></tr></thead>
+            <tbody role="rowgroup">
               {submissions.map((row) => (
-                <tr key={row.id}>
-                  <th scope="row">{row.templateName}</th>
-                  <td translate={row.subjectName ? "no" : undefined}>{row.subjectName || "Not named"}</td>
-                  <td>{formatDate(row.submittedAt)}</td>
-                  <td><Link className="secondary-button" href={`/account/area/${organizationId}/forms/${row.id}`}>View</Link></td>
+                <tr key={row.id} role="row">
+                  <th role="rowheader" scope="row">{row.templateName}</th>
+                  <td translate={row.subjectName ? "no" : undefined} {...cardCell("Member or subject")}>{row.subjectName || "Not named"}</td>
+                  <td {...cardCell("Submitted")}>{formatDate(row.submittedAt)}</td>
+                  <td {...cardCell(null)}><Link className="secondary-button" href={`/account/area/${organizationId}/forms/${row.id}`}>View</Link></td>
                 </tr>
               ))}
             </tbody>
