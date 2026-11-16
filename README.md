@@ -93,6 +93,7 @@ One place to find events, register a family or a whole club, run check-in, and k
 | 📏 **[Site rules](docs/SITE-RULES.md)** | Every approved look, behavior and sign-in rule, each with its test |
 | 🎨 **[Design system](docs/DESIGN-SYSTEM.md)** | Colors, type, components and layout |
 | 🚀 **[Deploy with Docker](docs/DEPLOY-DOCKER.md)** | Production setup, backups and the uptime monitor |
+| 🏛️ **[Setup guide for another organization](docs/SETUP-FOR-ANOTHER-ORGANIZATION.md)** | Run your own copy, events only or club ministry only |
 | 🧱 **[Architecture decisions](docs/decisions/)** | Why the system is built the way it is |
 | 🗺️ **[Roadmap (#98)](https://github.com/DurantTL/IMSDA-Events/issues/98)** | The ordered build queue |
 | 🤝 **[Contributor and agent guide](AGENTS.md)** | Repository map, checks and workflow rules |
