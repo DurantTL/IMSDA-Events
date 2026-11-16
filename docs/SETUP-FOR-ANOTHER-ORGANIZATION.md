@@ -125,7 +125,7 @@ This account can sign in at once. Change the password later and clear the
 variable. System administrators must also enrol a second factor (an
 authenticator app) the first time they sign in.
 
-Invite colleagues from **People & access** (`/admin/team`). If an administrator
+Invite colleagues from **People & access** (`/admin/people`). If an administrator
 loses their authenticator and recovery codes, use
 `docker compose exec app npm run admin:reset-mfa -- --email them@example.org`.
 
@@ -171,9 +171,10 @@ There is no switch that turns off events either. Club event registration, club
 orders and visiting clubs all depend on an event, so events still exist
 underneath. Today, to use only club ministry:
 
-- Create the events that clubs register for. If you do not want public
-  registration, keep them unpublished and off the public calendar. Both are set
-  on the event's Features page (`/more/features`).
+- Create the events that clubs register for, and publish them. Clubs can only
+  register for a published event. To keep an event out of the public list,
+  leave **Show on the public calendar** off. See
+  [`EVENT-FEATURES.md`](EVENT-FEATURES.md).
 - Add clubs and churches under **Clubs and churches** (`/admin/organizations`)
   and give the Clubs Administrator role from **People & access**.
 - Each club can switch on optional tools in its own Club settings. All are off
@@ -194,9 +195,10 @@ with `EMAIL_PROVIDER`:
   Amazon SES" in `DEPLOY-DOCKER.md`.
 
 Verify the sender address (`ACCOUNT_EMAIL_SENDER_ADDRESS`) with your provider
-first. Event email settings (sender name, address, reply-to) are on **Email**
-(`/admin/email`). A new event starts on local capture, so no registrant gets
-email until someone turns real delivery on for that event.
+first. The sender for event email (name, address, reply-to) is set once for the
+whole site on **Email** (`/admin/email`). Until that sender address is set,
+event email is held and no registrant gets it. Set it before you open
+registration.
 
 The System report has an email test card. Use it before you invite anyone.
 
