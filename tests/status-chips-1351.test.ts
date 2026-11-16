@@ -68,7 +68,7 @@ describe("staff pages moved to the shared chip and count badge (L4, #2025)", () 
 
   it("records the two reviewed exceptions (L14) and teaches the L4 check to skip them", () => {
     expect(read("docs/SITE-RULES.md")).toMatch(/\| L14 \| Exceptions to L4/);
-    expect(read("scripts/support/site-rule-checks.ts")).toContain("REVIEWED_OWN_CHIP = /badge-print|badge-sheet|badge-label|adminBadge/");
+    expect(read("scripts/support/site-rule-checks.ts")).toContain("REVIEWED_OWN_CHIP = /(?:^|\\s)(?:badge-print[\\w-]*|badge-sheet[\\w-]*|badge-label[\\w-]*|[\\w-]*adminBadge[\\w-]*)(?:\\s|$)/");
     expect(read("app/(workspace)/admin/page.tsx")).toContain("styles.adminBadge");
     expect(read("app/(workspace)/check-in/badges/page.tsx")).toContain("badge-print-page");
   });
