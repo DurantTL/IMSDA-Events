@@ -73,9 +73,9 @@ describe("starter attendee types (#1403)", () => {
     }
   });
 
-  it("only the four general starters have types; no club starter and no other starter does", () => {
+  it("only the four typed starters have types; no club starter and no other starter does", () => {
     const typed = starterEventTemplates.filter((entry) => starterPayload(entry).attendeeTypes.length > 0).map((entry) => entry.starterKey).sort();
-    expect(typed).toEqual(["camp_meeting", "man_camp", "womens_retreat"]);
+    expect(typed).toEqual(["camp_meeting", "man_camp", "music_festival", "womens_retreat"]);
     for (const entry of starterEventTemplates.filter((item) => item.audience === "CLUB")) {
       expect(starterPayload(entry).attendeeTypes).toEqual([]);
     }
