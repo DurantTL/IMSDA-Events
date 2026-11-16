@@ -157,6 +157,8 @@ The event journeys (attendee and event staff pages) and the club journeys (club 
 
 ## Coverage after release 1 (#1596 ledger)
 
+The final gate consolidates these rows, and the per-issue notes in `docs/redesign-coverage/`, into one matrix of every staff page: `docs/REDESIGN-STAFF-COVERAGE.md`.
+
 Pages finished after the release-1 merge, one row per page, added by each child's PR. Browser checks ran on a seeded local database with synthetic data, signed in as the seeded system admin, at 1280 and 390 px.
 
 | Page | Issue | Where it lives | What changed | Browser check (1280 / 390) | Not checked, and why |

@@ -164,7 +164,7 @@ export function ClubDirectorsWorkspace({
           <p className="eyebrow">Club admins</p>
           <h2 translate="no">{club.name}</h2>
           <p>
-            {clubRoleText.DIRECTOR.name}, {clubRoleText.DEPUTY.name}, {clubRoleText.REGISTRAR.name}
+            {clubRoleText.DIRECTOR.name}, {clubRoleText.DEPUTY.name}, {clubRoleText.REGISTRAR.name}{" "}
             and {clubRoleText.REPORTER.name} sign in with their own attendee account.
             A {clubRoleText.DIRECTOR.name} or {clubRoleText.DEPUTY.name} can also give and remove the{" "}
             {clubRoleText.REGISTRAR.name} and {clubRoleText.REPORTER.name} roles themselves.

@@ -26,6 +26,7 @@ import { HomepageMinistriesEditor } from "@/components/homepage-ministries-edito
 import type { HomepageMinistry } from "@/modules/system-admin/homepage-ministries-domain";
 import type { EnvironmentStatus } from "@/modules/system-admin/environment-status";
 import type { PlatformSettingsRecord } from "@/modules/system-admin/platform-settings";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /** Who owns each group on this page, shown as a chip on the group's heading. */
 const settingOwnership = [
@@ -690,7 +691,7 @@ export function PlatformSettingsWorkspace({
           </button>
         </div>
         <p className="field-help">
-          Last changed {new Date(settings.updatedAt).toLocaleString()}
+          Last changed {formatInConferenceTime(settings.updatedAt, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
           {settings.updatedByName ? ` by ${settings.updatedByName}` : ""}.
         </p>
       </form>

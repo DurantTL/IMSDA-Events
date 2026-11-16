@@ -211,7 +211,6 @@ const allowed: Record<string, string> = {
 const PENDING = "pending #1445/#1435 merge; follow-up";
 const pendingOtherBuilds: Record<string, string> = {
   "app/(workspace)/check-in/passes/page.tsx": PENDING,
-  "app/(workspace)/more/health/page.tsx": PENDING,
   "components/asset-issue-desk.tsx": PENDING,
   "components/attendee-community-board.tsx": PENDING,
   "components/cancellation-policy-workspace.tsx": PENDING,
@@ -221,7 +220,6 @@ const pendingOtherBuilds: Record<string, string> = {
   "components/finance-workspace.tsx": PENDING,
   "components/import-workspace.tsx": PENDING,
   "components/lodging-assignments-panels.tsx": PENDING,
-  "components/platform-settings-workspace.tsx": PENDING,
   "components/public-lodging-assignment.tsx": PENDING,
   "components/registration-meals-history.tsx": PENDING,
   "components/registration-notes-tags-panel.tsx": PENDING,

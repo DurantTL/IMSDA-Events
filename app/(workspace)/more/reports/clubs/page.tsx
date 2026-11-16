@@ -149,7 +149,7 @@ export default async function ClubEventReportsPage({
         {reports.camping.length === 0 ? <p className="report-empty">No active club registrations yet.</p> : (
           <div className="report-table-wrap">
             {campingSorting.order.key && <SortOrderNote>{sortLine(campingSorting.order)}</SortOrderNote>}
-            <table role="table" className="report-table table-cards">
+            <table role="table" className="report-table table-cards table-cards-max">
               <caption className="sr-only">Club camping summary</caption>
               <thead role="rowgroup">
                 <tr role="row">
