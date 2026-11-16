@@ -264,7 +264,7 @@ export function clubHonorsEmptyState(allRows: readonly ClubHonorsRow[], visibleR
 export const clubHonorsEmptyCopy: Record<ClubHonorsEmptyState, string> = {
   NO_MEMBERS: "No members on the roster yet — add them on the Roster page first.",
   NO_HONORS: "No honors recorded yet. Tick the names above, then choose Record honor.",
-  NO_MATCH: "No one matches these filters.",
+  NO_MATCH: "No people match these filters.",
 };
 
 /**

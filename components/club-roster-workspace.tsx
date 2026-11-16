@@ -1108,7 +1108,7 @@ function ClubRosterWorkspaceInner({
             canCreate
             className="empty-state public-manage-empty"
             icon={<Search size={17} aria-hidden="true" />}
-            title={complianceFilterOn && !query.trim() && !detailsOnly ? "No one matches this filter" : "No one matches these filters"}
+            title={complianceFilterOn && !query.trim() && !detailsOnly ? "No one matches this filter" : "No people match these filters"}
           >
             {complianceFilterOn
               ? "Clear the filters, or choose a different Sterling Volunteers filter, to see the rest of the roster."

@@ -331,6 +331,9 @@ export async function checkPage(page: Page, rec: Recorder, name: string, options
 
 /* ------------------------------------------------------------ search */
 
+/** The wording the S4 check accepts as a "no match" line (tests/search-no-match-copy-2025.test.ts keeps the staff pages on it). */
+export const NO_MATCH_LINE = /\b(no (?:\w+ )*(?:results?|matches|clubs?|guides?|items?|people|forms?|events?) (?:found|match)|no (?:results?|matches)|nothing (?:found|matches)|none of them match|0 (?:results?|matches|of \d+)|not found)\b/i;
+
 /** S1, S2, S4: typing narrows with no Enter, and clearing brings the whole list back. */
 export async function checkSearchBoxes(page: Page, rec: Recorder, name: string) {
   const boxes = page.locator('input[type="search"], .search-field input, [role="searchbox"]');
@@ -365,7 +368,7 @@ export async function checkSearchBoxes(page: Page, rec: Recorder, name: string) 
     await box.pressSequentially("zzqx-no-match-zz", { delay: 15 });
     // Narrowing means fewer lines of results than before, or a no-match message that was not there before; a different
     // line somewhere (a counter, an echo of the typed text) is not narrowing.
-    const noMatch = /\b(no (?:\w+ )*(?:results?|matches|clubs?|guides?|items?|people|forms?|events?) (?:found|match)|no (?:results?|matches)|nothing (?:found|matches)|none of them match|0 (?:results?|matches|of \d+)|not found)\b/i;
+    const noMatch = NO_MATCH_LINE;
     const baselineCount = baseline.split("\n").length;
     const narrowed = await pollPage<string>(page, read, (text) => text.split("\n").length < baselineCount || (noMatch.test(text) && !noMatch.test(baseline)), 5_000);
     rec.record(name, "S4", `${what} (typing narrows, no Enter)`, narrowed.ok ? "pass" : "fail", narrowed.ok ? "fewer results (or a no-match message) while typing" : "typing a string that matches nothing did not narrow the results or show a no-match message without pressing Enter");

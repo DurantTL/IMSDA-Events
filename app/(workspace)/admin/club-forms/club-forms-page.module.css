@@ -1,0 +1,11 @@
+/* Edit and Turn on / Turn off sit side by side on one line in each row of the form definitions table (#2025). */
+.rowActions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rowActions > * {
+  white-space: nowrap;
+}
