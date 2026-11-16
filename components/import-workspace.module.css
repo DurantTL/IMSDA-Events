@@ -1,0 +1,2 @@
+/* The Help button sits in the header's actions row with no margin of its own (same as the Registrations header). */
+.helpSlot.helpSlot > * { margin: 0; }

@@ -20,8 +20,9 @@ import {
 import { listRegistrations } from "@/modules/registrations/repository";
 import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 
-export const metadata: Metadata = { title: "Duplicate finder" };
+export const metadata: Metadata = { title: "Find duplicates" };
 
 function ConfidenceChip({ confidence }: { confidence: DuplicateMatchConfidence }) {
   return (
@@ -44,11 +45,14 @@ export default async function DuplicateFinderPage({
   const { event, permissions } = await resolveEventContext(query.event);
   if (!permissions.includes("VIEW_SENSITIVE_DATA")) {
     return (
-      <AccessRestricted
+      <>
+        <PageHeader title="Find duplicates" />
+        <AccessRestricted
         title="The duplicate finder is restricted"
         detail="Reviewing possible duplicates means reading attendee names and contact details, which your event role does not include."
         whoToAsk="your event administrator"
       />
+      </>
     );
   }
 
@@ -59,17 +63,10 @@ export default async function DuplicateFinderPage({
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Registration integrity</p>
-          <h2>Duplicate finder</h2>
-          <p>
-            People and registrations that look like the same person entered
-            more than once for {event.name}. Nothing here is changed
-            automatically — open a registration to decide what should happen.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Find duplicates"
+        description={<>People and registrations for {event.name} that look like the same person entered more than once. Nothing here is changed automatically; open a registration to decide what should happen.</>}
+      />
 
       <section className="finance-summary" aria-label="Duplicate scan summary">
         <article className="finance-stat">
@@ -104,7 +101,6 @@ export default async function DuplicateFinderPage({
         <section className="panel duplicate-section">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Same person, more than once</p>
               <h2>{report.attendeeGroups.length} attendee match{report.attendeeGroups.length === 1 ? "" : "es"}</h2>
             </div>
           </div>
@@ -153,7 +149,6 @@ export default async function DuplicateFinderPage({
         <section className="panel duplicate-section">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">One contact, several registrations</p>
               <h2>{report.registrationGroups.length} contact match{report.registrationGroups.length === 1 ? "" : "es"}</h2>
             </div>
           </div>

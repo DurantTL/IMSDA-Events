@@ -46,7 +46,12 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
   const { event, permissions } = await resolveEventContext(requestedEvent);
   // Same gate as the registrations list.
   if (!permissions.includes("VIEW_SENSITIVE_DATA")) {
-    return <AccessRestricted title="The attendee list is restricted" detail="Your event role does not include access to attendee names, meal and dietary answers, or contact details." whoToAsk="your event administrator" />;
+    return (
+      <>
+        <PageHeader title={staffPageTitles.attendeeList} />
+        <AccessRestricted title="The attendee list is restricted" detail="Your event role does not include access to attendee names, meal and dietary answers, or contact details." whoToAsk="your event administrator" />
+      </>
+    );
   }
   const clubEvent = await isClubAudienceEvent(event.id);
   // Club registrations stay Submitted (billed to the church), so a club event starts with Submitted too (#2017).

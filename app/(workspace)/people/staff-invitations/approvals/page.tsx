@@ -5,8 +5,9 @@ import { StaffApprovalQueue } from "@/components/staff-approval-queue";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listApprovals } from "@/modules/staff-invitations/repository";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
+import { PageHeader } from "@/components/page-header";
 
-export const metadata: Metadata = { title: "Staff registrations waiting for approval" };
+export const metadata: Metadata = { title: "Staff approvals" };
 
 /**
  * The registrations made through personal staff, pastor and volunteer links (#804). They arrive waiting for the office and are
@@ -17,35 +18,36 @@ export default async function StaffApprovalsPage({ searchParams }: { searchParam
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_REGISTRATION")) {
     return (
-      <AccessRestricted
+      <>
+        <PageHeader title="Staff approvals" />
+        <AccessRestricted
         title="Staff registrations are restricted"
         detail="Only event administrators and registration managers can approve staff, pastor and volunteer registrations."
         whoToAsk="your event administrator"
       />
+      </>
     );
   }
   if (event.audience !== "GENERAL") {
     return (
-      <NotAvailableForEvent reason="Personal staff, pastor and volunteer links are for events that are open to everyone." />
+      <>
+        <PageHeader title="Staff approvals" />
+        <NotAvailableForEvent reason="Personal staff, pastor and volunteer links are for events that are open to everyone." />
+      </>
     );
   }
   const approvals = await listApprovals(event.id);
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Registration</p>
-          <h2>Staff registrations waiting for approval</h2>
-          <p>
-            People who registered for {event.name} through their personal link. Until you approve a registration it is not confirmed and is
-            in no count, report or room list. Approve them together when you assign housing. Their price is $0, and approving covers every
-            person&rsquo;s meals under the conference-paid plan.
-          </p>
-        </div>
-        <div className="page-intro-actions">
-          <Link className="secondary-button" href={`/people/staff-invitations?event=${encodeURIComponent(event.id)}`}>Back to the invite list</Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Staff approvals"
+        description={<>People who registered for {event.name} through their personal link; until you approve a registration it is not confirmed and is in no count, report or room list.</>}
+        secondary={<Link className="secondary-button" href={`/people/staff-invitations?event=${encodeURIComponent(event.id)}`}>Back to the invite list</Link>}
+      />
+      <p className="quiet-copy">
+        Approve them together when you assign housing. Their price is $0, and approving covers every person&rsquo;s meals under the
+        conference-paid plan.
+      </p>
       <StaffApprovalQueue counts={approvals.counts} eventId={event.id} rows={approvals.rows} />
     </section>
   );

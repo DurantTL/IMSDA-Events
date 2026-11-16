@@ -4,6 +4,7 @@ import { ExportLink } from "@/components/export-link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Download } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { reviewKindLabels, type ReviewKind } from "@/modules/guardian-authority/domain";
 import type { GuardianReview, GuardianReviewItem } from "@/modules/guardian-authority/repository";
@@ -114,22 +115,12 @@ export function ResponsibleAdultReview({ eventId, review, canEdit, canExport }: 
   const minorSort = useTableSort(review.minors, MINOR_SORT, "minors");
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Registration hub</p>
-          <h2 className="duplicate-page-title">Responsible adults</h2>
-          <p>
-            A minor is a person under {review.event.ageOfMajority} on the event’s first day ({review.event.startDate}). The
-            responsible adult is whoever the registrant chose on the form, or whoever staff set here. Nothing is guessed from
-            a household, surname, email or the account holder, and this gives no access to health or other registration records.
-          </p>
-        </div>
-        {canExport && (
-          <div className="intro-actions">
-            <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(eventId)}/exports/responsible-adults`}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title="Responsible adults"
+        description={<>A minor is a person under {review.event.ageOfMajority} on the event’s first day ({review.event.startDate}); the responsible adult is whoever the registrant chose on the form, or whoever staff set here.</>}
+        secondary={canExport ? <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(eventId)}/exports/responsible-adults`}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink> : undefined}
+      />
+      <p className="quiet-copy">Nothing is guessed from a household, surname, email or the account holder, and this gives no access to health or other registration records.</p>
 
       <section className="panel" aria-labelledby="guardian_needs_review">
         <h3 id="guardian_needs_review">Needs review ({needing.length})</h3>
