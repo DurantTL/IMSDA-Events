@@ -843,7 +843,6 @@ export async function findEventSlug(eventId: string) {
   return event?.slug ?? null;
 }
 
-/** Whether the event is for clubs (CLUB audience). Unknown events read as not a club event. */
 /**
  * Whether the event's registrations are billed after the event (#2017, #2031): a club event, or a general event billed to
  * a church or school (`DEFERRED_ORGANIZATION_INVOICE`, such as Outdoor School or the Music Festival). Nothing is paid
@@ -858,6 +857,7 @@ export async function isBilledLaterEvent(eventId: string) {
   return event?.audience === "CLUB" || event?.billingMode === "DEFERRED_ORGANIZATION_INVOICE";
 }
 
+/** Whether the event is for clubs (CLUB audience). Unknown events read as not a club event. */
 export async function isClubAudienceEvent(eventId: string) {
   const event = await getPrisma().event.findUnique({
     where: { id: eventId },

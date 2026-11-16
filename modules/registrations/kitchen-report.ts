@@ -37,9 +37,9 @@ export type KitchenReport = {
   needs: Array<{ answer: string; count: number }>;
   /** People with at least one dietary need. */
   peopleWithNeeds: number;
-  /** People counted (confirmed attendees, and submitted ones on a club event). */
+  /** People counted (confirmed attendees, and submitted ones on a billed-later event). */
   totalPeople: number;
-  /** Whether Submitted registrations are counted too (a club event, #2017). */
+  /** Whether Submitted registrations are counted too (a billed-later event, #2017, #2031). */
   includesSubmitted: boolean;
   /**
    * How many of them registered through a personal staff, pastor or volunteer invitation (#804): their meals are covered by

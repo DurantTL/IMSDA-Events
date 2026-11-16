@@ -39,7 +39,7 @@ export type StarterEventTemplate = {
   generalRegistrationLink?: boolean;
   /** Attendee types created on the new event, with the age ranges messaging needs (#1403). GENERAL starters only. */
   attendeeTypes?: readonly TemplateAttendeeType[];
-  /** Replaces the generated description, for a starter whose form carries no prices and whose set-up the generic text does not describe. */
+  /** Replaces the generated description, for a starter whose set-up the generic text does not describe; it must then name any prices the form carries itself. */
   description?: string;
 };
 
