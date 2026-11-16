@@ -1549,7 +1549,7 @@ export function CommunicationsWorkspace({
               label: (
                 <>
                   <Icon aria-hidden="true" size={17} /> {label}
-                  {id === "deliveries" && messaging && <span>{Object.values(messaging.counts).reduce((sum, count) => sum + count, 0)}</span>}
+                  {id === "deliveries" && messaging && <span className="count-badge">{Object.values(messaging.counts).reduce((sum, count) => sum + count, 0)}</span>}
                 </>
               ),
             }))}

@@ -20,6 +20,9 @@ const statusLabel = {
   unknown: "Could not check",
 } as const;
 
+/** The shared chip's color for each automatic state (L4): grey is for information, never OK. */
+const statusTone = { ok: "green", attention: "coral", info: "neutral", unknown: "neutral" } as const;
+
 function formatDate(iso: string) {
   return formatInConferenceTime(iso, { dateStyle: "medium", timeStyle: "short" });
 }
@@ -156,7 +159,7 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
             <li className={styles.row} key={row.key}>
               <div className={styles.head}>
                 <p className={styles.title}>{row.title}</p>
-                <span className={`${styles.badge} ${styles[row.status]}`}>{statusLabel[row.status]}</span>
+                <span className={`status-chip ${statusTone[row.status]}`}>{statusLabel[row.status]}</span>
               </div>
               <p className={styles.detail}>{row.summary}</p>
               {row.people.length > 0 && (
@@ -186,7 +189,7 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
                   <div className={styles.head}>
                     <p className={styles.title}>{item.title}</p>
                     <span className={styles.headControls}>
-                      <span className={`${styles.badge} ${item.tick ? styles.ok : styles.unknown}`}>
+                      <span className={`status-chip ${item.tick ? "green" : "neutral"}`}>
                         {!readiness.ticksAvailable ? "Could not read ticks" : item.tick ? "Ticked" : "Not ticked"}
                       </span>
                       {!isOpen && readiness.ticksAvailable ? (

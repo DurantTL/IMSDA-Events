@@ -47,3 +47,29 @@ describe("a record waiting for approval says the approved word (B12, #1506)", ()
     expect(read("app/(public)/account/(portal)/registrations/page.tsx")).toContain('<span className="count-badge">({counts[key]})</span>');
   });
 });
+
+describe("staff pages moved to the shared chip and count badge (L4, #2025)", () => {
+  it("no longer keeps their own chip looks", () => {
+    expect(read("components/system-readiness-workspace.tsx")).toContain("`status-chip ${statusTone[row.status]}`");
+    expect(read("components/system-readiness-workspace.module.css")).not.toMatch(/^\.(badge|ok|attention|info|unknown) /m);
+    expect(read("components/environment-status-panel.tsx")).toContain("status-chip ${statusTone[");
+    expect(read("app/globals.css")).not.toMatch(/^\.(environment-status-badge|schedule-chip)/m);
+    for (const file of ["components/honors-schedule-board.tsx", "components/honors-schedule-agenda.tsx"]) {
+      expect(read(file), file).not.toContain("schedule-chip");
+      expect(read(file), file).toContain("status-chip");
+    }
+  });
+
+  it("shows the calendar and communications tab counts in the count badge", () => {
+    expect(read("components/calendar-admin-workspace.tsx").match(/<span className="count-badge">/g)).toHaveLength(4);
+    expect(read("components/communications-workspace.tsx")).toContain('<span className="count-badge">{Object.values(messaging.counts)');
+    expect(read("app/globals.css")).not.toMatch(/\.communications-tabs button > span \{/);
+  });
+
+  it("records the two reviewed exceptions (L14) and teaches the L4 check to skip them", () => {
+    expect(read("docs/SITE-RULES.md")).toMatch(/\| L14 \| Exceptions to L4/);
+    expect(read("scripts/support/site-rule-checks.ts")).toContain("REVIEWED_OWN_CHIP = /badge-print|badge-sheet|badge-label|adminBadge/");
+    expect(read("app/(workspace)/admin/page.tsx")).toContain("styles.adminBadge");
+    expect(read("app/(workspace)/check-in/badges/page.tsx")).toContain("badge-print-page");
+  });
+});

@@ -9,6 +9,9 @@ const statusText: Record<EnvironmentStatusValue, string> = {
   unavailable: "Unavailable right now",
 };
 
+/** The shared chip's color for each state (L4): a blank value is gold, an unreadable one grey. */
+const statusTone = { configured: "green", "not-configured": "gold", unknown: "neutral" } as const;
+
 /**
  * Environment-managed provider status (#1258): a read-only list of what the server environment has set. There is no
  * input here and no value: the server sends only a status and the names of blank variables. It is labelled as
@@ -26,7 +29,7 @@ export function EnvironmentStatusPanel({ status }: { status: EnvironmentStatus }
         {status.services.map((service) => (
           <li key={service.id} data-environment-service={service.id} data-status={service.status}>
             <span className="environment-status-name">{service.label}</span>
-            <span className={`environment-status-badge is-${service.status === "not-separate" || service.status === "unavailable" ? "not-configured" : service.status}`}>{statusText[service.status]}</span>
+            <span className={`status-chip ${statusTone[service.status === "not-separate" || service.status === "unavailable" ? "not-configured" : service.status]}`}>{statusText[service.status]}</span>
             {service.status === "not-configured" && service.missing.length > 0 && (
               <small className="environment-status-missing">Blank: {service.missing.join(", ")}</small>
             )}

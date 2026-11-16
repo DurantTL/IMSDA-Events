@@ -42,30 +42,6 @@
   color: var(--muted, #5b6470);
 }
 
-.badge {
-  flex: 0 0 auto;
-  border-radius: var(--radius-pill);
-  padding: 3px 10px;
-  font-size: max(var(--type-staff-floor, 0px), 0.75rem);
-  font-weight: 700;
-}
-
-.ok {
-  background: var(--green-soft);
-  color: var(--green);
-}
-
-.attention {
-  background: var(--coral-soft);
-  color: var(--coral);
-}
-
-.info,
-.unknown {
-  background: var(--surface-muted, #eef0f3);
-  color: var(--muted, #5b6470);
-}
-
 .people {
   margin: 0;
   padding-left: 18px;

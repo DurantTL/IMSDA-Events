@@ -5667,7 +5667,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 .communications-tabs button { display: inline-flex; min-height: 38px; align-items: center; gap: 7px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; padding: 8px 11px; font: inherit; font-size: max(var(--type-body-floor, 0px), 0.66rem); font-weight: 800; }
 .communications-tabs button:hover { border-color: var(--line); background: white; color: var(--imsda-navy); }
 .communications-tabs button.active { border-color: #b7ced8; background: var(--imsda-navy-soft); color: var(--imsda-navy); }
-.communications-tabs button > span { display: grid; min-width: 19px; height: 19px; place-items: center; border-radius: 999px; background: white; color: var(--imsda-purple); padding: 0 5px; font-size: max(var(--type-floor, 0px), 0.54rem); }
+/* The tab's count is the shared `.count-badge`; only its size is trimmed to fit the tab (L4, #2025). */
+.communications-tabs button > .count-badge { min-width: 19px; justify-content: center; padding: 2px 8px; }
 
 .reminder-workspace { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.55fr); align-items: start; gap: 13px; }
 .reminder-preview-panel { overflow: hidden; border-top: 4px solid var(--imsda-navy); padding: 0; }
@@ -11487,10 +11488,6 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .schedule-clash { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 0; color: var(--ink); font-size: max(var(--type-floor, 0px), 0.7rem); }
 .schedule-teacher { color: var(--muted); }
 .schedule-clash { align-items: flex-start; color: #8a2d1f; font-weight: 700; }
-.schedule-chip { display: inline-flex; align-items: center; gap: 3px; border: 1px solid var(--line); border-radius: 999px; background: #fff; padding: 1px 8px; color: var(--ink); font-size: max(var(--type-floor, 0px), 0.66rem); font-weight: 800; }
-.schedule-chip.is-nearly { border-color: #d9a21b; background: #fff1cc; color: #5c4200; }
-.schedule-chip.is-full { border-color: #c2402d; background: #fde3df; color: #7a1d10; }
-.schedule-chip.is-clash { border-color: #c2402d; background: #fde3df; color: #7a1d10; }
 .schedule-move,
 .schedule-here { min-height: 44px; justify-content: center; }
 .schedule-here { width: 100%; }
@@ -13292,10 +13289,6 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .environment-status-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .environment-status-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .environment-status-name { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
-.environment-status-badge { border: 1px solid #d7dee2; border-radius: 999px; padding: 2px 10px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-.environment-status-badge.is-configured { border-color: #b8d7ca; background: #eef8f2; color: #1c6b4a; }
-.environment-status-badge.is-not-configured { border-color: #ddcd9e; background: var(--imsda-gold-soft); color: #6f5316; }
-.environment-status-badge.is-unknown { border-color: #cfd6dc; background: #f1f4f6; color: #3d4852; }
 .environment-status-missing { flex-basis: 100%; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
 .email-health-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .message-file-storage-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }

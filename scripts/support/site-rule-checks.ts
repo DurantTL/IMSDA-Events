@@ -793,9 +793,16 @@ export async function checkErroredFocus(page: Page, rec: Recorder, name: string,
   rec.record(name, "L3", "an errored focused field keeps the red border and the ring", (borderRed || shadowRed) && ring ? "pass" : "fail", `border ${look.border} (${borderRed ? "red" : "not red"}), shadow ${look.shadow} (${shadowRed ? "red line" : "no red line"}), outline ${look.outline} ${look.color} at ${look.offset}`);
 }
 
+/**
+ * Reviewed own looks for L4 (docs/SITE-RULES.md, L4 exceptions, #2025): the name badges the check-in desk prints (`badge-print-*`,
+ * `badge-sheet*`, `badge-label-*`: the physical badge, not a status) and the System administrator role label on the dark
+ * System administration hero (`adminBadge`, white on navy, a role and not a record status).
+ */
+const REVIEWED_OWN_CHIP = /badge-print|badge-sheet|badge-label|adminBadge/;
+
 /** L4: status chips and badges use the shared `.status-chip` and `.count-badge`; filter counts use the count badge. */
 export async function checkChipsAndBadges(page: Page, rec: Recorder, name: string) {
-  const scan = await page.evaluate(() => {
+  const scan = await page.evaluate((reviewed: string) => {
     const visible = (element: Element) => { const box = element.getBoundingClientRect(); return box.width > 0 && box.height > 0; };
     const words = (value: string) => value.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z]+/);
     const shared = (element: Element) => element.matches(".status-chip, .count-badge") || Boolean(element.closest(".status-chip, .count-badge")) || Boolean(element.querySelector(".status-chip, .count-badge"));
@@ -803,7 +810,9 @@ export async function checkChipsAndBadges(page: Page, rec: Recorder, name: strin
       if (element.closest("svg, script, style, nav.skip-links") || !visible(element) || shared(element)) return false;
       const text = (element.textContent ?? "").replace(/\s+/g, " ").trim();
       if (text.length === 0 || text.length > 40 || element.children.length > 2) return false;
-      const classes = String((element as HTMLElement).className || "").split(/\s+/).flatMap((token) => words(token));
+      const className = String((element as HTMLElement).className || "");
+      if (new RegExp(reviewed).test(className)) return false;
+      const classes = className.split(/\s+/).flatMap((token) => words(token));
       return classes.some((word) => ["pill", "chip", "badge"].includes(word));
     }).map((element) => `${element.tagName.toLowerCase()}.${String((element as HTMLElement).className).split(/\s+/)[0]} "${(element.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 30)}"`);
     const filterLinks = [...document.querySelectorAll('nav[aria-label*="Show" i] a, nav[aria-label*="Filter" i] a, [role="tab"]')].filter(visible);
@@ -812,7 +821,7 @@ export async function checkChipsAndBadges(page: Page, rec: Recorder, name: strin
       return count ? [{ label: (link.textContent ?? "").replace(/\s+/g, " ").trim(), shared: count.matches(".count-badge") || Boolean(count.closest(".count-badge")), cls: String((count as HTMLElement).className) }] : [];
     });
     return { own: [...new Set(own)], counted };
-  });
+  }, REVIEWED_OWN_CHIP.source);
   if (scan.own.length === 0) rec.record(name, "L4", "chips and badges use the shared classes", "n/a", "no chip, pill or badge on this page outside the shared ones");
   else rec.record(name, "L4", "chips and badges use the shared classes", "fail", `own chip look instead of .status-chip / .count-badge: ${scan.own.slice(0, 8).join("; ")}`, [...new Set(scan.own.map((entry: string) => entry.replace(/ ".*$/, "")))] as string[]);
   if (scan.counted.length === 0) rec.record(name, "L4", "filter counts use the count badge", "n/a", "no filter with counts on this page");
