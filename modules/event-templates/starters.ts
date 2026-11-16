@@ -39,7 +39,7 @@ export type StarterEventTemplate = {
   generalRegistrationLink?: boolean;
   /** Attendee types created on the new event, with the age ranges messaging needs (#1403). GENERAL starters only. */
   attendeeTypes?: readonly TemplateAttendeeType[];
-  /** Replaces the generated description, for a starter whose form carries no prices and whose set-up the generic text does not describe. */
+  /** Replaces the generated description, for a starter whose set-up the generic text does not describe; it must then name any prices the form carries itself. */
   description?: string;
 };
 
@@ -60,6 +60,13 @@ const ageGroupAttendeeTypes: readonly TemplateAttendeeType[] = [
   { code: "ADULT", label: "Adult", description: "", sortOrder: 0, isActive: true, minimumAge: 18, maximumAge: null },
   { code: "YOUTH", label: "Youth", description: "", sortOrder: 1, isActive: true, minimumAge: 13, maximumAge: 17 },
   { code: "CHILD", label: "Child", description: "", sortOrder: 2, isActive: true, minimumAge: null, maximumAge: 12 },
+];
+
+/** The Music Festival (#2031) prices and shows questions by these types. Their age ranges are unknown, so they have none. */
+const musicFestivalAttendeeTypes: readonly TemplateAttendeeType[] = [
+  { code: "STUDENT_DORM", label: "Student, staying on campus", description: "", sortOrder: 0, isActive: true, minimumAge: null, maximumAge: null },
+  { code: "STUDENT_DAY", label: "Student, not staying in the dorm", description: "", sortOrder: 1, isActive: true, minimumAge: null, maximumAge: null },
+  { code: "TEACHER_SPONSOR", label: "Teacher / sponsor", description: "", sortOrder: 2, isActive: true, minimumAge: null, maximumAge: null },
 ];
 
 /**
@@ -125,6 +132,11 @@ export const starterEventTemplates: readonly StarterEventTemplate[] = [
   {
     starterKey: "outdoor_school", name: "Outdoor School", formTemplateKey: "outdoor_school", audience: "GENERAL", billingMode: "DEFERRED_ORGANIZATION_INVOICE", collectsShirtSizes: false, checksAdultBackgrounds: false,
     note: "A school registers its students and is billed after the event, so nothing is paid online.",
+  },
+  {
+    starterKey: "music_festival", name: "Iowa-Missouri Music Festival", formTemplateKey: "music_festival", audience: "GENERAL", billingMode: "DEFERRED_ORGANIZATION_INVOICE", collectsShirtSizes: false, checksAdultBackgrounds: false,
+    attendeeTypes: musicFestivalAttendeeTypes,
+    description: "Starter set: created from the built-in \"Iowa-Missouri Music Festival\" form (music_festival). A school registers its students and teachers or sponsors, and is billed after the event, so nothing is paid online. The form prices each person by attendee type: $50 for a student staying on campus, $40 for a student not staying in the dorm and $0 for a teacher or sponsor. Review those prices before publishing. Choose Thursday, April 8 to Saturday, April 10, 2027 as the event dates and enter Sunnydale Academy as the location when you create the event. No registration deadline is set. The attendee types have no age ranges, so add them if scheduled email needs them. This template sets no capacity.",
   },
   {
     starterKey: "hispanic_institute", name: "Hispanic Institute of Evangelism", formTemplateKey: "hispanic_institute", audience: "GENERAL", billingMode: "ATTENDEE_PAY", collectsShirtSizes: false, checksAdultBackgrounds: false, hostedPaymentLink: true,

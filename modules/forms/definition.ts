@@ -1000,7 +1000,7 @@ const manCampRegistrationPackages = [
 ];
 
 /**
- * Women's Retreat, Camp Meeting and Spring Camporee are seeded data (#153), not
+ * Women's Retreat, Camp Meeting, Spring Camporee and Music Festival are seeded data (#153), not
  * source: their definitions live in `prisma/seed-data/form-templates/` and are
  * synced into the `SeededFormTemplate` table by `npm run form-templates:sync`.
  * This file keeps the types, validation and generic behavior only. The bundled
@@ -1766,6 +1766,7 @@ formTemplates.splice(
   leadershipWeekendTemplate,
   tltRetreatTemplate,
   outdoorSchoolTemplate,
+  seededFormTemplate("music_festival"),
   hispanicInstituteTemplate,
   tltOpportunitiesTemplate,
   buildYearNominationTemplate("Pathfinder"),

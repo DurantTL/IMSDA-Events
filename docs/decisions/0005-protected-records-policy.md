@@ -1206,7 +1206,11 @@ issue #787, from the Communication Director's decision of 2026-10-05.
   left out. Confirmed registrations only, except on a club-audience event,
   where Submitted and Confirmed registrations are counted (Caleb, Nov 15, 2026,
   #2017): club registrations are billed to the church and stay Submitted. The
-  Attendee list uses the same rule. There are no names, confirmation
+  same holds for a general event billed to a church or school after the event
+  (billing mode `DEFERRED_ORGANIZATION_INVOICE`, for example the Music
+  Festival; PM relay of Caleb's answer, Nov 16, 2026, #2031). The Attendee
+  list uses the same rule. Who may read dietary text is unchanged and still
+  follows the club-audience rule. There are no names, confirmation
   codes, contact details, churches or clubs, and no answer links to a person.
 - **Who sees it.** Event staff holding `VIEW_REPORTS`, without needing
   `VIEW_SENSITIVE_DATA` or `VIEW_HEALTH_INFORMATION`, and Area Coordinators on

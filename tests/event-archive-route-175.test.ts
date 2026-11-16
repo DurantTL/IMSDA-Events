@@ -9,6 +9,7 @@ const dependencies = vi.hoisted(() => ({
   findEventArchiveFacts: vi.fn(),
   listRegistrations: vi.fn(),
   isClubAudienceEvent: vi.fn(),
+  isBilledLaterEvent: vi.fn(),
   listNotesForRegistration: vi.fn(),
   writeAuditLog: vi.fn(),
   listInformationForms: vi.fn(),
@@ -19,7 +20,7 @@ const dependencies = vi.hoisted(() => ({
 }));
 
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: dependencies.getCurrentSession }));
-vi.mock("@/modules/events/repository", () => ({ findActiveMembership: dependencies.findActiveMembership, findEventSlug: vi.fn(async () => "synthetic-camp"), isClubAudienceEvent: dependencies.isClubAudienceEvent }));
+vi.mock("@/modules/events/repository", () => ({ findActiveMembership: dependencies.findActiveMembership, findEventSlug: vi.fn(async () => "synthetic-camp"), isClubAudienceEvent: dependencies.isClubAudienceEvent, isBilledLaterEvent: dependencies.isBilledLaterEvent }));
 vi.mock("@/modules/events/archive-download-facts", () => ({ findEventArchiveFacts: dependencies.findEventArchiveFacts }));
 vi.mock("@/modules/event-locations/filter", () => ({ resolveLocationFilter: vi.fn(async () => ({ locations: [], locationId: null, selected: null })), locationParam: () => null }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: dependencies.listRegistrations }));
@@ -79,6 +80,7 @@ beforeEach(() => {
   dependencies.findEventArchiveFacts.mockResolvedValue(closed);
   dependencies.listRegistrations.mockResolvedValue([registration]);
   dependencies.isClubAudienceEvent.mockResolvedValue(false);
+  dependencies.isBilledLaterEvent.mockResolvedValue(false);
   dependencies.listNotesForRegistration.mockResolvedValue([{ body: "synthetic health note" }]);
   dependencies.listInformationForms.mockResolvedValue([{ id: "f1", purpose: null }, { id: "f2", purpose: "DEBRIEF" }]);
   dependencies.buildInformationFormResponsesCsv.mockResolvedValue({ csv: '"Submitted at"\r\n"2026-10-02"\r\n', filename: "survey-responses.csv", rowCount: 1 });
@@ -129,10 +131,23 @@ describe("event archive download route (#175)", () => {
     expect(dependencies.listRegistrations).toHaveBeenCalledWith("evt", { statuses: ["CONFIRMED"] });
     vi.clearAllMocks();
     dependencies.isClubAudienceEvent.mockResolvedValue(true);
+    dependencies.isBilledLaterEvent.mockResolvedValue(true);
     dependencies.listRegistrations.mockResolvedValue([{ ...registration, status: "SUBMITTED" }]);
     const { files } = await download();
     expect(dependencies.listRegistrations).toHaveBeenCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
     expect(files!.get("attendees.csv")!.trim().split("\r\n").length).toBeGreaterThan(1);
+  });
+
+  it("lists submitted attendees too on a general event billed to the school, still without dietary columns (#2031)", async () => {
+    sign(["VIEW_REPORTS", "VIEW_SENSITIVE_DATA", "VIEW_HEALTH_INFORMATION"]);
+    dependencies.isBilledLaterEvent.mockResolvedValue(true);
+    dependencies.listRegistrations.mockResolvedValue([{ ...registration, status: "SUBMITTED" }]);
+    const { files } = await download();
+    expect(dependencies.listRegistrations).toHaveBeenCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
+    const attendees = files!.get("attendees.csv")!;
+    expect(attendees.trim().split("\r\n").length).toBeGreaterThan(1);
+    expect(attendees).not.toContain("Dietary needs");
+    expect(attendees).not.toContain("peanut allergy synthetic");
   });
 
   it("leaves staff notes, dietary detail and health columns out even for a person who holds the health permission", async () => {

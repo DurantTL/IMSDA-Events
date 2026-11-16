@@ -10,10 +10,10 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/people",
 }));
 vi.mock("@/components/use-accessible-dialog", () => ({ useAccessibleDialog: () => ({ current: null }) }));
-const mocks = vi.hoisted(() => ({ resolveEventContext: vi.fn(), listRegistrations: vi.fn(), isClubAudienceEvent: vi.fn() }));
+const mocks = vi.hoisted(() => ({ resolveEventContext: vi.fn(), listRegistrations: vi.fn(), isClubAudienceEvent: vi.fn(), isBilledLaterEvent: vi.fn() }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: mocks.resolveEventContext }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: mocks.listRegistrations }));
-vi.mock("@/modules/events/repository", () => ({ isClubAudienceEvent: mocks.isClubAudienceEvent }));
+vi.mock("@/modules/events/repository", () => ({ isClubAudienceEvent: mocks.isClubAudienceEvent, isBilledLaterEvent: mocks.isBilledLaterEvent }));
 
 import AttendeeListingPage from "@/app/(workspace)/people/attendees/page";
 import { PeopleWorkspace } from "@/components/people-workspace";
@@ -39,6 +39,7 @@ describe("/people/attendees empty states", () => {
     mocks.resolveEventContext.mockResolvedValue({ event: { id: "evt 1", name: "Synthetic Event" }, permissions: ["VIEW_SENSITIVE_DATA"] });
     mocks.listRegistrations.mockResolvedValue([]);
     mocks.isClubAudienceEvent.mockResolvedValue(false);
+    mocks.isBilledLaterEvent.mockResolvedValue(false);
     return renderToStaticMarkup(await AttendeeListingPage({ searchParams: Promise.resolve(params) }));
   };
 

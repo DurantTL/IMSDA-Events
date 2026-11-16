@@ -217,6 +217,7 @@ describe("field resolution over the built-in templates", () => {
     leadership_weekend: { dietary: "dietary_needs", allergy: "food_allergies", church: "church_name", churchOther: "church_name_other" },
     tlt_retreat: { dietary: "dietary_needs", allergy: "food_allergies" },
     outdoor_school: { dietary: "dietary_needs" },
+    music_festival: { dietary: "dietary_needs" },
     hispanic_institute: { church: "church_name", churchOther: "church_name_other" },
     tlt_application: { meal: "meal_preference" },
     blank_club_form: { church: "church_name", churchOther: "church_name_other" },

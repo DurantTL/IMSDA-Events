@@ -13,7 +13,7 @@ import {
 } from "@/modules/event-templates/starters";
 import { formTemplates, getFormTemplate, registrationFormDefinitionSchema } from "@/modules/forms/definition";
 
-const wantedNames = ["Blank event", "Blank club event", "Women's Retreat", "Man Camp", "Spring Camporee", "Fall Camporee", "Camp Meeting", "Pathfinder Bible Experience", "Honors Weekend", "Pathfinder Leadership Weekend", "TLT Retreat", "Outdoor School", "Hispanic Institute of Evangelism"];
+const wantedNames = ["Blank event", "Blank club event", "Women's Retreat", "Man Camp", "Spring Camporee", "Fall Camporee", "Camp Meeting", "Pathfinder Bible Experience", "Honors Weekend", "Pathfinder Leadership Weekend", "TLT Retreat", "Outdoor School", "Iowa-Missouri Music Festival", "Hispanic Institute of Evangelism"];
 
 function fieldsOf(formKey: string) {
   const definition = getFormTemplate(formKey)!.definition;
@@ -21,7 +21,7 @@ function fieldsOf(formKey: string) {
 }
 
 describe("starter event templates (#546)", () => {
-  it("covers the two blank starters and the ten events with a form, with unique stable keys", () => {
+  it("covers the two blank starters and the eleven events with a form, with unique stable keys", () => {
     expect(starterEventTemplates.map((starter) => starter.name)).toEqual(wantedNames);
     expect(new Set(starterEventTemplates.map((starter) => starter.starterKey)).size).toBe(starterEventTemplates.length);
   });
@@ -49,7 +49,7 @@ describe("starter event templates (#546)", () => {
     expect(payload.moduleEnablement.autoPromoteWaitlist).toBe(false);
     expect(payload.messageTemplateDefaults).toEqual([]);
     // Only the general events carry attendee types (#1403): the age ranges messaging needs, nothing priced.
-    expect(payload.attendeeTypes.length > 0).toBe(["womens_retreat", "man_camp", "camp_meeting"].includes(starter.starterKey));
+    expect(payload.attendeeTypes.length > 0).toBe(["womens_retreat", "man_camp", "camp_meeting", "music_festival"].includes(starter.starterKey));
     // The Pathfinder Bible Experience (#809) also carries its team rules and registration deadline, and (#931) turns on the
     // general registration link.
     expect(Object.keys(payload).filter((key) => !["locations", "teamSettings", "registrationClosesOn", "generalRegistrationLink"].includes(key)).sort()).toEqual([
@@ -63,7 +63,7 @@ describe("starter event templates (#546)", () => {
 
   it("bills every CLUB starter to the church so directors can see the event (#565)", () => {
     // Church or school billing on a GENERAL event is allowed (#606): these individual and school-group starters take no online payment.
-    const generalChurchBilled = ["leadership_weekend", "outdoor_school"];
+    const generalChurchBilled = ["leadership_weekend", "outdoor_school", "music_festival"];
     for (const starter of starterEventTemplates) {
       const payload = parseEventTemplatePayload(starterPayload(starter));
       expect(starter.billingMode).toBe(starter.audience === "CLUB" || generalChurchBilled.includes(starter.starterKey) ? "DEFERRED_ORGANIZATION_INVOICE" : "ATTENDEE_PAY");
@@ -95,13 +95,16 @@ describe("starter event templates (#546)", () => {
       "Pathfinder Leadership Weekend": "GENERAL",
       "TLT Retreat": "GENERAL",
       "Outdoor School": "GENERAL",
+      "Iowa-Missouri Music Festival": "GENERAL",
       "Hispanic Institute of Evangelism": "GENERAL",
     });
   });
 
   it("turns shirt sizes on only when the form asks for a shirt size", () => {
     for (const starter of starterEventTemplates) {
-      const asksForShirt = fieldsOf(starter.formTemplateKey).some((field) => field.key === "shirt_size");
+      // The Music Festival (#2031) asks students for a shirt size, but the shirt-size confirmation checks every answer against
+      // the student sizes and would not cover a teacher's "No T-shirt, please", so that starter leaves the module off.
+      const asksForShirt = starter.starterKey !== "music_festival" && fieldsOf(starter.formTemplateKey).some((field) => field.key === "shirt_size");
       expect(starter.collectsShirtSizes, starter.name).toBe(asksForShirt);
     }
   });

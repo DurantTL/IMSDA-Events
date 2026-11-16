@@ -28,8 +28,8 @@ function canonical(value: unknown): unknown {
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
 
 describe("seeded form templates (#153)", () => {
-  it("lists exactly Women's Retreat, Camp Meeting and Spring Camporee, each with a positive integer version", () => {
-    expect([...seededFormTemplateKeys].sort()).toEqual(["camp_meeting_export", "spring_camporee_export", "womens_retreat_export"]);
+  it("lists exactly Women's Retreat, Camp Meeting, Spring Camporee and Music Festival, each with a positive integer version", () => {
+    expect([...seededFormTemplateKeys].sort()).toEqual(["camp_meeting_export", "music_festival", "spring_camporee_export", "womens_retreat_export"]);
     expect(new Set(seededFormTemplateKeys).size).toBe(seededFormTemplateKeys.length);
     for (const seed of bundledSeededFormTemplates) {
       expect(Number.isInteger(seed.version) && seed.version >= 1).toBe(true);

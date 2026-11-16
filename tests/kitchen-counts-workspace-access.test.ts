@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect, notFound: vi.fn(), useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
-vi.mock("@/modules/events/repository", () => ({ listEventsForUser: mocks.listEventsForUser, findActiveMembership: mocks.findActiveMembership, isClubAudienceEvent: vi.fn() }));
+vi.mock("@/modules/events/repository", () => ({ listEventsForUser: mocks.listEventsForUser, findActiveMembership: mocks.findActiveMembership, isClubAudienceEvent: vi.fn(), isBilledLaterEvent: vi.fn() }));
 // Page tests set `pageContext`; the real resolveEventContext is used by the others (see `realSelection`).
 vi.mock("@/modules/events/selection", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/modules/events/selection")>();

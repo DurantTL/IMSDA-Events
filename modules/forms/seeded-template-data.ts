@@ -1,6 +1,7 @@
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import campMeeting from "../../prisma/seed-data/form-templates/camp-meeting.json";
 import clubCamporee from "../../prisma/seed-data/form-templates/club-camporee.json";
+import musicFestival from "../../prisma/seed-data/form-templates/music-festival.json";
 import womensRetreat from "../../prisma/seed-data/form-templates/womens-retreat.json";
 
 /**
@@ -28,6 +29,7 @@ export const bundledSeededFormTemplates: readonly SeededFormTemplateSeed[] = [
   womensRetreat,
   clubCamporee,
   campMeeting,
+  musicFestival,
 ] as unknown as SeededFormTemplateSeed[];
 
 export const seededFormTemplateKeys: readonly string[] = bundledSeededFormTemplates.map((seed) => seed.key);

@@ -1,0 +1,391 @@
+{
+  "key": "music_festival",
+  "version": 1,
+  "name": "Iowa-Missouri Music Festival",
+  "description": "School and contact, music copies, a roster of students and teachers or sponsors priced by attendee type, lodging and Saturday sack suppers. The school is billed after the event.",
+  "audience": "School group",
+  "definition": {
+    "title": "Iowa-Missouri Music Festival registration",
+    "description": "Location: Sunnydale Academy. The school registers its students and teachers or sponsors, and is billed after the event.",
+    "confirmationMessage": "Your Iowa-Missouri Music Festival registration has been received. The school will be billed after the event.",
+    "attendeeRoster": {
+      "enabled": true,
+      "minAttendees": 1,
+      "maxAttendees": 50,
+      "attendeeLabel": "Student or teacher",
+      "addButtonLabel": "Add another student or teacher"
+    },
+    "sections": [
+      {
+        "id": "mf_school",
+        "title": "School & contact",
+        "description": "The school named here is billed after the festival.",
+        "fields": [
+          {
+            "id": "mf_school",
+            "key": "responsible_organization",
+            "label": "School name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "mf_contact",
+            "key": "contact_name",
+            "label": "Registering teacher or contact name",
+            "helpText": "First and last name.",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "mf_email",
+            "key": "email",
+            "label": "Contact email",
+            "helpText": "",
+            "type": "EMAIL",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "mf_phone",
+            "key": "phone",
+            "label": "Contact phone",
+            "helpText": "",
+            "type": "PHONE",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          }
+        ]
+      },
+      {
+        "id": "mf_music",
+        "title": "Music",
+        "description": "",
+        "fields": [
+          {
+            "id": "mf_choral",
+            "key": "choral_music_copies",
+            "label": "Number of copies of choral music",
+            "helpText": "",
+            "type": "NUMBER",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          },
+          {
+            "id": "mf_band",
+            "key": "band_music_copies",
+            "label": "Number of copies of band music",
+            "helpText": "",
+            "type": "NUMBER",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          }
+        ]
+      },
+      {
+        "id": "mf_people",
+        "title": "Students, teachers & sponsors",
+        "description": "Add each student and each teacher or sponsor once.",
+        "fields": [
+          {
+            "id": "mf_type",
+            "key": "participant_type",
+            "label": "Who is this?",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [],
+            "optionSource": "ATTENDEE_TYPES"
+          },
+          {
+            "id": "mf_title",
+            "key": "sponsor_title",
+            "label": "Title",
+            "helpText": "The nametag prints the title and last name.",
+            "type": "RADIO",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [
+              "Mr.",
+              "Mrs.",
+              "Ms.",
+              "Miss"
+            ],
+            "conditional": {
+              "fieldKey": "participant_type",
+              "operator": "EQUALS",
+              "value": "TEACHER_SPONSOR"
+            }
+          },
+          {
+            "id": "mf_first",
+            "key": "first_name",
+            "label": "First name",
+            "helpText": "Spell it as it should print on the nametag.",
+            "type": "TEXT",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "mf_last",
+            "key": "last_name",
+            "label": "Last name",
+            "helpText": "Spell it as it should print on the nametag. For a teacher or sponsor, the nametag prints the title and last name.",
+            "type": "TEXT",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "mf_age",
+            "key": "attendee_age",
+            "label": "Age",
+            "helpText": "",
+            "type": "NUMBER",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [],
+            "conditional": {
+              "fieldKey": "participant_type",
+              "operator": "NOT_EQUALS",
+              "value": "TEACHER_SPONSOR"
+            }
+          },
+          {
+            "id": "mf_gender",
+            "key": "gender",
+            "label": "Gender",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [
+              "Male",
+              "Female"
+            ],
+            "conditional": {
+              "fieldKey": "participant_type",
+              "operator": "NOT_EQUALS",
+              "value": "TEACHER_SPONSOR"
+            }
+          },
+          {
+            "id": "mf_grade",
+            "key": "grade",
+            "label": "Grade",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [],
+            "conditional": {
+              "fieldKey": "participant_type",
+              "operator": "NOT_EQUALS",
+              "value": "TEACHER_SPONSOR"
+            }
+          },
+          {
+            "id": "mf_voice",
+            "key": "voice_part",
+            "label": "Voice part",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [
+              "1st part Soprano",
+              "2nd part Alto",
+              "3rd part Tenor/Bass"
+            ],
+            "conditional": {
+              "fieldKey": "participant_type",
+              "operator": "NOT_EQUALS",
+              "value": "TEACHER_SPONSOR"
+            }
+          },
+          {
+            "id": "mf_shirt",
+            "key": "shirt_size",
+            "label": "T-shirt size",
+            "helpText": "",
+            "type": "SELECT",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [
+              "Adult XS",
+              "Adult S",
+              "Adult M",
+              "Adult L",
+              "Adult XL",
+              "Adult 2XL",
+              "Adult 3XL",
+              "Adult 4XL",
+              "Adult 5XL"
+            ],
+            "conditional": {
+              "fieldKey": "participant_type",
+              "operator": "NOT_EQUALS",
+              "value": "TEACHER_SPONSOR"
+            }
+          },
+          {
+            "id": "mf_instrument",
+            "key": "instrument",
+            "label": "Instrument",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [],
+            "conditional": {
+              "fieldKey": "participant_type",
+              "operator": "NOT_EQUALS",
+              "value": "TEACHER_SPONSOR"
+            }
+          },
+          {
+            "id": "mf_instrument_years",
+            "key": "instrument_years",
+            "label": "Years playing the instrument",
+            "helpText": "",
+            "type": "NUMBER",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [],
+            "conditional": {
+              "fieldKey": "participant_type",
+              "operator": "NOT_EQUALS",
+              "value": "TEACHER_SPONSOR"
+            }
+          },
+          {
+            "id": "mf_rating",
+            "key": "teacher_rating",
+            "label": "Teacher's rating",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [
+              "5 - Superior",
+              "4 - Excellent",
+              "3 - Good",
+              "2 - Average",
+              "1 - Below average"
+            ],
+            "conditional": {
+              "fieldKey": "participant_type",
+              "operator": "NOT_EQUALS",
+              "value": "TEACHER_SPONSOR"
+            }
+          },
+          {
+            "id": "mf_rating_comments",
+            "key": "teacher_rating_comments",
+            "label": "Teacher's comments",
+            "helpText": "",
+            "type": "LONG_TEXT",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [],
+            "conditional": {
+              "fieldKey": "participant_type",
+              "operator": "NOT_EQUALS",
+              "value": "TEACHER_SPONSOR"
+            }
+          },
+          {
+            "id": "mf_sponsor_shirt",
+            "key": "sponsor_shirt_size",
+            "label": "T-shirt size",
+            "helpText": "",
+            "type": "SELECT",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [
+              "Adult XS",
+              "Adult S",
+              "Adult M",
+              "Adult L",
+              "Adult XL",
+              "Adult 2XL",
+              "Adult 3XL",
+              "Adult 4XL",
+              "Adult 5XL",
+              "No T-shirt, please"
+            ],
+            "conditional": {
+              "fieldKey": "participant_type",
+              "operator": "EQUALS",
+              "value": "TEACHER_SPONSOR"
+            }
+          },
+          {
+            "id": "mf_fee",
+            "key": "registration_fee",
+            "label": "Music Festival fee",
+            "helpText": "",
+            "type": "CALCULATED",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [],
+            "attendeeTypePricesCents": {
+              "STUDENT_DORM": 5000,
+              "STUDENT_DAY": 4000,
+              "TEACHER_SPONSOR": 0
+            }
+          }
+        ]
+      },
+      {
+        "id": "mf_food",
+        "title": "Lodging & food",
+        "description": "",
+        "fields": [
+          {
+            "id": "mf_lodging",
+            "key": "lodging_request",
+            "label": "Lodging request",
+            "helpText": "For example, all boys or all girls together in one dorm location, or staying with certain SAA students.",
+            "type": "LONG_TEXT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          },
+          {
+            "id": "mf_sack",
+            "key": "sack_suppers_saturday",
+            "label": "Saturday Sack Supper: how many?",
+            "helpText": "",
+            "type": "NUMBER",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          },
+          {
+            "id": "mf_diet",
+            "key": "dietary_needs",
+            "label": "Special dietary requests or food allergies",
+            "helpText": "",
+            "type": "LONG_TEXT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": [],
+            "sensitive": true,
+            "filterable": false
+          }
+        ]
+      }
+    ]
+  }
+}

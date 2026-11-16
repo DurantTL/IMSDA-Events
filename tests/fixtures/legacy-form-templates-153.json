@@ -74,6 +74,12 @@
       "fields": 16
     },
     {
+      "key": "music_festival",
+      "sha256": "2b8f897ed193528751aa9fcf6982e49faf59f6579acbaa6b608bafa27fc1b7a7",
+      "sections": 4,
+      "fields": 24
+    },
+    {
       "key": "hispanic_institute",
       "sha256": "0ddda8a8facb2895b509ccbe40ba4aa907e90f3fe92fe8a450bb5238c12aa87e",
       "sections": 3,

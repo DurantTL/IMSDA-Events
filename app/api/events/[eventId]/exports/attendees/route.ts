@@ -1,6 +1,6 @@
 import { AccessDeniedError, effectivePermissions, requirePermission } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { findActiveMembership, isClubAudienceEvent } from "@/modules/events/repository";
+import { findActiveMembership, isBilledLaterEvent, isClubAudienceEvent } from "@/modules/events/repository";
 import { listRegistrations } from "@/modules/registrations/repository";
 import {
   attendeeListingCsv,
@@ -33,8 +33,8 @@ async function getHandler(
       throw new AccessDeniedError("Your event role does not include access to attendee names and answers.", 403, "PERMISSION_DENIED");
     }
     const clubEvent = await isClubAudienceEvent(eventId);
-    // The page's own default for this kind of event (#2017), so the download matches the list.
-    const query = parseAttendeeListingQuery(new URL(request.url).searchParams, defaultListingStatuses(clubEvent));
+    // The page's own default for this kind of event (#2017, #2031), so the download matches the list.
+    const query = parseAttendeeListingQuery(new URL(request.url).searchParams, defaultListingStatuses(await isBilledLaterEvent(eventId)));
     const registrations = await listRegistrations(eventId, { statuses: query.statuses });
     const showDietaryDetails = canViewDietaryDetails({ permissions, clubEvent });
     const rows = filterAttendeeListing(buildAttendeeListingRows(registrations, { showDietaryDetails }), query);

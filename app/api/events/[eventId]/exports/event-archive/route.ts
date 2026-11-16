@@ -2,7 +2,7 @@ import { AccessDeniedError, effectivePermissions, requireEventMembership } from 
 import { getCurrentSession } from "@/modules/access/current-session";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { findEventArchiveFacts } from "@/modules/events/archive-download-facts";
-import { findActiveMembership, isClubAudienceEvent } from "@/modules/events/repository";
+import { findActiveMembership, isBilledLaterEvent } from "@/modules/events/repository";
 import { effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { resolveLocationFilter } from "@/modules/event-locations/filter";
 import { InformationFormError } from "@/modules/information-forms/errors";
@@ -77,8 +77,8 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
 
     // Attendees: the attendees export's own gate, the default listing, dietary detail never shown.
     if (permissions.has("VIEW_REPORTS") && permissions.has("VIEW_SENSITIVE_DATA")) {
-      // A club event's default includes Submitted registrations, as its Attendee list does (#2017).
-      const query = parseAttendeeListingQuery(new URLSearchParams(), defaultListingStatuses(await isClubAudienceEvent(eventId)));
+      // A billed-later event's default includes Submitted registrations, as its Attendee list does (#2017, #2031).
+      const query = parseAttendeeListingQuery(new URLSearchParams(), defaultListingStatuses(await isBilledLaterEvent(eventId)));
       const registrations = await listRegistrations(eventId, { statuses: query.statuses });
       include("attendees.csv", attendeeListingCsv(filterAttendeeListing(buildAttendeeListingRows(registrations, { showDietaryDetails: false }), query), { omitDietaryColumns: true }));
     } else {

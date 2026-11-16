@@ -5,13 +5,13 @@ import { formTemplates } from "@/modules/forms/definition";
 const dependencies = vi.hoisted(() => ({
   resolveEventContext: vi.fn(),
   listRegistrations: vi.fn(),
-  isClubAudienceEvent: vi.fn(),
+  isClubAudienceEvent: vi.fn(), isBilledLaterEvent: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", async (importOriginal) => ({ ...(await importOriginal<typeof import("next/navigation")>()), useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: dependencies.resolveEventContext }));
-vi.mock("@/modules/events/repository", () => ({ isClubAudienceEvent: dependencies.isClubAudienceEvent }));
+vi.mock("@/modules/events/repository", () => ({ isClubAudienceEvent: dependencies.isClubAudienceEvent, isBilledLaterEvent: dependencies.isBilledLaterEvent }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: dependencies.listRegistrations }));
 
 import AttendeeListingPage from "@/app/(workspace)/people/attendees/page";
@@ -35,6 +35,7 @@ const context = (permissions: string[]) => ({ event: { id: "evt", name: "Synthet
 beforeEach(() => {
   vi.clearAllMocks();
   dependencies.isClubAudienceEvent.mockResolvedValue(false);
+  dependencies.isBilledLaterEvent.mockResolvedValue(false);
   dependencies.listRegistrations.mockResolvedValue([registration("R1")]);
 });
 
@@ -64,6 +65,7 @@ describe("attendee listing page", () => {
     expect(dependencies.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED"] });
 
     dependencies.isClubAudienceEvent.mockResolvedValue(true);
+    dependencies.isBilledLaterEvent.mockResolvedValue(true);
     const club = await render();
     expect(dependencies.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
     expect(club).toContain("WR26-C1");
@@ -75,6 +77,15 @@ describe("attendee listing page", () => {
     expect(submittedBox).toMatch(/\schecked=""/);
     // The CSV link carries no statuses, so the download uses the same club default.
     expect(club).toMatch(/href="\/api\/events\/evt\/exports\/attendees"/);
+  });
+
+  it("shows submitted registrations by default on a school-billed general event (#2031)", async () => {
+    dependencies.resolveEventContext.mockResolvedValue(context(["VIEW_REPORTS", "VIEW_SENSITIVE_DATA"]));
+    dependencies.listRegistrations.mockResolvedValue([registration("S1", "SUBMITTED")]);
+    dependencies.isBilledLaterEvent.mockResolvedValue(true);
+    const school = await render();
+    expect(dependencies.listRegistrations).toHaveBeenLastCalledWith("evt", { statuses: ["CONFIRMED", "SUBMITTED"] });
+    expect(school).toContain("WR26-S1");
   });
 
   it("pages the sorted list on the server: the sort covers every attendee, and a header link drops the page (#1458)", async () => {

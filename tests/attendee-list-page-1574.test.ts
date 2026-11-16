@@ -10,13 +10,13 @@ import { formTemplates } from "@/modules/forms/definition";
 const dependencies = vi.hoisted(() => ({
   resolveEventContext: vi.fn(),
   listRegistrations: vi.fn(),
-  isClubAudienceEvent: vi.fn(),
+  isClubAudienceEvent: vi.fn(), isBilledLaterEvent: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", async (importOriginal) => ({ ...(await importOriginal<typeof import("next/navigation")>()), useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: dependencies.resolveEventContext }));
-vi.mock("@/modules/events/repository", () => ({ isClubAudienceEvent: dependencies.isClubAudienceEvent }));
+vi.mock("@/modules/events/repository", () => ({ isClubAudienceEvent: dependencies.isClubAudienceEvent, isBilledLaterEvent: dependencies.isBilledLaterEvent }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: dependencies.listRegistrations }));
 
 import AttendeeListingPage from "@/app/(workspace)/people/attendees/page";
@@ -42,6 +42,7 @@ const context = (permissions: string[]) => ({ event: { id: "evt", name: "Synthet
 beforeEach(() => {
   vi.clearAllMocks();
   dependencies.isClubAudienceEvent.mockResolvedValue(false);
+  dependencies.isBilledLaterEvent.mockResolvedValue(false);
   dependencies.listRegistrations.mockResolvedValue([registration("R1")]);
 });
 

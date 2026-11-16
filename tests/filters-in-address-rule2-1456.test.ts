@@ -11,7 +11,7 @@ import { summarizeClub } from "@/modules/club-reports/area-summary-domain";
  */
 const mocks = vi.hoisted(() => ({
   session: vi.fn(), allowed: vi.fn(), clubs: vi.fn(), events: vi.fn(), newYear: vi.fn(),
-  directory: vi.fn(), contacts: vi.fn(), resolveEventContext: vi.fn(), listRegistrations: vi.fn(), isClubAudienceEvent: vi.fn(),
+  directory: vi.fn(), contacts: vi.fn(), resolveEventContext: vi.fn(), listRegistrations: vi.fn(), isClubAudienceEvent: vi.fn(), isBilledLaterEvent: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
@@ -29,7 +29,7 @@ vi.mock("@/modules/organizations/eadventist-import-repository", () => ({ listDir
 vi.mock("@/modules/organizations/contacts-repository", () => ({ listDirectoryContacts: mocks.contacts }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: mocks.resolveEventContext }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: mocks.listRegistrations }));
-vi.mock("@/modules/events/repository", () => ({ isClubAudienceEvent: mocks.isClubAudienceEvent }));
+vi.mock("@/modules/events/repository", () => ({ isClubAudienceEvent: mocks.isClubAudienceEvent, isBilledLaterEvent: mocks.isBilledLaterEvent }));
 vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }));
 vi.mock("@/components/admin-section-header", () => ({ AdminSectionHeaderFor: () => null }));
 vi.mock("@/components/use-accessible-dialog", () => ({ useAccessibleDialog: () => ({ current: null }) }));
@@ -161,6 +161,7 @@ describe("a list loaded with ?q=zzzz shows Clear filters with an address that ha
     mocks.resolveEventContext.mockResolvedValue({ event: { id: "evt-1", name: "Synthetic Event" }, permissions: ["VIEW_SENSITIVE_DATA"] });
     mocks.listRegistrations.mockResolvedValue([]);
     mocks.isClubAudienceEvent.mockResolvedValue(false);
+    mocks.isBilledLaterEvent.mockResolvedValue(false);
     const html = renderToStaticMarkup(await AttendeeListingPage({ searchParams: Promise.resolve({ event: "evt-1", q: "zzzz" }) }));
     const links = clearLinks(html);
     expect(links.length).toBeGreaterThan(0);
