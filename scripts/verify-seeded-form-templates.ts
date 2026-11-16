@@ -170,7 +170,7 @@ async function run() {
     return { ...seed, version: seed.version + 1, definition };
   });
   const bump = await syncSeededFormTemplates(prisma, revisedSeeds);
-  assert(bump.updated.length === 1 && bump.updated[0]!.key === "womens_retreat_export" && bump.unchanged.length === 2, `the bump updates only the revised template (${JSON.stringify(bump)})`);
+  assert(bump.updated.length === 1 && bump.updated[0]!.key === "womens_retreat_export" && bump.unchanged.length === bundledSeededFormTemplates.length - 1, `the bump updates only the revised template (${JSON.stringify(bump)})`);
   const wr = await prisma.seededFormTemplate.findUniqueOrThrow({ where: { key: "womens_retreat_export" }, include: { versions: { orderBy: { version: "asc" } } } });
   assert(wr.version === 2 && wr.versions.length === 2, "the revised template is at version 2 with both versions kept");
   assert(canonicalJson(wr.versions[0]!.definition) === canonicalJson(bundledSeededFormTemplates.find((seed) => seed.key === "womens_retreat_export")!.definition), "version 1 is kept as it was");
