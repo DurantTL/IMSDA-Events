@@ -29,6 +29,7 @@ import {
 import { getOperationalHealth } from "@/modules/operations/repository";
 import { paginate, parsePageParam, type PageSlice } from "@/lib/pagination";
 import { searchPageHref } from "@/lib/search-page-href";
+import { dateTimeInZone } from "@/lib/format-date-time";
 import styles from "./operational-health.module.css";
 import { staffPageTitles } from "@/components/staff-navigation";
 
@@ -37,12 +38,9 @@ export const metadata: Metadata = { title: staffPageTitles.operationalHealth };
 /** Rows per page in each section (#1458): every exception is listed, a page at a time, each section with its own page. */
 const PAGE_SIZE = 20;
 
+/** In the event's time zone and labeled with it ("Nov 16, 2026, 11:25 AM CST"), as B13 asks (#1596). */
 function timeLabel(value: string, timeZone: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone,
-  }).format(new Date(value));
+  return dateTimeInZone(value, timeZone);
 }
 
 function words(value: string) {

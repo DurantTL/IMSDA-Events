@@ -145,6 +145,11 @@ describe("the Role given notice and leader chips", () => {
     expect(html(true)).toContain("Two-step on");
     expect(html(true)).not.toContain("Two-step not set up");
   });
+
+  it("keeps the space between the role names in the intro (#1596)", () => {
+    expect(html(false)).toContain("Registrar and Reporter sign in");
+    expect(html(false)).not.toContain("Registrarand");
+  });
 });
 
 describe("every view agrees on which months are due (#1410)", () => {
