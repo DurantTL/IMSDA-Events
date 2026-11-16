@@ -1533,7 +1533,9 @@ async function cleanupPbeEvent(prisma: PrismaClient) {
     prisma.registrationAttendee.deleteMany({ where: { eventId: pbeEventId } }),
     prisma.registration.deleteMany({ where: { eventId: pbeEventId } }),
     prisma.event.deleteMany({ where: { id: pbeEventId } }),
-    prisma.person.deleteMany({ where: { id: { in: personIds } } }),
+    // A person who still holds another event's registration (the director's own person row, shared with the cancellation event) stays;
+    // the final cleanup removes it once those registrations are gone (#2029).
+    prisma.person.deleteMany({ where: { id: { in: personIds }, heldRegistrations: { none: {} }, registrationEvents: { none: {} } } }),
   ]);
 }
 

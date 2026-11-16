@@ -5,6 +5,7 @@ import { useId, useState } from "react";
 import type { RecipientCandidate } from "@/modules/invoices/delivery-domain";
 import { savedMessage } from "@/components/form-message";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import styles from "@/components/invoice-ledger-controls.module.css";
 
 /**
  * Staff controls for sending an invoice, marking it posted to AR, and recording payments (#168). Each posts to an
@@ -60,7 +61,7 @@ export function PostToArForm({ eventId, versionId, posted }: { eventId: string; 
   useUnsavedChangesGuard(date !== savedDate || reference !== savedReference || reason.trim() !== "");
   return (
     <form
-      className="billing-link-form"
+      className={`billing-link-form ${styles.form}`}
       onSubmit={(event) => {
         event.preventDefault();
         void run(
@@ -117,7 +118,7 @@ export function RecordPaymentForm({ eventId, invoiceId }: { eventId: string; inv
   useUnsavedChangesGuard(amount.trim() !== "" || checkNumber.trim() !== "" || note.trim() !== "" || receivedOn !== baseDate);
   return (
     <form
-      className="billing-link-form"
+      className={`billing-link-form ${styles.form}`}
       onSubmit={(event) => {
         event.preventDefault();
         void run({ action: "record-payment", invoiceId, amount, checkNumber: checkNumber.trim() || null, receivedOn, note: note.trim() || null, requestKey: key }, (result) =>
@@ -168,7 +169,7 @@ export function VoidPaymentButton({ eventId, paymentId }: { eventId: string; pay
   if (!open) return <button className="secondary-button" onClick={() => setOpen(true)} type="button">Void</button>;
   return (
     <form
-      className="billing-link-form"
+      className={`billing-link-form ${styles.form}`}
       onSubmit={(event) => {
         event.preventDefault();
         void run({ action: "void-payment", paymentId, reason, requestKey: key }).then((ok) => { if (ok) setReason(""); });
@@ -195,7 +196,7 @@ export function PaymentInstructionsForm({ eventId, value, defaultText }: { event
   useUnsavedChangesGuard(text !== savedText);
   return (
     <form
-      className="billing-link-form"
+      className={`billing-link-form ${styles.form}`}
       onSubmit={(event) => {
         event.preventDefault();
         void run({ action: "set-payment-instructions", instructions: text.trim() === "" ? null : text }, () => savedMessage()).then((ok) => { if (ok) setSavedText(text); });
@@ -284,7 +285,7 @@ export function SendInvoiceForm(props: SendFormProps) {
   }
   return (
     <form
-      className="billing-link-form"
+      className={`billing-link-form ${styles.form}`}
       onSubmit={(event) => {
         event.preventDefault();
         void send();

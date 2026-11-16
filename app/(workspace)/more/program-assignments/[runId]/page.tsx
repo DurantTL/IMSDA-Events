@@ -4,6 +4,7 @@ import { BackLink } from "@/components/back-link";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { Download, ShieldCheck } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
+import { cardCell } from "@/components/table-card-labels";
 import { PrintReportButton } from "@/components/print-report-button";
 import { resolveEventContext } from "@/modules/events/selection";
 import { canManageProgramAssignments } from "@/modules/program-assignments/access";
@@ -79,20 +80,20 @@ export default async function ProgramAssignmentRosterPage({
             <span className="count-badge">{assignments.length} {assignments.length === 1 ? "person" : "people"}</span>
           </div>
           <div className="report-table-wrap">
-            <table className="report-table">
+            <table className="report-table table-cards" role="table">
               <caption className="sr-only">{option} assignment roster</caption>
-              <thead><tr><th scope="col">Attendee</th><th scope="col">Result</th><th scope="col">Type</th><th scope="col">Registration</th></tr></thead>
-              <tbody>
+              <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Attendee</th><th role="columnheader" scope="col">Result</th><th role="columnheader" scope="col">Type</th><th role="columnheader" scope="col">Registration</th></tr></thead>
+              <tbody role="rowgroup">
                 {assignments.map((assignment) => (
-                  <tr key={assignment.attendeeId}>
-                    <th scope="row">{formatPersonName(assignment)}</th>
-                    <td>{assignment.unassignedReason === "NO_RANKED_CHOICES"
+                  <tr key={assignment.attendeeId} role="row">
+                    <th role="rowheader" scope="row">{formatPersonName(assignment)}</th>
+                    <td {...cardCell("Result")}>{assignment.unassignedReason === "NO_RANKED_CHOICES"
                       ? "No ranking submitted"
                       : assignment.unassignedReason === "CAPACITY_FULL"
                         ? "No ranked room available"
                         : rankLabel(assignment.preferenceRank)}</td>
-                    <td>{assignment.attendeeType}</td>
-                    <td>{assignment.confirmationCode}</td>
+                    <td {...cardCell("Type")}>{assignment.attendeeType}</td>
+                    <td {...cardCell("Registration")}>{assignment.confirmationCode}</td>
                   </tr>
                 ))}
               </tbody>
