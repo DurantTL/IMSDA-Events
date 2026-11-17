@@ -6,6 +6,7 @@ import { useId, useState } from "react";
 import { savedMessage } from "@/components/form-message";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import styles from "@/components/invoice-controls.module.css";
+import ledgerStyles from "@/components/invoice-ledger-controls.module.css";
 
 /**
  * Staff controls for the Invoices screens (#167). Every action posts to one endpoint that checks
@@ -144,7 +145,7 @@ export function ReviseForm({
   useUnsavedChangesGuard(reason.trim() !== "" || mode !== startMode);
   return (
     <form
-      className={`billing-link-form ${styles.reviseForm}`}
+      className={`billing-link-form ${styles.reviseForm} ${ledgerStyles.form}`}
       onSubmit={(event) => {
         event.preventDefault();
         void run({ action: "revise", invoiceId, mode, reason }).then((ok) => {
@@ -234,7 +235,7 @@ export function InvoiceClubTypeForm({ eventId, clubType }: { eventId: string; cl
   useUnsavedChangesGuard(text !== savedText);
   return (
     <form
-      className="billing-link-form"
+      className={`billing-link-form ${ledgerStyles.form}`}
       onSubmit={(event) => {
         event.preventDefault();
         void run({ action: "set-club-type", clubType: text.trim() === "" ? null : text }, () => savedMessage()).then((ok) => { if (ok) setSavedText(text); });
@@ -293,7 +294,7 @@ export function ManualLinesPanel({
       ))}
       {canEdit ? (
         <form
-          className="billing-link-form"
+          className={`billing-link-form ${ledgerStyles.form}`}
           onSubmit={(event) => {
             event.preventDefault();
             void run({ action: "add-manual-line", invoiceId, item, description: description.trim() === "" ? null : description, quantity: Number(quantity), rate }).then((ok) => {
@@ -331,7 +332,7 @@ export function InvoiceCodeForm({ eventId, explicit, effective, locked, year }: 
   const yy = String(year % 100).padStart(2, "0");
   return (
     <form
-      className="billing-link-form"
+      className={`billing-link-form ${ledgerStyles.form}`}
       onSubmit={(event) => {
         event.preventDefault();
         void run({ action: "set-code", code: code.trim() === "" ? null : code }, () => savedMessage()).then((ok) => { if (ok) setSavedCode(code); });

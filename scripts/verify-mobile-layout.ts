@@ -139,6 +139,7 @@ const stationEventId = `${P}_station_event`;
 const staffInviteEventId = `${P}_staffinv_event`;
 const staffInviteEventSlug = `${P}-staff-invitations`;
 const staffInviteEmail = (key: string) => `${P}.staffinv.${key}@example.test`;
+const financeEventId = `${P}_finance_event`;
 const churchA = `${P}_church_a`;
 const churchB = `${P}_church_b`;
 const reportMonth = "2026-09";
@@ -1160,6 +1161,104 @@ async function seedStationEvent(prisma: PrismaClient) {
   });
 }
 
+/**
+ * An event of its own for the finance and seminar pages (#2029): one finalized invoice for church A (with its receivable), and one applied
+ * seminar assignment run with three people. Finalized invoice rows can only go with their event, so cleanup removes the whole event
+ * (removeEventOwnedRows). Idempotent. Returns the four staff pages that open these rows.
+ */
+async function seedFinanceEvent(prisma: PrismaClient): Promise<PageSpec[]> {
+  const { addDays, calendarDateIn } = await import("../modules/calendar/domain");
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
+  const today = calendarDateIn(new Date());
+  const invoiceId = `${P}_invoice`;
+  const versionId = `${P}_invoice_version`;
+  const runId = `${P}_assignment_run`;
+  if (!(await prisma.event.findUnique({ where: { id: financeEventId }, select: { id: true } }))) {
+    const baseNumber = "MCK27-0001";
+    await prisma.$transaction(async (tx) => {
+      await tx.event.create({
+        data: {
+          id: financeEventId, slug: `${P}-finance-weekend`, name: "Mobilecheck Finance Weekend",
+          startsAt: new Date(`${addDays(today, 60)}T15:00:00Z`), endsAt: new Date(`${addDays(today, 62)}T18:00:00Z`), timezone: "America/Chicago",
+          // Unpublished, so it never joins the public calendar.
+          isPublished: false, billingMode: "ATTENDEE_PAY",
+        },
+      });
+      await tx.eventMembership.create({ data: { eventId: financeEventId, userId: admin.id, role: "EVENT_ADMIN", status: "ACTIVE" } });
+      const formId = `${P}_finance_form`;
+      const formVersionId = `${P}_finance_form_version`;
+      await tx.registrationForm.create({ data: { id: formId, eventId: financeEventId, createdByUserId: admin.id, name: "Mobilecheck seminar form", slug: `${P}-finance-form` } });
+      await tx.registrationFormVersion.create({
+        data: { id: formVersionId, formId, createdByUserId: admin.id, versionNumber: 1, status: "PUBLISHED", publishedAt: new Date(), definition: { title: "Seminars", description: "", confirmationMessage: "Received.", sections: [] } },
+      });
+      const reconciliation = await tx.attendanceReconciliationVersion.create({
+        data: { eventId: financeEventId, versionNumber: 1, fingerprint: `${P}-finance`, ruleVersion: "mobilecheck", invoiceGrouping: "PER_CHURCH", registeredCount: 2, checkedInCount: 2, noShowCount: 0, addedByStaffCount: 0, removedByStaffCount: 0, billableCount: 2, estimatedCents: 15_000, billableCents: 15_000, snapshot: {} },
+      });
+      await tx.invoice.create({ data: { id: invoiceId, eventId: financeEventId, groupKey: `${P}:church_a`, invoiceGrouping: "PER_CHURCH", partyKind: "ORGANIZATION", partyId: churchA } });
+      const counts = { registered: 2, checkedIn: 2, noShow: 0, addedByStaff: 0, removedByStaff: 0, billable: 2 };
+      await tx.invoiceVersion.create({
+        data: {
+          id: versionId, invoiceId, eventId: financeEventId, revision: 0, basis: "RECONCILIATION", reconciliationVersionId: reconciliation.id,
+          groupTitle: "Mobilecheck Prairie Church", organizationName: "Mobilecheck Prairie Church", contactName: "Pat Mobilecheck", contactEmail: `${P}.billing@example.test`,
+          contactRoleLabel: "Treasurer", contactVerified: true, registeredCount: 2, billableCount: 2, amountDueCents: 15_000, amountsFingerprint: `${P}-finance-fingerprint`,
+          snapshot: {
+            schema: 1, event: { id: financeEventId, name: "Mobilecheck Finance Weekend" }, groupKey: `${P}:church_a`, groupTitle: "Mobilecheck Prairie Church", invoiceGrouping: "PER_CHURCH",
+            party: { kind: "ORGANIZATION", id: churchA, name: "Mobilecheck Prairie Church" }, clubId: null,
+            reconciliation: { versionId: reconciliation.id, versionNumber: 1, ruleVersion: "mobilecheck" },
+            lines: [{
+              registrationId: `${P}_reg_finance`, confirmationCode: "MOBFIN1", label: "Mobilecheck Prairie Church", clubId: null, counts, basis: "PER_PERSON_LINES",
+              people: [
+                { attendeeId: `${P}_finance_attendee_0`, name: "Casey Sample", billable: true, amountCents: 7500 },
+                { attendeeId: `${P}_finance_attendee_1`, name: "Riley Sample", billable: true, amountCents: 7500 },
+              ],
+              chargesNotTiedToPerson: [], credits: [], promo: null, adjustmentCents: 0,
+              components: { personChargesCents: 15_000, registrationChargeCents: 0, creditCents: 0, promoCents: 0, adjustmentCents: 0 }, amountCents: 15_000,
+            }],
+            totals: { registered: 2, checkedIn: 2, noShow: 0, billable: 2, amountDueCents: 15_000 },
+          },
+        },
+      });
+      await tx.invoice.update({ where: { id: invoiceId }, data: { baseNumber, numberCode: "MCK", numberYear: 2027, numberSequence: 1 } });
+      await tx.invoiceVersion.update({
+        where: { id: versionId },
+        data: { status: "FINALIZED", number: baseNumber, finalizedAt: new Date(), finalizedByName: "Mobilecheck Finance", finalizeIdempotencyKey: `${P}-finance-finalize` },
+      });
+      await tx.invoiceReceivable.create({ data: { eventId: financeEventId, invoiceId, invoiceVersionId: versionId, amountCents: 15_000 } });
+      await tx.programAssignmentRun.create({
+        data: {
+          id: runId, eventId: financeEventId, formId, formVersionId, fieldId: `${P}_seminar_field`, fieldKeySnapshot: "seminar", fieldLabelSnapshot: "Seminar choice", formNameSnapshot: "Mobilecheck seminar form",
+          formVersionNumber: 1, optionsSnapshot: [], limitsSnapshot: {}, summarySnapshot: {}, sourceFingerprint: `${P}-run-fingerprint`, sourceParticipantCount: 3,
+          clientRequestId: `${P}-run-request`, appliedByNameSnapshot: "Mobilecheck Admin",
+          assignments: {
+            create: [
+              { attendeeIdSnapshot: `${P}_run_attendee_0`, registrationIdSnapshot: `${P}_run_reg`, confirmationCodeSnapshot: "MOBRUN1", attendeePositionSnapshot: 0, stableOrder: 1, firstNameSnapshot: "Casey", lastNameSnapshot: "Sample", attendeeTypeSnapshot: "ADULT", preferencesSnapshot: {}, optionValue: "room-a", preferenceRank: 1, outcome: "ASSIGNED" },
+              { attendeeIdSnapshot: `${P}_run_attendee_1`, registrationIdSnapshot: `${P}_run_reg`, confirmationCodeSnapshot: "MOBRUN1", attendeePositionSnapshot: 1, stableOrder: 2, firstNameSnapshot: "Riley", lastNameSnapshot: "Sample", attendeeTypeSnapshot: "YOUTH", preferencesSnapshot: {}, optionValue: "room-a", preferenceRank: 2, outcome: "ASSIGNED" },
+              { attendeeIdSnapshot: `${P}_run_attendee_2`, registrationIdSnapshot: `${P}_run_reg`, confirmationCodeSnapshot: "MOBRUN1", attendeePositionSnapshot: 2, stableOrder: 3, firstNameSnapshot: "Morgan", lastNameSnapshot: "Sample", attendeeTypeSnapshot: "CHILD", preferencesSnapshot: {}, outcome: "UNASSIGNED", unassignedReason: "NO_RANKED_CHOICES" },
+            ],
+          },
+        },
+      });
+    }, { timeout: 30_000 });
+  }
+  const at = (route: string) => `${route}${route.includes("?") ? "&" : "?"}event=${financeEventId}`;
+  return [
+    { name: "staff-finance-invoice-detail", path: at(`/finance/invoices/${invoiceId}`), role: "event-admin" },
+    { name: "staff-finance-invoice-send", path: at(`/finance/invoices/${invoiceId}/send?version=${versionId}`), role: "event-admin" },
+    { name: "staff-finance-invoice-statement", path: at(`/finance/invoices/statements/${churchA}`), role: "event-admin" },
+    { name: "staff-program-assignments-run", path: at(`/more/program-assignments/${runId}`), role: "event-admin" },
+  ];
+}
+
+async function cleanupFinanceEvent(prisma: PrismaClient) {
+  if (!(await prisma.event.findUnique({ where: { id: financeEventId }, select: { id: true } }))) return;
+  const { removeEventOwnedRows } = await import("../modules/events/deletion-repository");
+  await prisma.auditLog.deleteMany({ where: { eventId: financeEventId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`;
+    await removeEventOwnedRows(tx, financeEventId);
+  }, { timeout: 30_000 });
+}
+
 async function cleanupStationEvent(prisma: PrismaClient) {
   if (!(await prisma.event.findUnique({ where: { id: stationEventId }, select: { id: true } }))) return;
   const { removeEventOwnedRows } = await import("../modules/events/deletion-repository");
@@ -1434,7 +1533,9 @@ async function cleanupPbeEvent(prisma: PrismaClient) {
     prisma.registrationAttendee.deleteMany({ where: { eventId: pbeEventId } }),
     prisma.registration.deleteMany({ where: { eventId: pbeEventId } }),
     prisma.event.deleteMany({ where: { id: pbeEventId } }),
-    prisma.person.deleteMany({ where: { id: { in: personIds } } }),
+    // A person who still holds another event's registration (the director's own person row, shared with the cancellation event) stays;
+    // the final cleanup removes it once those registrations are gone (#2029).
+    prisma.person.deleteMany({ where: { id: { in: personIds }, heldRegistrations: { none: {} }, registrationEvents: { none: {} } } }),
   ]);
 }
 
@@ -1661,6 +1762,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   await cleanupPbeEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic PBE event: ${error.message}`));
   await cleanupCancellationEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic cancellation event: ${error.message}`));
   await cleanupHistoryAccount(prisma).catch((error: Error) => console.error(`Could not remove the synthetic history events: ${error.message}`));
+  await cleanupFinanceEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic finance event: ${error.message}`));
   await cleanupStationEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic station event: ${error.message}`));
   await cleanupStaffInviteEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic staff invitation event: ${error.message}`));
   await cleanupInformationForm(prisma).catch((error: Error) => console.error(`Could not remove the synthetic information form: ${error.message}`));
@@ -1691,6 +1793,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
     prisma.scholarshipContribution.deleteMany({ where: { id: { startsWith: `${P}_` } } }),
     prisma.scholarshipFund.deleteMany({ where: { id: { startsWith: `${P}_` } } }),
     prisma.clubMonthlyReport.deleteMany({ where: orgs }),
+    prisma.clubFormSubmission.deleteMany({ where: { OR: [orgs, { id: { startsWith: `${P}_` } }] } }),
     prisma.clubRosterMember.deleteMany({ where: orgs }),
     prisma.person.deleteMany({ where: { id: { startsWith: `${P}_` } } }),
     prisma.clubDirectorGrant.deleteMany({ where: { attendeeAccountId: { in: accountIds } } }),
@@ -1866,6 +1969,20 @@ async function seedSynthetic(prisma: PrismaClient) {
         id, organizationId: index === 2 ? clubB : clubA, email: `${P}.invite${index}.with-a-long-address@example.test`,
         name: index === 0 ? "Pat Mobilecheck-Longsurname-Invitee" : `Invitee ${index}`, role: index === 1 ? "DEPUTY" : "DIRECTOR", status,
         ...(status === "SENT" ? { sentAt: now, sentCount: 1, expiresAt: new Date(now.getTime() + 14 * 86_400_000) } : {}),
+      },
+    });
+  }
+
+  // #2029: one SUBMITTED club form for club A (a Pathfinder Club Membership Application), so the director's Filled forms list and
+  // the Area Coordinator's Submitted forms list are audited in their filled state, not only their empty one (removed in cleanupSynthetic).
+  const membershipTemplate = await prisma.clubFormTemplate.findUnique({ where: { key: "pathfinder_membership_application" }, select: { id: true, version: true } });
+  if (membershipTemplate) {
+    await prisma.clubFormSubmission.upsert({
+      where: { id: `${P}_club_form_submission` },
+      update: {},
+      create: {
+        id: `${P}_club_form_submission`, templateId: membershipTemplate.id, organizationId: clubA, clubYear, subjectName: "Mobilecheck Sample Member",
+        status: "SUBMITTED", answers: {}, templateVersion: membershipTemplate.version, enteredVia: "STAFF_ACTING", submittedAt: now,
       },
     });
   }
@@ -5044,6 +5161,7 @@ async function main() {
     pages.push(...await seedCancellationEvent(prisma));
     pages.push(...await seedHistoryAccount(prisma));
     await seedStationEvent(prisma);
+    pages.push(...await seedFinanceEvent(prisma));
     pages.push(...staffInvitePages(await seedStaffInviteEvent(prisma)));
     pages.push(...await seedInformationForm(prisma));
     pages.push(...await seedDebriefPages(prisma));

@@ -28,3 +28,6 @@ details[open] > .summary::before { transform: rotate(90deg); }
 .yearBody { display: grid; gap: 14px; padding-bottom: 8px; }
 .yearBody h4 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .startYearHelp { margin: 4px 0 8px; }
+
+/* Keep the row action on one line in the wide table (#2029). */
+.rowAction { white-space: nowrap; }

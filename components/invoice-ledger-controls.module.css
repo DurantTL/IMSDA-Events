@@ -1,0 +1,5 @@
+/* A label sitting over its field in the invoice forms gets the normal gap, so the label text never touches the control (#2029). */
+.form > label {
+  display: grid;
+  gap: 6px;
+}
