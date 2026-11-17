@@ -320,8 +320,8 @@
   .openerShell { display: flex; width: 100%; }
   .openerShell select { width: 100%; color: var(--imsda-navy); }
   /* Phones put the task first (#2023): when the tabs have become the menu line, the line names the current view and the shell's
-     views strip is dropped. Every view stays in the Event menu, which lists each tab's views. */
-  .tabline[data-fit="tight"] ~ .shellViews { display: none; }
+     views strip is dropped. The strip shows only once the row is measured and fits, so the page never jumps up on load. Every view stays in the Event menu, which lists each tab's views. */
+  .tabline:not([data-measured][data-fit="ok"]) ~ .shellViews { display: none; }
   /* Two short lines: the tab, then "› view". A name too long for its line ends in an ellipsis, never breaking mid-word. */
   .tabline[data-fit="tight"] .menuline { min-width: 0; }
   .tabline[data-fit="tight"] .current:has(.currentView) { flex-direction: column; align-items: stretch; justify-content: center; gap: 0; padding-top: 4px; line-height: 1.25; overflow-wrap: normal; }

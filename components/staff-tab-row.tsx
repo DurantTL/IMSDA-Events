@@ -34,6 +34,9 @@ export function StaffTabRow({
   const lineRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const [tight, setTight] = useState(false);
+  // Until the row is measured nobody knows whether it fits; on a phone the shell's views strip waits for that, so a row that
+  // becomes the menu line never shows the strip first and then pulls the page up (#2023).
+  const [measured, setMeasured] = useState(false);
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
@@ -51,6 +54,7 @@ export function StaffTabRow({
       // the tabs may use the whole line: only the row's own width decides between tabs and the menu line.
       const room = line.clientWidth;
       setTight(!tabRowFits(list.getBoundingClientRect().width, room));
+      setMeasured(true);
     }
     measure();
     const observer = new ResizeObserver(measure);
@@ -62,7 +66,7 @@ export function StaffTabRow({
 
   if (tabs.length === 0) return null;
   return (
-    <div className={styles.tabline} ref={lineRef} data-staff-tabs data-fit={tight ? "tight" : "ok"}>
+    <div className={styles.tabline} ref={lineRef} data-staff-tabs data-fit={tight ? "tight" : "ok"} data-measured={measured ? "" : undefined}>
       <nav className={styles.tabs} aria-label={label}>
         <ul ref={listRef}>
           {tabs.map((tab) => (

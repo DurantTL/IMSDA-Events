@@ -17,7 +17,7 @@ import { StaffViewStrip } from "@/components/staff-view-strip";
 const read = (file: string) => readFileSync(join(process.cwd(), file), "utf8");
 const shellCss = read("components/staff-shell.module.css");
 const phoneBlock = (() => {
-  const at = shellCss.indexOf(".tabline[data-fit=\"tight\"] ~ .shellViews");
+  const at = shellCss.indexOf("~ .shellViews");
   const start = shellCss.lastIndexOf("@media (max-width: 800px)", at);
   return shellCss.slice(start, shellCss.indexOf("\n}\n", at));
 })();
@@ -56,8 +56,8 @@ describe("the shell's views strip on a phone", () => {
     expect(read("components/app-shell.tsx")).toContain("<StaffViewStrip shell label=");
   });
 
-  it("drops the strip only when the tabs have become the menu line, and keeps the line to two short lines", () => {
-    expect(phoneBlock).toContain(".tabline[data-fit=\"tight\"] ~ .shellViews { display: none; }");
+  it("hides the strip until the row is measured and fits, and keeps the line to two short lines", () => {
+    expect(phoneBlock).toContain(".tabline:not([data-measured][data-fit=\"ok\"]) ~ .shellViews { display: none; }");
     expect(phoneBlock).toContain(".tabline[data-fit=\"tight\"] .currentView { display: block; }");
     expect(phoneBlock).toMatch(/:is\(\.currentName, \.currentView\) \{[^}]*text-overflow: ellipsis/);
     // Wider screens never show the view's name in the menu line; the strip shows it.
