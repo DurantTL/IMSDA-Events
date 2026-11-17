@@ -46,7 +46,7 @@ describe("the delivery log count line and pager", () => {
   });
 
   it("labels the Delivery log tab with every message, not the rows loaded", () => {
-    expect(render(messaging(400, 1))).toMatch(/Delivery log[^<]*<span>400<\/span>/);
+    expect(render(messaging(400, 1))).toMatch(/Delivery log[^<]*<span class="count-badge">400<\/span>/);
   });
 
   it("marks the filter the server applied", () => {

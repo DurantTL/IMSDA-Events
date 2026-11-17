@@ -210,9 +210,9 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
       />
 
       <ul className="schedule-legend" aria-label="What the colors and labels mean">
-        <li><span className="schedule-chip is-nearly">Nearly full</span> 80% of the seats or more</li>
-        <li><span className="schedule-chip is-full">Full</span> every seat taken</li>
-        <li><span className="schedule-chip is-clash"><TriangleAlert aria-hidden="true" size={12} /> Clash</span> an instructor in two classes at once</li>
+        <li><span className="status-chip gold">Nearly full</span> 80% of the seats or more</li>
+        <li><span className="status-chip coral">Full</span> every seat taken</li>
+        <li><span className="status-chip coral"><TriangleAlert aria-hidden="true" size={12} /> Clash</span> an instructor in two classes at once</li>
       </ul>
 
       <div aria-live="polite" role="status">
@@ -392,15 +392,15 @@ function RowCells({ row, section, columns, clashes, selected, dragId, overKey, b
                   <p className="schedule-seats">
                     <Users aria-hidden="true" size={13} />
                     <span>{card.seatsTaken} / {card.capacity} seats</span>
-                    {status !== "OPEN" && <span className={`schedule-chip is-${status === "FULL" ? "full" : "nearly"}`}>{seatStatusLabels[status]}</span>}
-                    {!card.isActive && <span className="schedule-chip">Inactive</span>}
+                    {status !== "OPEN" && <span className={`status-chip ${status === "FULL" ? "coral" : "gold"}`}>{seatStatusLabels[status]}</span>}
+                    {!card.isActive && <span className="status-chip neutral">Inactive</span>}
                   </p>
                   {/* #833 extension point: assigned instructors, when the data exists; otherwise the legacy free-text teacher. */}
                   {people.length > 0
                     ? <p className="schedule-teacher">Instructor{people.length === 1 ? "" : "s"}: <span translate="no">{people.join(", ")}</span></p>
                     : card.teacherName && <p className="schedule-teacher">Teacher: <span translate="no">{card.teacherName}</span></p>}
                   {clash.map((message) => (
-                    <p className="schedule-clash" key={message}><TriangleAlert aria-hidden="true" size={13} /> <span className="schedule-chip is-clash">Clash</span> {message}</p>
+                    <p className="schedule-clash" key={message}><TriangleAlert aria-hidden="true" size={13} /> <span className="status-chip coral">Clash</span> {message}</p>
                   ))}
                   <button
                     aria-label={selected?.id === card.id ? `Cancel moving ${card.title}` : `Move ${card.title}`}

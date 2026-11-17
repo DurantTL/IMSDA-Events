@@ -452,10 +452,10 @@ export function CalendarAdminWorkspace({
         selectedKey={tab}
         onSelect={(key) => setTab(key as CalendarTab)}
         tabs={([
-          { key: "entries", label: <>Calendar entries <span>{entryList.totalAll}</span></> },
-          { key: "events", label: <>Events <span>{events.filter((event) => event.isPublished && event.showOnCalendar).length}</span></> },
-          { key: "imports", label: <>Imported calendars <span>{initialFeeds.length}</span></>, kept: true },
-          { key: "reminders", label: <>Deadline reminders <span>{reminderCount}</span></>, kept: true },
+          { key: "entries", label: <>Calendar entries <span className="count-badge">{entryList.totalAll}</span></> },
+          { key: "events", label: <>Events <span className="count-badge">{events.filter((event) => event.isPublished && event.showOnCalendar).length}</span></> },
+          { key: "imports", label: <>Imported calendars <span className="count-badge">{initialFeeds.length}</span></>, kept: true },
+          { key: "reminders", label: <>Deadline reminders <span className="count-badge">{reminderCount}</span></>, kept: true },
         ] as const).map(({ key, label, ...rest }) => ({
           key,
           id: calendarTabId(key),

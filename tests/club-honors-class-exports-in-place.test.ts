@@ -92,7 +92,7 @@ describe("Honors page empty states (D4) and labels (D3)", () => {
     expect(honorsMarkup({ initialRows: [] })).toContain("No members on the roster yet");
     const noHonors = honorsMarkup({ initialRows: [row("a")] });
     expect(noHonors).toContain(clubHonorsEmptyCopy.NO_HONORS);
-    expect(noHonors).not.toContain("No one matches these filters.");
+    expect(noHonors).not.toContain(clubHonorsEmptyCopy.NO_MATCH);
     expect(honorsMarkup({ initialRows: [row("a", [honor])] })).not.toContain("No honors recorded yet");
   });
 

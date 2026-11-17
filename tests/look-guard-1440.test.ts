@@ -125,6 +125,10 @@ describe("L5: buttons use the shared button classes", () => {
     expect(globalsCss).toMatch(/\.primary-button:disabled,\s*\.secondary-button:disabled \{[^}]*cursor: not-allowed/);
   });
 
+  it("gives the light and icon buttons the same disabled look (column order, form builder, Show birth dates, #2025)", () => {
+    expect(globalsCss).toMatch(/\.text-button:disabled,\s*\.icon-button:disabled \{[^}]*cursor: not-allowed/);
+  });
+
   it("never shows a wait or progress cursor on a disabled or busy button (one --cursor-busy token, #1506)", () => {
     expect(rootBlock).toMatch(/--cursor-busy:\s*not-allowed\s*;/);
     const offenders = [{ file: "app/globals.css", rules: cssRules(globalsCss) }, ...modules]

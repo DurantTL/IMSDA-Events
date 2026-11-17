@@ -576,6 +576,8 @@ textarea:focus-visible {
 .secondary-button:hover:not(:disabled) { background: var(--imsda-navy-soft); border-color: #b9ccd4; }
 .primary-button:disabled,
 .secondary-button:disabled { cursor: not-allowed; opacity: 0.58; }
+.text-button:disabled,
+.icon-button:disabled { cursor: not-allowed; opacity: 0.58; }
 @media (prefers-reduced-motion: reduce) {
 .primary-button, .secondary-button { transition: none; } }
 .filter-field {
@@ -1103,6 +1105,7 @@ body { padding-bottom: calc(73px + env(safe-area-inset-bottom)); }
 .public-registration-progress li:not(.is-current):not(:has(> button)) > span { border-style: dashed; }
 }
 .communications-workspace .inline-notice { display: flex; align-items: center; gap: 8px; }
+.communications-tabs button > .count-badge { min-width: 19px; justify-content: center; padding: 2px 8px; }
 .reminder-recipient-table-wrap { overflow-x: auto; }
 .team-account-actions .secondary-button { width: auto; min-width: max-content; padding: 6px 8px; font-size: max(var(--type-body-floor, 0px), 0.54rem); }
 .team-directory-table .team-account-actions .secondary-button { white-space: nowrap; }

@@ -290,7 +290,7 @@ export function ClubFormTemplateToggle({ templateKey, enabled, name, needsSync =
   return (
     <>
       {confirmDialog}
-      <button className={enabled ? "secondary-button" : "primary-button"} disabled={saving || (needsSync && !enabled)} onClick={toggle} type="button">
+      <button className="secondary-button" disabled={saving || (needsSync && !enabled)} onClick={toggle} type="button">
         {enabled ? "Turn off" : "Turn on"}
       </button>
       {error && <small className="club-report-problem">{error}</small>}

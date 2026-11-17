@@ -143,7 +143,23 @@ describe("the Club forms definitions page (#1573)", () => {
   it("keeps the access check, the redirect states and the table", () => {
     expect(definitions).toContain("hasClubsAdministration(user)");
     expect(definitions).toContain('redirect("/no-access")');
-    expect(definitions).toContain('role="table" className="report-table table-cards table-cards-wide"');
+    expect(definitions).toContain('role="table" className="report-table table-cards table-cards-xwide"');
+  });
+
+  it("keeps one filled button per view and each row's buttons on one line (SA2, #2025)", () => {
+    const actions = read("components/club-forms-actions.tsx");
+    const toggle = actions.slice(actions.indexOf("export function ClubFormTemplateToggle"));
+    expect(toggle).toContain('className="secondary-button"');
+    expect(toggle).not.toContain("primary-button");
+    const css = read("app/(workspace)/admin/club-forms/club-forms-page.module.css");
+    expect(css).toMatch(/\.rowActions\s*{[^}]*flex-wrap:\s*nowrap/);
+    expect(definitions).toContain("styles.rowActions");
+  });
+
+  it("lets the Required select size to its text (#2025)", () => {
+    const globals = read("app/globals.css");
+    expect(globals).toMatch(/\.club-form-requirement select \{[^}]*width: auto/);
+    expect(globals).not.toMatch(/\.club-form-requirement \{[^}]*max-width: 15rem/);
   });
 
   it("draws the missing view with the same header and strip, and its list has no back link", () => {

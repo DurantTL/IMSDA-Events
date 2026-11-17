@@ -25,6 +25,7 @@ import { openApplicationUrl } from "@/modules/club-forms/open-applications-domai
 import { listClubFormTemplatesForAdmin } from "@/modules/club-forms/templates";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import styles from "./club-forms-page.module.css";
 
 export const metadata: Metadata = { title: "Club forms" };
 export const dynamic = "force-dynamic";
@@ -108,7 +109,7 @@ export default async function AdminClubFormsPage({ searchParams }: { searchParam
       <section className="panel">
         <div className="report-table-wrap card-box">
           {sorting.order.key && <SortOrderNote>{sortOrderText(formSortLabels[sorting.order.key].label, sorting.order.dir, formSortLabels[sorting.order.key].kind)}</SortOrderNote>}
-          <table role="table" className="report-table table-cards table-cards-wide">
+          <table role="table" className="report-table table-cards table-cards-xwide">
             <caption className="sr-only">Club forms</caption>
             <thead role="rowgroup">
               <tr role="row"><ColumnHeader column="form" label="Form" sorting={sorting} /><ColumnHeader column="status" label="Status" sorting={sorting} /><ColumnHeader column="fillMode" label="Who fills it in" sorting={sorting} /><ColumnHeader column="required" label="Required" sorting={sorting} /><ColumnHeader column="filled" label="Filled in" sorting={sorting} /><ColumnHeader column="version" label="Version" sorting={sorting} /><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>
@@ -154,7 +155,7 @@ export default async function AdminClubFormsPage({ searchParams }: { searchParam
                     {template.draftStale && <small className="club-report-problem"> · Draft is stale (started on version {template.draftBaseVersion}); discard it</small>}
                   </td>
                   <td {...cardCell(null)}>
-                    <div className="button-pair">
+                    <div className={styles.rowActions}>
                       {template.version > 0 && <Link className="secondary-button" href={`/admin/club-forms/${encodeURIComponent(template.key)}`}>Edit</Link>}
                       <ClubFormTemplateToggle enabled={template.enabled} name={template.name} needsSync={template.needsSync} templateKey={template.key} />
                     </div>

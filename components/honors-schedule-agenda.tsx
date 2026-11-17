@@ -53,14 +53,14 @@ export function HonorsScheduleAgenda({ eventId, section, clashes, busy, onOpenMo
                       <div className={styles.meta}>
                         <span translate={room ? "no" : undefined}>{room ? room.name : "No room yet"}</span>
                         <span><Users aria-hidden="true" size={14} /> {card.seatsTaken} / {card.capacity} seats</span>
-                        {status !== "OPEN" && <span className={`schedule-chip is-${status === "FULL" ? "full" : "nearly"}`}>{seatStatusLabels[status]}</span>}
-                        {!card.isActive && <span className="schedule-chip">Inactive</span>}
+                        {status !== "OPEN" && <span className={`status-chip ${status === "FULL" ? "coral" : "gold"}`}>{seatStatusLabels[status]}</span>}
+                        {!card.isActive && <span className="status-chip neutral">Inactive</span>}
                       </div>
                       {people.length > 0
                         ? <p>Instructor{people.length === 1 ? "" : "s"}: <span translate="no">{people.join(", ")}</span></p>
                         : card.teacherName && <p>Teacher: <span translate="no">{card.teacherName}</span></p>}
                       {clash.map((message) => (
-                        <p key={message}><TriangleAlert aria-hidden="true" size={14} /> <span className="schedule-chip is-clash">Clash</span> {message}</p>
+                        <p key={message}><TriangleAlert aria-hidden="true" size={14} /> <span className="status-chip coral">Clash</span> {message}</p>
                       ))}
                       <button
                         aria-haspopup="dialog"
