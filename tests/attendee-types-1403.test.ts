@@ -202,11 +202,26 @@ describe("publish readiness: attendee types (#1403, required by #1408)", () => {
       complete: false,
       href: "/more/attendee-configuration?event=evt_1",
       actionLabel: "Set attendee types",
-      detail: "Attendee types decide who is an adult, youth or child, which sets prices and who gets each email.",
+      detail: "No attendee types yet. Add at least one with a minimum age of 18 or more (for example Adult, 18 and up). Attendee types decide who is an adult, youth or child, which sets prices and who gets each email.",
     });
     // It blocks publishing, and is not among the recommended items.
     expect(readiness.ready).toBe(false);
     expect(readiness.recommendedItems.map((item) => item.id)).not.toContain("attendee-types");
+  });
+
+  it("names the types and the field to set when types exist but none is an adult (#2040)", () => {
+    const readiness = getEventPublishReadiness({
+      ...base, audience: "GENERAL", attendeeTypesWithAgeRangeCount: 0,
+      attendeeTypeNames: ["Student, staying on campus", "Student, not staying in the dorm", "Teacher / sponsor"],
+    }, 1);
+    expect(find(readiness)).toMatchObject({
+      label: "An adult attendee type (minimum age 18)",
+      complete: false,
+      href: "/more/attendee-configuration?event=evt_1",
+      actionLabel: "Set an adult minimum age",
+      detail: "None of these attendee types has a minimum age of 18 or more: Student, staying on campus, Student, not staying in the dorm, Teacher / sponsor. Set Min age to 18 on the adult type (for example a teacher, sponsor or Adult type) so scheduled email knows who is an adult. Other types can stay without ages.",
+    });
+    expect(readiness.ready).toBe(false);
   });
 
   it("is done once an active type has an age range, and lists the type names", () => {

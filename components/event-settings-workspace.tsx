@@ -572,10 +572,13 @@ export function EventSettingsWorkspace({
         : { text: "Next: ask a system administrator to save the central email sender." };
     }
     if (missing.id === "attendee-types") {
-      return { text: "Next: set attendee types.", actionLabel: "Go to attendee types", href: missing.href };
+      // #2040: types that exist but have no adult (minimum age 18 or more) need an age, not new types.
+      return (readinessInputs.attendeeTypeNames ?? []).length > 0
+        ? { text: "Next: set a minimum age of 18 on the adult attendee type.", actionLabel: "Go to attendee types", href: missing.href }
+        : { text: "Next: set attendee types.", actionLabel: "Go to attendee types", href: missing.href };
     }
     return { text: "Next: choose church billing.", actionLabel: "Go to Billing mode", targetId: "event-field-billing-mode" };
-  }, [publishBlockedBySave, saving, readiness, savedDraft, initialEvent?.id, canOpenPlatformSettings]);
+  }, [publishBlockedBySave, saving, readiness, readinessInputs.attendeeTypeNames, savedDraft, initialEvent?.id, canOpenPlatformSettings]);
 
   // Open the block that holds a control (a "Go to ..." link, an error, a jump
   // link), then scroll to it and focus it. The block is opened in the DOM at

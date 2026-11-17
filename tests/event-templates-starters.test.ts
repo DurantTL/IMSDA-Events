@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { classifyAttendeeType } from "@/modules/attendee-types/domain";
 import {
   EventTemplateReferenceError,
   parseEventTemplatePayload,
@@ -50,6 +51,10 @@ describe("starter event templates (#546)", () => {
     expect(payload.messageTemplateDefaults).toEqual([]);
     // Only the general events carry attendee types (#1403): the age ranges messaging needs, nothing priced.
     expect(payload.attendeeTypes.length > 0).toBe(["womens_retreat", "man_camp", "camp_meeting", "music_festival"].includes(starter.starterKey));
+    // #2040: a starter that creates attendee types includes an adult one (minimum age 18 or more), or its event can't publish.
+    if (payload.attendeeTypes.length > 0) {
+      expect(payload.attendeeTypes.some((type) => type.isActive && classifyAttendeeType(type) === "ADULT")).toBe(true);
+    }
     // The Pathfinder Bible Experience (#809) also carries its team rules and registration deadline, and (#931) turns on the
     // general registration link.
     expect(Object.keys(payload).filter((key) => !["locations", "teamSettings", "registrationClosesOn", "generalRegistrationLink"].includes(key)).sort()).toEqual([
