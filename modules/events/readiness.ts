@@ -114,8 +114,9 @@ function listNames(names: readonly string[]) {
 
 /**
  * "Attendee types set" (#1403, required by #1408): attendee types matter for general events, never club events. Age class
- * comes only from a type's age range, so without an adult type every attendee's age is unknown and scheduled email reaches
- * nobody. Required before publishing a GENERAL event. Null for a club event, and for a caller that has not loaded the count.
+ * comes only from a type's age range, so without an adult type (minimum age 18 or more) every attendee's age is unknown
+ * and scheduled email reaches nobody. When types exist but none is adult, the item is labelled "An adult attendee type
+ * (minimum age 18)" and names the types (quoted, since labels can hold commas) and the field to set (#2040). Required before publishing a GENERAL event. Null for a club event, and for a caller that has not loaded the count.
  */
 export function getAttendeeTypesReadinessItem(
   event: Pick<EventReadinessSource, "audience" | "id" | "attendeeTypesWithAgeRangeCount" | "attendeeTypeNames">,
@@ -124,14 +125,18 @@ export function getAttendeeTypesReadinessItem(
   const done = event.attendeeTypesWithAgeRangeCount > 0;
   const names = (event.attendeeTypeNames ?? []).filter(hasText);
   const href = attendeeTypesHref(event.id);
+  // #2040: when the types exist but none is an adult, say which types and which field, not just "set attendee types".
+  const detail = done
+    ? names.length > 0 ? listNames(names) : "An adult attendee type tells scheduled email who is an adult."
+    : names.length > 0
+      ? `None of these attendee types has a minimum age of 18 or more: ${listNames(names.map((name) => `"${name}"`))} Set Min age to 18 on the adult type (for example a teacher, sponsor or Adult type) so scheduled email knows who is an adult. Other types can stay without ages.`
+      : "No attendee types yet. Add at least one with a minimum age of 18 or more (for example Adult, 18 and up). Attendee types decide who is an adult, youth or child, which sets prices and who gets each email.";
   return {
     id: "attendee-types",
-    label: "Attendee types set",
-    detail: done
-      ? names.length > 0 ? listNames(names) : "An adult attendee type tells scheduled email who is an adult."
-      : "Attendee types decide who is an adult, youth or child, which sets prices and who gets each email.",
+    label: done || names.length === 0 ? "Attendee types set" : "An adult attendee type (minimum age 18)",
+    detail,
     complete: done,
-    ...(href ? { href, actionLabel: "Set attendee types" } : {}),
+    ...(href ? { href, actionLabel: names.length > 0 && !done ? "Set an adult minimum age" : "Set attendee types" } : {}),
   };
 }
 

@@ -115,7 +115,7 @@ describe("Music Festival starter event template (#2031)", () => {
     expect(payload.attendeeTypes.map((type) => [type.code, type.label, type.sortOrder, type.minimumAge, type.maximumAge])).toEqual([
       ["STUDENT_DORM", "Student, staying on campus", 0, null, null],
       ["STUDENT_DAY", "Student, not staying in the dorm", 1, null, null],
-      ["TEACHER_SPONSOR", "Teacher / sponsor", 2, null, null],
+      ["TEACHER_SPONSOR", "Teacher / sponsor", 2, 18, null],
     ]);
     expect(payload.registrationClosesOn).toBeUndefined();
     expect(payload.locations ?? []).toEqual([]);

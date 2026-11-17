@@ -164,9 +164,10 @@ describe("the server gate enforces the required items (#1408)", () => {
 
   it("blocks a general event with no adult attendee type, and not a club event", async () => {
     mockPrisma(row(), { types: [{ label: "Child", minimumAge: null }] });
-    expect(await failure(publish())).toMatchObject({ code: "EVENT_NOT_READY", message: expect.stringContaining("attendee types set") });
+    // #2040: types exist but none is adult, so the message names the adult type that is missing.
+    expect(await failure(publish())).toMatchObject({ code: "EVENT_NOT_READY", message: expect.stringContaining("an adult attendee type (minimum age 18)") });
     mockPrisma(row(), { types: [] });
-    expect(await failure(publish())).toMatchObject({ code: "EVENT_NOT_READY" });
+    expect(await failure(publish())).toMatchObject({ code: "EVENT_NOT_READY", message: expect.stringContaining("attendee types set") });
 
     const clubTx = mockPrisma(row({ audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE" }), { types: [] });
     await expect(publish()).resolves.toMatchObject({ changed: true, toState: "PUBLISHED" });
