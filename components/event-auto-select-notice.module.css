@@ -2,4 +2,6 @@
 .notice { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
 @media (max-width: 800px) {
   .notice { padding: 8px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+  /* Inside an event the event bar already names the event and offers Switch, so a phone drops this repeat (#2023). */
+  .withEventBar { display: none; }
 }

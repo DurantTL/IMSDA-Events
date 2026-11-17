@@ -116,8 +116,8 @@ export default async function CommunicationsPage({
   return (
     <>
       <AdminPageHeader path="/communications" eventId={event.id} />
-    <StaffContextualHelp guideId="resolve-email-problem" event={requested} />
     <CommunicationsWorkspace
+      help={<StaffContextualHelp guideId="resolve-email-problem" event={requested} />}
       key={event.id}
       eventId={event.id}
       eventName={event.name}

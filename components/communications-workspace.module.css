@@ -3,3 +3,6 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* The contextual Help button sits in the header's actions (#2023); its own row margin is dropped there. */
+.helpSlot.helpSlot > * { margin: 0; }
