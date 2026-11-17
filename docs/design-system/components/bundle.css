@@ -2757,6 +2757,9 @@ html[data-keyboard="open"] .mobile-nav { transform: translateY(calc(100% + 12px)
 .staff-shell__eventBar { flex-wrap: wrap; gap: 0 8px; padding-top: 8px; }
 .staff-shell__eventBar .staff-shell__crumb { flex: none; }
 .staff-shell__eventName { flex: 1 1 7rem; min-width: 7rem; font-size: 1.05rem; line-height: 1.2; overflow-wrap: break-word; word-break: normal; }
+.staff-shell__tabline[data-fit="tight"] .staff-shell__menuline { min-width: 0; }
+.staff-shell__tabline[data-fit="tight"] .staff-shell__current:has(.staff-shell__currentView) { flex-direction: column; align-items: stretch; justify-content: center; gap: 0; padding-top: 4px; line-height: 1.25; overflow-wrap: normal; }
+.staff-shell__eventBar ~ .workspace-content > .page-stack { padding-top: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
 .staff-shell__tabs a { transition: none; }
