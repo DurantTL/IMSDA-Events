@@ -25,6 +25,7 @@ import {
 } from "@/modules/payments/deposit-domain";
 import { formatPersonName } from "@/lib/person-name";
 import { attendeeShareCentsFrom } from "@/modules/registrations/person-price";
+import { teamLabel } from "@/modules/club-teams/domain";
 import { snapshotIsYouthNotPathfinder } from "@/modules/club-registrations/domain";
 
 type RegistrationWithRelations = Awaited<ReturnType<typeof getRegistrationQuery>>[number];
@@ -62,6 +63,8 @@ function getRegistrationQuery(
       location: { select: { id: true, name: true } },
       // A "Group" registration (#650) is billed to its contact, not to a church.
       groupRegistration: { select: { id: true } },
+      // A club registration's team (#2038): shown with the club's name on staff lists, search and the attendee list.
+      clubRegistration: { select: { teamName: true, organization: { select: { name: true } } } },
       // A registration made through a personal staff, pastor or volunteer link (#804): its group and the office's decision.
       staffInvitation: { select: { group: true, approval: true } },
       waitlistEntry: { select: { status: true } },
@@ -278,6 +281,9 @@ function serializeRegistration(registration: RegistrationWithRelations, director
     isDeferredOrganizationBilling: registration.event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
     /** Billed to its contact (the account holder below), not to a church or club (#650). */
     isGroup: Boolean(registration.groupRegistration),
+    clubTeamLabel: registration.clubRegistration
+      ? teamLabel(registration.clubRegistration.organization.name, registration.clubRegistration.teamName)
+      : null,
     /** Set when the registration was made through a personal staff invitation (#804): Staff, Pastor or Volunteer, and whether the office has approved it. */
     staffInvitation: registration.staffInvitation ? { group: registration.staffInvitation.group, approval: registration.staffInvitation.approval } : null,
     submittedAt: registration.submittedAt?.toISOString() ?? null,
@@ -385,7 +391,9 @@ function serializeRegistration(registration: RegistrationWithRelations, director
 }
 
 type SerializedRegistration = ReturnType<typeof serializeRegistration>;
-export type RegistrationRecord = Omit<SerializedRegistration, "attendees" | "publicSubmission" | "location" | "locationWaitlistPlace" | "deposit" | "staffInvitation"> & {
+export type RegistrationRecord = Omit<SerializedRegistration, "attendees" | "publicSubmission" | "location" | "locationWaitlistPlace" | "deposit" | "staffInvitation" | "clubTeamLabel"> & {
+  /** "Team (Club)" or the club for a club registration (#2038); optional so records built before it still type-check. */
+  clubTeamLabel?: string | null;
   /** Optional so records built before personal staff invitations existed (#804) still type-check. */
   staffInvitation?: SerializedRegistration["staffInvitation"];
   /** The reservation deposit (#415); optional so records built before it existed still type-check. */

@@ -17,6 +17,7 @@ export function registrationSearchTerms(registration: RegistrationRecord) {
     registration.accountHolder.lastName,
     registration.accountHolder.email,
     registration.accountHolder.phone,
+    registration.clubTeamLabel ?? "",
     ...registration.attendees.flatMap((attendee) => [
       attendee.firstName,
       attendee.lastName,

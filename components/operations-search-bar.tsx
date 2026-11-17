@@ -109,7 +109,7 @@ export function OperationsSearchBar({
             return (
               <label className="field" key="q">
                 <span>Search</span>
-                <input defaultValue={query.text} maxLength={100} name="q" placeholder="Name, email, phone or confirmation code" type="search" />
+                <input defaultValue={query.text} maxLength={100} name="q" placeholder="Name, email, phone, team or confirmation code" type="search" />
               </label>
             );
           }

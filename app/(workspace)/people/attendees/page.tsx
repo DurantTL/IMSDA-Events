@@ -60,12 +60,15 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
   const registrations = await listRegistrations(event.id, { statuses: query.statuses });
   // Free-text dietary answers are health-type: the same function gates the CSV.
   const showDietaryDetails = canViewDietaryDetails({ permissions, clubEvent });
-  const rows = filterAttendeeListing(buildAttendeeListingRows(registrations, { showDietaryDetails }), query);
+  const allRows = buildAttendeeListingRows(registrations, { showDietaryDetails });
+  const rows = filterAttendeeListing(allRows, query);
   const totals = mealTotals(rows);
   // Paged after the filter and the sort, so a page is a slice of the whole sorted list, never the other way round (#1458).
   const slice = paginate(rows, parsePageParam(firstParam(params.page)), ATTENDEE_PAGE_SIZE);
   // Every column is viewable by VIEW_SENSITIVE_DATA holders (dietary content is gated above, in the rows).
-  const columns = visibleListingColumns(query.view);
+  // The Club / team column only on an event with club registrations (#2038); the CSV always has it, so its header is stable.
+  const hasClubTeams = allRows.some((row) => row.clubTeam);
+  const columns = visibleListingColumns(query.view).filter((column) => hasClubTeams || column.key !== "clubTeam");
   const activeView = LISTING_VIEWS.find((view) => view.id === query.view) ?? LISTING_VIEWS[0]!;
   const canExport = permissions.includes("VIEW_REPORTS");
 
@@ -126,7 +129,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
             {LISTING_VIEWS.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}
           </select>
         </label>
-        <label className={styles.searchField}>Search<input type="search" name="q" defaultValue={query.search} placeholder="Name or confirmation code" /></label>
+        <label className={styles.searchField}>Search<input type="search" name="q" defaultValue={query.search} placeholder="Name, team or confirmation code" /></label>
         <label className={styles.mealField}>Meal preference
           <select name="meal" defaultValue={query.meal ?? ""}>
             <option value="">All meals</option>

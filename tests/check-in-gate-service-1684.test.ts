@@ -59,12 +59,12 @@ type Db = {
 };
 let db: Db;
 
-function attendeeRow(id: string, first: string, last: string, club: string | null, arrival?: Date) {
+function attendeeRow(id: string, first: string, last: string, club: string | null, arrival?: Date, teamName: string | null = null) {
   return {
     id,
     profileSnapshot: {},
     person: { firstName: first, lastName: last },
-    registration: { clubRegistration: club ? { organization: { name: club } } : null },
+    registration: { clubRegistration: club ? { teamName, organization: { name: club } } : null },
     gateArrivals: arrival ? [{ arrivedAt: arrival }] : [],
   };
 }
@@ -150,6 +150,13 @@ describe("gate lookup by name (#1684)", () => {
         arrivedAtLabel: null,
       }],
     });
+  });
+
+  it("shows the team with the club when the registration has a team (#2038)", async () => {
+    db.$queryRaw.mockResolvedValue([{ id: "a1" }]);
+    db.registrationAttendee.findMany.mockResolvedValue([attendeeRow("a1", "Sam", "Rivera", "Synthetic Pathfinders", undefined, "Synthetic Eagles")]);
+    const response = await gateLookup(station, { kind: "name", value: "rivera" });
+    expect(response.results[0].clubName).toBe("Synthetic Eagles (Synthetic Pathfinders)");
   });
 
   it("returns exactly the minimal keys and nothing else about the person", async () => {

@@ -280,6 +280,11 @@ describe("the predicate and the order", () => {
     expect(where.AND).toEqual([{ id: { in: [] } }]);
   });
 
+  it("matches typed text against a club registration's team name (#2038)", () => {
+    const teamWhere = JSON.stringify(buildRegistrationWhere(parse("q=Eagles").query, { eventId: "event-a", questions: [], paymentRegistrationIds: null }));
+    expect(teamWhere).toContain('"clubRegistration":{"is":{"teamName":{"contains":"Eagles","mode":"insensitive"}}}');
+  });
+
   it("escapes pattern characters in typed text", () => {
     expect(escapeLikePattern("50%_off\\")).toBe("50\\%\\_off\\\\");
     const where = JSON.stringify(buildRegistrationWhere(parse("q=%25").query, { eventId: "event-a", questions: [], paymentRegistrationIds: null }));

@@ -62,6 +62,8 @@ export type AttendeeListingRow = {
   /** Staff, Pastor or Volunteer for a registration made through a personal invitation (#804); blank for everyone else. */
   group: string;
   church: string;
+  /** "Team (Club)" or the club for a club registration (#2038); blank for everyone else. */
+  clubTeam: string;
   mealPreference: string;
   mealCategory: MealCategory;
   dietaryNeeds: string;
@@ -257,6 +259,7 @@ export function buildAttendeeListingRows(registrations: readonly RegistrationRec
         attendeeType: attendee.attendeeType,
         group: registration.staffInvitation ? STAFF_GROUP_LABEL[registration.staffInvitation.group] : "",
         church,
+        clubTeam: registration.clubTeamLabel ?? "",
         // With no meal question, the column shows the meal type the diet choices give, so it matches the tiles and filter.
         mealPreference: mealFromDietChoices(fields) ? mealCategoryLabel(mealCategory) : mealPreference,
         mealCategory,
@@ -281,6 +284,7 @@ export const LISTING_COLUMNS: ReadonlyArray<{ key: ListingSortKey; label: string
   { key: "attendeeType", label: "Type" },
   { key: "group", label: "Group" },
   { key: "church", label: "Church" },
+  { key: "clubTeam", label: "Club / team" },
   { key: "mealPreference", label: "Meal preference" },
   { key: "dietaryNeeds", label: "Dietary needs" },
   { key: "childcareNeeded", label: "Childcare needed" },
@@ -392,7 +396,7 @@ export function filterAttendeeListing(rows: readonly AttendeeListingRow[], query
     if (!query.statuses.includes(row.status as ListingStatus)) return false;
     if (query.meal && row.mealCategory !== query.meal) return false;
     if (query.dietaryOnly && !row.hasDietaryNeeds) return false;
-    if (needle && !row.name.toLowerCase().includes(needle) && !row.confirmationCode.toLowerCase().includes(needle)) return false;
+    if (needle && !row.name.toLowerCase().includes(needle) && !row.confirmationCode.toLowerCase().includes(needle) && !row.clubTeam.toLowerCase().includes(needle)) return false;
     return true;
   });
   if (!query.sort) return filtered;
