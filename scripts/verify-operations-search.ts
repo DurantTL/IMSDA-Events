@@ -242,7 +242,7 @@ async function main() {
   await amend("amended_twice", "car", "2026-10-06T10:00:00Z");
   // A club registration, and a registration at a site of the event.
   await prisma.organization.create({ data: { id: `${P}_org_eagle`, type: "CLUB", name: "Eagle Ridge Club", normalizedName: "eagle ridge club" } });
-  await prisma.clubEventRegistration.create({ data: { eventId: eventA, organizationId: `${P}_org_eagle`, registrationId: reg0("jane_doe") } });
+  await prisma.clubEventRegistration.create({ data: { eventId: eventA, organizationId: `${P}_org_eagle`, registrationId: reg0("jane_doe"), teamName: "Sword Drill", teamKey: "sword drill" } });
   const siteNorth = await prisma.eventLocation.create({ data: { id: `${P}_loc_north`, eventId: eventA, name: "North Site", normalizedName: "north site" } });
   await prisma.eventLocation.create({ data: { id: `${P}_loc_south`, eventId: eventA, name: "South Site", normalizedName: "south site", sortOrder: 1 } });
   await prisma.registration.update({ where: { id: reg0("jane_smith") }, data: { locationId: siteNorth.id } });
@@ -474,6 +474,7 @@ async function main() {
   // Organization.
   assert(sameSet(ids(await run(registrar, `organization=${P}_org_eagle`)), [reg("jane_doe")]), "an organization filter keeps that club's registrations");
   assert(sameSet(ids(await run(registrar, "q=Eagle+Ridge")), [reg("jane_doe")]), "text also finds a club by name");
+  assert(sameSet(ids(await run(registrar, "q=sword+drill")), [reg("jane_doe")]), "text also finds a club registration by its team name (#2038)");
   const staleOrg = await run(registrar, "organization=ops_org_gone");
   assert(!staleOrg.ok && staleOrg.issues.some((issue) => issue.code === "stale-reference"), "an unknown organization is reported");
   const noOrg = await run(view(eventA, "VIEW_EVENT", "MANAGE_REGISTRATION"), `organization=${P}_org_eagle`);
