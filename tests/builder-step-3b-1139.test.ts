@@ -186,7 +186,7 @@ describe("version-state chips (#1139)", () => {
   });
 
   it("viewing the live version while a newer draft exists says live, not old", () => {
-    expect(versionStateChips({ versions: [draft, live], selected: live, isHistorical: true, dirty: false }).map((chip) => chip.text)).toEqual(["Viewing live version 3 (read-only)", "Published (version 3)", "Draft (version 4)"]);
+    expect(versionStateChips({ versions: [draft, live], selected: live, isHistorical: true, dirty: false }).map((chip) => chip.text)).toEqual(["Viewing published version 3 (read-only)", "Published (version 3)", "Draft (version 4)"]);
   });
 
   it("unsaved changes is its own chip, next to the state", () => {
