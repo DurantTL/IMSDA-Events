@@ -330,6 +330,10 @@
   .tabline[data-fit="tight"] .currentView { display: block; }
   /* Inside an event a page's own header starts just under the menu line; the page-stack's top padding is dropped (#2023). */
   .eventBar ~ :global(.workspace-content) > :global(.page-stack) { padding-top: 0; }
+  /* An Events Administrator's "Event administration" section name repeats the event bar and menu line; wider screens already
+     hide it, and so does a phone inside an event (#2023). */
+  .eventBar ~ :global(.workspace-content) :global([data-testid="admin-section-header"][data-section="events"]) { padding-top: 0; }
+  .eventBar ~ :global(.workspace-content) :global([data-testid="admin-section-header"][data-section="events"] > .eyebrow) { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

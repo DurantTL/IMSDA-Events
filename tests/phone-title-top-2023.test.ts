@@ -67,6 +67,11 @@ describe("the shell's views strip on a phone", () => {
   it("drops the page-stack's top padding only under the event bar", () => {
     expect(phoneBlock).toContain(".eventBar ~ :global(.workspace-content) > :global(.page-stack) { padding-top: 0; }");
   });
+
+  it("drops an Events Administrator's repeated section name only under the event bar, as wider screens already do", () => {
+    expect(phoneBlock).toContain(':global([data-testid="admin-section-header"][data-section="events"] > .eyebrow) { display: none; }');
+    expect(read("components/admin-section-header.module.css")).toMatch(/@media \(min-width: 801px\) \{[\s\S]*?\.header \.name \{ display: none; \}/);
+  });
 });
 
 describe("the Continuing with notice and page Help", () => {
