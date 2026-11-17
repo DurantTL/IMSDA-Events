@@ -539,6 +539,12 @@ function focusConfirmationHeading(element: HTMLHeadingElement | null) {
   element?.focus({ preventScroll: true });
 }
 
+/**
+ * Shown at the top of every public registration form (#2045): people may write their answers in Spanish. Plain text, so
+ * a browser's translator translates it like the rest of the page (T1). Left out when staff enter a registration.
+ */
+export const ANSWER_LANGUAGE_NOTE = "You may answer in English or Spanish.";
+
 export function PublicRegistrationForm({
   event,
   form,
@@ -3747,6 +3753,7 @@ export function PublicRegistrationForm({
           <section className="public-registration-intro">
             <p className="public-registration-eyebrow">Registration form</p>
             <h2>{definition.title}</h2>
+            {!staffSubmit && <p>{ANSWER_LANGUAGE_NOTE}</p>}
             {definition.description && <ExpandableText text={definition.description} />}
             <span><span aria-hidden="true">*</span> Required field</span>
           </section>
