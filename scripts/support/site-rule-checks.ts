@@ -69,7 +69,9 @@ const NOT_A_RECORD_STATUS = [...Object.values(clubDirectorRoleLabels), "Clear", 
  *  - system health: exactly "OK" (green), "Check soon" (amber, the gold chip), "Needs attention" (red, the coral chip),
  *    in that order of severity;
  *  - neutral reading labels (grey, never OK): "Unavailable", "Count only", "Not run yet";
- *  - progress: "N of M ticked";
+ *  - progress: "N of M ticked", "Ticked", "Not ticked";
+ *  - summaries (#2025): "Configured", "Not configured", "N forms on", "All published", "Nothing paused", "N of M paused",
+ *    "Nearly full", "Full", "Clash", "Needs gender, current class", "Version 2", "Published (version 2)";
  *  - tallies of the above: "N OK", "N check soon", "N need attention", "N unavailable", "N count only".
  * A detail after " · " is checked part by part: each part must be one of these labels or a count like "2 chosen".
  */
@@ -81,12 +83,23 @@ export const HEALTH_LABELS = [
 const MONEY_LABELS = [/^\$[\d,]+(\.\d{2})? due$/, /^Paid in full$/, /^No charge$/];
 const ACCOUNT_LABELS = ["Staff login", "Website account", "Two-step on", "Two-step not set up"];
 const PUBLISHED_AT = /^Published( by [^·]+?)? [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{1,2}:\d{2} [AP]M C[SD]T$/;
-const PUBLISHING_LABELS = [/^Published$/, PUBLISHED_AT, /^Draft$/, /^Active$/, /^Inactive$/, /^No unpublished changes$/];
-const READING_WORDS = ["Unavailable", "Count only", "Not run yet"];
+// "Published (version 3)" is a form's live version in the registration builder; "Version 3" names a template's version number.
+const PUBLISHING_LABELS = [/^Published$/, PUBLISHED_AT, /^Published \(version \d+\)$/, /^Version \d+$/, /^Draft$/, /^Active$/, /^Inactive$/, /^No unpublished changes$/];
+// "For information" is the readiness page's grey chip for a line that carries no verdict.
+const READING_WORDS = ["Unavailable", "Count only", "Not run yet", "For information"];
 const PROGRESS_LABEL = /^\d+ of \d+ ticked$/;
+// A person's tick on the readiness checklist, and the environment panel's "a value is set" reading (B12, #2025).
+const TICK_WORDS = ["Ticked", "Not ticked"];
+const CONFIGURATION_WORDS = ["Configured", "Not configured"];
+// Hub-card summaries (a count of what is on or paused, or nothing outstanding) and a class's seat and clash flags on the
+// Honors schedule: they describe a tally or a capacity, not a record.
+const SUMMARY_LABELS = [/^\d+ forms? on$/, /^All published$/, /^Nothing paused$/, /^\d+ of \d+ paused$/];
+const CAPACITY_WORDS = ["Nearly full", "Full", "Clash"];
+// The roster's "Needs gender, current class": what a person still has to be given (the roster's own field labels).
+const NEEDS_DETAILS = /^Needs (gender|current class|grade|role|type|birth date)(, (gender|current class|grade|role|type|birth date))*$/;
 const COUNT_DETAIL = /^\d+ [a-z]+$/;
 
-type InfoKind = "money" | "account" | "publishing" | "health" | "reading" | "progress";
+type InfoKind = "money" | "account" | "publishing" | "health" | "reading" | "progress" | "summary";
 
 function infoKindOfPart(part: string): InfoKind | null {
   if (MONEY_LABELS.some((pattern) => pattern.test(part))) return "money";
@@ -94,7 +107,8 @@ function infoKindOfPart(part: string): InfoKind | null {
   if (PUBLISHING_LABELS.some((pattern) => pattern.test(part))) return "publishing";
   if (HEALTH_LABELS.some((label) => label.word === part) || /^\d+ (OK|check soon|need attention)$/.test(part)) return "health";
   if (READING_WORDS.includes(part) || /^\d+ (unavailable|count only)$/.test(part)) return "reading";
-  if (PROGRESS_LABEL.test(part)) return "progress";
+  if (PROGRESS_LABEL.test(part) || TICK_WORDS.includes(part)) return "progress";
+  if (CONFIGURATION_WORDS.includes(part) || CAPACITY_WORDS.includes(part) || NEEDS_DETAILS.test(part) || SUMMARY_LABELS.some((pattern) => pattern.test(part))) return "summary";
   return null;
 }
 
@@ -208,8 +222,17 @@ type Scan = {
   notSet: Array<{ text: string; fixLinks: string[]; asksWho: boolean }>;
 };
 
+/**
+ * H3 skip (Caleb, Nov 2026): the L4 short status word inside the shared `.status-chip` ("Missing", "Missing 1 earlier month")
+ * is a status label on a record, not a "not set up" sentence, so it is not a dead end by itself. Only a chip whose whole
+ * text is that word (up to five words) is skipped; a sentence still needs a way forward nearby.
+ */
+export const SHORT_STATUS_CHIP_WORD = /^(?:missing|incomplete)(?: [\w-]+){0,4}$/i;
+export const isShortStatusChipWord = (text: string) => SHORT_STATUS_CHIP_WORD.test(text.replace(/\s+/g, " ").trim());
+
 async function scanPage(page: Page): Promise<Scan> {
-  return page.evaluate(() => {
+  return page.evaluate((shortChipSource: string) => {
+    const shortChip = new RegExp(shortChipSource, "i");
     const visible = (element: Element) => {
       const box = element.getBoundingClientRect();
       const style = getComputedStyle(element);
@@ -252,8 +275,11 @@ async function scanPage(page: Page): Promise<Scan> {
     const seen = new Set<Element>();
     for (const element of document.body.querySelectorAll("p, li, small, span, h3, h4, strong, div")) {
       if (!visible(element) || element.closest("script, style, option, nav, header, .modal-card, a[href]")) continue;
+      // An L4 short status word in the shared chip ("Missing") labels a record; it is not a not-set-up sentence (H3).
+      const chip = element.closest(".status-chip");
+      if (chip && shortChip.test(squash(chip.textContent ?? ""))) continue;
       // The deepest element that says it: a container whose own children already say it is skipped.
-      if ([...element.children].some((child) => notSetPattern.test(squash(child.textContent ?? "")))) continue;
+      if ([...element.children].some((child) => notSetPattern.test(squash(child.textContent ?? "")) && !(child.matches(".status-chip") && shortChip.test(squash(child.textContent ?? ""))))) continue;
       const own = squash(element.textContent ?? "");
       if (own.length > 220 || !notSetPattern.test(own) || seen.has(element)) continue;
       seen.add(element);
@@ -270,7 +296,7 @@ async function scanPage(page: Page): Promise<Scan> {
       notSet.push({ text: own.slice(0, 100), fixLinks: fixLinks.slice(0, 3), asksWho: whoPattern.test(squash(container.textContent ?? "")) });
     }
     return { chips, chipColors, badTimes, times, tables: tables.length, wideTables, notSet };
-  });
+  }, SHORT_STATUS_CHIP_WORD.source);
 }
 
 export async function checkPage(page: Page, rec: Recorder, name: string, options: { extraWords?: string[]; look?: boolean } = {}) {

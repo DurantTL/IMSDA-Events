@@ -170,7 +170,7 @@ describe("version-state chips (#1139)", () => {
   const old = { status: "ARCHIVED", versionNumber: 2 };
 
   it("a live version alone", () => {
-    expect(versionStateChips({ versions: [live, old], selected: live, isHistorical: false, dirty: false }).map((chip) => chip.text)).toEqual(["Live (version 3)"]);
+    expect(versionStateChips({ versions: [live, old], selected: live, isHistorical: false, dirty: false }).map((chip) => chip.text)).toEqual(["Published (version 3)"]);
   });
 
   it("a draft alone", () => {
@@ -178,19 +178,19 @@ describe("version-state chips (#1139)", () => {
   });
 
   it("a live version and a newer draft are both visible", () => {
-    expect(versionStateChips({ versions: [draft, live, old], selected: draft, isHistorical: false, dirty: false }).map((chip) => chip.text)).toEqual(["Live (version 3)", "Draft (version 4)"]);
+    expect(versionStateChips({ versions: [draft, live, old], selected: draft, isHistorical: false, dirty: false }).map((chip) => chip.text)).toEqual(["Published (version 3)", "Draft (version 4)"]);
   });
 
   it("an old version is named read-only, with the live one still shown", () => {
-    expect(versionStateChips({ versions: [live, old], selected: old, isHistorical: true, dirty: false }).map((chip) => chip.text)).toEqual(["Viewing old version 2 (read-only)", "Live (version 3)"]);
+    expect(versionStateChips({ versions: [live, old], selected: old, isHistorical: true, dirty: false }).map((chip) => chip.text)).toEqual(["Viewing old version 2 (read-only)", "Published (version 3)"]);
   });
 
   it("viewing the live version while a newer draft exists says live, not old", () => {
-    expect(versionStateChips({ versions: [draft, live], selected: live, isHistorical: true, dirty: false }).map((chip) => chip.text)).toEqual(["Viewing live version 3 (read-only)", "Live (version 3)", "Draft (version 4)"]);
+    expect(versionStateChips({ versions: [draft, live], selected: live, isHistorical: true, dirty: false }).map((chip) => chip.text)).toEqual(["Viewing published version 3 (read-only)", "Published (version 3)", "Draft (version 4)"]);
   });
 
   it("unsaved changes is its own chip, next to the state", () => {
-    expect(versionStateChips({ versions: [live], selected: live, isHistorical: false, dirty: true }).map((chip) => chip.text)).toEqual(["Live (version 3)", "Unsaved changes"]);
+    expect(versionStateChips({ versions: [live], selected: live, isHistorical: false, dirty: true }).map((chip) => chip.text)).toEqual(["Published (version 3)", "Unsaved changes"]);
   });
 
   it("a withdrawn form with nothing live or in draft is still named", () => {
@@ -200,7 +200,7 @@ describe("version-state chips (#1139)", () => {
   it("the top bar renders the chips as text", () => {
     const { markup } = renderShell({ status: "PUBLISHED", extraVersions: [{ id: "version-2", versionNumber: 2, status: "DRAFT" }] });
     expect(markup).toContain('aria-label="Version state"');
-    expect(markup).toContain("Live (version 1)");
+    expect(markup).toContain("Published (version 1)");
     expect(markup).toContain("Draft (version 2)");
     const bar = read("components/registration-builder/builder-editor-shell.tsx");
     expect(bar).toContain("<BuilderVersionChips />");

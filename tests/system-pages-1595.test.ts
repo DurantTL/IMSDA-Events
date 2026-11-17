@@ -180,7 +180,7 @@ const readiness = (over: Partial<SystemReadiness> = {}): SystemReadiness => ({
 describe("readiness page (#1595)", () => {
   it("shows what could not be checked as such and never as OK, with when it was checked", () => {
     const html = renderToStaticMarkup(createElement(SystemReadinessWorkspace, { initialReadiness: readiness() }));
-    expect(html).toContain("Could not check");
+    expect(html).toContain("Unavailable");
     expect(html).toContain("Could not be checked, so not counted as done: Backups");
     expect(html).toContain("0 of 1 manual items ticked.");
     expect(html).toContain("Checked ");
@@ -207,7 +207,7 @@ describe("readiness page (#1595)", () => {
   it("says when manual ticks could not be read instead of showing zero ticked", () => {
     const html = renderToStaticMarkup(createElement(SystemReadinessWorkspace, { initialReadiness: readiness({ ticksAvailable: false }) }));
     expect(html).toContain("Manual ticks could not be read.");
-    expect(html).toContain("Could not read ticks");
+    expect(html).toContain("Unavailable");
     expect(html).not.toContain(">Tick<");
   });
 });

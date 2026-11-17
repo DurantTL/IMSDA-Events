@@ -294,9 +294,10 @@ export const CLOSEOUT_NOTE_MAX_LENGTH = 500;
 export const CLOSED_MONEY_CLEAR_NOTE_MAX_LENGTH = 500;
 
 export const closeoutStateWords: Record<CloseoutState, string> = {
-  ready: "Ready",
-  warning: "Warning",
-  blocking: "Blocking",
+  // The shared health words (B12): green, amber, red.
+  ready: "OK",
+  warning: "Check soon",
+  blocking: "Needs attention",
 };
 
 /** Why a sign-off is refused, or null when it may go ahead. `acknowledged` is the signer's explicit tick. */

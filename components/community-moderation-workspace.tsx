@@ -199,7 +199,7 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
             <p>Discussion remains private to verified attendees with active registrations.</p>
           </div>
           <span className={`status-chip ${community.settings.isEnabled ? "green" : "gold"}`}>
-            {community.settings.isEnabled ? "Enabled" : "Disabled"}
+            {community.settings.isEnabled ? "Active" : "Inactive"}
           </span>
         </div>
         <form onSubmit={saveSettings}>

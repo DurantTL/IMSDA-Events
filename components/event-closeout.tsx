@@ -77,7 +77,7 @@ export function EventCloseoutView({ data, canSignOff, canManageFinance, canOpenM
 
       <section className={styles.panel} aria-labelledby="closeout-checks">
         <h3 className={styles.panelHeading} id="closeout-checks">Checklist</h3>
-        <p className={styles.note}>Blocking checks stop the sign-off. Warnings can be signed off once you have reviewed them. A check that could not be read is never shown as ready.</p>
+        <p className={styles.note}>Checks marked Needs attention stop the sign-off. Checks marked Check soon can be signed off once you have reviewed them. A check that could not be read is never shown as OK.</p>
         <ul className={styles.checks} data-testid="closeout-checks">
           {checks.map((check) => {
             const href = linkFor(check, { canManageFinance, canOpenMoneyReport, canViewEvent });

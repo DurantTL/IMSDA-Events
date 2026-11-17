@@ -226,7 +226,7 @@ function PrintStep({ organizationId, letters, people }: { organizationId: string
                         onChange={(event) => setPicked((current) => (event.target.checked ? [...current, person.personId] : current.filter((item) => item !== person.personId)))}
                         type="checkbox"
                       />
-                      {formatPersonName(person)}<span className={styles.meta}>{` · ${person.typeLabel}`}</span>
+                      <span className={styles.personText}>{formatPersonName(person)}<span className={styles.meta}>{` · ${person.typeLabel}`}</span></span>
                     </label>
                   </li>
                 );

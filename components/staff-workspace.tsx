@@ -180,10 +180,10 @@ export function StaffWorkspace({ eventId, eventName, initialMemberships, current
       const pendingActivation = membership.user.accountStatus === "PENDING_ACTIVATION";
       const hasAccess = membership.status === "ACTIVE" && !membership.user.accountDisabled && !pendingActivation;
       const statusLabel = membership.user.accountDisabled
-        ? "account disabled"
+        ? "Inactive"
         : pendingActivation
           ? "awaiting activation"
-          : membership.status.toLowerCase();
+          : membership.status === "ACTIVE" ? "Active" : "Inactive";
       return <button className="staff-row staff-record" type="button" key={membership.id} onClick={() => openEdit(membership)}><span className="staff-person"><span className="person-avatar">{typeof membership.user.photoVersion === "number" ? <img alt="" className="person-avatar-photo" height={38} loading="lazy" src={`/api/profile-photos/${encodeURIComponent(membership.user.id)}?size=thumb&v=${membership.user.photoVersion}`} width={38} /> : membership.user.displayName.split(/\s+/).map((part) => part[0]).slice(0, 2).join("")}</span><span><strong>{membership.user.displayName}{membership.user.id === currentUserId ? " (you)" : ""}</strong><small>{membership.user.jobTitle || membership.user.email}</small>{membership.user.jobTitle && <small>{membership.user.email}</small>}</span></span><span><strong>{roleLabel(membership.role)}</strong><small>{membership.user.globalRole === "SYSTEM_ADMIN" ? systemRoleText.SYSTEM_ADMIN.name : roleDetails[membership.role].description}</small></span><span className={`status-chip ${hasAccess ? "green" : "purple"}`}>{statusLabel}</span><span>{hasAccess ? `${rolePermissions[membership.role].length} permissions` : "No access"}</span></button>;
     })}</div>
     {memberships.length === 0
