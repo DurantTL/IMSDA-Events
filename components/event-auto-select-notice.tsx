@@ -12,13 +12,16 @@ import styles from "./event-auto-select-notice.module.css";
 export function EventAutoSelectNotice({
   eventName,
   switchHref = "/select-event",
+  withEventBar = false,
 }: {
   eventName: string;
+  /** The event bar above already names this event and offers Switch, so a phone hides this notice (#2023). */
+  withEventBar?: boolean;
   /** Where "Switch event" goes: the picker for staff, `/admin` for system administrators. */
   switchHref?: string;
 }) {
   return (
-    <div className={`inline-notice event-auto-select-notice ${styles.notice}`} role="status">
+    <div className={`inline-notice event-auto-select-notice ${styles.notice}${withEventBar ? ` ${styles.withEventBar}` : ""}`} role="status">
       <span>Continuing with <strong>{eventName}</strong>.</span>
       <Link className="text-link" href={switchHref}>Switch event</Link>
     </div>

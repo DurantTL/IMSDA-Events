@@ -38,6 +38,8 @@ export function StaffTabRow({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const current = tabs.find((tab) => tab.current) ?? tabs[0];
+  // On a phone the shell's views strip gives way to the menu line, so the line names the current view too (#2023).
+  const currentView = current && current.views && current.views.length > 1 ? current.views.find((view) => view.current) : undefined;
 
   useLayoutEffect(() => {
     const line = lineRef.current;
@@ -74,7 +76,10 @@ export function StaffTabRow({
         </ul>
       </nav>
       <div className={styles.menuline} data-staff-menu-line>
-        <span className={styles.current}>{current.label}{current.count ? <span className={`count-badge ${styles.countText}`}>{current.count}</span> : null}</span>
+        <span className={styles.current}>
+          <span className={styles.currentTab}><span className={styles.currentName}>{current.label}</span>{current.count ? <span className={`count-badge ${styles.countText}`}>{current.count}</span> : null}</span>
+          {currentView ? <span className={styles.currentView}><span aria-hidden="true">› </span>{currentView.label}</span> : null}
+        </span>
         <button
           ref={buttonRef}
           type="button"

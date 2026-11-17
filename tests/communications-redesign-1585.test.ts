@@ -73,7 +73,8 @@ describe("each page has one titled header and is registered (#1585)", () => {
     expect(markup).toContain(`${staffPageTitles.emails}</h1>`);
     expect(markup).not.toContain("Messages &amp; announcements");
     expect(markup).not.toContain("Event communications");
-    expect(markup).toMatch(/page-header-actions[^>]*>\s*<button class="primary-button"[^>]*>[\s\S]*?New announcement/);
+    // The contextual Help slot sits first in the header's actions, beside the title rather than above it (#2023).
+    expect(markup).toMatch(/page-header-actions[^>]*>\s*(?:<div class="[^"]*helpSlot[^"]*">[\s\S]*?<\/div>)?\s*<button class="primary-button"[^>]*>[\s\S]*?New announcement/);
     expect(count(markup, /primary-button/g)).toBe(1);
     expect(markup).toContain("Communication tools");
     // The empty state offers the same action, outlined, because the header holds the filled one.

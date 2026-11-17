@@ -208,6 +208,9 @@
 /* A page below a view (a queue under Review queues, a money page under More money tools) still says where it belongs. */
 .views a[aria-current="true"] { background: var(--imsda-navy-soft); color: var(--imsda-navy); }
 .views a:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
+/* The current view's name in the menu line shows only on a phone, where it stands in for the shell's views strip (#2023). */
+.currentView { display: none; font-weight: 700; }
+.currentTab { display: contents; }
 
 /* ---------- page header (title and Event administration badge) ---------- */
 .pageHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 14px 0 6px; }
@@ -316,6 +319,17 @@
   .trailing:has(.openerShell) { flex: 1 1 100%; }
   .openerShell { display: flex; width: 100%; }
   .openerShell select { width: 100%; color: var(--imsda-navy); }
+  /* Phones put the task first (#2023): when the tabs have become the menu line, the line names the current view and the shell's
+     views strip is dropped. Every view stays in the Event menu, which lists each tab's views. */
+  .tabline[data-fit="tight"] ~ .shellViews { display: none; }
+  /* Two short lines: the tab, then "› view". A name too long for its line ends in an ellipsis, never breaking mid-word. */
+  .tabline[data-fit="tight"] .menuline { min-width: 0; }
+  .tabline[data-fit="tight"] .current:has(.currentView) { flex-direction: column; align-items: stretch; justify-content: center; gap: 0; padding-top: 4px; line-height: 1.25; overflow-wrap: normal; }
+  .tabline[data-fit="tight"] .current:has(.currentView) .currentTab { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .tabline[data-fit="tight"] .current:has(.currentView) :is(.currentName, .currentView) { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .tabline[data-fit="tight"] .currentView { display: block; }
+  /* Inside an event a page's own header starts just under the menu line; the page-stack's top padding is dropped (#2023). */
+  .eventBar ~ :global(.workspace-content) > :global(.page-stack) { padding-top: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

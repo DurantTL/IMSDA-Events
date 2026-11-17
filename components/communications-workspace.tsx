@@ -108,6 +108,8 @@ import styles from "./communications-workspace.module.css";
 export const DELIVERY_REFRESH_INTERVAL_MS = 20_000;
 
 type CommunicationsWorkspaceProps = {
+  /** The page's contextual Help button (server-rendered), shown in the header beside the title, not above it (#2023). */
+  help?: ReactNode;
   eventId: string;
   eventName: string;
   /** Church-billed events send the portal link as "View or edit". */
@@ -320,6 +322,7 @@ export function CommunicationsWorkspace({
   initialView,
   openNew = false,
   emailLayoutSettings = DEFAULT_EMAIL_LAYOUT_SETTINGS,
+  help,
 }: CommunicationsWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -1528,6 +1531,7 @@ export function CommunicationsWorkspace({
       <PageHeader
         title={staffPageTitles.emails}
         description={`Announcements, reminders and the delivery record for ${eventName}.`}
+        extra={help ? <div className={styles.helpSlot}>{help}</div> : undefined}
         primary={canManage && view === "announcements" ? (
           <button className="primary-button" type="button" onClick={() => openDraftEditor(blankAnnouncementValues, [], null)}>
             <Plus aria-hidden="true" size={17} /> New announcement

@@ -361,7 +361,7 @@ export function AppShell({
             tabs={rowTabs}
             trailing={showsClubYearSelector(place) ? <ClubsYearSelector /> : place.area === "clubs" && !place.inEvent ? null : openPicker}
           />
-          {currentTab?.views && currentTab.views.length > 1 && <StaffViewStrip label={`${currentTab.label} views`} views={currentTab.views} />}
+          {currentTab?.views && currentTab.views.length > 1 && <StaffViewStrip shell label={`${currentTab.label} views`} views={currentTab.views} />}
           {!pageDrawsOwnHeader && (
             <header className={styles.pageHeader}>
               <div>
@@ -380,6 +380,7 @@ export function AppShell({
               <EventAutoSelectNotice
                 eventName={defaultEvent.name}
                 switchHref={isSystemAdmin ? "/admin" : "/select-event"}
+                withEventBar={eventBarShown}
               />
             )}
             <StaffViewerProvider value={staffViewer}>{children}</StaffViewerProvider>
