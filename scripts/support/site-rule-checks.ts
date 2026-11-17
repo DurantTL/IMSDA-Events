@@ -798,7 +798,7 @@ export async function checkErroredFocus(page: Page, rec: Recorder, name: string,
  * `badge-sheet*`, `badge-label-*`: the physical badge, not a status) and the System administrator role label on the dark
  * System administration hero (`adminBadge`, white on navy, a role and not a record status).
  */
-const REVIEWED_OWN_CHIP = /(?:^|\s)(?:badge-print[\w-]*|badge-sheet[\w-]*|badge-label[\w-]*|[\w-]*adminBadge[\w-]*)(?:\s|$)/;
+const REVIEWED_OWN_CHIP = /(?:^|\s)(?:badge-print[\w-]*|badge-sheet[\w-]*|badge-label[\w-]*|badge-background-actions|[\w-]*adminBadge[\w-]*)(?:\s|$)/;
 
 /** L4: status chips and badges use the shared `.status-chip` and `.count-badge`; filter counts use the count badge. */
 export async function checkChipsAndBadges(page: Page, rec: Recorder, name: string) {
