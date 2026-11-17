@@ -219,7 +219,7 @@ describe("publish readiness: attendee types (#1403, required by #1408)", () => {
       complete: false,
       href: "/more/attendee-configuration?event=evt_1",
       actionLabel: "Set an adult minimum age",
-      detail: "None of these attendee types has a minimum age of 18 or more: Student, staying on campus, Student, not staying in the dorm, Teacher / sponsor. Set Min age to 18 on the adult type (for example a teacher, sponsor or Adult type) so scheduled email knows who is an adult. Other types can stay without ages.",
+      detail: 'None of these attendee types has a minimum age of 18 or more: "Student, staying on campus", "Student, not staying in the dorm", "Teacher / sponsor". Set Min age to 18 on the adult type (for example a teacher, sponsor or Adult type) so scheduled email knows who is an adult. Other types can stay without ages.',
     });
     expect(readiness.ready).toBe(false);
   });
