@@ -87,7 +87,7 @@ export function BuilderActionHints() {
 
 const versionChipTone: Record<VersionChipKind, string> = { live: "green", draft: "gold", withdrawn: "purple", "viewing-old": "purple", unsaved: "gold" };
 
-/** The editor's version state as text chips (#1139): Live, Draft, Viewing old version, Unsaved changes. A live version and a newer draft both show. */
+/** The editor's version state as text chips (#1139): Published, Draft, Viewing old version, Unsaved changes. A live version and a newer draft both show. */
 export function BuilderVersionChips() {
   const { selectedForm, selectedVersion, isHistorical, dirty } = useLoadedBuilder();
   const chips = versionStateChips({ versions: selectedForm.versions, selected: selectedVersion, isHistorical, dirty });

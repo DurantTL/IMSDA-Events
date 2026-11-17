@@ -23,6 +23,8 @@
 .person { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .person input { width: 20px; height: 20px; flex: none; }
 .person label { display: flex; align-items: center; gap: 8px; min-height: 44px; flex: 1; cursor: pointer; overflow-wrap: anywhere; }
+/* The name and its type share one flex item, so the type is never squeezed into its own narrow box. */
+.personText { min-width: 0; }
 
 /* The print view: one sheet per person; the site chrome is left out of the printout. */
 .printTools { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }

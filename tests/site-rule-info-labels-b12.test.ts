@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { APPROVED_STATUS_WORDS, HEALTH_LABELS, infoLabelKind, requiredHealthColor } from "../scripts/support/site-rule-checks";
+import { APPROVED_STATUS_WORDS, HEALTH_LABELS, infoLabelKind, isShortStatusChipWord, requiredHealthColor } from "../scripts/support/site-rule-checks";
+import { closeoutStateWords } from "@/modules/events/closeout-domain";
+import { versionStateChips } from "@/components/registration-builder/version-state";
 import { STATE_LABEL } from "@/modules/system-admin/system-report/model";
 
 const rules = readFileSync(join(__dirname, "..", "docs", "SITE-RULES.md"), "utf8");
@@ -94,5 +96,55 @@ describe("B12 status words and info labels (Caleb, Nov 7, 2026)", () => {
     const site = readFileSync(join(__dirname, "..", "components", "site-content-workspace.tsx"), "utf8");
     expect(site).not.toMatch(/status-chip[^>]*>Nothing published yet/);
     expect(site).toContain("<span>Nothing published yet: visitors see the standard homepage</span>");
+  });
+});
+
+describe("B12 summary labels and record-status words (#2025 follow-up)", () => {
+  it("accepts the summary and info chips in exactly their shapes", () => {
+    for (const chip of ["For information"]) expect(infoLabelKind(chip), chip).toBe("reading");
+    for (const chip of ["Ticked", "Not ticked"]) expect(infoLabelKind(chip), chip).toBe("progress");
+    for (const chip of ["Configured", "Not configured", "3 forms on", "1 form on", "All published", "Nothing paused", "2 of 5 paused", "Nearly full", "Full", "Clash", "Needs grade", "Needs gender, current class"]) expect(infoLabelKind(chip), chip).toBe("summary");
+    for (const chip of ["Version 2", "Published (version 3)"]) expect(infoLabelKind(chip), chip).toBe("publishing");
+    expect(requiredHealthColor("For information")).toBe("neutral");
+  });
+
+  it("still rejects near misses and the old words", () => {
+    for (const chip of ["Live (version 1)", "Ready", "Warning", "Blocking", "Disabled", "Enabled", "active", "Could not check", "Could not read ticks", "account disabled", "Needs", "Needs nothing", "Needs grade extra", "Version", "Version two", "forms on", "3 forms off", "ticked", "configured", "not configured", "full", "Clash today", "All published soon"]) {
+      expect(infoLabelKind(chip), chip).toBeNull();
+    }
+  });
+
+  it("uses the agreed words for record statuses on the pages", () => {
+    expect(closeoutStateWords).toEqual({ ready: "OK", warning: "Check soon", blocking: "Needs attention" });
+    const live = { status: "PUBLISHED", versionNumber: 3 } as never;
+    expect(versionStateChips({ versions: [live], selected: live, isHistorical: false, dirty: false }).map((chip) => infoLabelKind(chip.text))).toEqual(["publishing"]);
+    const staff = readFileSync(join(__dirname, "..", "components", "staff-workspace.tsx"), "utf8");
+    expect(staff).not.toContain("membership.status.toLowerCase()");
+    const community = readFileSync(join(__dirname, "..", "components", "community-moderation-workspace.tsx"), "utf8");
+    expect(community).toContain('isEnabled ? "Active" : "Inactive"');
+  });
+
+  it("records the summary labels and the word changes in SITE-RULES.md", () => {
+    for (const text of ['"Configured", "Not configured"', '"For information"', '"Ticked", "Not ticked"', '"Nearly full", "Full", "Clash"', '"All published"', '"Nothing paused"', '"Published (version 2)"', "#2025"]) {
+      expect(b12, text).toContain(text);
+    }
+  });
+});
+
+describe("H3 skips the L4 short status word in the shared chip (Caleb, Nov 2026)", () => {
+  it("skips a chip that is only the short word", () => {
+    for (const text of ["Missing", "missing", "Missing 1 earlier month", "Missing  2 records", "Incomplete"]) expect(isShortStatusChipWord(text), text).toBe(true);
+  });
+
+  it("does not skip a real not-set-up sentence", () => {
+    for (const text of ["Payments are not set up", "Not configured", "Missing: the billing address has not been entered yet by anyone", "The roster is missing", "Square is not set up yet", "Incomplete setup, ask the office to finish the form now"]) expect(isShortStatusChipWord(text), text).toBe(false);
+  });
+
+  it("applies the skip only inside .status-chip, and records it in SITE-RULES.md", () => {
+    const checker = readFileSync(join(__dirname, "..", "scripts", "support", "site-rule-checks.ts"), "utf8");
+    expect(checker).toContain('element.closest(".status-chip")');
+    const h3 = rules.split("\n").find((line) => line.startsWith("| H3 |")) ?? "";
+    expect(h3).toContain("short status word");
+    expect(h3).toContain("status-chip");
   });
 });

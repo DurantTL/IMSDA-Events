@@ -17,7 +17,7 @@ const statusLabel = {
   ok: "OK",
   attention: "Needs attention",
   info: "For information",
-  unknown: "Could not check",
+  unknown: "Unavailable",
 } as const;
 
 /** The shared chip's color for each automatic state (L4): grey is for information, never OK. */
@@ -190,7 +190,7 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
                     <p className={styles.title}>{item.title}</p>
                     <span className={styles.headControls}>
                       <span className={`status-chip ${item.tick ? "green" : "neutral"}`}>
-                        {!readiness.ticksAvailable ? "Could not read ticks" : item.tick ? "Ticked" : "Not ticked"}
+                        {!readiness.ticksAvailable ? "Unavailable" : item.tick ? "Ticked" : "Not ticked"}
                       </span>
                       {!isOpen && readiness.ticksAvailable ? (
                         <button
