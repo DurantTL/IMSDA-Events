@@ -117,7 +117,7 @@ export function FilledFormsTable({ submissions, base, caption = "Filled forms", 
               <td {...cardCell("Status")}>{row.status === "DRAFT" ? "Draft" : "Submitted"}{row.enteredVia === "LINK" ? " · private link" : row.enteredVia === "OPEN_APPLICATION" ? " · open application" : ""}</td>
               <td {...cardCell("Date")}>{formatDate(row.submittedAt ?? row.updatedAt)}</td>
               <td {...cardCell(null)}>
-                <Link className="secondary-button" href={`${base}/submissions/${row.id}`}>
+                <Link className={`secondary-button ${styles.rowAction}`} href={`${base}/submissions/${row.id}`}>
                   {row.status === "DRAFT" ? "Open" : <><Printer aria-hidden="true" size={13} /> View and print</>}
                 </Link>
               </td>
