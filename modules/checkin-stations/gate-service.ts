@@ -9,6 +9,7 @@ import { AttendeePassResolutionError } from "@/modules/checkin/attendee-pass-rep
 import { clubPassTokenPrefix } from "@/modules/checkin/club-pass-token";
 import { resolvePassLookupForEvent } from "@/modules/checkin/pass-lookup";
 import { formatInTimeZone } from "@/modules/calendar/conference-format";
+import { teamLabel } from "@/modules/club-teams/domain";
 import {
   GATE_NAME_OR_PASS_MESSAGE,
   GATE_RESULT_LIMIT,
@@ -129,7 +130,7 @@ async function gateResultsFor(eventId: string, timeZone: string, ids: string[]):
       id: true,
       profileSnapshot: true,
       person: { select: { firstName: true, lastName: true } },
-      registration: { select: { clubRegistration: { select: { organization: { select: { name: true } } } } } },
+      registration: { select: { clubRegistration: { select: { teamName: true, organization: { select: { name: true } } } } } },
       gateArrivals: { where: { eventId }, orderBy: { arrivedAt: "desc" }, take: 1, select: { arrivedAt: true } },
     },
   });
@@ -144,7 +145,7 @@ async function gateResultsFor(eventId: string, timeZone: string, ids: string[]):
       result: {
         attendeeId: attendee.id,
         displayName: formatPersonName({ firstName, lastName }),
-        clubName: attendee.registration.clubRegistration?.organization.name ?? null,
+        clubName: attendee.registration.clubRegistration ? teamLabel(attendee.registration.clubRegistration.organization.name, attendee.registration.clubRegistration.teamName) : null,
         sterlingCurrent,
         state: gateStateFor(sterlingCurrent),
         // Only today's arrival counts at the gate; an earlier day's shows the button again.

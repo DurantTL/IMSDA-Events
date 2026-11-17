@@ -669,6 +669,7 @@ function textPredicate(text: string): Prisma.RegistrationWhereInput {
       accountHolder,
       { attendees: { some: attendee } },
       { clubRegistration: { is: { organization: { is: { name: { contains: whole, mode: insensitive } } } } } },
+      { clubRegistration: { is: { teamName: { contains: whole, mode: insensitive } } } },
     ],
   };
 }

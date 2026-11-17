@@ -76,6 +76,16 @@ describe("attendee listing rows", () => {
     expect(rows.find((row) => row.name === "Cleo Synthetic")!.church).toBe("Other Fellowship");
   });
 
+  it("shows the club and team on a club registration's rows and finds it by team name (#2038)", () => {
+    const club = { ...registration("K1", "CONFIRMED", [attendee("k1", "Kai", "Synthetic", {})]), clubTeamLabel: "Synthetic Eagles (Synthetic Pathfinders)" } as unknown as RegistrationRecord;
+    const clubRows = buildAttendeeListingRows([club, registrations[0]], { showDietaryDetails: true });
+    expect(clubRows[0].clubTeam).toBe("Synthetic Eagles (Synthetic Pathfinders)");
+    expect(clubRows[1].clubTeam).toBe("");
+    expect(filterAttendeeListing(clubRows, { ...defaults, search: "eagles" }).map((row) => row.name)).toEqual(["Kai Synthetic"]);
+    const csv = attendeeListingCsv(clubRows);
+    expect(csv).toContain('"Synthetic Eagles (Synthetic Pathfinders)"');
+  });
+
   it("leaves a column blank when the registration's form lacks the question", () => {
     const [row] = buildAttendeeListingRows([registration("Z9", "CONFIRMED", [attendee("z1", "Zed", "Synthetic", { meal_preference: "Vegan" })], {}, null)], { showDietaryDetails: true });
     expect(row).toMatchObject({ mealPreference: "", dietaryNeeds: "", childcareNeeded: "", volunteer: "", church: "", mealCategory: "none" });
@@ -149,9 +159,9 @@ describe("attendee listing CSV", () => {
     const csv = attendeeListingCsv(shown);
     expect(csv.startsWith(ATTENDEE_LISTING_BOM)).toBe(true);
     const lines = csv.slice(1).trim().split("\r\n");
-    expect(lines[0]).toBe('"Confirmation code","Status","Attendee","Type","Group","Church","Meal preference","Dietary needs","Childcare needed","Volunteer","Phone","Account holder","Account holder email"');
+    expect(lines[0]).toBe('"Confirmation code","Status","Attendee","Type","Group","Church","Club / team","Meal preference","Dietary needs","Childcare needed","Volunteer","Phone","Account holder","Account holder email"');
     expect(lines).toHaveLength(1 + shown.length);
-    expect(lines[1]).toBe('"WR26-A1","Confirmed","Ada Synthetic","Adult","","Test Church","Vegetarian","synthetic: no peanuts","Yes","No","555-0101","Holder A1","A1@example.test"');
+    expect(lines[1]).toBe('"WR26-A1","Confirmed","Ada Synthetic","Adult","","Test Church","","Vegetarian","synthetic: no peanuts","Yes","No","555-0101","Holder A1","A1@example.test"');
   });
 
   it("escapes formula-like cells", () => {

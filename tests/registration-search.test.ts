@@ -69,6 +69,14 @@ describe("registration search", () => {
     expect(registrationSearchTerms(registration())).not.toContain("");
   });
 
+  it("finds a club registration by its team or club name (#2038)", () => {
+    const club = registration({ clubTeamLabel: "Synthetic Eagles (Synthetic Pathfinders)" });
+    expect(registrationMatchesSearch(club, "eagles")).toBe(true);
+    expect(registrationMatchesSearch(club, "synthetic pathfinders")).toBe(true);
+    expect(registrationMatchesSearch(registration(), "eagles")).toBe(false);
+    expect(registrationSearchTerms(registration({ clubTeamLabel: null }))).not.toContain("");
+  });
+
   it("summarizes attendee names and counts the remainder", () => {
     expect(attendeeSummaryLabel(registration())).toBe("Marta Alvarez, Rosalind Nkemdirim");
     expect(attendeeSummaryLabel(registration(), 1)).toBe("Marta Alvarez +1 more");
