@@ -6,6 +6,8 @@ import { logError, logInfo, logWarn } from "@/lib/logger";
 import { currentCorrelationId } from "@/lib/request-context";
 import { recordJobRun } from "@/modules/operations/sweep-heartbeat-repository";
 import { ALERT_WEBHOOK_DELIVERY_JOB } from "@/modules/operations/sweep-heartbeat";
+import { postToDiscord } from "@/modules/operations/discord-alert-settings";
+import type { DiscordGroup } from "@/modules/operations/discord-alerts-domain";
 
 /**
  * Something that watches the signals.
@@ -21,7 +23,8 @@ import { ALERT_WEBHOOK_DELIVERY_JOB } from "@/modules/operations/sweep-heartbeat
  * no webhook configured still leaves a trail an aggregator can match on.
  */
 
-export type AlertSeverity = "URGENT" | "WATCH";
+/** `INFO` is a plain notice (a deploy went live, a restore check passed); it is logged at info level. */
+export type AlertSeverity = "URGENT" | "WATCH" | "INFO";
 
 export type Alert = {
   /**
@@ -35,6 +38,12 @@ export type Alert = {
   /** Sent to the webhook only, never written to the log (for a name that staff need but a log line should not carry). */
   webhookOnlyDetail?: string;
   context?: Record<string, string | number | boolean | null>;
+  /**
+   * Which Discord group switch (#2048) this belongs to. Absent means "site-health", the alert scan's alerts. Only
+   * site-health alerts also go to the `ALERT_WEBHOOK_URL` webhook, as before; the other groups are Discord only.
+   * Discord is sent `severity`, `summary` and `detail` only, never `webhookOnlyDetail` or `context`.
+   */
+  group?: DiscordGroup;
 };
 
 export type AlertDispatchResult = {
@@ -130,7 +139,9 @@ function record(alert: Alert) {
     ...(alert.detail ? { detail: alert.detail } : {}),
     ...alert.context,
   };
-  if (alert.severity === "URGENT") {
+  if (alert.severity === "INFO") {
+    logInfo(`ALERT ${alert.summary}`, fields);
+  } else if (alert.severity === "URGENT") {
     // Logged through logError so it lands on stderr with the request's
     // correlation id, without an error object to redact.
     logError(`ALERT ${alert.summary}`, new AlertConditionError(alert.detail ?? alert.summary), fields);
@@ -173,9 +184,20 @@ export async function dispatchAlerts(
     }
 
     record(alert);
-    const delivery = await postToWebhook(alert, { fetchImpl: options.fetchImpl });
-    if (delivery.attempted) await recordWebhookDelivery(delivery);
-    if (delivery.attempted && !delivery.delivered) {
+    const toEnvWebhook = !alert.group || alert.group === "site-health";
+    const webhook: WebhookDelivery = toEnvWebhook
+      ? await postToWebhook(alert, { fetchImpl: options.fetchImpl })
+      : { delivered: false, attempted: false };
+    if (webhook.attempted) await recordWebhookDelivery(webhook);
+    // Discord is one more destination: it never throws, and a failure there only counts when nothing else delivered.
+    const discord = await postToDiscord(
+      alert.group ?? "site-health",
+      { severity: alert.severity, summary: alert.summary, detail: alert.detail },
+      { fetchImpl: options.fetchImpl, now },
+    );
+    const attempted = webhook.attempted || discord.attempted;
+    const delivered = webhook.delivered || discord.delivered;
+    if (attempted && !delivered) {
       result.undelivered.push(alert);
       continue;
     }
@@ -213,17 +235,26 @@ export async function resolveAlertsExcept(
   keyPrefix: string,
   now = new Date(),
 ) {
-  const resolved = await getPrisma().alertNotification.updateMany({
-    where: {
-      key: { startsWith: keyPrefix, notIn: [...activeKeys] },
-      resolvedAt: null,
-    },
-    data: { resolvedAt: now },
-  });
+  return (await resolveAlertsExceptWithDetails(activeKeys, keyPrefix, now)).count;
+}
+
+/** Like `resolveAlertsExcept`, and also says which conditions cleared (key and summary), so "back to normal" can be said. */
+export async function resolveAlertsExceptWithDetails(
+  activeKeys: readonly string[],
+  keyPrefix: string,
+  now = new Date(),
+): Promise<{ count: number; cleared: { key: string; summary: string }[] }> {
+  const where = {
+    key: { startsWith: keyPrefix, notIn: [...activeKeys] },
+    resolvedAt: null,
+  };
+  const prisma = getPrisma().alertNotification;
+  const cleared = await prisma.findMany({ where, select: { key: true, summary: true } });
+  const resolved = await prisma.updateMany({ where, data: { resolvedAt: now } });
   if (resolved.count > 0) {
     logInfo("Alert conditions cleared.", { cleared: resolved.count, keyPrefix });
   }
-  return resolved.count;
+  return { count: resolved.count, cleared };
 }
 
 /**

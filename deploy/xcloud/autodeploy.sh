@@ -79,7 +79,8 @@ echo "[autodeploy] Deploying $SHA (live was ${LIVE:-unknown})"
 DEPLOY_RC=0
 "$DEPLOY" || DEPLOY_RC=$?
 if [ "$DEPLOY_RC" -eq 0 ]; then
-  heartbeat server-autodeploy SUCCEEDED result=deployed
+  # The short version id lets the Discord message say which version went live, once.
+  heartbeat server-autodeploy SUCCEEDED result=deployed "version=$(printf '%s' "$SHA" | cut -c1-7)"
 else
   heartbeat server-autodeploy FAILED result=deploy-failed
 fi

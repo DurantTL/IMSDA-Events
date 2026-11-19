@@ -19,6 +19,8 @@ import {
   type PlatformSettingsDraft,
   type PlatformSettingsField,
 } from "@/components/platform-settings-impact";
+import { DiscordAlertsPanel } from "@/components/discord-alerts-panel";
+import type { DiscordAlertSettingsView } from "@/modules/operations/discord-alert-settings";
 import { LeaderDirectorySwitch, type LeaderDirectorySwitchState } from "@/components/leader-directory-switch";
 import { EnvironmentStatusPanel } from "@/components/environment-status-panel";
 import { classifySettingsSaveFailure, settingsSaveState } from "@/components/settings-save-state";
@@ -91,12 +93,14 @@ export function PlatformSettingsWorkspace({
   initialSettings,
   initialSignIn,
   initialLeaderDirectory,
+  initialDiscordAlerts,
   initialMinistries,
   environmentStatus = null,
 }: {
   initialSettings: PlatformSettingsRecord;
   initialSignIn: SignInSwitchState;
   initialLeaderDirectory: LeaderDirectorySwitchState;
+  initialDiscordAlerts: DiscordAlertSettingsView;
   initialMinistries: { ministries: HomepageMinistry[]; updatedAt: string | null; updatedByName: string | null };
   /** Computed on the server for a system administrator: configured / not configured / unknown, never a value. */
   environmentStatus?: EnvironmentStatus | null;
@@ -420,6 +424,8 @@ export function PlatformSettingsWorkspace({
       </section>
 
       <LeaderDirectorySwitch initial={initialLeaderDirectory} />
+
+      <DiscordAlertsPanel initial={initialDiscordAlerts} />
 
       <form className="form-stack" onSubmit={save}>
         <fieldset className="form-stack settings-fields" disabled={saving}>

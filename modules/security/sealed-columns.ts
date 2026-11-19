@@ -23,7 +23,8 @@ export type SealedModel =
   | "clubFormSubmission"
   | "calendarFeed"
   | "healthRecordField"
-  | "healthRecordSnapshotField";
+  | "healthRecordSnapshotField"
+  | "platformSettings";
 
 export type SealedRowFields = Record<string, unknown>;
 
@@ -225,6 +226,19 @@ export const SEALED_COLUMNS: readonly SealedColumn[] = [
     purpose: (row) => `health-snapshot:${text(row, "snapshotId")}:${text(row, "fieldKey")}`,
     keyRotationGuard: true,
     sourceFiles: ["modules/health-records/crypto.ts"],
+  },
+  {
+    // The Discord channel webhook address for system alerts (#2048). Sealed with the sign-in key: it is a secret, not personal data.
+    label: "PlatformSettings.sealedDiscordWebhook",
+    keyring: "sign-in",
+    model: "platformSettings",
+    schemaModel: "PlatformSettings",
+    preserve: ["updatedAt"],
+    column: "sealedDiscordWebhook",
+    nullable: true,
+    purposeColumns: [],
+    purpose: () => "discord-alert-webhook",
+    sourceFiles: ["modules/operations/discord-alert-settings.ts"],
   },
 ];
 

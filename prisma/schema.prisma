@@ -1949,6 +1949,20 @@ model PlatformSettings {
   leaderDirectoryEnabled     Boolean            @default(false)
   leaderDirectorySetAt       DateTime?
   leaderDirectorySetByUserId String?
+  /// Alerts to a Discord channel (#2048). The channel webhook address is a secret: it is sealed with `lib/secret-box.ts`
+  /// (purpose `discord-alert-webhook`), never read back to a browser, and never written to a log or an audit row.
+  /// `discordWebhookLast4` is the last 4 characters of the address, the only part ever shown.
+  sealedDiscordWebhook      String?
+  discordWebhookLast4       String?
+  discordWebhookSetAt       DateTime?
+  discordWebhookSetByUserId String?
+  /// One switch per message group, all on by default.
+  discordAlertSiteHealth    Boolean            @default(true)
+  discordAlertDeploys       Boolean            @default(true)
+  discordAlertBackups       Boolean            @default(true)
+  discordAlertPracticeRuns  Boolean            @default(true)
+  discordLastDeliveredAt    DateTime?
+  discordLastFailedAt       DateTime?
   updatedAt                 DateTime           @updatedAt
   updatedByUserId           String?
 

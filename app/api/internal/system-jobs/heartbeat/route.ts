@@ -6,6 +6,7 @@ import {
   isAuthorizedHostJobRequest,
   parseHostJobHeartbeat,
 } from "@/modules/operations/host-job-heartbeat";
+import { sendHostJobMessage } from "@/modules/operations/host-job-alerts";
 import { recordJobRun } from "@/modules/operations/sweep-heartbeat-repository";
 
 /**
@@ -40,6 +41,8 @@ async function postHandler(request: Request) {
       { status: 500 },
     );
   }
+  // After the run is recorded; never throws, so Discord can not turn an accepted heartbeat into an error.
+  await sendHostJobMessage(heartbeat);
   return Response.json({ ok: true });
 }
 

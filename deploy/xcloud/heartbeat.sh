@@ -3,6 +3,7 @@
 # /usr/local/bin/imsda-heartbeat. Usage:
 #   imsda-heartbeat JOB OUTCOME [key=value ...]
 #   imsda-heartbeat server-docker-cleanup SUCCEEDED result=cleaned diskUsedAfterPct=71
+#   imsda-heartbeat server-autodeploy SUCCEEDED result=deployed version=0a1b2c3
 #
 # Reads IMSDA_HEARTBEAT_TOKEN (and optionally IMSDA_HEARTBEAT_URL) from
 # /etc/default/imsda-heartbeat. Only ever talks to the app on this machine. The
@@ -52,6 +53,13 @@ for pair in "$@"; do
   value="${pair#*=}"
   case "$pair" in *=*) ;; *) echo "[heartbeat] $JOB not sent (bad detail)"; exit 0 ;; esac
   case "$key" in "" | *[!a-zA-Z]*) echo "[heartbeat] $JOB not sent (bad detail)"; exit 0 ;; esac
+  if [ "$key" = "version" ]; then
+    # A short commit id (7 to 12 hex characters), sent as text even when it is all digits or starts with 0.
+    case "$value" in *[!0-9a-f]* | "") echo "[heartbeat] $JOB not sent (bad detail)"; exit 0 ;; esac
+    if [ "${#value}" -lt 7 ] || [ "${#value}" -gt 12 ]; then echo "[heartbeat] $JOB not sent (bad detail)"; exit 0; fi
+    SUMMARY="${SUMMARY:+$SUMMARY,}\"version\":\"$value\""
+    continue
+  fi
   case "$value" in
     0[0-9]*) echo "[heartbeat] $JOB not sent (bad detail)"; exit 0 ;;
     "") echo "[heartbeat] $JOB not sent (bad detail)"; exit 0 ;;

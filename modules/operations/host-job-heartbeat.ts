@@ -3,6 +3,9 @@ import { z } from "zod";
 import {
   SERVER_AUTODEPLOY_JOB,
   SERVER_DOCKER_CLEANUP_JOB,
+  SERVER_LOAD_REHEARSAL_JOB,
+  SERVER_PREDEPLOY_BACKUP_JOB,
+  SERVER_RESTORE_DRILL_JOB,
   SERVER_RUNTIME_GUARD_JOB,
 } from "@/modules/operations/sweep-heartbeat";
 
@@ -42,8 +45,22 @@ export const AUTODEPLOY_FAILURE_RESULTS = [
 
 const percent = z.number().int().min(0).max(100);
 
+/** A short commit id (7 to 12 hex characters), the only thing about a version a heartbeat may carry. */
+const shortVersion = z.string().regex(/^[0-9a-f]{7,12}$/);
+const smallCount = z.number().int().min(0).max(1000000);
+
 const autodeploySummary = z
-  .object({ result: z.enum([...AUTODEPLOY_SUCCESS_RESULTS, ...AUTODEPLOY_FAILURE_RESULTS]) })
+  .object({ result: z.enum([...AUTODEPLOY_SUCCESS_RESULTS, ...AUTODEPLOY_FAILURE_RESULTS]), version: shortVersion.optional() })
+  .strict();
+/** The database copy before a deploy (#1790): copied, or skipped on purpose (still a run that worked), or failed. */
+export const PREDEPLOY_SUCCESS_RESULTS = ["copied", "skipped"] as const;
+const predeploySummary = z.object({ result: z.enum(["copied", "skipped", "failed"]), version: shortVersion.optional() }).strict();
+/** A restore drill (#1792) and a load rehearsal (#1791): pass or fail, with minutes and counts only. */
+const restoreDrillSummary = z
+  .object({ result: z.enum(["passed", "failed"]), minutes: smallCount.optional(), checks: smallCount.optional(), failed: smallCount.optional() })
+  .strict();
+const loadRehearsalSummary = z
+  .object({ result: z.enum(["passed", "failed"]), minutes: smallCount.optional(), requests: smallCount.optional(), failed: smallCount.optional() })
   .strict();
 const cleanupSummary = z
   .object({
@@ -62,15 +79,29 @@ export const hostJobHeartbeatSchema = z
     z.object({ job: z.literal(SERVER_AUTODEPLOY_JOB), outcome, summary: autodeploySummary }).strict(),
     z.object({ job: z.literal(SERVER_DOCKER_CLEANUP_JOB), outcome, summary: cleanupSummary }).strict(),
     z.object({ job: z.literal(SERVER_RUNTIME_GUARD_JOB), outcome, summary: guardSummary }).strict(),
+    z.object({ job: z.literal(SERVER_PREDEPLOY_BACKUP_JOB), outcome, summary: predeploySummary }).strict(),
+    z.object({ job: z.literal(SERVER_RESTORE_DRILL_JOB), outcome, summary: restoreDrillSummary }).strict(),
+    z.object({ job: z.literal(SERVER_LOAD_REHEARSAL_JOB), outcome, summary: loadRehearsalSummary }).strict(),
   ])
   .refine((value) => {
     // A cleanup that skipped because a deploy held the lock is a normal, successful run.
-    const succeeds =
-      value.job === SERVER_AUTODEPLOY_JOB
-        ? (AUTODEPLOY_SUCCESS_RESULTS as readonly string[]).includes(value.summary.result)
-        : value.job === SERVER_DOCKER_CLEANUP_JOB
-          ? true
-          : value.summary.result === "ok";
+    let succeeds: boolean;
+    switch (value.job) {
+      case SERVER_AUTODEPLOY_JOB:
+        succeeds = (AUTODEPLOY_SUCCESS_RESULTS as readonly string[]).includes(value.summary.result);
+        break;
+      case SERVER_DOCKER_CLEANUP_JOB:
+        succeeds = true;
+        break;
+      case SERVER_RUNTIME_GUARD_JOB:
+        succeeds = value.summary.result === "ok";
+        break;
+      case SERVER_PREDEPLOY_BACKUP_JOB:
+        succeeds = (PREDEPLOY_SUCCESS_RESULTS as readonly string[]).includes(value.summary.result);
+        break;
+      default:
+        succeeds = value.summary.result === "passed";
+    }
     return succeeds === (value.outcome === "SUCCEEDED");
   });
 

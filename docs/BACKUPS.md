@@ -363,6 +363,29 @@ is never used) every 7th run and records the result. Weekly, a human:
 3. Once a quarter, restore from **R2** (not the local copy) using the steps below
    on a scratch database, to prove the off-site files themselves are usable.
 
+## Practice runs (#2048)
+
+A restore drill (#1792) and a load rehearsal (#1791) are run by a person. When one finishes, report it to the app
+with one line on the server, so the result appears in the Discord alert channel (the **Practice runs** switch on
+Platform settings) and the System report. Use `passed` or `failed` for `result`. The outcome is `SUCCEEDED` for a
+pass and `FAILED` for a fail. `minutes` and the counts are whole numbers and are all optional. Never put a name, a
+path or an address in one.
+
+```bash
+# Restore drill: minutes taken, checks run, checks that failed
+imsda-heartbeat server-restore-drill SUCCEEDED result=passed minutes=42 checks=12 failed=0
+imsda-heartbeat server-restore-drill FAILED result=failed minutes=42 checks=12 failed=2
+
+# Load rehearsal: minutes it ran, requests sent, requests that failed
+imsda-heartbeat server-load-rehearsal SUCCEEDED result=passed minutes=15 requests=5000 failed=0
+imsda-heartbeat server-load-rehearsal FAILED result=failed minutes=15 requests=5000 failed=120
+```
+
+The pre-deploy database copy (#1790) reports itself from `deploy/xcloud/deploy.sh`
+(`server-predeploy-backup`: `copied`, `skipped` or `failed`, with the short version id). The nightly backup and the
+weekly automatic restore check are read from the status rows the backup container already records, so they need
+no extra command.
+
 ## Restoring from R2
 
 Do this only for a real recovery or a drill on a scratch database. Restoring

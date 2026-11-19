@@ -51,6 +51,7 @@ function prismaFixture(existing: Record<string, unknown> | null = null) {
         upserts.push(query);
         return {};
       }),
+      findMany: vi.fn(async () => []),
       updateMany: vi.fn(async () => ({ count: 2 })),
     },
   };

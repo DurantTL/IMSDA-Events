@@ -104,6 +104,10 @@ export function assessSweepHeartbeat(
 export const SERVER_AUTODEPLOY_JOB = "server-autodeploy";
 export const SERVER_DOCKER_CLEANUP_JOB = "server-docker-cleanup";
 export const SERVER_RUNTIME_GUARD_JOB = "server-runtime-guard";
+/** Reported when they happen (#2048), so they have no stale threshold: the database copy before a deploy, a restore drill and a load rehearsal. */
+export const SERVER_PREDEPLOY_BACKUP_JOB = "server-predeploy-backup";
+export const SERVER_RESTORE_DRILL_JOB = "server-restore-drill";
+export const SERVER_LOAD_REHEARSAL_JOB = "server-load-rehearsal";
 
 /** Stale thresholds: the auto-deploy timer runs every 2 minutes, cleanup daily, the runtime guard every 30 seconds. */
 export const SERVER_AUTODEPLOY_STALE_AFTER_MS = 30 * 60 * 1000;

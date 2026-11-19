@@ -70,6 +70,19 @@ describe("heartbeat.sh", () => {
     expect(result.stdin).toContain(`Authorization: Bearer ${token}`);
   });
 
+  it("sends a short version id as text, even when it starts with 0 or is all digits (#2048)", () => {
+    for (const version of ["0a1b2c3", "1234567"]) {
+      const result = run(["server-autodeploy", "SUCCEEDED", "result=deployed", `version=${version}`], {});
+      expect(result.args).toContain(`"summary":{"result":"deployed","version":"${version}"}`);
+    }
+  });
+
+  it.each(["version=abc", "version=ABCDEF1", "version=0a1b2c3d4e5f6", "version=abc;1234", "version="])("sends nothing for the version detail %s (#2048)", (pair) => {
+    const result = run(["server-autodeploy", "SUCCEEDED", "result=deployed", pair], {});
+    expect(result.status).toBe(0);
+    expect(result.args).toBe("");
+  });
+
   it("reports a rejected status in one line and still exits 0", () => {
     const result = run(["server-runtime-guard", "FAILED", "result=failed"], { FAKE_STATUS: "401" });
     expect(result.status).toBe(0);
@@ -166,7 +179,7 @@ exit 0
   }
 
   it.each([
-    ["deploys", {}, 0, "SUCCEEDED result=deployed"],
+    ["deploys", {}, 0, `SUCCEEDED result=deployed version=${sha.slice(0, 7)}`],
     ["is up to date", { FAKE_LIVE: sha }, 0, "SUCCEEDED result=up-to-date"],
     ["is outside the window", { FAKE_HOUR: "13" }, 0, "SUCCEEDED result=outside-window"],
     ["is waiting for the image", { FAKE_PULL_EXIT: "1" }, 0, "SUCCEEDED result=image-pending"],
