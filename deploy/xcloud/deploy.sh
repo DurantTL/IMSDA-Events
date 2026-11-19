@@ -109,19 +109,28 @@ move_live_tag() {
 # A copy of the database before anything can migrate it (#1790). If it fails,
 # nothing is changed. IMSDA_PREDEPLOY_BACKUP=skip is a human's decision for an
 # emergency only (docs/BACKUPS.md); the timer never sets it.
+# Each outcome is reported to the System report and to Discord (#2048). Best effort: never fails or blocks the deploy.
+HEARTBEAT="${IMSDA_HEARTBEAT:-/usr/local/bin/imsda-heartbeat}"
+SHORT_SHA="$(printf '%s' "$SHA" | cut -c1-7)"
+predeploy_heartbeat() { # SUCCEEDED|FAILED copied|skipped|failed
+  if [ -x "$HEARTBEAT" ]; then "$HEARTBEAT" server-predeploy-backup "$1" "result=$2" "version=$SHORT_SHA" || true; fi
+}
+
 pre_deploy_backup() {
   if [ "${IMSDA_PREDEPLOY_BACKUP:-}" = skip ]; then
     echo "[deploy] WARNING: IMSDA_PREDEPLOY_BACKUP=skip, so no database copy was taken before $SHA." >&2
+    predeploy_heartbeat SUCCEEDED skipped
     return 0
   fi
   [ -r "$BACKUP_ENV_FILE" ] \
-    || fail "No database copy was taken: $BACKUP_ENV_FILE is missing (docs/BACKUPS.md, 'Pre-deploy copies'). Nothing was changed."
+    || { predeploy_heartbeat FAILED failed; fail "No database copy was taken: $BACKUP_ENV_FILE is missing (docs/BACKUPS.md, 'Pre-deploy copies'). Nothing was changed."; }
   echo "[deploy] Copying the database before deploying $SHA ..."
   docker rm -f imsda-predeploy >/dev/null 2>&1 || true
   timeout "$PREDEPLOY_TIMEOUT" docker run --rm --name imsda-predeploy --network "$PG_NETWORK" --env-file "$BACKUP_ENV_FILE" \
     -v "$BACKUPS_VOLUME:/backups" --entrypoint sh "$BACKUP_IMAGE" \
     /usr/local/bin/pre-deploy-backup.sh "$SHA" </dev/null \
-    || fail "The database copy before $SHA failed (above). Nothing was changed; the live version is still running. For a commit from before #1790, set IMSDA_BACKUP_IMAGE to the -backup:main image (docs/BACKUPS.md)."
+    || { predeploy_heartbeat FAILED failed; fail "The database copy before $SHA failed (above). Nothing was changed; the live version is still running. For a commit from before #1790, set IMSDA_BACKUP_IMAGE to the -backup:main image (docs/BACKUPS.md)."; }
+  predeploy_heartbeat SUCCEEDED copied
 }
 
 # Images built before #1263 ignore IMSDA_PREP_ONLY (their prep run would start

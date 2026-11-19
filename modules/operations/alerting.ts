@@ -6,6 +6,9 @@ import { logError, logInfo, logWarn } from "@/lib/logger";
 import { currentCorrelationId } from "@/lib/request-context";
 import { recordJobRun } from "@/modules/operations/sweep-heartbeat-repository";
 import { ALERT_WEBHOOK_DELIVERY_JOB } from "@/modules/operations/sweep-heartbeat";
+import { postToDiscord } from "@/modules/operations/discord-alert-settings";
+import { DISCORD_PENDING_KEY_PREFIX } from "@/modules/operations/discord-alerts-domain";
+import type { DiscordGroup } from "@/modules/operations/discord-alerts-domain";
 
 /**
  * Something that watches the signals.
@@ -21,7 +24,8 @@ import { ALERT_WEBHOOK_DELIVERY_JOB } from "@/modules/operations/sweep-heartbeat
  * no webhook configured still leaves a trail an aggregator can match on.
  */
 
-export type AlertSeverity = "URGENT" | "WATCH";
+/** `INFO` is a plain notice (a deploy went live, a restore check passed); it is logged at info level. */
+export type AlertSeverity = "URGENT" | "WATCH" | "INFO";
 
 export type Alert = {
   /**
@@ -35,6 +39,13 @@ export type Alert = {
   /** Sent to the webhook only, never written to the log (for a name that staff need but a log line should not carry). */
   webhookOnlyDetail?: string;
   context?: Record<string, string | number | boolean | null>;
+  /**
+   * Which Discord group switch (#2048) this belongs to. Discord is an allow-list: an alert with no group is never sent
+   * there (a payment alert carries identifiers). Set it only in code that builds fixed words or counts. A site-health
+   * or ungrouped alert also goes to the `ALERT_WEBHOOK_URL` webhook, as before; the other groups are Discord only.
+   * Discord is sent `severity`, `summary` and `detail` only, never `webhookOnlyDetail` or `context`.
+   */
+  group?: DiscordGroup;
 };
 
 export type AlertDispatchResult = {
@@ -130,7 +141,9 @@ function record(alert: Alert) {
     ...(alert.detail ? { detail: alert.detail } : {}),
     ...alert.context,
   };
-  if (alert.severity === "URGENT") {
+  if (alert.severity === "INFO") {
+    logInfo(`ALERT ${alert.summary}`, fields);
+  } else if (alert.severity === "URGENT") {
     // Logged through logError so it lands on stderr with the request's
     // correlation id, without an error object to redact.
     logError(`ALERT ${alert.summary}`, new AlertConditionError(alert.detail ?? alert.summary), fields);
@@ -148,13 +161,29 @@ export class AlertConditionError extends Error {
 }
 
 /**
+ * Remembers that Discord already got this alert while another destination still has to be retried. Written already
+ * resolved, so it never counts as an open alert.
+ */
+async function markDiscordPosted(key: string, alert: Alert, now: Date) {
+  try {
+    await getPrisma().alertNotification.upsert({
+      where: { key },
+      update: { lastSentAt: now, resolvedAt: now },
+      create: { key, severity: alert.severity, summary: "Posted to Discord, waiting on another destination", firstSeenAt: now, lastSentAt: now, resolvedAt: now },
+    });
+  } catch (error) {
+    logWarn("Could not remember a Discord delivery.", { error: error instanceof Error ? error.name : typeof error });
+  }
+}
+
+/**
  * Sends what is due and records it. A condition whose delivery failed is left
  * un-recorded so the next run tries again rather than treating a dropped page
  * as a delivered one.
  */
 export async function dispatchAlerts(
   alerts: readonly Alert[],
-  options: { now?: Date; fetchImpl?: typeof fetch; repeatMinutes?: number } = {},
+  options: { now?: Date; fetchImpl?: typeof fetch; repeatMinutes?: number; discordTimeoutMs?: number } = {},
 ): Promise<AlertDispatchResult> {
   const now = options.now ?? new Date();
   const repeatMinutes = options.repeatMinutes ?? getServerEnv().ALERT_REPEAT_MINUTES;
@@ -173,12 +202,37 @@ export async function dispatchAlerts(
     }
 
     record(alert);
-    const delivery = await postToWebhook(alert, { fetchImpl: options.fetchImpl });
-    if (delivery.attempted) await recordWebhookDelivery(delivery);
-    if (delivery.attempted && !delivery.delivered) {
+    const toEnvWebhook = !alert.group || alert.group === "site-health";
+    const webhook: WebhookDelivery = toEnvWebhook
+      ? await postToWebhook(alert, { fetchImpl: options.fetchImpl })
+      : { delivered: false, attempted: false };
+    if (webhook.attempted) await recordWebhookDelivery(webhook);
+    // Discord is an allow-list: only an alert whose code named a group (and built fixed words or counts) goes there.
+    // An alert with no group (a payment alert, for one) carries identifiers and never goes to Discord.
+    const pendingKey = `${DISCORD_PENDING_KEY_PREFIX}${alert.key}`;
+    let discord: { attempted: boolean; delivered: boolean } = { attempted: false, delivered: false };
+    if (alert.group) {
+      // A retry of an alert that Discord already got (because another destination failed) is not posted there again.
+      const marker = await getPrisma().alertNotification.findUnique({ where: { key: pendingKey }, select: { lastSentAt: true } });
+      const alreadyPosted = marker !== null && marker !== undefined && !isAlertDue(marker.lastSentAt, now, repeatMinutes);
+      if (!alreadyPosted) {
+        discord = await postToDiscord(
+          alert.group,
+          { severity: alert.severity, summary: alert.summary, detail: alert.detail },
+          { fetchImpl: options.fetchImpl, now, timeoutMs: options.discordTimeoutMs },
+        );
+      }
+    }
+    // Each destination is judged on its own: the env webhook failing is retried next scan, as before. A Discord
+    // failure is retried only when nothing else delivered, so it never repeats a message the webhook already sent.
+    const webhookFailed = webhook.attempted && !webhook.delivered;
+    const discordOnlyFailed = discord.attempted && !discord.delivered && !webhook.delivered;
+    if (webhookFailed || discordOnlyFailed) {
+      if (discord.delivered) await markDiscordPosted(pendingKey, alert, now);
       result.undelivered.push(alert);
       continue;
     }
+    if (alert.group) await getPrisma().alertNotification.deleteMany({ where: { key: pendingKey } });
 
     await getPrisma().alertNotification.upsert({
       where: { key: alert.key },
@@ -213,17 +267,29 @@ export async function resolveAlertsExcept(
   keyPrefix: string,
   now = new Date(),
 ) {
-  const resolved = await getPrisma().alertNotification.updateMany({
-    where: {
-      key: { startsWith: keyPrefix, notIn: [...activeKeys] },
-      resolvedAt: null,
-    },
-    data: { resolvedAt: now },
-  });
+  return (await resolveAlertsExceptWithDetails(activeKeys, keyPrefix, now)).count;
+}
+
+/** Like `resolveAlertsExcept`, and also says which conditions cleared (key and summary), so "back to normal" can be said. */
+export async function resolveAlertsExceptWithDetails(
+  activeKeys: readonly string[],
+  keyPrefix: string,
+  now = new Date(),
+  /** Keys under these prefixes are left as they are: their source could not be read, so "gone" is not known. */
+  keepPrefixes: readonly string[] = [],
+): Promise<{ count: number; cleared: { key: string; summary: string }[] }> {
+  const where = {
+    key: { startsWith: keyPrefix, notIn: [...activeKeys] },
+    resolvedAt: null,
+    ...(keepPrefixes.length ? { NOT: keepPrefixes.map((prefix) => ({ key: { startsWith: prefix } })) } : {}),
+  };
+  const prisma = getPrisma().alertNotification;
+  const cleared = await prisma.findMany({ where, select: { key: true, summary: true } });
+  const resolved = await prisma.updateMany({ where, data: { resolvedAt: now } });
   if (resolved.count > 0) {
     logInfo("Alert conditions cleared.", { cleared: resolved.count, keyPrefix });
   }
-  return resolved.count;
+  return { count: resolved.count, cleared };
 }
 
 /**

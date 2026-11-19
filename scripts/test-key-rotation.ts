@@ -1,4 +1,7 @@
 /**
+ * Note: the platform settings row has one fixed id, so this script borrows the real `platform` row for its sealed
+ * Discord address and restores what it found (in its own try/finally at the end).
+ *
  * Proves key rotation (#1516) against a real PostgreSQL database:
  *
  * - values sealed under an old key (version 1) are all reported "older" by the
@@ -12,7 +15,7 @@
  *   item it left behind were recomputed together;
  * - a value sealed under a key that is not loaded is counted as unreadable and
  *   does not stop the run;
- * - every registered sealed column (all 11) has a synthetic row that is sealed under the old key and
+ * - every registered sealed column (all 12) has a synthetic row that is sealed under the old key and
  *   rotated, so a column missing from the rotation fails this script;
  * - rotation keeps each row's `updatedAt`, and a concurrent edit makes a write skip instead of being
  *   rolled back;
@@ -82,6 +85,16 @@ async function withoutChecks(work: (tx: Parameters<Parameters<typeof prisma.$tra
   });
 }
 
+/** The platform settings row has one fixed id, so the check borrows it and puts back what it found. */
+const PLATFORM_ID = "platform";
+let platformBefore: { sealedDiscordWebhook: string | null; discordWebhookLast4: string | null } | null | undefined;
+async function restorePlatformRow() {
+  if (platformBefore === undefined) return;
+  if (platformBefore === null) await prisma.platformSettings.deleteMany({ where: { id: PLATFORM_ID } });
+  else await prisma.platformSettings.update({ where: { id: PLATFORM_ID }, data: platformBefore });
+  platformBefore = undefined;
+}
+
 async function cleanup() {
   await withoutChecks(async (tx) => {
     await tx.calendarEntry.deleteMany({ where: OWN });
@@ -115,7 +128,7 @@ async function main() {
   const { SEALED_COLUMNS } = await import("../modules/security/sealed-columns");
   const { rotateSealedColumns, scanSealedColumns } = await import("../modules/security/key-rotation");
   const { createPrismaSealedColumnStore } = await import("../modules/security/sealed-column-store");
-  const store = createPrismaSealedColumnStore({ idPrefix: P });
+  const store = createPrismaSealedColumnStore({ idPrefix: P, alsoIds: [PLATFORM_ID] });
   const column = (label: string) => {
     const found = SEALED_COLUMNS.find((entry) => entry.label === label);
     assert.ok(found, `${label} is in the registry`);
@@ -217,6 +230,13 @@ async function main() {
       await tx.healthRecordField.create({
         data: { id: `${P}hfield`, recordId: `${P}record`, fieldKey: "allergies", sealedValue: sealHealthField(`${P}record`, "allergies", "synthetic") },
       });
+      const sealedDiscord = secretBox.sealSecret("https://discord.com/api/webhooks/123456789012345678/synthetic-token-abcdefghijklmnop", "discord-alert-webhook");
+      platformBefore = await tx.platformSettings.findUnique({ where: { id: PLATFORM_ID }, select: { sealedDiscordWebhook: true, discordWebhookLast4: true } });
+      await tx.platformSettings.upsert({
+        where: { id: PLATFORM_ID },
+        update: { sealedDiscordWebhook: sealedDiscord, discordWebhookLast4: "mnop" },
+        create: { id: PLATFORM_ID, sealedDiscordWebhook: sealedDiscord, discordWebhookLast4: "mnop" },
+      });
       await tx.healthRecordSnapshot.create({
         data: {
           id: `${P}snap`, personId: `${P}person`, eventId: `${P}event`, trigger: "CHECK_IN", eventDate: "2027-01-10", ageBasis: "ADULT",
@@ -277,7 +297,7 @@ async function main() {
 
     // Every registered column has a row that is readable and still on the old key.
     const everyColumn = await scanSealedColumns(store, { batchSize: 2 });
-    assert.equal(everyColumn.length, 11);
+    assert.equal(everyColumn.length, 12);
     for (const scan of everyColumn) assert.ok(scan.older >= 1, `${scan.label} has a synthetic row on the old key`);
 
     const dry = await rotateSealedColumns(store, { apply: false, columns: both, batchSize: 2 });
@@ -445,7 +465,11 @@ async function main() {
 
     console.log("key rotation checks passed");
   } finally {
-    await cleanup();
+    try {
+      await cleanup();
+    } finally {
+      await restorePlatformRow();
+    }
     await prisma.$disconnect();
   }
 }

@@ -94,11 +94,13 @@ export const SYSTEM_SETUP_STEPS: Record<SystemSetupId, SetupHelp> = {
   "alert-webhook": {
     steps: [
       "In Slack or Teams, add an Incoming Webhook to the channel that should get alerts, and copy its URL. Anything that accepts a JSON POST also works. The URL is a secret. " + NEVER_SHARE,
+      "For Discord there is nothing to add in xCloud: a system administrator pastes the channel's webhook address in Platform settings, under Alerts to Discord, and uses Send a test message.",
       `${ADD_IN_XCLOUD} the setting listed below.`,
       REDEPLOY,
     ],
     settingNames: ["ALERT_WEBHOOK_URL"],
     docsLink: "docs/DEPLOY-DOCKER.md",
+    // Discord needs no server setting: a system administrator pastes its webhook on Platform settings (#2048).
     whenDone: "Alert delivery reads Never at first (no alert has needed sending yet) and turns OK after the first alert reaches the webhook.",
   },
   "square-payments": {

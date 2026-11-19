@@ -36,16 +36,15 @@ function selectFor(column: SealedColumn) {
 /**
  * `idPrefix` limits every read to rows whose id starts with it. Only the
  * verification script uses it, to touch nothing but its own fictitious rows.
+ * `alsoIds` adds exact ids (the platform settings row has one fixed id, so a prefix cannot match it).
  */
-export function createPrismaSealedColumnStore(options: { idPrefix?: string } = {}): SealedColumnStore {
+export function createPrismaSealedColumnStore(options: { idPrefix?: string; alsoIds?: readonly string[] } = {}): SealedColumnStore {
   return {
     async readBatch(column, afterId, take): Promise<SealedRow[]> {
       const where: Record<string, unknown> = {};
-      if (afterId !== null || options.idPrefix) {
-        where.id = {
-          ...(afterId !== null ? { gt: afterId } : {}),
-          ...(options.idPrefix ? { startsWith: options.idPrefix } : {}),
-        };
+      if (afterId !== null) where.id = { gt: afterId };
+      if (options.idPrefix) {
+        where.OR = [{ id: { startsWith: options.idPrefix } }, ...(options.alsoIds?.length ? [{ id: { in: [...options.alsoIds] } }] : [])];
       }
       if (column.nullable) where[column.column] = { not: null };
       const rows = await delegates(getPrisma())[column.model].findMany({

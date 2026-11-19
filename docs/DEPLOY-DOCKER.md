@@ -1445,6 +1445,41 @@ latest run failed), or `never` (nothing has reported since this was added).
 `stale` and `failing` turn the detailed `status` to `degraded` while still
 answering 200. The System command center shows the same signal.
 
+#### Alerts to Discord (#2048)
+
+A system administrator can also send alerts to one Discord channel, set up on a page instead of in a server
+file. It is in addition to `ALERT_WEBHOOK_URL`, which keeps working as before.
+
+1. In Discord, open the channel's settings, then **Integrations**, then **Webhooks**, then **New Webhook**. Name it
+   (for example "IMAdventist Events") and choose **Copy Webhook URL**. It looks like
+   `https://discord.com/api/webhooks/<number>/<long code>`. It is a secret: anyone who has it can post to the
+   channel. Do not put it in chat, an issue or a document.
+2. Open **System management, Platform settings**, find **Alerts to Discord**, paste the address and choose **Save
+   address**. The page then shows "Connected" and the last 4 characters. The address is stored encrypted and is
+   never shown again. Use **Replace** to change it and **Remove** to turn Discord off.
+3. Choose **Send a test message**. It answers Delivered, Discord refused it (with a status number), or Could not
+   reach Discord. "Last delivered" and "Last failed" under it show the latest results.
+
+Four switches choose what is sent, all on to begin with:
+
+| Group | What it sends |
+| --- | --- |
+| Site health and errors | The alerts in the table above (not the instant webhook-verification ones), and a "back to normal" message when each clears |
+| Deploys | "Deployed version `<short id>`" once per version; a deploy that failed or is being held; the server could not fetch or fast-forward; the database copy before a deploy failed or was skipped (#1790) |
+| Backups and restore checks | The nightly backup failed or is overdue; the off-host copy is overdue; the automatic restore check passed or failed |
+| Practice runs | A restore drill or load rehearsal result (see "Practice runs" in `docs/BACKUPS.md`) |
+
+Messages hold fixed words, counts, job names and short version ids only. They never carry a name, an email address
+or any attendee detail, and they never ping `@everyone` or anyone else. The repeat window for each alert
+(`ALERT_REPEAT_MINUTES`) still applies, so one condition does not repeat on every scan. If Discord is down or the
+address stops working, nothing else breaks: the scan, deploy reports and saves carry on, and the failure shows in
+"Last failed".
+
+**The app cannot report its own outage.** When the site is down, no alert can leave it. Point the outside uptime
+monitor (#1789, `docs/MONITORING.md`) at the same Discord channel: most monitors, UptimeRobot included, have a
+Discord (or generic webhook) alert contact. Create a second webhook for the monitor in the same channel so each can
+be turned off on its own, and keep the monitor's email contacts too.
+
 #### Uptime monitor
 
 The outside site-down checker (UptimeRobot every 5 minutes against the home

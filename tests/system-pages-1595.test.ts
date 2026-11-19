@@ -32,6 +32,17 @@ vi.mock("@/modules/account-merge/account-link", () => ({ isUnifiedSignInEnabled:
 vi.mock("@/modules/account-merge/sign-in-switch", () => ({ getSignInLinkCheck: async () => ({ unlinkedPairs: 0, linkedPairs: 0 }) }));
 vi.mock("@/modules/system-admin/homepage-ministries", () => ({ getHomepageMinistriesForAdmin: async () => ({ ministries: [], updatedAt: null, updatedByName: null }) }));
 vi.mock("@/modules/system-admin/environment-status", () => ({ getEnvironmentStatusForViewer: () => null }));
+vi.mock("@/modules/operations/discord-alert-settings", () => ({
+  getDiscordAlertSettingsView: async () => ({
+    connected: false,
+    last4: null,
+    setAt: null,
+    setByName: null,
+    groups: { "site-health": true, deploys: true, backups: true, "practice-runs": true },
+    lastDeliveredAt: null,
+    lastFailedAt: null,
+  }),
+}));
 vi.mock("@/modules/system-admin/system-report/load", () => ({ loadSystemReport: mocks.loadSystemReport }));
 vi.mock("@/integrations/email/provider", () => ({ getEmailBackupStatus: () => ({ active: false }) }));
 vi.mock("@/integrations/cloudflare/purge", () => ({ isCloudflarePurgeConfigured: () => false }));
