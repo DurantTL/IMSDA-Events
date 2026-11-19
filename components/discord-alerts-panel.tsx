@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BellRing } from "lucide-react";
 import { useConfirm } from "@/components/use-confirm";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -28,6 +28,17 @@ export function DiscordAlertsPanel({ initial }: { initial: DiscordAlertSettingsV
   const [action, setAction] = useState<"save" | "remove" | "switch" | "test" | null>(null);
   const [notice, setNotice] = useState("");
   const { confirm, confirmDialog } = useConfirm();
+  const addressRef = useRef<HTMLInputElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
+  // Busy controls are disabled, which drops keyboard focus to the page. When an action ends with
+  // nothing focused, send focus to the address field after an address error, or else to the result message.
+  useEffect(() => {
+    if (busy || typeof document === "undefined") return;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    if (addressError) addressRef.current?.focus();
+    else if (error || notice) messagesRef.current?.focus();
+  }, [busy, addressError, error, notice]);
   // A typed address that has not been saved is lost on leaving, so the page asks first.
   useUnsavedChangesGuard(editing && address.trim() !== "", "The Discord address has not been saved. Leave and discard it?");
 
@@ -138,6 +149,7 @@ export function DiscordAlertsPanel({ initial }: { initial: DiscordAlertSettingsV
               autoComplete="off"
               disabled={busy}
               id="discord-webhook-address"
+              ref={addressRef}
               name="discord-webhook-address"
               onChange={(event) => { setAddress(event.target.value); setAddressError(""); }}
               placeholder="https://discord.com/api/webhooks/..."
@@ -185,8 +197,10 @@ export function DiscordAlertsPanel({ initial }: { initial: DiscordAlertSettingsV
         </>
       )}
 
-      {error && <p className="form-error" role="alert">{error}</p>}
-      {notice && <p className="inline-notice" role="status">{notice}</p>}
+      <div className={styles.messages} ref={messagesRef} tabIndex={-1}>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        {notice && <p className="inline-notice" role="status">{notice}</p>}
+      </div>
       {confirmDialog}
     </section>
   );

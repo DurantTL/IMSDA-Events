@@ -1,6 +1,6 @@
 /* Two classes, so the shared .field-help margin (-9px) and size do not win over these. */
 .panel .help { margin: 4px 0 0; font-weight: 400; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 8px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 0 8px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .field { display: grid; gap: 4px; max-width: 640px; margin: 8px 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .field label { font-weight: 600; }
 .field input { width: 100%; }
@@ -12,3 +12,6 @@
 .panel .check small { display: block; margin: 2px 0 0; font-weight: 400; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
 .delivery { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.messages { margin: 12px 0 0; }
+.messages:empty { display: none; }
+.messages:focus { outline: none; }
