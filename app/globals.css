@@ -1924,7 +1924,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 .import-sheet-form input { border: 1px solid var(--field-border); border-radius: 10px; padding: 11px 13px; font-size: max(var(--type-body-floor, 0px), 0.72rem); }
 .import-sheet-form input:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: 1px; }
 .reconciliation-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.reconciliation-grid span { border-radius: 12px; background: var(--paper); padding: 12px; }
+/* Only the tile itself (#2025): the amount in the Registration value tile is a span too, and used to get its own tile padding. */
+.reconciliation-grid > span { border-radius: 12px; background: var(--paper); padding: 12px 14px; min-width: 0; }
 .reconciliation-grid small,
 .reconciliation-grid strong { display: block; }
 .reconciliation-grid small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.59rem); }
@@ -6417,6 +6418,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 .roster-table th:first-child { min-width: 190px; }
 .roster-table td,
 .roster-table th { white-space: nowrap; }
+/* The last column is the account holder: a long name keeps room instead of wrapping to three lines (#2025). */
+.roster-table td[data-label="Account holder"] { width: auto; min-width: 12rem; }
 .report-record-link { color: var(--imsda-purple); font-weight: 700; text-decoration: none; }
 .report-record-link:hover { text-decoration: underline; }
 

@@ -108,6 +108,17 @@ describe("B12 summary labels and record-status words (#2025 follow-up)", () => {
     expect(requiredHealthColor("For information")).toBe("neutral");
   });
 
+  it("accepts the calendar and platform settings notes in exactly their shapes (#2025 final cleanup)", () => {
+    for (const chip of ["On calendar", "Deadline", "Possible match", "Linked to an event", "Affects everyone", "Central value", "A template copy", "Owned by Email", "Not separate yet"]) expect(infoLabelKind(chip), chip).toBe("summary");
+    expect(infoLabelKind("Deadline · 2 chosen")).toBe("summary");
+  });
+
+  it("still rejects near misses of the calendar and platform settings notes", () => {
+    for (const chip of ["on calendar", "On the calendar", "Deadlines", "deadline", "Possible matches", "Possible match?", "Linked to events", "Linked to an event today", "Affects everyone else", "affects everyone", "Central values", "A template", "A template copy of it", "Owned by email", "Owned by Email team", "Not separate", "Not separate yet!", "Deadline · Healthy"]) {
+      expect(infoLabelKind(chip), chip).toBeNull();
+    }
+  });
+
   it("still rejects near misses and the old words", () => {
     for (const chip of ["Live (version 1)", "Ready", "Warning", "Blocking", "Disabled", "Enabled", "active", "Could not check", "Could not read ticks", "account disabled", "Needs", "Needs nothing", "Needs grade extra", "Version", "Version two", "forms on", "3 forms off", "ticked", "configured", "not configured", "full", "Clash today", "All published soon"]) {
       expect(infoLabelKind(chip), chip).toBeNull();
@@ -125,7 +136,7 @@ describe("B12 summary labels and record-status words (#2025 follow-up)", () => {
   });
 
   it("records the summary labels and the word changes in SITE-RULES.md", () => {
-    for (const text of ['"Configured", "Not configured"', '"For information"', '"Ticked", "Not ticked"', '"Nearly full", "Full", "Clash"', '"All published"', '"Nothing paused"', '"Published (version 2)"', "#2025"]) {
+    for (const text of ['"Configured", "Not configured"', '"For information"', '"Ticked", "Not ticked"', '"Nearly full", "Full", "Clash"', '"All published"', '"Nothing paused"', '"Published (version 2)"', '"On calendar", "Deadline", "Possible match", "Linked to an event"', '"Affects everyone", "Central value", "A template copy", "Owned by Email", "Not separate yet"', "#2025"]) {
       expect(b12, text).toContain(text);
     }
   });

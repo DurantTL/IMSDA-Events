@@ -12,7 +12,9 @@ name: Mobile layout
 #    mobile-layout-label.yml, which calls this workflow (a `paths` filter and a
 #    label cannot be OR'd in one workflow, so there are two small triggers
 #    and one job);
-#  - weekly and by hand: the full run (all four widths, with screenshots).
+#  - weekly and by hand: the full run (all four widths, with screenshots), as a matrix with
+#    one job per width, so each width has its own time limit. The single four-width job was
+#    cancelled at the 30-minute limit on Nov 16, 2026 (#2025).
 #
 # A quick run is 360 and 1024 px with no screenshots. It is optional
 # (continue-on-error), like badge-print: a browser or runner flake must not
@@ -44,7 +46,12 @@ jobs:
   # GitHub-hosted runners ship Google Chrome, which this job drives instead of
   # downloading a browser. `--no-save` keeps the lockfile untouched.
   mobile-layout:
-    name: Mobile layout (real browser, optional)
+    name: Mobile layout (real browser, optional) ${{ matrix.widths }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # A pull request keeps one job with the quick pair of widths; weekly and manual runs get one job per width.
+        widths: ${{ fromJSON(github.event_name == 'pull_request' && '["360,1024"]' || '["360","390","768","1024"]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     continue-on-error: true
@@ -68,7 +75,7 @@ jobs:
       # Node's default ~4 GB heap (#214). 10 GB leaves room to grow on the 16 GB runner.
       NODE_OPTIONS: --max-old-space-size=10240
       # Pull requests (by path or by label) get the quick run; weekly and manual runs the full one.
-      MOBILE_LAYOUT_WIDTHS: ${{ github.event_name == 'pull_request' && '360,1024' || '360,390,768,1024' }}
+      MOBILE_LAYOUT_WIDTHS: ${{ matrix.widths }}
       MOBILE_LAYOUT_NO_SHOTS: ${{ github.event_name == 'pull_request' && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
@@ -117,7 +124,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mobile-layout-screenshots
+          name: mobile-layout-screenshots-${{ matrix.widths == '360,1024' && 'quick' || matrix.widths }}
           path: ${{ runner.temp }}/mobile-layout
           if-no-files-found: ignore
           retention-days: 14

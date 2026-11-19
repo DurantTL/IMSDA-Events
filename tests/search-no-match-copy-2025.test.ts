@@ -33,3 +33,21 @@ describe("no-match lines on the club staff searches (S4, #2025)", () => {
     expect(read("components/club-year-end-conference.tsx")).not.toContain("No club matches that search");
   });
 });
+
+describe("no-match line on the staff search (S4, #2025)", () => {
+  it("says no staff match that search, in words the check recognises", () => {
+    expect(NO_MATCH_LINE.test("No staff match that search.")).toBe(true);
+    expect(read("components/staff-workspace.tsx")).toContain('searchTitle="No staff match that search."');
+  });
+
+  it("narrows while typing, with no Enter, and never gates on Enter", () => {
+    const source = read("components/staff-workspace.tsx");
+    expect(source).toContain("useClientSearch()");
+    expect(source).toContain("search.inputProps");
+    expect(source).not.toMatch(/<form[^>]*onSubmit=\{[^}]*search/);
+  });
+
+  it("does not widen the check to near misses", () => {
+    for (const line of ["Nothing to show", "No staffing", "Staff match that search", "No staff here"]) expect(NO_MATCH_LINE.test(line), line).toBe(false);
+  });
+});

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { SetupHelpPanel } from "@/components/setup-help";
+import { ENVIRONMENT_SERVICE_SETUP, systemSetupFor } from "@/modules/setup-help/system-setup-steps";
 import type { EnvironmentStatus, EnvironmentStatusValue } from "@/modules/system-admin/environment-status";
 
 const statusText: Record<EnvironmentStatusValue, string> = {
@@ -32,6 +34,12 @@ export function EnvironmentStatusPanel({ status }: { status: EnvironmentStatus }
             <span className={`status-chip ${statusTone[service.status === "not-separate" || service.status === "unavailable" ? "not-configured" : service.status]}`}>{statusText[service.status]}</span>
             {service.status === "not-configured" && service.missing.length > 0 && (
               <small className="environment-status-missing">Blank: {service.missing.join(", ")}</small>
+            )}
+            {service.status === "not-configured" && (
+              // H3 (#2025): a not-configured service always has its setup steps one click away. Names only, never a value.
+              <div className="environment-status-missing">
+                <SetupHelpPanel setup={systemSetupFor(ENVIRONMENT_SERVICE_SETUP[service.id])} context={service.label} />
+              </div>
             )}
             {service.note && <small className="environment-status-missing">{service.note}</small>}
             {service.status === "unknown" && (

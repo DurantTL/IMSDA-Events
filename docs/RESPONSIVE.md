@@ -57,8 +57,11 @@ It runs as its own workflow, not in `ci.yml` (CI minutes are tight):
   (`workflow_call`). A PR that matches both shares one concurrency group, so one
   of the two runs is cancelled (it shows as a cancelled check). Adding a
   different label does not start a run.
-- **Weekly (Monday) and by hand** (`workflow_dispatch`): the full run, all four
-  widths, with screenshots (the `mobile-layout-screenshots` artifact, 14 days).
+- **Weekly (Monday) and by hand** (`workflow_dispatch`): the full run, one job per
+  width (360, 390, 768, 1024) in a matrix, each with its own 30-minute limit and
+  screenshots (the `mobile-layout-screenshots-<width>` artifacts, 14 days). The
+  single four-width job was cancelled at the limit on Nov 16, 2026 (#2025). A
+  pull request still gets one job with 360 and 1024.
 
 The job is optional (`continue-on-error: true`, like badge-print): a browser or
 runner flake does not turn a pull request red, so read the job's log. Workflows
@@ -118,7 +121,7 @@ plus a chip row above a title (`club-admin-links`, `report-actions`).
 
 Run the table rules at the widths where the staff column is narrowest, as well as the default four:
 `MOBILE_LAYOUT_WIDTHS=360,390,768,861,980,1024,1180,1280 npm run test:mobile-layout` (the default stays four widths, so the
-weekly run keeps inside its 30-minute limit).
+weekly run keeps inside its 30-minute limit, one width per job).
 
 **Adding a page:** add a line to `pages` in the script. A page that needs data
 the script does not create gets that data in `seedSynthetic`. A button that
