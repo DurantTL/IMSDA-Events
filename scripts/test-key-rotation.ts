@@ -1,4 +1,7 @@
 /**
+ * Note: the platform settings row has one fixed id, so this script borrows the real `platform` row for its sealed
+ * Discord address and restores what it found (in its own try/finally at the end).
+ *
  * Proves key rotation (#1516) against a real PostgreSQL database:
  *
  * - values sealed under an old key (version 1) are all reported "older" by the
@@ -108,7 +111,6 @@ async function cleanup() {
     await tx.healthRecordSnapshotField.deleteMany({ where: OWN });
     await tx.healthRecordSnapshot.deleteMany({ where: OWN });
   });
-  await restorePlatformRow();
 }
 
 async function refused(work: () => Promise<unknown>) {
@@ -463,7 +465,11 @@ async function main() {
 
     console.log("key rotation checks passed");
   } finally {
-    await cleanup();
+    try {
+      await cleanup();
+    } finally {
+      await restorePlatformRow();
+    }
     await prisma.$disconnect();
   }
 }

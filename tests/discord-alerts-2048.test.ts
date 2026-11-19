@@ -23,6 +23,7 @@ vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: 
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 
 import { openSecret } from "@/lib/secret-box";
+import { assessSystemSignals } from "@/modules/operations/alert-scan";
 import { dispatchAlerts, type Alert } from "@/modules/operations/alerting";
 import {
   DiscordAlertSettingsError,
@@ -64,6 +65,10 @@ function database(initial: Row | null = null) {
   const tx = {
     platformSettings: {
       findUnique: vi.fn(async () => (row ? { ...row } : null)),
+      update: vi.fn(async ({ data }: { data: Row }) => {
+        row = { ...(row ?? {}), ...stamped(data) };
+        return row;
+      }),
       upsert: vi.fn(async ({ update, create }: { update: Row; create: Row }) => {
         row = row ? { ...row, ...stamped(update) } : { updatedAt: STAMP, ...create };
         return row;
@@ -516,7 +521,6 @@ describe("Discord is an allow-list (#2048 review)", () => {
   });
 
   it("gives every alert-scan alert an explicit group", async () => {
-    const { assessSystemSignals } = await import("@/modules/operations/alert-scan");
     const alerts = assessSystemSignals({
       outbox: { due: 99, oldestDueAgeMs: 9_999_999, accountMessagesDue: 3 } as never,
       failedMessages: 1, failedPayments: 1, stuckPayments: 1, oldestStuckPaymentMinutes: 30,
@@ -600,27 +604,34 @@ describe("a backup read that fails keeps its alerts open (#2048 review)", () => 
     vi.doMock("@/modules/operations/backup-status-repository", () => ({ getBackupStatus: vi.fn(async () => { throw new Error("db"); }) }));
     vi.doMock("@/modules/operations/offsite-backups-reader", () => ({ getOffsiteBackups: vi.fn(async () => ({ state: "ok-not-used" })) }));
     const first = await import("@/modules/operations/backup-alerts");
-    expect((await first.readBackupAlerts(now)).readFailed).toBe(true);
+    expect((await first.readBackupAlerts(now)).keepPrefixes).toEqual(["system.backup.nightly-", "system.backup.rehearsal-"]);
 
     vi.resetModules();
     vi.doMock("@/modules/operations/backup-status-repository", () => ({ getBackupStatus: vi.fn(async () => { throw new Error("db"); }) }));
     vi.doMock("@/modules/operations/offsite-backups-reader", () => ({ getOffsiteBackups: vi.fn(async () => { throw new Error("r2"); }) }));
     const second = await import("@/modules/operations/backup-alerts");
-    expect((await second.readBackupAlerts(now)).readFailed).toBe(true);
+    expect((await second.readBackupAlerts(now)).keepPrefixes.sort()).toEqual(["system.backup.nightly-", "system.backup.offsite-", "system.backup.rehearsal-"]);
 
     vi.resetModules();
     vi.doMock("@/modules/operations/backup-status-repository", () => ({ getBackupStatus: vi.fn(async () => { throw new Error("db"); }) }));
     vi.doMock("@/modules/operations/offsite-backups-reader", () => ({ getOffsiteBackups: vi.fn(async () => ({ state: "error", reason: "x", checkedAt: now.toISOString() })) }));
     const third = await import("@/modules/operations/backup-alerts");
-    expect((await third.readBackupAlerts(now)).readFailed).toBe(true);
+    expect((await third.readBackupAlerts(now)).keepPrefixes.sort()).toEqual(["system.backup.nightly-", "system.backup.offsite-", "system.backup.rehearsal-"]);
+
+    // An off-host listing error alone keeps only the off-host key; the nightly and restore keys can still clear.
+    vi.resetModules();
+    vi.doMock("@/modules/operations/backup-status-repository", () => ({ getBackupStatus: vi.fn(async () => ({ lastRunAt: null, lastRehearsalAt: null, stale: false, status: "never", offsiteStopped: false, offsiteOk: null, lastRehearsalOk: null, rehearsalOverdue: false })) }));
+    vi.doMock("@/modules/operations/offsite-backups-reader", () => ({ getOffsiteBackups: vi.fn(async () => ({ state: "error", reason: "x", checkedAt: now.toISOString() })) }));
+    const fourth = await import("@/modules/operations/backup-alerts");
+    expect((await fourth.readBackupAlerts(now)).keepPrefixes).toEqual(["system.backup.offsite-"]);
     vi.doUnmock("@/modules/operations/backup-status-repository");
     vi.doUnmock("@/modules/operations/offsite-backups-reader");
     vi.resetModules();
-  });
+  }, 30_000);
 
-  it("does not clear or announce backup alerts when the scan could not read them", async () => {
+  it("does not clear or announce the backup alerts of a source the scan could not read", async () => {
     vi.resetModules();
-    const readBackupAlerts = vi.fn(async () => ({ alerts: [], notices: [], readFailed: true }));
+    const readBackupAlerts = vi.fn(async () => ({ alerts: [], notices: [], keepPrefixes: ["system.backup.offsite-"] }));
     vi.doMock("@/modules/operations/backup-alerts", () => ({ readBackupAlerts }));
     vi.doMock("@/modules/communications/outbox-sweep", () => ({
       assessOutboxQueue: () => ({ status: "ok", reasons: [] }),
@@ -634,9 +645,9 @@ describe("a backup read that fails keeps its alerts open (#2048 review)", () => 
     const scan = await import("@/modules/operations/alert-scan");
     await scan.runAlertScan({ now, fetchImpl: okFetch() });
     const where = (db.prisma.alertNotification.updateMany.mock.calls[0] as unknown as [{ where: { NOT?: unknown } }])[0].where;
-    expect(where.NOT).toEqual([{ key: { startsWith: "system.backup." } }]);
+    expect(where.NOT).toEqual([{ key: { startsWith: "system.backup.offsite-" } }]);
     vi.doUnmock("@/modules/operations/backup-alerts");
     vi.doUnmock("@/modules/communications/outbox-sweep");
     vi.resetModules();
-  });
+  }, 30_000);
 });

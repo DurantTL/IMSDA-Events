@@ -153,7 +153,7 @@ export async function runAlertScan(
   // Backup problems are read separately: a failed read adds no alert and never stops the rest of the scan.
   const backups = await readBackupAlerts(now).catch((error) => {
     logWarn("The backup alerts could not be read.", { error: error instanceof Error ? error.name : typeof error });
-    return { alerts: [] as Alert[], notices: [] as Alert[], readFailed: true };
+    return { alerts: [] as Alert[], notices: [] as Alert[], keepPrefixes: [BACKUP_ALERT_KEY_PREFIX] };
   });
   const alerts = [...assessSystemSignals(signals), ...backups.alerts];
 
@@ -165,7 +165,7 @@ export async function runAlertScan(
     ALERT_KEY_PREFIX,
     now,
     // A backup read that failed says nothing about whether the problem is gone: keep those alerts as they are.
-    backups.readFailed ? [BACKUP_ALERT_KEY_PREFIX] : [],
+    backups.keepPrefixes,
   );
   const dispatched = await dispatchAlerts(alerts, { now, fetchImpl: options.fetchImpl });
   // One-time notices (a restore check passed) are sent once each, never repeated.

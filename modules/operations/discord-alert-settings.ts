@@ -204,10 +204,13 @@ export type DiscordDelivery = { attempted: boolean; delivered: boolean; status?:
 
 async function recordDelivery(delivered: boolean, now: Date) {
   try {
-    const stamp = await keepStamp(getPrisma());
-    await getPrisma().platformSettings.update({
-      where: { id: SETTINGS_ID },
-      data: { ...(delivered ? { discordLastDeliveredAt: now } : { discordLastFailedAt: now }), ...stamp },
+    // Read and write in one transaction, so the row's "Last changed" time cannot move between the two steps.
+    await getPrisma().$transaction(async (tx) => {
+      const stamp = await keepStamp(tx);
+      await tx.platformSettings.update({
+        where: { id: SETTINGS_ID },
+        data: { ...(delivered ? { discordLastDeliveredAt: now } : { discordLastFailedAt: now }), ...stamp },
+      });
     });
   } catch (error) {
     logWarn("Could not record the Discord delivery result.", { error: error instanceof Error ? error.name : typeof error });
