@@ -1,5 +1,6 @@
 import "server-only";
 
+import { OPEN_ALERT_WHERE } from "@/modules/operations/discord-alerts-domain";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
@@ -163,7 +164,7 @@ export async function getSystemAdminDashboard(now = new Date()) {
       prisma.user.count({ where: { accountStatus: "ACTIVE" } }),
       prisma.user.count({ where: { accountStatus: "PENDING_ACTIVATION" } }),
       prisma.user.count({ where: { globalRole: "SYSTEM_ADMIN", accountStatus: "ACTIVE" } }),
-      prisma.alertNotification.count({ where: { resolvedAt: null } }),
+      prisma.alertNotification.count({ where: OPEN_ALERT_WHERE }),
     ]);
 
   const eventSources = events.map(toDashboardEventSource);
@@ -194,7 +195,7 @@ export async function getSystemHealth(now = new Date()) {
       return null;
     }),
     getPrisma().alertNotification.findMany({
-      where: { resolvedAt: null },
+      where: OPEN_ALERT_WHERE,
       orderBy: { firstSeenAt: "asc" },
       take: 5,
       select: { key: true, severity: true, summary: true, firstSeenAt: true },

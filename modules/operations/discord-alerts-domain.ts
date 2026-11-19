@@ -44,6 +44,13 @@ export const ALL_DISCORD_GROUPS_ON: DiscordGroupSwitches = {
   "practice-runs": true,
 };
 
+/** One-time notices (a version went live, a restore check passed) are kept out of the open-alert counts and lists. */
+export const NOTICE_KEY_PREFIX = "notice.";
+/** Bookkeeping rows: Discord already got this alert while another destination is being retried. Never shown as an alert. */
+export const DISCORD_PENDING_KEY_PREFIX = "discord-pending.";
+/** The condition for "open alerts": not resolved, and not a one-time notice. */
+export const OPEN_ALERT_WHERE = { resolvedAt: null, NOT: { key: { startsWith: NOTICE_KEY_PREFIX } } } as const;
+
 export const DISCORD_USERNAME = "IMAdventist Events";
 export const DISCORD_CONTENT_MAX = 2000;
 

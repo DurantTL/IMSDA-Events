@@ -29,6 +29,8 @@ import {
 const SETTINGS_ID = "platform";
 const SEAL_PURPOSE = "discord-alert-webhook";
 const DISCORD_TIMEOUT_MS = 5000;
+/** The heartbeat route answers a curl that gives up after 5 seconds, so its Discord post waits less. */
+export const DISCORD_HEARTBEAT_TIMEOUT_MS = 2000;
 
 const GROUP_COLUMN = {
   "site-health": "discordAlertSiteHealth",
@@ -52,6 +54,15 @@ export class DiscordAlertSettingsError extends Error {
     super(message);
     this.name = "DiscordAlertSettingsError";
   }
+}
+
+/**
+ * Prisma stamps `updatedAt` on every write. The main form shows "Last changed" from it, so Discord's own writes
+ * (a delivery time, the address, the switches) hand back the value the row already had.
+ */
+async function keepStamp(client: { platformSettings: { findUnique: (args: { where: { id: string }; select: { updatedAt: true } }) => Promise<{ updatedAt: Date } | null> } }) {
+  const row = await client.platformSettings.findUnique({ where: { id: SETTINGS_ID }, select: { updatedAt: true } });
+  return row ? { updatedAt: row.updatedAt } : {};
 }
 
 /** What the page is given. Built field by field, so the sealed value cannot ride along. */
@@ -107,9 +118,10 @@ export async function saveDiscordWebhook(rawAddress: unknown, actorUserId: strin
     discordWebhookSetByUserId: actorUserId,
   };
   await getPrisma().$transaction(async (tx) => {
+    const stamp = await keepStamp(tx);
     await tx.platformSettings.upsert({
       where: { id: SETTINGS_ID },
-      update: data,
+      update: { ...data, ...stamp },
       create: { id: SETTINGS_ID, ...data },
     });
     await writeAuditLog(
@@ -123,9 +135,10 @@ export async function saveDiscordWebhook(rawAddress: unknown, actorUserId: strin
 export async function removeDiscordWebhook(actorUserId: string): Promise<DiscordAlertSettingsView> {
   const data = { sealedDiscordWebhook: null, discordWebhookLast4: null, discordWebhookSetAt: null, discordWebhookSetByUserId: null };
   await getPrisma().$transaction(async (tx) => {
+    const stamp = await keepStamp(tx);
     await tx.platformSettings.upsert({
       where: { id: SETTINGS_ID },
-      update: data,
+      update: { ...data, ...stamp },
       create: { id: SETTINGS_ID, ...data },
     });
     await writeAuditLog(
@@ -139,9 +152,10 @@ export async function removeDiscordWebhook(actorUserId: string): Promise<Discord
 export async function saveDiscordGroups(groups: DiscordGroupSwitches, actorUserId: string): Promise<DiscordAlertSettingsView> {
   const data = Object.fromEntries(DISCORD_GROUPS.map((group) => [GROUP_COLUMN[group], groups[group]])) as Record<(typeof GROUP_COLUMN)[DiscordGroup], boolean>;
   await getPrisma().$transaction(async (tx) => {
+    const stamp = await keepStamp(tx);
     await tx.platformSettings.upsert({
       where: { id: SETTINGS_ID },
-      update: data,
+      update: { ...data, ...stamp },
       create: { id: SETTINGS_ID, ...data },
     });
     await writeAuditLog(
@@ -190,22 +204,25 @@ export type DiscordDelivery = { attempted: boolean; delivered: boolean; status?:
 
 async function recordDelivery(delivered: boolean, now: Date) {
   try {
+    const stamp = await keepStamp(getPrisma());
     await getPrisma().platformSettings.update({
       where: { id: SETTINGS_ID },
-      data: delivered ? { discordLastDeliveredAt: now } : { discordLastFailedAt: now },
+      data: { ...(delivered ? { discordLastDeliveredAt: now } : { discordLastFailedAt: now }), ...stamp },
     });
   } catch (error) {
     logWarn("Could not record the Discord delivery result.", { error: error instanceof Error ? error.name : typeof error });
   }
 }
 
-async function post(url: string, message: DiscordMessage, fetchImpl: typeof fetch): Promise<DiscordDelivery> {
+async function post(url: string, message: DiscordMessage, fetchImpl: typeof fetch, timeoutMs = DISCORD_TIMEOUT_MS): Promise<DiscordDelivery> {
   try {
     const response = await fetchImpl(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(buildDiscordPayload(message)),
-      signal: AbortSignal.timeout(DISCORD_TIMEOUT_MS),
+      // A redirect is never followed: the address is posted to exactly where it was saved.
+      redirect: "error",
+      signal: AbortSignal.timeout(timeoutMs),
     });
     return { attempted: true, delivered: response.ok, status: response.status };
   } catch (error) {
@@ -221,12 +238,12 @@ async function post(url: string, message: DiscordMessage, fetchImpl: typeof fetc
 export async function postToDiscord(
   group: DiscordGroup,
   message: DiscordMessage,
-  options: { fetchImpl?: typeof fetch; now?: Date } = {},
+  options: { fetchImpl?: typeof fetch; now?: Date; timeoutMs?: number } = {},
 ): Promise<DiscordDelivery> {
   try {
     const url = await readDestination(group);
     if (!url) return { attempted: false, delivered: false };
-    const delivery = await post(url, message, options.fetchImpl ?? fetch);
+    const delivery = await post(url, message, options.fetchImpl ?? fetch, options.timeoutMs);
     if (!delivery.delivered) logWarn("An alert could not be delivered to Discord.", { group, status: delivery.status ?? null });
     await recordDelivery(delivery.delivered, options.now ?? new Date());
     return delivery;

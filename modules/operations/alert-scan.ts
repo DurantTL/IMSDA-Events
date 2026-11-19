@@ -14,7 +14,7 @@ import {
 } from "@/modules/communications/outbox-sweep";
 import { PAYMENT_STUCK_AFTER_MINUTES } from "@/modules/operations/operational-health";
 import { readBackupAlerts } from "@/modules/operations/backup-alerts";
-import { backToNormalSummary } from "@/modules/operations/backup-alerts-domain";
+import { BACKUP_ALERT_KEY_PREFIX, backToNormalSummary } from "@/modules/operations/backup-alerts-domain";
 import { postToDiscord } from "@/modules/operations/discord-alert-settings";
 import { discordGroupForAlertKey, ONCE_ONLY_REPEAT_MINUTES } from "@/modules/operations/discord-alerts-domain";
 import { logWarn } from "@/lib/logger";
@@ -54,6 +54,7 @@ export function assessSystemSignals(signals: SystemAlertSignals): Alert[] {
     alerts.push({
       key: `${ALERT_KEY_PREFIX}outbox.backed-up`,
       severity: "URGENT",
+      group: "site-health",
       summary: "Email delivery is falling behind",
       detail: queue.reasons.join("; "),
       context: {
@@ -70,6 +71,7 @@ export function assessSystemSignals(signals: SystemAlertSignals): Alert[] {
     alerts.push({
       key: `${ALERT_KEY_PREFIX}outbox.messages-failed`,
       severity: "URGENT",
+      group: "site-health",
       summary: `${signals.failedMessages} message${signals.failedMessages === 1 ? "" : "s"} gave up after every retry`,
       detail: "Somebody did not receive a confirmation, a reminder, or an account link.",
       context: { failedMessages: signals.failedMessages, windowMinutes: ALERT_WINDOW_MINUTES },
@@ -80,6 +82,7 @@ export function assessSystemSignals(signals: SystemAlertSignals): Alert[] {
     alerts.push({
       key: `${ALERT_KEY_PREFIX}payments.failed`,
       severity: "URGENT",
+      group: "site-health",
       summary: `${signals.failedPayments} card payment${signals.failedPayments === 1 ? "" : "s"} failed`,
       detail: "Check the payment attempts in Operational health before the registrant tries again.",
       context: { failedPayments: signals.failedPayments, windowMinutes: ALERT_WINDOW_MINUTES },
@@ -90,6 +93,7 @@ export function assessSystemSignals(signals: SystemAlertSignals): Alert[] {
     alerts.push({
       key: `${ALERT_KEY_PREFIX}payments.stuck`,
       severity: "URGENT",
+      group: "site-health",
       summary: `${signals.stuckPayments} card payment${signals.stuckPayments === 1 ? "" : "s"} never reached a result`,
       detail: `A payment left processing for more than ${PAYMENT_STUCK_AFTER_MINUTES} minutes usually means the provider webhook is not arriving.`,
       context: {
@@ -149,7 +153,7 @@ export async function runAlertScan(
   // Backup problems are read separately: a failed read adds no alert and never stops the rest of the scan.
   const backups = await readBackupAlerts(now).catch((error) => {
     logWarn("The backup alerts could not be read.", { error: error instanceof Error ? error.name : typeof error });
-    return { alerts: [] as Alert[], notices: [] as Alert[] };
+    return { alerts: [] as Alert[], notices: [] as Alert[], readFailed: true };
   });
   const alerts = [...assessSystemSignals(signals), ...backups.alerts];
 
@@ -160,6 +164,8 @@ export async function runAlertScan(
     alerts.map((alert) => alert.key),
     ALERT_KEY_PREFIX,
     now,
+    // A backup read that failed says nothing about whether the problem is gone: keep those alerts as they are.
+    backups.readFailed ? [BACKUP_ALERT_KEY_PREFIX] : [],
   );
   const dispatched = await dispatchAlerts(alerts, { now, fetchImpl: options.fetchImpl });
   // One-time notices (a restore check passed) are sent once each, never repeated.

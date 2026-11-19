@@ -56,12 +56,16 @@ type Row = Record<string, unknown>;
 
 /** An in-memory stand-in for the one platform settings row and the tables the code touches. */
 function database(initial: Row | null = null) {
-  let row: Row | null = initial;
+  const STAMP = new Date("2026-11-01T00:00:00.000Z");
+  // Like Prisma's @updatedAt: a write that does not hand back its own value stamps "now".
+  const stamped = (data: Row) => ({ ...data, updatedAt: "updatedAt" in data ? data.updatedAt : new Date("2030-01-01T00:00:00.000Z") });
+  let row: Row | null = initial ? { updatedAt: STAMP, ...initial } : null;
   const alertRows = new Map<string, Row>();
   const tx = {
     platformSettings: {
+      findUnique: vi.fn(async () => (row ? { ...row } : null)),
       upsert: vi.fn(async ({ update, create }: { update: Row; create: Row }) => {
-        row = row ? { ...row, ...update } : { ...create };
+        row = row ? { ...row, ...stamped(update) } : { updatedAt: STAMP, ...create };
         return row;
       }),
     },
@@ -71,7 +75,7 @@ function database(initial: Row | null = null) {
     platformSettings: {
       findUnique: vi.fn(async () => (row ? { ...row } : null)),
       update: vi.fn(async ({ data }: { data: Row }) => {
-        row = { ...(row ?? {}), ...data };
+        row = { ...(row ?? {}), ...stamped(data) };
         return row;
       }),
     },
@@ -84,10 +88,11 @@ function database(initial: Row | null = null) {
       }),
       updateMany: vi.fn(async () => ({ count: 0 })),
       findMany: vi.fn(async () => []),
+      deleteMany: vi.fn(async ({ where }: { where: { key: string } }) => ({ count: alertRows.delete(where.key) ? 1 : 0 })),
     },
   };
   mocks.getPrisma.mockReturnValue(prisma);
-  return { prisma, tx, row: () => row };
+  return { prisma, tx, row: () => row, alertRows, STAMP };
 }
 
 const okFetch = () => vi.fn(async () => new Response(null, { status: 204 }));
@@ -290,6 +295,7 @@ describe("dispatching alerts to Discord", () => {
   const alert: Alert = {
     key: "system.outbox.messages-failed",
     severity: "URGENT",
+    group: "site-health",
     summary: "2 messages gave up after every retry",
     detail: "Somebody did not receive a confirmation.",
     webhookOnlyDetail: "Jane Synthetic <jane@example.test>",
@@ -489,5 +495,148 @@ describe("who can change the settings", () => {
     expect(await refused.text()).not.toContain("example.com");
     const extra = await call(PUT, request("PUT", { address: ADDRESS, other: 1 }));
     expect(extra.status).toBe(400);
+  });
+});
+
+describe("Discord is an allow-list (#2048 review)", () => {
+  it("never sends an alert that has no group, such as the Square payment alert with a confirmation code and amount", async () => {
+    database();
+    await saveDiscordWebhook(ADDRESS, "admin-1", now);
+    mocks.getServerEnv.mockReturnValue({ SECRET_ENCRYPTION_KEY: "a-synthetic-sign-in-key-of-adequate-length", ALERT_WEBHOOK_URL: "https://hooks.test/imsda", ALERT_REPEAT_MINUTES: 60 });
+    const fetchImpl = okFetch();
+    const payment: Alert = {
+      key: "payments.duplicate-charge.pay_synthetic_1",
+      severity: "URGENT",
+      summary: "Possible duplicate charge for registration ABC-1234",
+      detail: "Payment pay_synthetic_1 for $125.00 needs a refund review.",
+    };
+    const result = await dispatchAlerts([payment], { now, fetchImpl });
+    expect(result.sent).toEqual([payment]);
+    expect((fetchImpl.mock.calls as unknown as [string][]).map(([url]) => url)).toEqual(["https://hooks.test/imsda"]);
+  });
+
+  it("gives every alert-scan alert an explicit group", async () => {
+    const { assessSystemSignals } = await import("@/modules/operations/alert-scan");
+    const alerts = assessSystemSignals({
+      outbox: { due: 99, oldestDueAgeMs: 9_999_999, accountMessagesDue: 3 } as never,
+      failedMessages: 1, failedPayments: 1, stuckPayments: 1, oldestStuckPaymentMinutes: 30,
+    });
+    expect(alerts.length).toBeGreaterThanOrEqual(3);
+    expect(alerts.every((alert) => alert.group === "site-health")).toBe(true);
+  });
+});
+
+describe("one destination at a time (#2048 review)", () => {
+  const alert: Alert = { key: "system.payments.failed", severity: "URGENT", group: "site-health", summary: "1 card payment failed" };
+  const withEnv = () => mocks.getServerEnv.mockReturnValue({ SECRET_ENCRYPTION_KEY: "a-synthetic-sign-in-key-of-adequate-length", ALERT_WEBHOOK_URL: "https://hooks.test/imsda", ALERT_REPEAT_MINUTES: 60 });
+
+  it("retries a failed env webhook without repeating the Discord message, then forgets the note", async () => {
+    const db = database();
+    await saveDiscordWebhook(ADDRESS, "admin-1", now);
+    withEnv();
+    let envUp = false;
+    const calls: string[] = [];
+    const fetchImpl = vi.fn(async (url: string) => {
+      calls.push(url);
+      return new Response(null, { status: url === ADDRESS || envUp ? 204 : 500 });
+    }) as unknown as typeof fetch;
+    const first = await dispatchAlerts([alert], { now, fetchImpl });
+    expect(first.undelivered).toEqual([alert]);
+    expect(db.alertRows.has("discord-pending.system.payments.failed")).toBe(true);
+    envUp = true;
+    const second = await dispatchAlerts([alert], { now: new Date(now.getTime() + 5 * 60_000), fetchImpl });
+    expect(second.sent).toEqual([alert]);
+    expect(calls.filter((url) => url === ADDRESS)).toHaveLength(1);
+    expect(calls.filter((url) => url === "https://hooks.test/imsda")).toHaveLength(2);
+    expect(db.alertRows.has("discord-pending.system.payments.failed")).toBe(false);
+  });
+
+  it("does not follow a redirect when posting to Discord", async () => {
+    database();
+    await saveDiscordWebhook(ADDRESS, "admin-1", now);
+    const fetchImpl = okFetch();
+    await postToDiscord("site-health", { severity: "URGENT", summary: "x" }, { fetchImpl, now });
+    expect((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].redirect).toBe("error");
+  });
+});
+
+describe("one-time notices stay out of the open alerts (#2048 review)", () => {
+  it("excludes notice keys from the open-alert condition used by every open-alert count and list", async () => {
+    const { OPEN_ALERT_WHERE, NOTICE_KEY_PREFIX } = await import("@/modules/operations/discord-alerts-domain");
+    expect(OPEN_ALERT_WHERE).toEqual({ resolvedAt: null, NOT: { key: { startsWith: NOTICE_KEY_PREFIX } } });
+    const { readFileSync } = await import("node:fs");
+    for (const file of ["modules/system-admin/repository.ts", "modules/system-admin/system-report/providers.ts"]) {
+      const text = readFileSync(file, "utf8");
+      expect(text, file).toContain("OPEN_ALERT_WHERE");
+      expect(text, file).not.toMatch(/alertNotification\.(count|findMany)\(\{\s*where: \{ resolvedAt: null \}/);
+    }
+    expect(NOTICE_KEY_PREFIX).toBe("notice.");
+    for (const key of ["notice.deploy.deployed.abc1234", "notice.practice.restore-drill.1", "notice.predeploy.failed.abc1234", "notice.backup.rehearsal-passed.1"]) {
+      expect(key.startsWith(NOTICE_KEY_PREFIX)).toBe(true);
+    }
+  });
+});
+
+describe("Discord bookkeeping leaves 'Last changed' alone (#2048 review)", () => {
+  it("keeps updatedAt through save, switches, remove and delivery results", async () => {
+    const db = database({ id: "platform" });
+    const stamp = db.STAMP;
+    await saveDiscordWebhook(ADDRESS, "admin-1", now);
+    expect(db.row()?.updatedAt).toEqual(stamp);
+    await saveDiscordGroups({ ...ALL_DISCORD_GROUPS_ON, deploys: false }, "admin-1");
+    expect(db.row()?.updatedAt).toEqual(stamp);
+    await postToDiscord("site-health", { severity: "URGENT", summary: "x" }, { fetchImpl: okFetch(), now });
+    expect(db.row()?.updatedAt).toEqual(stamp);
+    await postToDiscord("site-health", { severity: "URGENT", summary: "x" }, { fetchImpl: vi.fn(async () => new Response("", { status: 500 })), now });
+    expect(db.row()?.updatedAt).toEqual(stamp);
+    await removeDiscordWebhook("admin-1");
+    expect(db.row()?.updatedAt).toEqual(stamp);
+  });
+});
+
+describe("a backup read that fails keeps its alerts open (#2048 review)", () => {
+  it("says so from readBackupAlerts, when either source throws or the listing errors", async () => {
+    vi.resetModules();
+    vi.doMock("@/modules/operations/backup-status-repository", () => ({ getBackupStatus: vi.fn(async () => { throw new Error("db"); }) }));
+    vi.doMock("@/modules/operations/offsite-backups-reader", () => ({ getOffsiteBackups: vi.fn(async () => ({ state: "ok-not-used" })) }));
+    const first = await import("@/modules/operations/backup-alerts");
+    expect((await first.readBackupAlerts(now)).readFailed).toBe(true);
+
+    vi.resetModules();
+    vi.doMock("@/modules/operations/backup-status-repository", () => ({ getBackupStatus: vi.fn(async () => { throw new Error("db"); }) }));
+    vi.doMock("@/modules/operations/offsite-backups-reader", () => ({ getOffsiteBackups: vi.fn(async () => { throw new Error("r2"); }) }));
+    const second = await import("@/modules/operations/backup-alerts");
+    expect((await second.readBackupAlerts(now)).readFailed).toBe(true);
+
+    vi.resetModules();
+    vi.doMock("@/modules/operations/backup-status-repository", () => ({ getBackupStatus: vi.fn(async () => { throw new Error("db"); }) }));
+    vi.doMock("@/modules/operations/offsite-backups-reader", () => ({ getOffsiteBackups: vi.fn(async () => ({ state: "error", reason: "x", checkedAt: now.toISOString() })) }));
+    const third = await import("@/modules/operations/backup-alerts");
+    expect((await third.readBackupAlerts(now)).readFailed).toBe(true);
+    vi.doUnmock("@/modules/operations/backup-status-repository");
+    vi.doUnmock("@/modules/operations/offsite-backups-reader");
+    vi.resetModules();
+  });
+
+  it("does not clear or announce backup alerts when the scan could not read them", async () => {
+    vi.resetModules();
+    const readBackupAlerts = vi.fn(async () => ({ alerts: [], notices: [], readFailed: true }));
+    vi.doMock("@/modules/operations/backup-alerts", () => ({ readBackupAlerts }));
+    vi.doMock("@/modules/communications/outbox-sweep", () => ({
+      assessOutboxQueue: () => ({ status: "ok", reasons: [] }),
+      getOutboxQueueSnapshot: async () => ({ due: 0, oldestDueAgeMs: null, accountMessagesDue: 0 }),
+    }));
+    const db = database();
+    Object.assign(db.prisma, {
+      messageOutbox: { count: vi.fn(async () => 0) },
+      paymentAttempt: { count: vi.fn(async () => 0), findFirst: vi.fn(async () => null) },
+    });
+    const scan = await import("@/modules/operations/alert-scan");
+    await scan.runAlertScan({ now, fetchImpl: okFetch() });
+    const where = (db.prisma.alertNotification.updateMany.mock.calls[0] as unknown as [{ where: { NOT?: unknown } }])[0].where;
+    expect(where.NOT).toEqual([{ key: { startsWith: "system.backup." } }]);
+    vi.doUnmock("@/modules/operations/backup-alerts");
+    vi.doUnmock("@/modules/communications/outbox-sweep");
+    vi.resetModules();
   });
 });

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { OPEN_ALERT_WHERE } from "@/modules/operations/discord-alerts-domain";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { getReleaseIdentity, getReleaseTimes } from "@/lib/release";
@@ -201,7 +202,7 @@ function openProblemReportCount(ctx: ReportContext) {
   return ctx.once("open-problem-report-count", () => countOpenProblemReports());
 }
 function unresolvedAlertCount(ctx: ReportContext) {
-  return ctx.once("alert-count", () => getPrisma().alertNotification.count({ where: { resolvedAt: null } }));
+  return ctx.once("alert-count", () => getPrisma().alertNotification.count({ where: OPEN_ALERT_WHERE }));
 }
 
 /** Events worth reading operational health and the ledger for: not archived, and not ended more than 30 days ago. */

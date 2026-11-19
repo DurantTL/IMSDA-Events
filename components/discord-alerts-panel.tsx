@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BellRing } from "lucide-react";
 import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { submitJson } from "@/lib/submit-json";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { DISCORD_GROUPS, DISCORD_GROUP_LABELS, type DiscordGroup } from "@/modules/operations/discord-alerts-domain";
@@ -23,33 +24,40 @@ export function DiscordAlertsPanel({ initial }: { initial: DiscordAlertSettingsV
   const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [addressError, setAddressError] = useState("");
+  const [action, setAction] = useState<"save" | "remove" | "switch" | "test" | null>(null);
   const [notice, setNotice] = useState("");
   const { confirm, confirmDialog } = useConfirm();
+  // A typed address that has not been saved is lost on leaving, so the page asks first.
+  useUnsavedChangesGuard(editing && address.trim() !== "", "The Discord address has not been saved. Leave and discard it?");
 
-  async function call(path: string, body: unknown, method: "PUT" | "PATCH" | "DELETE" | "POST") {
+  async function call(path: string, body: unknown, method: "PUT" | "PATCH" | "DELETE" | "POST", which: "save" | "remove" | "switch", onError: (message: string) => void = setError) {
     setBusy(true);
+    setAction(which);
     setError("");
+    setAddressError("");
     setNotice("");
     try {
       const response = await submitJson(path, body, { method, init: { cache: "no-store" } });
       const data = response.body as { settings?: DiscordAlertSettingsView; result?: { state: string; message: string }; message?: string } | null;
       if (!response.ok || !data?.settings) {
-        setError(data?.message ?? "That could not be saved. Try again.");
+        onError(data?.message ?? "That could not be saved. Try again.");
         return null;
       }
       setSettings(data.settings);
       return data;
     } catch {
-      setError("That could not be saved. Try again.");
+      onError("That could not be saved. Try again.");
       return null;
     } finally {
       setBusy(false);
+      setAction(null);
     }
   }
 
   async function saveAddress(event: React.FormEvent) {
     event.preventDefault();
-    const data = await call(ENDPOINT, { address }, "PUT");
+    const data = await call(ENDPOINT, { address }, "PUT", "save", setAddressError);
     if (!data) return;
     setAddress("");
     setEditing(false);
@@ -64,7 +72,7 @@ export function DiscordAlertsPanel({ initial }: { initial: DiscordAlertSettingsV
       body: <p>Alerts stop going to Discord. They are still written to the app logs, and the email webhook (if one is set) is not affected.</p>,
     });
     if (!ok) return;
-    const data = await call(ENDPOINT, undefined, "DELETE");
+    const data = await call(ENDPOINT, undefined, "DELETE", "remove");
     if (data) {
       setEditing(true);
       setNotice("Removed. Alerts no longer go to Discord.");
@@ -72,13 +80,15 @@ export function DiscordAlertsPanel({ initial }: { initial: DiscordAlertSettingsV
   }
 
   async function toggle(group: DiscordGroup, on: boolean) {
-    const data = await call(ENDPOINT, { groups: { ...settings.groups, [group]: on } }, "PATCH");
+    const data = await call(ENDPOINT, { groups: { ...settings.groups, [group]: on } }, "PATCH", "switch");
     if (data) setNotice(`${DISCORD_GROUP_LABELS[group].label} is ${on ? "on" : "off"}.`);
   }
 
   async function sendTest() {
     setBusy(true);
+    setAction("test");
     setError("");
+    setAddressError("");
     setNotice("");
     try {
       const response = await submitJson(`${ENDPOINT}/test`, {}, { method: "POST", init: { cache: "no-store" } });
@@ -94,23 +104,24 @@ export function DiscordAlertsPanel({ initial }: { initial: DiscordAlertSettingsV
       setError("The test message could not be sent.");
     } finally {
       setBusy(false);
+      setAction(null);
     }
   }
 
   return (
-    <section className="panel" aria-labelledby="discord-alerts-heading">
+    <section className={`panel ${styles.panel}`} aria-labelledby="discord-alerts-heading">
       <div className="section-heading">
         <div>
           <p className="eyebrow"><BellRing aria-hidden="true" size={14} /> System alerts</p>
           <h2 id="discord-alerts-heading">Alerts to Discord</h2>
         </div>
       </div>
-      <p className={`field-help ${styles.help}`}>
+      <p className={`field-help ${styles.help}`} id="discord-alerts-intro">
         Sends site trouble, deploys, backups and practice runs to one Discord channel. Messages carry fixed words, counts and version ids only, never anyone&apos;s name or details.
       </p>
 
       <p className={styles.status}>
-        <span className={`${styles.badge} ${settings.connected ? styles.badgeOn : ""}`}>{settings.connected ? "Connected" : "Not connected"}</span>
+        <span className={`status-chip ${settings.connected ? "green" : "neutral"}`}>{settings.connected ? "Connected" : "Not connected"}</span>
         {settings.connected && settings.last4 && <span>Address ends in <strong>{settings.last4}</strong></span>}
         {settings.connected && settings.setAt && (
           <span>Set {when(settings.setAt)}{settings.setByName ? ` by ${settings.setByName}` : ""}</span>
@@ -119,30 +130,34 @@ export function DiscordAlertsPanel({ initial }: { initial: DiscordAlertSettingsV
 
       {editing ? (
         <form onSubmit={saveAddress}>
-          <label className={styles.field}>
-            Discord webhook address
+          <div className={styles.field}>
+            <label htmlFor="discord-webhook-address">Discord webhook address</label>
             <input
+              aria-describedby={`discord-address-help${addressError ? " discord-address-error" : ""}`}
+              aria-invalid={addressError ? true : undefined}
               autoComplete="off"
               disabled={busy}
+              id="discord-webhook-address"
               name="discord-webhook-address"
-              onChange={(event) => setAddress(event.target.value)}
+              onChange={(event) => { setAddress(event.target.value); setAddressError(""); }}
               placeholder="https://discord.com/api/webhooks/..."
               required
               spellCheck={false}
               type="password"
               value={address}
             />
-            <small className={`field-help ${styles.help}`}>In Discord: channel settings, Integrations, Webhooks, New webhook, Copy Webhook URL. It is stored encrypted and is never shown again.</small>
-          </label>
+            <small className={`field-help ${styles.help}`} id="discord-address-help">In Discord: channel settings, Integrations, Webhooks, New webhook, Copy Webhook URL. It is stored encrypted and is never shown again.</small>
+            {addressError && <p className="form-error" id="discord-address-error" role="alert">{addressError}</p>}
+          </div>
           <div className={styles.actions}>
-            <button className="primary-button" disabled={busy || !address.trim()} type="submit">Save address</button>
-            {settings.connected && <button className="secondary-button" disabled={busy} onClick={() => { setEditing(false); setAddress(""); setError(""); }} type="button">Cancel</button>}
+            <button className="primary-button" disabled={busy || !address.trim()} type="submit">{action === "save" ? "Saving…" : "Save address"}</button>
+            {settings.connected && <button className="secondary-button" disabled={busy} onClick={() => { setEditing(false); setAddress(""); setError(""); setAddressError(""); }} type="button">Cancel</button>}
           </div>
         </form>
       ) : (
         <div className={styles.actions}>
           <button className="secondary-button" disabled={busy} onClick={() => setEditing(true)} type="button">Replace</button>
-          <button className="secondary-button" disabled={busy} onClick={() => void remove()} type="button">Remove</button>
+          <button className="secondary-button" disabled={busy} onClick={() => void remove()} type="button">{action === "remove" ? "Removing…" : "Remove"}</button>
         </div>
       )}
 
@@ -161,7 +176,7 @@ export function DiscordAlertsPanel({ initial }: { initial: DiscordAlertSettingsV
             ))}
           </fieldset>
           <div className={styles.actions}>
-            <button className="secondary-button" disabled={busy} onClick={() => void sendTest()} type="button">Send a test message</button>
+            <button className="secondary-button" disabled={busy} onClick={() => void sendTest()} type="button">{action === "test" ? "Sending…" : "Send a test message"}</button>
           </div>
           <ul className={styles.delivery}>
             <li>Last delivered: {settings.lastDeliveredAt ? when(settings.lastDeliveredAt) : "never"}</li>
