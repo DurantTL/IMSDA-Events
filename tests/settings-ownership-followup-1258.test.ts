@@ -250,6 +250,18 @@ describe("environment-managed provider status (#1258)", () => {
     expect(page).toContain("getEnvironmentStatusForViewer(user)");
   });
 
+  it("gives every not-configured service a how-to-set-this-up panel next to it (H3, #2025)", () => {
+    const status = buildEnvironmentStatus({}, { ...readers, emailAvailability: () => ({ deliveryConfigured: false, webhookConfigured: false }) });
+    const markup = renderToStaticMarkup(createElement(EnvironmentStatusPanel, { status }));
+    for (const service of status.services.filter((entry) => entry.status === "not-configured")) {
+      const item = markup.split("<li ").find((part) => part.includes(`data-environment-service="${service.id}"`)) ?? "";
+      expect(item, service.id).toContain("Not configured");
+      expect(item, service.id).toContain("How to set this up");
+    }
+    const configured = renderToStaticMarkup(createElement(EnvironmentStatusPanel, { status: buildEnvironmentStatus(secrets, readers) }));
+    for (const part of configured.split("<li ").filter((item) => item.includes('data-status="configured"'))) expect(part).not.toContain("How to set this up");
+  });
+
   it("keeps configuration apart from live health and manual readiness evidence", () => {
     const markup = renderToStaticMarkup(createElement(EnvironmentStatusPanel, { status: buildEnvironmentStatus({}, readers) }));
     expect(markup).toContain("Environment configuration");

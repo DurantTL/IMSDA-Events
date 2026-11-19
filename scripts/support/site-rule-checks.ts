@@ -71,7 +71,8 @@ const NOT_A_RECORD_STATUS = [...Object.values(clubDirectorRoleLabels), "Clear", 
  *  - neutral reading labels (grey, never OK): "Unavailable", "Count only", "Not run yet";
  *  - progress: "N of M ticked", "Ticked", "Not ticked";
  *  - summaries (#2025): "Configured", "Not configured", "N forms on", "All published", "Nothing paused", "N of M paused",
- *    "Nearly full", "Full", "Clash", "Needs gender, current class", "Version 2", "Published (version 2)";
+ *    "Nearly full", "Full", "Clash", the calendar and platform settings notes ("On calendar", "Deadline", "Possible match",
+ *    "Linked to an event", "Affects everyone", "Central value", "A template copy", "Owned by Email", "Not separate yet"), "Needs gender, current class", "Version 2", "Published (version 2)";
  *  - tallies of the above: "N OK", "N check soon", "N need attention", "N unavailable", "N count only".
  * A detail after " · " is checked part by part: each part must be one of these labels or a count like "2 chosen".
  */
@@ -95,6 +96,8 @@ const CONFIGURATION_WORDS = ["Configured", "Not configured"];
 // Honors schedule: they describe a tally or a capacity, not a record.
 const SUMMARY_LABELS = [/^\d+ forms? on$/, /^All published$/, /^Nothing paused$/, /^\d+ of \d+ paused$/];
 const CAPACITY_WORDS = ["Nearly full", "Full", "Clash"];
+// Calendar settings and Platform settings chips that say what a row is or who it reaches, not the state of a record (#2025).
+const SETTINGS_NOTE_WORDS = ["On calendar", "Deadline", "Possible match", "Linked to an event", "Affects everyone", "Central value", "A template copy", "Owned by Email", "Not separate yet"];
 // The roster's "Needs gender, current class": what a person still has to be given (the roster's own field labels).
 const NEEDS_DETAILS = /^Needs (gender|current class|grade|role|type|birth date)(, (gender|current class|grade|role|type|birth date))*$/;
 const COUNT_DETAIL = /^\d+ [a-z]+$/;
@@ -108,7 +111,7 @@ function infoKindOfPart(part: string): InfoKind | null {
   if (HEALTH_LABELS.some((label) => label.word === part) || /^\d+ (OK|check soon|need attention)$/.test(part)) return "health";
   if (READING_WORDS.includes(part) || /^\d+ (unavailable|count only)$/.test(part)) return "reading";
   if (PROGRESS_LABEL.test(part) || TICK_WORDS.includes(part)) return "progress";
-  if (CONFIGURATION_WORDS.includes(part) || CAPACITY_WORDS.includes(part) || NEEDS_DETAILS.test(part) || SUMMARY_LABELS.some((pattern) => pattern.test(part))) return "summary";
+  if (CONFIGURATION_WORDS.includes(part) || CAPACITY_WORDS.includes(part) || SETTINGS_NOTE_WORDS.includes(part) || NEEDS_DETAILS.test(part) || SUMMARY_LABELS.some((pattern) => pattern.test(part))) return "summary";
   return null;
 }
 
@@ -358,7 +361,7 @@ export async function checkPage(page: Page, rec: Recorder, name: string, options
 /* ------------------------------------------------------------ search */
 
 /** The wording the S4 check accepts as a "no match" line (tests/search-no-match-copy-2025.test.ts keeps the staff pages on it). */
-export const NO_MATCH_LINE = /\b(no (?:\w+ )*(?:results?|matches|clubs?|guides?|items?|people|forms?|events?) (?:found|match)|no (?:results?|matches)|nothing (?:found|matches)|none of them match|0 (?:results?|matches|of \d+)|not found)\b/i;
+export const NO_MATCH_LINE = /\b(no (?:\w+ )*(?:results?|matches|clubs?|guides?|items?|people|staff|forms?|events?) (?:found|match)|no (?:results?|matches)|nothing (?:found|matches)|none of them match|0 (?:results?|matches|of \d+)|not found)\b/i;
 
 /** S1, S2, S4: typing narrows with no Enter, and clearing brings the whole list back. */
 export async function checkSearchBoxes(page: Page, rec: Recorder, name: string) {

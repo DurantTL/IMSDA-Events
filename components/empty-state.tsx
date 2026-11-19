@@ -77,6 +77,7 @@ export function NoMatchesState({
   className = "empty-state panel",
   headingLevel = 3,
   announce = false,
+  searchTitle,
 }: {
   /** Plural noun for what is listed, e.g. "registrations". */
   noun: string;
@@ -89,6 +90,8 @@ export function NoMatchesState({
   headingLevel?: 2 | 3 | 4;
   /** Defaults to false: this is the visible result of a search, so typing never re-announces it. */
   announce?: boolean;
+  /** The heading when text was searched, in place of the one that echoes the text (S4: "No staff match that search."). */
+  searchTitle?: string;
 }) {
   const text = (query ?? "").trim();
   return (
@@ -100,7 +103,7 @@ export function NoMatchesState({
       className={className}
       headingLevel={headingLevel}
       icon={icon ?? <Search aria-hidden="true" size={24} />}
-      title={text ? `No ${noun} match "${text}"` : `No ${noun} match these filters`}
+      title={text ? searchTitle ?? `No ${noun} match "${text}"` : `No ${noun} match these filters`}
     >
       {`${known ? `${known} ` : ""}${text ? "Check the spelling, or clear the search and filters to see them all." : "Clear the filters to see them all."}`}
     </EmptyState>
