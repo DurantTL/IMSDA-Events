@@ -101,6 +101,7 @@ beforeEach(() => {
       : []
   ));
   db.clubRosterGuardian.deleteMany.mockResolvedValue({ count: 0 });
+  db.clubRosterParent.deleteMany.mockResolvedValue({ count: 0 });
   db.memberTransfer.create.mockResolvedValue({ id: "transfer-1" });
   db.memberTransfer.findUnique.mockResolvedValue(null);
   db.clubDirectorGrant.findMany.mockResolvedValue([]);
@@ -261,6 +262,8 @@ describe("completing a transfer", () => {
     });
     // Guardian contacts (#510) stay with the sending membership: they are deleted, never copied to the receiving row.
     expect(db.clubRosterGuardian.deleteMany).toHaveBeenCalledWith({ where: { rosterMemberId: "row-ada" } });
+    // Parent or guardian contacts (#2058) go the same way.
+    expect(db.clubRosterParent.deleteMany).toHaveBeenCalledWith({ where: { rosterMemberId: "row-ada" } });
     expect(db.clubRosterMember.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ organizationId: "club-b", personId: "person-ada", sealedBirthDate: "v1.sealed", source: "TRANSFER", createdByAccountId: "account-a", isTlt: true, schoolGrade: "GRADE_6", schoolType: "HOMESCHOOL", churchMember: "YES", baptized: "NOT_SURE" }),
     }));

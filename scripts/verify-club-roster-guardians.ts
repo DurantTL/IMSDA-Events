@@ -24,7 +24,7 @@ import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 import { addRosterMember, removeRosterMember, updateRosterMember } from "@/modules/club-rosters/repository";
 import { runRosterExport } from "@/modules/club-rosters/export-repository";
-import { GuardianAccessError, listGuardianContactsForClub, listGuardiansByMember } from "@/modules/club-rosters/guardians-repository";
+import { GuardianAccessError, listGuardianContactsForClub, listGuardiansByMember, listParentsByMember } from "@/modules/club-rosters/guardians-repository";
 import type { GuardianViewer } from "@/modules/club-rosters/guardians-domain";
 
 loadEnvConfig(process.cwd());
@@ -40,6 +40,8 @@ const actor = { accountId: `${P}_acct` };
 const SECRET_NAME = "Verify Guardian Only";
 const SECRET_EMAIL = "verify.guardian@example.test";
 const SECRET_PHONE = "(515) 555-0188";
+const PARENT_NAME = "Verify Parent Only";
+const PARENT_EMAIL = "verify.parent@example.test";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`FAILED: ${message}`);
@@ -149,11 +151,28 @@ async function main() {
   assert(await rejects(runRosterExport(clubs.a, clubYear, { mode: "csv", columns: exportColumns, confirmSensitive: true }, false, actor, false)), "the export refuses a role that may not see emergency contacts");
   await updateRosterMember(clubs.a, added.memberId, { guardians: [guardian(SECRET_NAME, { email: SECRET_EMAIL, phone: SECRET_PHONE }), guardian("Verify Second", { relationship: "Uncle" })] }, actor);
 
+  // Parents or guardians (#2058): a separate set with the same rules, and the same readers.
+  const parentCount = (id: string) => prisma.clubRosterParent.count({ where: { rosterMemberId: id } });
+  await updateRosterMember(clubs.a, added.memberId, { parents: [guardian(PARENT_NAME, { email: PARENT_EMAIL, phone: "(515) 555-0134" }), guardian("Verify Parent Two", { relationship: "Father" })] }, actor);
+  assert((await parentCount(added.memberId)) === 2 && (await countFor(added.memberId)) === 2, "parents are stored apart from emergency contacts");
+  assert(await rejects(prisma.clubRosterParent.create({ data: { rosterMemberId: added.memberId, position: 3, name: "Third" } })), "a third parent slot is refused");
+  assert(await rejects(prisma.clubRosterParent.create({ data: { rosterMemberId: added.memberId, position: 1, name: "Duplicate" } })), "a duplicate parent slot is refused");
+  await updateRosterMember(clubs.a, added.memberId, { role: "TLT" }, actor);
+  assert((await parentCount(added.memberId)) === 2, "an edit that doesn't send parents leaves them alone");
+  await updateRosterMember(clubs.a, added.memberId, { parents: [guardian("Verify Parent Renamed"), blank] }, actor);
+  assert((await parentCount(added.memberId)) === 1, "an edit replaces the parent set and a blank slot removes that parent");
+  assert(await rejects(updateRosterMember(clubs.a, added.memberId, { parents: [guardian("Verify Bad Parent", { email: "not an email" })] }, actor)), "a changed bad parent email is refused");
+  assert(!(adult.memberId in (await listParentsByMember(leaderA, clubs.a, clubYear))), "a member with no parents is not listed");
+  assert(added.memberId in (await listParentsByMember(leaderA, clubs.a, clubYear)), "the club's leader reads its parents");
+  assert(await rejects(listParentsByMember(leaderB, clubs.a, clubYear)), "another club's leader is refused the parents");
+  await updateRosterMember(clubs.a, added.memberId, { parents: [guardian(PARENT_NAME, { email: PARENT_EMAIL, phone: "(515) 555-0134" })] }, actor);
+
   // An inactive member keeps theirs; removal deletes only that member's.
   await updateRosterMember(clubs.a, other.memberId, { status: "INACTIVE" }, actor);
   assert((await countFor(other.memberId)) === 1, "an inactive member keeps their guardians");
   await removeRosterMember(clubs.a, added.memberId, actor);
   assert((await countFor(added.memberId)) === 0, "removing a member deletes every guardian of that member");
+  assert((await parentCount(added.memberId)) === 0, "removing a member deletes every parent of that member");
   assert((await countFor(other.memberId)) === 1, "removal leaves other members' guardians");
   assert(!(await listGuardianContactsForClub(coordinator, clubs.a, clubYear)).some((contact) => contact.memberId === added.memberId), "a removed member is not listed");
 
@@ -164,7 +183,7 @@ async function main() {
   // No audit row holds a guardian value.
   const audits = await prisma.auditLog.findMany({ where: { metadata: { path: ["organizationId"], string_starts_with: P } } });
   const text = JSON.stringify(audits);
-  for (const secret of [SECRET_NAME, SECRET_EMAIL, SECRET_PHONE, "Verify Renamed", "Verify Second", "Verify Other Guardian", "Verify Adult Contact", "Verify Adult Contact Two", "=SUM(1+1)", "Verify August Contact", "Verify August Second", "Verify Past Year", "Verify Other Club"]) {
+  for (const secret of [PARENT_NAME, PARENT_EMAIL, "Verify Parent Renamed", "Verify Parent Two", SECRET_NAME, SECRET_EMAIL, SECRET_PHONE, "Verify Renamed", "Verify Second", "Verify Other Guardian", "Verify Adult Contact", "Verify Adult Contact Two", "=SUM(1+1)", "Verify August Contact", "Verify August Second", "Verify Past Year", "Verify Other Club"]) {
     assert(!text.includes(secret), `no audit row contains "${secret}"`);
   }
   assert(audits.some((row) => row.action === "CLUB_ROSTER_GUARDIANS_VIEWED"), "a coordinator's or staff opening is audited");

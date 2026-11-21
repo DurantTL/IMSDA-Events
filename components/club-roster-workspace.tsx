@@ -47,10 +47,12 @@ import {
 import {
   GUARDIAN_SLOTS,
   validateGuardianForm,
+  validateParentForm,
   type GuardianFormErrors,
+  type ParentFormErrors,
   type GuardianRecord,
 } from "@/modules/club-rosters/guardians-domain";
-import { RosterGuardianFields, guardianErrorItems } from "@/components/roster-guardian-fields";
+import { RosterGuardianFields, RosterParentFields, guardianErrorItems, parentErrorItems } from "@/components/roster-guardian-fields";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
@@ -74,10 +76,21 @@ import styles from "@/components/club-roster-sections.module.css";
 import tableStyles from "@/components/club-roster-table.module.css";
 import { clubMemberNounPlural } from "@/modules/organizations/club-kind";
 
+/** The two contact slots (emergency `g` or parent `p`, #2058) read from the roster form. */
+function contactSlots(form: FormData, prefix: "g" | "p") {
+  return Array.from({ length: GUARDIAN_SLOTS }, (_, index) => ({
+    name: String(form.get(`${prefix}${index + 1}Name`) ?? "").trim(),
+    relationship: String(form.get(`${prefix}${index + 1}Relationship`) ?? "").trim(),
+    email: String(form.get(`${prefix}${index + 1}Email`) ?? "").trim(),
+    phone: String(form.get(`${prefix}${index + 1}Phone`) ?? "").trim(),
+  }));
+}
+
 type RosterResponse = {
   members?: RosterMemberRecord[];
   birthDates?: Record<string, string>;
   guardians?: Record<string, GuardianRecord[]>;
+  parents?: Record<string, GuardianRecord[]>;
   nameKept?: boolean;
   message?: string;
   issues?: Array<{ message?: string }>;
@@ -196,6 +209,7 @@ function ClubRosterWorkspaceInner({
   healthEntryOnly,
   healthRecordFlags,
   guardians: initialGuardians,
+  parents: initialParents,
   guardiansOnly = false,
   sectionsStartClosed = false,
   schoolDetails = false,
@@ -269,6 +283,8 @@ function ClubRosterWorkspaceInner({
    * about guardians is rendered or sent.
    */
   guardians?: Record<string, GuardianRecord[]>;
+  /** Parent or guardian contacts per roster member id (#2058): sent with the same rule as `guardians`, and shown for youth and underage members. */
+  parents?: Record<string, GuardianRecord[]>;
   /**
    * Next year's roster (#959): the rest of the page is read-only, but a
    * director or deputy can edit each person's emergency contacts. The pop-up
@@ -331,10 +347,19 @@ function ClubRosterWorkspaceInner({
     setGuardiansFrom(initialGuardians);
     setGuardianMap(initialGuardians);
   }
+  const [parentMap, setParentMap] = useState(initialParents);
+  const [parentsFrom, setParentsFrom] = useState(initialParents);
+  if (parentsFrom !== initialParents) {
+    setParentsFrom(initialParents);
+    setParentMap(initialParents);
+  }
   const [guardianErrors, setGuardianErrors] = useState<GuardianFormErrors>({});
+  const [parentErrors, setParentErrors] = useState<ParentFormErrors>({});
   const { ref: memberRef, items: memberItems, show: showMember, clear: clearMember, clearField: clearMemberField } = useFormErrorSummary();
   const canEditGuardians = initialGuardians !== undefined && (!readOnly || guardiansOnly);
   const contactsOnlyDialog = guardiansOnly && readOnly;
+  /** Parents or guardians (#2058) are asked for youth and underage members only, and only where the server sent them. */
+  const showParentFields = canEditGuardians && initialParents !== undefined && (formType === "YOUTH" || formType === "UNDERAGE");
   /** Whether the dialog has this member's current guardians (#510): "failed" leaves guardians untouched on save. */
   const [guardianState, setGuardianState] = useState<"ready" | "loading" | "failed">("ready");
   const [guardianRev, setGuardianRev] = useState(0);
@@ -412,6 +437,7 @@ function ClubRosterWorkspaceInner({
     setError("");
     setFieldErrors({});
     setGuardianErrors({});
+    setParentErrors({});
     setDialogDirty(false);
     setDialogOpen(true);
     // Re-read this member's guardians as the dialog opens, so a page left open
@@ -424,8 +450,9 @@ function ClubRosterWorkspaceInner({
         .then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => ({})) as RosterResponse }))
         .then(({ ok, body }) => {
           if (token !== guardianLoadToken.current) return;
-          if (ok && body.guardians) {
+          if (ok && body.guardians && (body.parents || initialParents === undefined)) {
             setGuardianMap(body.guardians);
+            if (body.parents) setParentMap(body.parents);
             setGuardianRev((current) => current + 1);
             setGuardianState("ready");
           } else {
@@ -685,6 +712,7 @@ function ClubRosterWorkspaceInner({
       }
       if (result.members) setMembers(result.members);
       if (result.guardians) setGuardianMap(result.guardians);
+      if (result.parents) setParentMap(result.parents);
       if (success) {
         setNotice(success);
       }
@@ -728,21 +756,21 @@ function ClubRosterWorkspaceInner({
       setError("Still loading this person's emergency contacts. Try again in a moment.");
       return;
     }
-    const guardianSlots = canEditGuardians && guardianState === "ready"
-      ? Array.from({ length: GUARDIAN_SLOTS }, (_, index) => ({
-        name: String(form.get(`g${index + 1}Name`) ?? "").trim(),
-        relationship: String(form.get(`g${index + 1}Relationship`) ?? "").trim(),
-        email: String(form.get(`g${index + 1}Email`) ?? "").trim(),
-        phone: String(form.get(`g${index + 1}Phone`) ?? "").trim(),
-      }))
-      : null;
+    const guardianSlots = canEditGuardians && guardianState === "ready" ? contactSlots(form, "g") : null;
     const guardianProblems = guardianSlots ? validateGuardianForm(guardianSlots, (editing ? guardianMap?.[editing.id] : undefined) ?? []) : {};
     setGuardianErrors(guardianProblems);
+    // Parents or guardians (#2058): the same two slots, only for a youth or underage member, and left alone otherwise.
+    const parentSlots = showParentFields && guardianState === "ready" && (attendeeType === "YOUTH" || attendeeType === "UNDERAGE")
+      ? contactSlots(form, "p")
+      : null;
+    const parentProblems = parentSlots ? validateParentForm(parentSlots, (editing ? parentMap?.[editing.id] : undefined) ?? []) : {};
+    setParentErrors(parentProblems);
     const memberProblems = [
       ...rosterFormFieldOrder.filter((field) => errors[field]).map((field) => ({
         targetId: field === "birthDate" ? "birthDate-input" : `roster-${field}`,
         message: summaryMessage(rosterFieldLabels[field], errors[field] as string),
       })),
+      ...parentErrorItems(parentProblems),
       ...guardianErrorItems(guardianProblems),
     ];
     if (memberProblems.length > 0) {
@@ -767,6 +795,7 @@ function ClubRosterWorkspaceInner({
       baptized: String(form.get("baptized") ?? "") || null,
       gender: String(form.get("gender") ?? "") || null,
       ...(guardianSlots ? { guardians: guardianSlots } : {}),
+      ...(parentSlots ? { parents: parentSlots } : {}),
     };
     const result = editing
       ? await call(`${base}/${encodeURIComponent(editing.id)}`, "PATCH", {
@@ -791,21 +820,19 @@ function ClubRosterWorkspaceInner({
         : "This person's emergency contacts could not be loaded, so nothing was saved. Close this and try again.");
       return;
     }
-    const slots = Array.from({ length: GUARDIAN_SLOTS }, (_, index) => ({
-      name: String(form.get(`g${index + 1}Name`) ?? "").trim(),
-      relationship: String(form.get(`g${index + 1}Relationship`) ?? "").trim(),
-      email: String(form.get(`g${index + 1}Email`) ?? "").trim(),
-      phone: String(form.get(`g${index + 1}Phone`) ?? "").trim(),
-    }));
+    const slots = contactSlots(form, "g");
     const problems = validateGuardianForm(slots, guardianMap?.[editing.id] ?? []);
     setGuardianErrors(problems);
-    const contactProblems = guardianErrorItems(problems);
+    const parentSlots = showParentFields ? contactSlots(form, "p") : null;
+    const parentProblems = parentSlots ? validateParentForm(parentSlots, parentMap?.[editing.id] ?? []) : {};
+    setParentErrors(parentProblems);
+    const contactProblems = [...parentErrorItems(parentProblems), ...guardianErrorItems(problems)];
     if (contactProblems.length > 0) {
       showMember(contactProblems);
       return;
     }
     clearMember();
-    const result = await call(`${base}/${encodeURIComponent(editing.id)}${yearQuery}`, "PATCH", { guardians: slots }, savedMessage());
+    const result = await call(`${base}/${encodeURIComponent(editing.id)}${yearQuery}`, "PATCH", { guardians: slots, ...(parentSlots ? { parents: parentSlots } : {}) }, savedMessage());
     if (result) closeDialog();
   }
 
@@ -1344,6 +1371,7 @@ function ClubRosterWorkspaceInner({
           // The changed field's summary item goes with its message (the summary hides when it empties).
           clearMemberField((event.target as HTMLElement).id);
           if (name in guardianErrors) setGuardianErrors((current) => ({ ...current, [name]: undefined }));
+          if (name in parentErrors) setParentErrors((current) => ({ ...current, [name]: undefined }));
         }}
         onSubmit={save}
       >
@@ -1358,7 +1386,7 @@ function ClubRosterWorkspaceInner({
         </div>
         {memberItems.length > 0 && <FormErrorSummary items={memberItems} ref={memberRef} />}
         {contactsOnlyDialog ? (
-          <p className="field-help">Next year&apos;s roster. Only emergency contacts can be changed here; the rest of this person&apos;s details are edited once the club year starts.</p>
+          <p className="field-help">Next year&apos;s roster. Only parents or guardians and emergency contacts can be changed here; the rest of this person&apos;s details are edited once the club year starts.</p>
         ) : (
         <div className="form-grid two-column">
           <label>
@@ -1456,6 +1484,14 @@ function ClubRosterWorkspaceInner({
             <FieldError id="roster-gender-error">{fieldErrors.gender}</FieldError>
           </label>
         </div>
+        )}
+        {showParentFields && (
+          <RosterParentFields
+            errors={parentErrors}
+            guardianState={guardianState}
+            key={`parents-${editing?.id ?? "new"}-${guardianRev}`}
+            records={editing ? parentMap?.[editing.id] : undefined}
+          />
         )}
         {canEditGuardians && (
           <RosterGuardianFields

@@ -34,7 +34,7 @@ const youth = {
 
 function fakeDatabase() {
   let sequence = 0;
-  const db = { guardians: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), snapshotReferences: new Set<string>(), mergeReferences: new Set<string>(), anonymizedReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[], tltProfilesErased: [] as string[], masterGuideErased: [] as Row[] };
+  const db = { guardians: [] as Row[], parents: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), snapshotReferences: new Set<string>(), mergeReferences: new Set<string>(), anonymizedReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[], tltProfilesErased: [] as string[], masterGuideErased: [] as Row[] };
   const matches = (row: Row, where: Record<string, unknown> = {}) => Object.entries(where).every(([key, value]) => {
     if (value === undefined) return true;
     if (value && typeof value === "object" && "not" in value) return row[key] !== (value as { not: unknown }).not;
@@ -107,6 +107,23 @@ function fakeDatabase() {
         db.guardians = db.guardians.filter((row) => !(row.rosterMemberId === where.rosterMemberId
           && (where.position === undefined || where.position.in.includes(row.position as number))));
         return { count: before - db.guardians.length };
+      },
+    },
+    clubRosterParent: {
+      findMany: async ({ where }: { where: { rosterMemberId: string } }) => db.parents.filter((row) => row.rosterMemberId === where.rosterMemberId),
+      upsert: async ({ where, create, update }: { where: { rosterMemberId_position: { rosterMemberId: string; position: number } }; create: Row; update: Row }) => {
+        const key = where.rosterMemberId_position;
+        const found = db.parents.find((row) => row.rosterMemberId === key.rosterMemberId && row.position === key.position);
+        if (found) return Object.assign(found, update);
+        const row = { ...create, id: `parent-${++sequence}` };
+        db.parents.push(row);
+        return row;
+      },
+      deleteMany: async ({ where }: { where: { rosterMemberId: string; position?: { in: number[] } } }) => {
+        const before = db.parents.length;
+        db.parents = db.parents.filter((row) => !(row.rosterMemberId === where.rosterMemberId
+          && (where.position === undefined || where.position.in.includes(row.position as number))));
+        return { count: before - db.parents.length };
       },
     },
     organization: { findUnique: async () => ({ clubKind: "PATHFINDER" }) },
@@ -269,6 +286,65 @@ describe("club roster storage", () => {
         expect(JSON.stringify(error)).not.toContain("not an email");
         expect((error as Error).message).not.toContain(legacyEmail);
       }
+    });
+
+    describe("parent or guardian contacts (#2058)", () => {
+      const parentOnFile = (id: string) => db.parents.filter((row) => row.rosterMemberId === id).map((row) => ({ position: row.position, name: row.name }));
+      const mother = { name: "Synthetic Parent One", relationship: "Mother", email: "parent.one@example.test", phone: "(515) 555-0100" };
+      const father = { name: "Synthetic Parent Two", relationship: "Father", email: "", phone: "515-555-0134" };
+
+      it("stores them apart from emergency contacts, and audits counts only", async () => {
+        const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, parents: [mother, father], guardians: [first] }, actor, { now });
+        expect(parentOnFile(memberId)).toEqual([{ position: 1, name: mother.name }, { position: 2, name: father.name }]);
+        expect(onFile(memberId)).toEqual([{ position: 1, name: first.name }]);
+        const added = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "CLUB_ROSTER_MEMBER_ADDED");
+        expect(added.metadata).toMatchObject({ parentsStored: 2, guardiansStored: 1 });
+        expect(JSON.stringify(mocks.writeAuditLog.mock.calls)).not.toContain("parent.one@example.test");
+      });
+
+      it("leaves them alone when an edit does not send them, replaces the set when it does, and clears with an empty one", async () => {
+        const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, parents: [mother, father] }, actor, { now });
+        await updateRosterMember("club-1", memberId, { role: "TLT" }, actor, now);
+        expect(parentOnFile(memberId)).toHaveLength(2);
+        await updateRosterMember("club-1", memberId, { parents: [{ ...mother, name: "Renamed Parent" }] }, actor, now);
+        expect(parentOnFile(memberId)).toEqual([{ position: 1, name: "Renamed Parent" }]);
+        await updateRosterMember("club-1", memberId, { parents: [] }, actor, now);
+        expect(parentOnFile(memberId)).toEqual([]);
+        const updates = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).filter((entry) => entry.action === "CLUB_ROSTER_MEMBER_UPDATED");
+        expect(updates.at(-1).metadata).toMatchObject({ parentsStored: 0, parentsCleared: 1 });
+      });
+
+      it("checks a changed email or phone slot by slot, but lets a saved one through", async () => {
+        const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, parents: [{ ...mother, phone: "515-555-0134" }] }, actor, { now });
+        const legacy = "legacy..mail@example.test";
+        db.parents.find((row) => row.rosterMemberId === memberId && row.position === 1)!.email = legacy;
+        const slot1 = { ...mother, phone: "515-555-0134", email: legacy };
+        await expect(updateRosterMember("club-1", memberId, { role: "TLT", parents: [slot1] }, actor, now)).resolves.toBeDefined();
+        await expect(updateRosterMember("club-1", memberId, { parents: [{ ...slot1, email: "not an email" }] }, actor, now)).rejects.toMatchObject({ code: "PARENT_EMAIL_INVALID" });
+        await expect(updateRosterMember("club-1", memberId, { parents: [slot1, { ...father, phone: "call me" }] }, actor, now)).rejects.toMatchObject({ code: "PARENT_PHONE_INVALID" });
+      });
+
+      it("deletes them with the member, and only that member's", async () => {
+        const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, parents: [mother, father] }, actor, { now });
+        const { memberId: other } = await addRosterMember("club-1", "2026-27", { ...youth, firstName: "Other", parents: [mother] }, actor, { now });
+        await removeRosterMember("club-1", memberId, actor, now);
+        expect(parentOnFile(memberId)).toEqual([]);
+        expect(parentOnFile(other)).toHaveLength(1);
+        const removed = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "CLUB_ROSTER_MEMBER_REMOVED");
+        expect(removed.metadata).toMatchObject({ parentsErased: 2 });
+      });
+
+      it("refuses writes on a past year's row, and on next year only parents and emergency contacts may change", async () => {
+        const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, parents: [mother] }, actor, { now });
+        db.members.find((row) => row.id === memberId)!.clubYear = "2025-26";
+        await expect(updateRosterMember("club-1", memberId, { parents: [father] }, actor, now)).rejects.toMatchObject({ code: "GUARDIANS_PRIOR_YEAR" });
+        expect(parentOnFile(memberId)).toEqual([{ position: 1, name: mother.name }]);
+        const august = new Date("2026-08-15T15:00:00Z");
+        db.members.find((row) => row.id === memberId)!.clubYear = "2026-27";
+        await expect(updateRosterMember("club-1", memberId, { parents: [{ ...mother, name: "Next Year Parent" }] }, actor, august)).resolves.toBeDefined();
+        expect(parentOnFile(memberId)).toEqual([{ position: 1, name: "Next Year Parent" }]);
+        await expect(updateRosterMember("club-1", memberId, { parents: [mother], role: "TLT" }, actor, august)).rejects.toMatchObject({ code: "ROSTER_YEAR_READ_ONLY" });
+      });
     });
 
     it("deletes every guardian when the member is removed, and only that member's", async () => {

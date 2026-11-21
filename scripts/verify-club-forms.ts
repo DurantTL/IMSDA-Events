@@ -1066,6 +1066,23 @@ async function main() {
     await prisma.clubRosterGuardian.create({ data: { rosterMemberId: rileyRow.id, position: 1, name: "Pat Verify", relationship: "Parent", email: `Outing.Parent@${emailDomain}` } });
     const sent = await outings.sendOuting(directorA, clubs.a, created.outingId, { memberIds: [rileyRow.id, otherClubRow.id] });
     assert(sent.sent === 1 && sent.results.find((row) => row.memberId === otherClubRow.id)?.outcome === "NOT_FOUND", "the other club's member is not found");
+    // Parent first, then an emergency contact (#2058): who can be sent a slip, as a yes or no per member. Read-only, and cleaned up here.
+    const choiceSpecs = [
+      { key: "pa", name: "ParentOnly", parent: `Parent.Only@${emailDomain}`, emergency: null },
+      { key: "pb", name: "EmergencyOnly", parent: null, emergency: `Emergency.Only@${emailDomain}` },
+      { key: "pc", name: "NeitherOne", parent: "not an email", emergency: "" },
+    ];
+    for (const spec of choiceSpecs) {
+      await prisma.person.create({ data: { id: `${P}_${spec.key}`, firstName: spec.name, lastName: "Verify" } });
+      const row = await prisma.clubRosterMember.create({ data: { organizationId: clubs.a, clubYear, personId: `${P}_${spec.key}`, attendeeType: "YOUTH", role: "Pathfinder", source: "DIRECTOR" } });
+      if (spec.parent) await prisma.clubRosterParent.create({ data: { rosterMemberId: row.id, position: 1, name: "Parent Verify", email: spec.parent } });
+      if (spec.emergency) await prisma.clubRosterGuardian.create({ data: { rosterMemberId: row.id, position: 1, name: "Emergency Verify", email: spec.emergency } });
+    }
+    const choices = await outings.listOutingRosterChoices(directorA, clubs.a, created.outingId);
+    const hasEmail = (name: string) => choices.find((choice) => choice.name.includes(name))?.hasParentEmail;
+    assert(hasEmail("ParentOnly") === true && hasEmail("EmergencyOnly") === true && hasEmail("NeitherOne") === false, "a parent email or an emergency contact email makes a member sendable, and neither does not");
+    await prisma.clubRosterMember.deleteMany({ where: { organizationId: clubs.a, personId: { in: choiceSpecs.map((spec) => `${P}_${spec.key}`) } } });
+    await prisma.person.deleteMany({ where: { id: { in: choiceSpecs.map((spec) => `${P}_${spec.key}`) } } });
     const outingLink = await prisma.clubFormLink.findFirstOrThrow({ where: { outingId: created.outingId } });
     assert(outingLink.organizationId === clubs.a && outingLink.rosterMemberId === rileyRow.id && outingLink.recipientEmail === `outing.parent@${emailDomain}`, "the link is the family's own, to the roster's parent email");
     assert((await outings.sendOuting(directorA, clubs.a, created.outingId, { memberIds: [rileyRow.id] })).results[0].outcome === "ALREADY_SENT", "a live link is not sent twice without Resend");

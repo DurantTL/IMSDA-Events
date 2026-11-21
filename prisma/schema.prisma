@@ -6981,6 +6981,8 @@ model ClubRosterMember {
   meetingAttendance   ClubMeetingAttendance[]
   /// Up to two guardian contacts (#510). Deleted with the member's removal.
   guardians           ClubRosterGuardian[]
+  /// Up to two parent or guardian contacts (#2058), separate from emergency contacts. Deleted with the member's removal.
+  parents             ClubRosterParent[]
 
   @@unique([organizationId, clubYear, personId])
   @@index([organizationId, clubYear, status])
@@ -6994,6 +6996,27 @@ model ClubRosterMember {
 /// member is on the roster: it cascades with the member and is deleted when the
 /// member is removed or erased. Values never go into audit metadata or logs.
 model ClubRosterGuardian {
+  id             String   @id @default(cuid())
+  rosterMemberId String
+  /// 1 or 2 (a CHECK constraint in the migration enforces it).
+  position       Int
+  name           String   @default("")
+  relationship   String   @default("")
+  email          String   @default("")
+  phone          String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  rosterMember ClubRosterMember @relation(fields: [rosterMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([rosterMemberId, position])
+}
+
+/// A parent or guardian contact for a roster member (#2058): slot 1 or 2, every field optional, plain text, the same
+/// rules and readers as ClubRosterGuardian (emergency contacts) but a separate set. Permission slips go to the first
+/// parent email. The row cascades with the member and is deleted when the member is removed or erased. Values never go
+/// into audit metadata or logs.
+model ClubRosterParent {
   id             String   @id @default(cuid())
   rosterMemberId String
   /// 1 or 2 (a CHECK constraint in the migration enforces it).

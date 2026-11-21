@@ -104,6 +104,8 @@ async function parseAndMatch(files: Array<{ bytes: Uint8Array }>, now: Date): Pr
           sealedBirthDate: true,
           person: { select: { firstName: true, lastName: true } },
           guardians: { select: { email: true } },
+          // A parent's email matches the same way an emergency contact's does (#2058).
+          parents: { select: { email: true } },
         },
       });
   // Ids only: whether a record exists for this row, or for the same person's row in an earlier club year.
@@ -122,7 +124,7 @@ async function parseAndMatch(files: Array<{ bytes: Uint8Array }>, now: Date): Pr
     firstName: row.person?.firstName ?? "",
     lastName: row.person?.lastName ?? "",
     birthDate: openBirthDateSafely(row.sealedBirthDate),
-    guardianEmails: row.guardians.map((guardian) => guardian.email.trim().toLowerCase()).filter(Boolean),
+    guardianEmails: [...new Set([...row.guardians, ...row.parents].map((contact) => contact.email.trim().toLowerCase()).filter(Boolean))],
     hasRecord: recordedMembers.has(row.id) || (row.personId !== null && recordedPeople.has(`${row.organizationId}|${row.personId}`)),
   }));
   return {

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /** Who the roster API hands school type and church membership to (#1668). Synthetic data only. */
 
 const mocks = vi.hoisted(() => ({
-  requireRosterAccess: vi.fn(), listRoster: vi.fn(), rosterGuardiansForAccess: vi.fn(), addRosterMember: vi.fn(), updateRosterMember: vi.fn(),
+  requireRosterAccess: vi.fn(), listRoster: vi.fn(), rosterGuardiansForAccess: vi.fn(), rosterParentsForAccess: vi.fn(), addRosterMember: vi.fn(), updateRosterMember: vi.fn(),
   rejectCrossOriginRequest: vi.fn(), refreshBackgroundCheckMatchesSafely: vi.fn(),
 }));
 
@@ -12,7 +12,7 @@ vi.mock("@/modules/club-rosters/access", async () => {
   const actual = await vi.importActual<typeof import("@/modules/club-rosters/access")>("@/modules/club-rosters/access");
   return { ...actual, requireRosterAccess: mocks.requireRosterAccess };
 });
-vi.mock("@/modules/club-rosters/guardians-access", () => ({ rosterGuardiansForAccess: mocks.rosterGuardiansForAccess, requireGuardianEditor: vi.fn() }));
+vi.mock("@/modules/club-rosters/guardians-access", () => ({ rosterGuardiansForAccess: mocks.rosterGuardiansForAccess, rosterParentsForAccess: mocks.rosterParentsForAccess, requireGuardianEditor: vi.fn() }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
 vi.mock("@/modules/background-checks/refresh-after-write", () => ({ refreshBackgroundCheckMatchesSafely: mocks.refreshBackgroundCheckMatchesSafely }));
 vi.mock("@/modules/club-rosters/repository", async () => {
@@ -30,6 +30,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.listRoster.mockResolvedValue([]);
   mocks.rosterGuardiansForAccess.mockResolvedValue(undefined);
+  mocks.rosterParentsForAccess.mockResolvedValue(undefined);
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
   mocks.addRosterMember.mockResolvedValue({ memberId: "member-1", personId: "person-1" });
   mocks.updateRosterMember.mockResolvedValue({ personId: "person-1" });
