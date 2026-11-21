@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   updateRosterMember: vi.fn(),
   removeRosterMember: vi.fn(),
   listGuardiansByMember: vi.fn(),
+  listParentsByMember: vi.fn(),
   refreshBackgroundCheckMatchesSafely: vi.fn(),
 }));
 
@@ -29,7 +30,7 @@ vi.mock("@/modules/club-rosters/repository", async () => {
 });
 vi.mock("@/modules/club-rosters/guardians-repository", async () => {
   const actual = await vi.importActual<typeof import("@/modules/club-rosters/guardians-repository")>("@/modules/club-rosters/guardians-repository");
-  return { ...actual, listGuardiansByMember: mocks.listGuardiansByMember };
+  return { ...actual, listGuardiansByMember: mocks.listGuardiansByMember, listParentsByMember: mocks.listParentsByMember };
 });
 vi.mock("@/modules/background-checks/refresh-after-write", () => ({ refreshBackgroundCheckMatchesSafely: mocks.refreshBackgroundCheckMatchesSafely }));
 
@@ -64,6 +65,8 @@ const guardians = [
   { name: "", relationship: "", email: "", phone: "" },
 ];
 const storedGuardians = { "member-1": [{ position: 1, name: "Synthetic Guardian", relationship: "Mother", email: "guardian@example.test", phone: "(515) 555-0101" }] };
+const parents = [{ name: "Synthetic Parent", relationship: "Father", email: "parent@example.test", phone: "(515) 555-0102" }];
+const storedParents = { "member-1": [{ position: 1, ...parents[0] }] };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -73,6 +76,7 @@ beforeEach(() => {
   mocks.updateRosterMember.mockResolvedValue({ personId: "person-1" });
   mocks.removeRosterMember.mockResolvedValue({ personId: null, nameKept: false });
   mocks.listGuardiansByMember.mockResolvedValue(storedGuardians);
+  mocks.listParentsByMember.mockResolvedValue(storedParents);
   mocks.refreshBackgroundCheckMatchesSafely.mockResolvedValue(undefined);
 });
 
@@ -177,5 +181,58 @@ describe("roster routes and guardian contacts (#510)", () => {
     expect(tooMany.status).toBe(400);
     expect(mocks.addRosterMember).not.toHaveBeenCalled();
     expect(mocks.updateRosterMember).not.toHaveBeenCalled();
+  });
+});
+
+describe("roster routes and parent or guardian contacts (#2058)", () => {
+  it.each(["DIRECTOR", "DEPUTY"] as const)("lets a %s add and edit a member with parents, and returns them", async (role) => {
+    mocks.requireRosterAccess.mockResolvedValue(accessFor(role));
+    let response = await postRoster(request("POST", { ...newMember, parents }), orgCtx);
+    expect(response.status).toBe(201);
+    expect(mocks.addRosterMember).toHaveBeenCalledWith("club-1", expect.any(String), expect.objectContaining({ parents: [expect.objectContaining({ name: "Synthetic Parent" })] }), { accountId: "account-1" });
+    await expect(response.json()).resolves.toMatchObject({ parents: storedParents, guardians: storedGuardians });
+
+    response = await patchMember(request("PATCH", { parents }), memberCtx);
+    expect(response.status).toBe(200);
+    expect(mocks.updateRosterMember).toHaveBeenCalledWith("club-1", "member-1", expect.objectContaining({ parents: expect.any(Array) }), { accountId: "account-1" }, undefined, { requireGender: true });
+    await expect(response.json()).resolves.toMatchObject({ parents: storedParents });
+  });
+
+  it("refuses a registrar who sends parents with 403 and writes nothing, even an empty set", async () => {
+    mocks.requireRosterAccess.mockResolvedValue(accessFor("REGISTRAR"));
+    let response = await postRoster(request("POST", { ...newMember, parents }), orgCtx);
+    expect(response.status).toBe(403);
+    expect(mocks.addRosterMember).not.toHaveBeenCalled();
+    response = await patchMember(request("PATCH", { parents }), memberCtx);
+    expect(response.status).toBe(403);
+    response = await patchMember(request("PATCH", { parents: [] }), memberCtx);
+    expect(response.status).toBe(403);
+    expect(mocks.updateRosterMember).not.toHaveBeenCalled();
+  });
+
+  it("never sends parents to a registrar, and returns them on GET and after a removal for a director", async () => {
+    mocks.requireRosterAccess.mockResolvedValue(accessFor("REGISTRAR"));
+    let response = await getRoster(request("GET"), orgCtx);
+    expect(await response.json()).not.toHaveProperty("parents");
+    expect(mocks.listParentsByMember).not.toHaveBeenCalled();
+    mocks.requireRosterAccess.mockResolvedValue(accessFor("DIRECTOR"));
+    response = await getRoster(request("GET"), orgCtx);
+    await expect(response.json()).resolves.toMatchObject({ parents: storedParents });
+    mocks.listParentsByMember.mockResolvedValue({});
+    response = await deleteMember(request("DELETE", { confirm: true }), memberCtx);
+    await expect(response.json()).resolves.toMatchObject({ parents: {} });
+  });
+
+  it("rejects a bad parent shape with a 400 and answers a prior-year or bad-email edit with the roster's errors", async () => {
+    mocks.requireRosterAccess.mockResolvedValue(accessFor("DIRECTOR"));
+    let response = await patchMember(request("PATCH", { parents: [{}, {}, {}] }), memberCtx);
+    expect(response.status).toBe(400);
+    mocks.updateRosterMember.mockRejectedValueOnce(new RosterOperationError("GUARDIANS_PRIOR_YEAR", "Emergency contacts and parents or guardians can only be changed on the current or next club year's roster."));
+    response = await patchMember(request("PATCH", { parents }), memberCtx);
+    expect(response.status).toBe(409);
+    mocks.updateRosterMember.mockRejectedValueOnce(new RosterOperationError("PARENT_EMAIL_INVALID", "Enter a valid email address."));
+    response = await patchMember(request("PATCH", { parents }), memberCtx);
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: "PARENT_EMAIL_INVALID" });
   });
 });

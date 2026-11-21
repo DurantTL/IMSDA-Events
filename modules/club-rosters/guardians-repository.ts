@@ -80,6 +80,50 @@ export async function deleteGuardiansForMember(tx: Prisma.TransactionClient, ros
   return result.count;
 }
 
+/** Replaces one member's whole parent or guardian set (#2058), the same way as `replaceGuardians`. Counts only. */
+export async function replaceParents(
+  tx: Prisma.TransactionClient,
+  rosterMemberId: string,
+  parents: readonly GuardianInput[],
+): Promise<{ stored: number; cleared: number }> {
+  const slots = guardianSlotsFrom(parents);
+  const kept = new Set(slots.map((slot) => slot.position));
+  for (const slot of slots) {
+    const values = { name: slot.name, relationship: slot.relationship, email: slot.email, phone: slot.phone };
+    await tx.clubRosterParent.upsert({
+      where: { rosterMemberId_position: { rosterMemberId, position: slot.position } },
+      create: { rosterMemberId, position: slot.position, ...values },
+      update: values,
+    });
+  }
+  const positionsToClear = Array.from({ length: GUARDIAN_SLOTS }, (_, index) => index + 1).filter((position) => !kept.has(position));
+  const cleared = await tx.clubRosterParent.deleteMany({ where: { rosterMemberId, position: { in: positionsToClear } } });
+  return { stored: slots.length, cleared: cleared.count };
+}
+
+/** Deletes every parent or guardian of a member (removal, erasure). Returns how many went. */
+export async function deleteParentsForMember(tx: Prisma.TransactionClient, rosterMemberId: string): Promise<number> {
+  const result = await tx.clubRosterParent.deleteMany({ where: { rosterMemberId } });
+  return result.count;
+}
+
+/** The club's parents or guardians keyed by roster member id, for the club leader's roster dialog (#2058). */
+export async function listParentsByMember(
+  viewer: GuardianViewer,
+  organizationId: string,
+  clubYear: string,
+): Promise<Record<string, GuardianRecord[]>> {
+  assertCanRead(viewer, organizationId);
+  const rows = await getPrisma().clubRosterParent.findMany({
+    where: { rosterMember: { organizationId, clubYear, status: { not: "REMOVED" } } },
+    orderBy: [{ rosterMemberId: "asc" }, { position: "asc" }],
+    select: { rosterMemberId: true, ...guardianSelect },
+  });
+  const byMember: Record<string, GuardianRecord[]> = {};
+  for (const row of rows) (byMember[row.rosterMemberId] ??= []).push(toRecord(row));
+  return byMember;
+}
+
 /**
  * The club's guardians keyed by roster member id, for the club leader's roster
  * dialog. Members who were removed have none (their rows were deleted).

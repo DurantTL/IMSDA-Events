@@ -7,7 +7,7 @@ import { lockClubOrders } from "@/modules/club-orders/repository";
 import { BIRTH_DATE_LOCKED_ACTION_MESSAGE, openBirthDateOrLocked, openBirthDateOrNull, sealBirthDate } from "@/modules/club-rosters/birth-dates";
 import { ageOn, birthDateProblem, calendarDateOf, clubYearFor, defaultRosterRole, guardianEditableYears, isDefaultYouthRole, rosterIsTltFor } from "@/modules/club-rosters/domain";
 import { guardianSetEmailProblem, guardianSetPhoneProblem } from "@/modules/club-rosters/guardians-domain";
-import { deleteGuardiansForMember, replaceGuardians } from "@/modules/club-rosters/guardians-repository";
+import { deleteGuardiansForMember, deleteParentsForMember, replaceGuardians, replaceParents } from "@/modules/club-rosters/guardians-repository";
 import type { RosterMemberInput, RosterMemberUpdate } from "@/modules/club-rosters/schemas";
 import { formatPersonName } from "@/lib/person-name";
 
@@ -27,6 +27,8 @@ export type RosterErrorCode =
   | "ROSTER_YEAR_READ_ONLY"
   | "GUARDIAN_PHONE_INVALID"
   | "GUARDIAN_EMAIL_INVALID"
+  | "PARENT_PHONE_INVALID"
+  | "PARENT_EMAIL_INVALID"
   | "CARRY_FORWARD_DONE"
   | "CARRY_FORWARD_BUSY"
   | "DATA_KEY_UNAVAILABLE";
@@ -299,12 +301,15 @@ export async function addRosterMemberInTransaction(
   });
   // Guardian contacts (#510): the route has already refused anyone but a club leader.
   const guardianCounts = input.guardians ? await replaceGuardians(tx, member.id, input.guardians) : null;
+  // Parent or guardian contacts (#2058): the same rule, a separate set.
+  const parentCounts = input.parents ? await replaceParents(tx, member.id, input.parents) : null;
   await audit(tx, actor, "CLUB_ROSTER_MEMBER_ADDED", organizationId, member.id, "Added a person to a club roster.", {
     clubYear,
     attendeeType: input.attendeeType,
     source: options.source ?? "DIRECTOR",
     // Counts only, never a guardian's name, email or phone.
     ...(guardianCounts ? { guardiansStored: guardianCounts.stored } : {}),
+    ...(parentCounts ? { parentsStored: parentCounts.stored } : {}),
   });
   return { memberId: member.id, personId: person.id };
 }
@@ -336,15 +341,15 @@ export async function updateRosterMember(
     // next year's (#959: a director fixes a carried-forward contact in August,
     // not in September). A past year is history: a crafted request against
     // it, or against a year further out, is refused.
-    if (input.guardians !== undefined && !guardianEditableYears(now).includes(member.clubYear)) {
-      throw new RosterOperationError("GUARDIANS_PRIOR_YEAR", "Emergency contacts can only be changed on the current or next club year's roster.");
+    if ((input.guardians !== undefined || input.parents !== undefined) && !guardianEditableYears(now).includes(member.clubYear)) {
+      throw new RosterOperationError("GUARDIANS_PRIOR_YEAR", "Emergency contacts and parents or guardians can only be changed on the current or next club year's roster.");
     }
     // Only the current club year's row can change anything but its emergency
     // contacts: next year's details stay read-only until the year starts, and a
     // past year is history. A crafted request mixing `guardians` with other
     // fields, or sending status or details alone, is refused whole.
-    if (member.clubYear !== clubYearFor(now) && Object.keys(input).some((field) => field !== "guardians")) {
-      throw new RosterOperationError("ROSTER_YEAR_READ_ONLY", "Only emergency contacts can be changed outside the current club year's roster.");
+    if (member.clubYear !== clubYearFor(now) && Object.keys(input).some((field) => field !== "guardians" && field !== "parents")) {
+      throw new RosterOperationError("ROSTER_YEAR_READ_ONLY", "Only emergency contacts and parents or guardians can be changed outside the current club year's roster.");
     }
     // Nothing to change (an older client sending only `willingToDrive`, which
     // the schema strips, or an empty edit): no write, no audit entry.
@@ -353,7 +358,7 @@ export async function updateRosterMember(
     // gender, sent or already on file. Marking someone active or inactive
     // doesn't touch their details, so it stays exempt.
     // Nor does an emergency-contact-only edit (#959), such as one on next year's row.
-    const editsDetails = Object.keys(input).some((field) => field !== "status" && field !== "guardians");
+    const editsDetails = Object.keys(input).some((field) => field !== "status" && field !== "guardians" && field !== "parents");
     if (options.requireGender && editsDetails && (input.gender === undefined ? member.gender : input.gender) === null) {
       throw new RosterOperationError("GENDER_REQUIRED", "Choose Male or Female.");
     }
@@ -424,6 +429,15 @@ export async function updateRosterMember(
       if (phoneProblem) throw new RosterOperationError("GUARDIAN_PHONE_INVALID", phoneProblem);
     }
     const guardianCounts = input.guardians ? await replaceGuardians(tx, memberId, input.guardians) : null;
+    if (input.parents) {
+      // The same checks for the parent or guardian set (#2058), slot by slot against what is stored.
+      const storedParents = await tx.clubRosterParent.findMany({ where: { rosterMemberId: memberId }, select: { position: true, phone: true, email: true } });
+      const parentEmailProblem = guardianSetEmailProblem(input.parents, storedParents);
+      if (parentEmailProblem) throw new RosterOperationError("PARENT_EMAIL_INVALID", parentEmailProblem);
+      const parentPhoneProblem = guardianSetPhoneProblem(input.parents, storedParents);
+      if (parentPhoneProblem) throw new RosterOperationError("PARENT_PHONE_INVALID", parentPhoneProblem);
+    }
+    const parentCounts = input.parents ? await replaceParents(tx, memberId, input.parents) : null;
     const action = input.status === "INACTIVE" && member.status !== "INACTIVE"
       ? "CLUB_ROSTER_MEMBER_DEACTIVATED"
       : input.status === "ACTIVE" && member.status !== "ACTIVE"
@@ -433,6 +447,7 @@ export async function updateRosterMember(
       // Field names and counts only: a guardian's values never reach the audit log.
       fields: Object.keys(input),
       ...(guardianCounts ? { guardiansStored: guardianCounts.stored, guardiansCleared: guardianCounts.cleared } : {}),
+      ...(parentCounts ? { parentsStored: parentCounts.stored, parentsCleared: parentCounts.cleared } : {}),
     });
     return { personId: member.personId };
   });
@@ -447,9 +462,11 @@ export async function updateRosterMember(
  * `personId` also frees the `[organizationId, clubYear, personId]` unique
  * key, which is what lets the same person transfer back later in the year.
  */
-export async function eraseRosterRow(tx: Prisma.TransactionClient, memberId: string, now: Date): Promise<{ guardiansErased: number }> {
+export async function eraseRosterRow(tx: Prisma.TransactionClient, memberId: string, now: Date): Promise<{ guardiansErased: number; parentsErased: number }> {
   // Guardian contacts are kept only while the member is on the roster (#510).
   const guardiansErased = await deleteGuardiansForMember(tx, memberId);
+  // Parent or guardian contacts go the same way (#2058).
+  const parentsErased = await deleteParentsForMember(tx, memberId);
   // A meeting check-off names the member by roster row; it goes with them (#653).
   await tx.clubMeetingAttendance.deleteMany({ where: { rosterMemberId: memberId } });
   // Removing someone erases their Health Record at once, whether or not the
@@ -487,7 +504,7 @@ export async function eraseRosterRow(tx: Prisma.TransactionClient, memberId: str
       willingToDrive: false,
     },
   });
-  return { guardiansErased };
+  return { guardiansErased, parentsErased };
 }
 
 /**
@@ -556,7 +573,7 @@ export async function removeRosterMember(organizationId: string, memberId: strin
     }
     // Both waits are done: a stuck lock gave up fast (55P03 -> 503) above.
     await tx.$executeRawUnsafe("SET LOCAL lock_timeout = 0");
-    const { guardiansErased } = await eraseRosterRow(tx, memberId, now);
+    const { guardiansErased, parentsErased } = await eraseRosterRow(tx, memberId, now);
     // A need this club has not ordered yet has no reason to outlive the
     // membership (#566). ORDERED, RECEIVED and AWARDED needs are history and stay.
     let ordersCancelled = 0;
@@ -673,6 +690,7 @@ export async function removeRosterMember(organizationId: string, memberId: strin
       classCompletionsErased,
       masterGuideCandidatesErased,
       guardiansErased,
+      parentsErased,
       nameKept,
       tltProfileErased,
     });

@@ -77,7 +77,7 @@ import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
 import { isClubFormsRole, type ClubFormsViewer } from "@/modules/club-forms/domain";
 import { resolveClubFormLinkForFill, submitClubFormViaLink } from "@/modules/club-forms/links";
 import { checkClubFormOutingRecipientRateLimit } from "@/modules/rate-limit/service";
-import { closeOuting, createOuting, getOutingForCopy, getOutingTracking, listOutings, sendOuting } from "@/modules/club-forms/outings";
+import { closeOuting, createOuting, getOutingForCopy, getOutingTracking, listOutingRosterChoices, listOutings, sendOuting } from "@/modules/club-forms/outings";
 
 const now = new Date("2026-11-10T15:00:00Z");
 const director: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } };
@@ -141,8 +141,9 @@ function outingRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function member(id: string, first: string, emails: string[], attendeeType = "YOUTH") {
-  return { id, attendeeType, person: { firstName: first, lastName: "Sample" }, guardians: emails.map((email) => ({ email })) };
+function member(id: string, first: string, emails: string[], attendeeType = "YOUTH", parentEmails: string[] = []) {
+  // `emails` are the emergency contacts; `parentEmails` the parents or guardians (#2058).
+  return { id, attendeeType, person: { firstName: first, lastName: "Sample" }, guardians: emails.map((email) => ({ email })), parents: parentEmails.map((email) => ({ email })) };
 }
 
 const parentAnswers = {
@@ -343,6 +344,48 @@ describe("sending to the chosen families (#1672)", () => {
       "member-of-club-b": "NOT_FOUND",
     });
     expect(mocks.linkCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends to the first parent with a valid email, then falls back to an emergency contact, else reports none (#2058)", async () => {
+    mocks.rosterFindMany.mockResolvedValue([
+      // A parent and an emergency contact: the parent wins, and slot order decides between parents; a bad first slot is skipped.
+      member("member-1", "Riley", ["emergency.one@example.test"], "YOUTH", ["not an email", "Parent.One@Example.test", "parent.two@example.test"]),
+      // No parent email at all: the first valid emergency contact is used, so a club that only lists those keeps working.
+      member("member-2", "Jordan", ["", "emergency.two@example.test"], "YOUTH", ["", ""]),
+      member("member-3", "Casey", ["emergency.three@example.test"]),
+      // Neither.
+      member("member-4", "Avery", ["no good"], "UNDERAGE", ["also bad"]),
+    ]);
+    const result = await send({ memberIds: ["member-1", "member-2", "member-3", "member-4"] });
+    expect(Object.fromEntries(result.results.map((entry) => [entry.memberId, entry.outcome]))).toEqual({
+      "member-1": "SENT",
+      "member-2": "SENT",
+      "member-3": "SENT",
+      "member-4": "NO_PARENT_EMAIL",
+    });
+    expect(mocks.linkCreate.mock.calls.map((call) => call[0].data.recipientEmail)).toEqual([
+      "parent.one@example.test",
+      "emergency.two@example.test",
+      "emergency.three@example.test",
+    ]);
+    expect(JSON.stringify(result.results)).not.toContain("example.test");
+  });
+
+  it("reports hasParentEmail for a parent email, an emergency fallback or neither, never the address (#2058)", async () => {
+    mocks.outingFindFirst.mockResolvedValue(outingRow());
+    mocks.linkFindMany.mockResolvedValue([]);
+    mocks.rosterFindMany.mockResolvedValue([
+      member("member-1", "Riley", [], "YOUTH", ["parent.one@example.test"]),
+      member("member-2", "Jordan", ["emergency.two@example.test"]),
+      member("member-3", "Casey", ["bad"], "YOUTH", ["bad"]),
+    ]);
+    const choices = await listOutingRosterChoices(director, "club-a", "outing-1");
+    expect(choices.map((choice) => [choice.name.split(" ")[0], choice.hasParentEmail])).toEqual([
+      ["Casey", false],
+      ["Jordan", true],
+      ["Riley", true],
+    ]);
+    expect(JSON.stringify(choices)).not.toContain("example.test");
   });
 
   it("looks members up in this club and year only", async () => {

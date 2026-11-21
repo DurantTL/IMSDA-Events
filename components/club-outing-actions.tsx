@@ -24,8 +24,8 @@ async function postSend(organizationId: string, outingId: string, body: Record<s
 
 /**
  * Sends the outing's slip to the chosen members' parents (#1672). Each family gets its own private link in its own
- * email, the same link and email flow as any club form link. A member with no parent email on the roster can't be
- * picked: the roster is where that is added.
+ * email, the same link and email flow as any club form link. A member with no parent or emergency contact email on the roster can't be
+ * picked (a parent's email is used first, then an emergency contact's): the roster is where that is added.
  */
 export function SendOutingPanel({
   organizationId,
@@ -82,7 +82,7 @@ export function SendOutingPanel({
           <p className="field-help">Choose the members going. Each parent gets their own private link by email. A link works once and shows nothing else about the club.</p>
           <label className="checkbox-label">
             <input checked={allSelected} disabled={sendable.length === 0} onChange={(event) => setSelected(event.target.checked ? sendable.map((choice) => choice.id) : [])} type="checkbox" />
-            Choose everyone with a parent email ({sendable.length})
+            Choose everyone with a parent or emergency contact email ({sendable.length})
           </label>
           <ul className={styles.choices}>
             {choices.map((choice) => (
@@ -95,7 +95,7 @@ export function SendOutingPanel({
                     type="checkbox"
                   />
                   <span translate="no">{choice.name}</span>
-                  {!choice.hasParentEmail && <small className="field-help"> No parent email on the roster</small>}
+                  {!choice.hasParentEmail && <small className="field-help"> No parent or emergency contact email on the roster</small>}
                 </label>
               </li>
             ))}

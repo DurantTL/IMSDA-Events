@@ -37,6 +37,12 @@ export const guardianFieldLabels: Record<GuardianField, string> = {
  */
 export const EMERGENCY_CONTACT_TERM = { singular: "Emergency contact", plural: "Emergency contacts" } as const;
 
+/**
+ * Parent or guardian contacts (#2058): a separate set from emergency contacts, stored in `ClubRosterParent`, with the
+ * same fields, limits, readers and editors. Outing permission slips go to the first parent email.
+ */
+export const PARENT_CONTACT_TERM = { singular: "Parent or guardian", plural: "Parents or guardians" } as const;
+
 export type GuardianValues = Record<GuardianField, string>;
 
 /** One stored guardian: the slot (1 or 2) and its values. */
@@ -110,6 +116,10 @@ export const guardiansUpdateSchema = z.array(guardianUpdateInputSchema).max(GUAR
  */
 export const guardiansInputSchema = z.array(guardianInputSchema).max(GUARDIAN_SLOTS, "A member can have two emergency contacts at most.");
 
+/** The parent or guardian set (#2058): the same shape and checks as emergency contacts, with its own message. */
+export const parentsInputSchema = z.array(guardianInputSchema).max(GUARDIAN_SLOTS, "A member can have two parents or guardians at most.");
+export const parentsUpdateSchema = z.array(guardianUpdateInputSchema).max(GUARDIAN_SLOTS, "A member can have two parents or guardians at most.");
+
 export type GuardianInput = z.infer<typeof guardianInputSchema>;
 
 export function guardianIsBlank(guardian: GuardianValues) {
@@ -146,6 +156,20 @@ export function validateGuardianForm(
     if (email) errors[`g${slot}Email`] = email;
     if (phone) errors[`g${slot}Phone`] = phone;
   });
+  return errors;
+}
+
+/** Inline errors for the parents or guardians fieldset, keyed `p1Email`, `p2Phone` and so on (#2058). */
+export type ParentFormErrors = Partial<Record<`p${1 | 2}${"Email" | "Phone"}`, string>>;
+
+export function validateParentForm(
+  parents: readonly Pick<GuardianValues, "email" | "phone">[],
+  stored: ReadonlyArray<{ position: number; phone: string; email?: string }> = [],
+): ParentFormErrors {
+  const errors: ParentFormErrors = {};
+  for (const [key, message] of Object.entries(validateGuardianForm(parents, stored))) {
+    errors[key.replace("g", "p") as keyof ParentFormErrors] = message;
+  }
   return errors;
 }
 

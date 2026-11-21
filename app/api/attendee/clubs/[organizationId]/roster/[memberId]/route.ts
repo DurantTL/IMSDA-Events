@@ -4,7 +4,7 @@ import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/ac
 import { rosterSchoolDetailsVisible } from "@/modules/club-rosters/school-details-access";
 import { readRosterJson, rosterApiError } from "@/modules/club-rosters/api-errors";
 import { contactsRosterYear } from "@/modules/club-rosters/domain";
-import { requireGuardianEditor, rosterGuardiansForAccess } from "@/modules/club-rosters/guardians-access";
+import { requireGuardianEditor, rosterGuardiansForAccess, rosterParentsForAccess } from "@/modules/club-rosters/guardians-access";
 import { listRoster, removeRosterMember, updateRosterMember } from "@/modules/club-rosters/repository";
 import { rosterMemberUpdateSchema, rosterRemoveSchema } from "@/modules/club-rosters/schemas";
 import { refreshBackgroundCheckMatchesSafely } from "@/modules/background-checks/refresh-after-write";
@@ -16,8 +16,8 @@ async function roster(access: Parameters<typeof rosterGuardiansForAccess>[0] & P
   // The current year, or next year when `?year=` names it (#959): the contacts screen on next year's roster.
   const clubYear = contactsRosterYear(new URL(request.url).searchParams.get("year"));
   // Guardian contacts (#510) ride along for a director or deputy only.
-  const guardians = await rosterGuardiansForAccess(access, organizationId, clubYear);
-  return { clubYear, members: await listRoster(organizationId, clubYear, new Date(), { includeSchoolDetails: rosterSchoolDetailsVisible(access) }), ...(guardians ? { guardians } : {}) };
+  const [guardians, parents] = await Promise.all([rosterGuardiansForAccess(access, organizationId, clubYear), rosterParentsForAccess(access, organizationId, clubYear)]);
+  return { clubYear, members: await listRoster(organizationId, clubYear, new Date(), { includeSchoolDetails: rosterSchoolDetailsVisible(access) }), ...(guardians ? { guardians } : {}), ...(parents ? { parents } : {}) };
 }
 
 async function patchHandler(request: Request, context: RouteContext) {
@@ -27,8 +27,8 @@ async function patchHandler(request: Request, context: RouteContext) {
     const { organizationId, memberId } = await context.params;
     const access = await requireRosterAccess(organizationId);
     const input = rosterMemberUpdateSchema.parse(await readRosterJson(request));
-    // Only a director or deputy may send guardian contacts; a registrar gets a 403, not a silent drop.
-    if (input.guardians !== undefined) requireGuardianEditor(access);
+    // Only a director or deputy may send emergency contacts or parents (#2058); a registrar gets a 403, not a silent drop.
+    if (input.guardians !== undefined || input.parents !== undefined) requireGuardianEditor(access);
     // A details edit must leave the person with a gender (#424); status-only edits are exempt.
     const { personId } = await updateRosterMember(organizationId, memberId, input, actorAttribution(access.actor), undefined, { requireGender: true });
     // #527: a name change or other edit is matched against the background

@@ -81,6 +81,7 @@ function member(id: string, firstName: string, overrides: Record<string, unknown
     sealedBirthDate: sealBirth.value("2012-04-09"),
     person: { firstName, lastName: "Sample" },
     guardians: [],
+    parents: [],
     ...overrides,
   };
 }
@@ -362,6 +363,17 @@ describe("applying the import", () => {
     const loggedMessages = state.logged.map((args) => (args as unknown[]).map((arg) => (arg instanceof Error ? arg.message : String(arg))).join(" "));
     expect(loggedMessages.join("\n")).toContain("P9999");
     expect(loggedMessages.join("\n")).not.toMatch(/peanut/);
+  });
+
+  it("matches on a parent or guardian email as well as an emergency contact's (#2058)", async () => {
+    // No birth date on file, so only the guardian email can confirm the match.
+    state.members = [member("m1", "Riley", { sealedBirthDate: null, parents: [{ email: "  Parent.Sample@Example.test " }] })];
+    const viaParent = await previewHealthImport(admin, files([mainRow()]), now);
+    expect(viaParent.rows[0]!.outcome).toBe("MATCHED");
+    state.members = [member("m1", "Riley", { sealedBirthDate: null, guardians: [{ email: "parent.sample@example.test" }] })];
+    expect((await previewHealthImport(admin, files([mainRow()]), now)).rows[0]!.outcome).toBe("MATCHED");
+    state.members = [member("m1", "Riley", { sealedBirthDate: null })];
+    expect((await previewHealthImport(admin, files([mainRow()]), now)).rows[0]!.outcome).not.toBe("MATCHED");
   });
 
   it("uses the later of two entries for one member", async () => {

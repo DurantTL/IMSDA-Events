@@ -13,6 +13,7 @@ import {
   outingDateLabel,
   outingDetailRows,
   outingLinkState,
+  outingRecipientEmail,
   parseOutingInput,
   readStoredOuting,
   type OutingInput,
@@ -224,14 +225,12 @@ export const sendOutingSchema = z.object({
 
 export type OutingSendResult = { memberId: string; name: string; outcome: OutingSendOutcome };
 
-const emailSchema = z.email().max(160);
-
 const CHILD_TYPES = new Set(["YOUTH", "UNDERAGE"]);
 
 /**
  * Sends each chosen member's parent their own private link, through the same link and email flow as any club form
- * link: one email to one family, never a list. The parent is the roster member's first guardian with an email on the
- * roster. A member who already signed is left alone; one with a live link is skipped unless this is a resend.
+ * link: one email to one family, never a list. The parent is the roster member's first parent or guardian (#2058) with a valid email; when none has
+ * one, the first emergency contact with a valid email (so clubs that only list emergency contacts keep working). A member who already signed is left alone; one with a live link is skipped unless this is a resend.
  * Outcomes name members, never an address. `allowRecipient` lets the route apply its per-recipient rate limit.
  */
 export async function sendOuting(
@@ -254,6 +253,7 @@ export async function sendOuting(
       id: true,
       attendeeType: true,
       person: { select: { firstName: true, lastName: true } },
+      parents: { orderBy: { position: "asc" }, select: { email: true } },
       guardians: { orderBy: { position: "asc" }, select: { email: true } },
     },
   });
@@ -287,7 +287,7 @@ export async function sendOuting(
       done("ALREADY_SENT");
       continue;
     }
-    const email = member.guardians.map((guardian) => guardian.email.trim().toLowerCase()).find((value) => emailSchema.safeParse(value).success);
+    const email = outingRecipientEmail(member.parents, member.guardians);
     if (!email) {
       done("NO_PARENT_EMAIL");
       continue;
@@ -336,7 +336,7 @@ export async function sendOuting(
 
 /**
  * The members an outing can still be sent to: active youth on this year's roster with no link for this outing yet
- * (the ones that have one are on the tracking list, with Resend). Whether a parent email is on the roster is a yes or no;
+ * (the ones that have one are on the tracking list, with Resend). Whether a parent or emergency contact email is on the roster is a yes or no;
  * the address itself never leaves this function.
  */
 export async function listOutingRosterChoices(viewer: ClubFormsViewer, organizationId: string, outingId: string) {
@@ -346,7 +346,7 @@ export async function listOutingRosterChoices(viewer: ClubFormsViewer, organizat
   const [members, sent] = await Promise.all([
     prisma.clubRosterMember.findMany({
       where: { organizationId, clubYear: row.clubYear, status: "ACTIVE", attendeeType: { in: ["YOUTH", "UNDERAGE"] }, personId: { not: null } },
-      select: { id: true, person: { select: { firstName: true, lastName: true } }, guardians: { select: { email: true } } },
+      select: { id: true, person: { select: { firstName: true, lastName: true } }, parents: { orderBy: { position: "asc" }, select: { email: true } }, guardians: { orderBy: { position: "asc" }, select: { email: true } } },
     }),
     prisma.clubFormLink.findMany({ where: { outingId: row.id }, select: { rosterMemberId: true } }),
   ]);
@@ -356,7 +356,7 @@ export async function listOutingRosterChoices(viewer: ClubFormsViewer, organizat
     .map((member) => ({
       id: member.id,
       name: formatPersonName(member.person!),
-      hasParentEmail: member.guardians.some((guardian) => emailSchema.safeParse(guardian.email.trim()).success),
+      hasParentEmail: outingRecipientEmail(member.parents, member.guardians) !== null,
     }))
     .sort((left, right) => left.name.localeCompare(right.name, "en-US"));
 }

@@ -241,13 +241,28 @@ export function outingLinkState(link: { status: "OPEN" | "USED" | "REVOKED"; exp
 
 export const outingLinkStateLabel: Record<OutingLinkState, string> = { SIGNED: "Signed", NOT_YET: "Not yet", EXPIRED: "Link expired" };
 
+/**
+ * Who a permission slip goes to (#2058): the first parent or guardian (by slot) with a valid email, else the first
+ * emergency contact with one, else nobody. Pure, so the send and the choice list agree. Addresses are lower-cased.
+ */
+export function outingRecipientEmail(
+  parents: ReadonlyArray<{ email: string }>,
+  emergencyContacts: ReadonlyArray<{ email: string }>,
+): string | null {
+  const valid = (contacts: ReadonlyArray<{ email: string }>) =>
+    contacts.map((contact) => contact.email.trim().toLowerCase()).find((value) => outingEmailSchema.safeParse(value).success) ?? null;
+  return valid(parents) ?? valid(emergencyContacts);
+}
+
+const outingEmailSchema = z.email().max(160);
+
 export type OutingSendOutcome = "SENT" | "ALREADY_SIGNED" | "ALREADY_SENT" | "NO_PARENT_EMAIL" | "NOT_ELIGIBLE" | "RATE_LIMITED" | "CLUB_LIMIT" | "NOT_FOUND" | "FAILED";
 
 export const outingSendOutcomeText: Record<OutingSendOutcome, string> = {
   SENT: "Sent",
   ALREADY_SIGNED: "Already signed",
   ALREADY_SENT: "Already sent: use Resend to send again",
-  NO_PARENT_EMAIL: "No parent email on the roster",
+  NO_PARENT_EMAIL: "No parent or emergency contact email on the roster",
   NOT_ELIGIBLE: "Not a youth member",
   RATE_LIMITED: "This parent's address was sent this outing's slip 3 times in the last hour, or 12 slips in all: try again later",
   CLUB_LIMIT: `Your club's daily limit of ${OUTING_SLIPS_PER_DAY} slips is used up: try again tomorrow`,
