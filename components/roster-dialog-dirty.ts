@@ -46,7 +46,7 @@ export function rosterCloseDecision(input: { saving: boolean; reviewing: boolean
 
 export const rosterDiscardPrompt = {
   title: "Discard unsaved changes?",
-  body: "This person's details emergency contacts or parents or guardians have changes that haven't been saved. Discarding closes the editor and loses them.",
+  body: "This person's details, emergency contacts or parents or guardians have changes that haven't been saved. Discarding closes the editor and loses them.",
   confirmLabel: "Discard changes",
   cancelLabel: "Keep editing",
   destructive: true,

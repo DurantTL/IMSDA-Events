@@ -358,8 +358,12 @@ function ClubRosterWorkspaceInner({
   const { ref: memberRef, items: memberItems, show: showMember, clear: clearMember, clearField: clearMemberField } = useFormErrorSummary();
   const canEditGuardians = initialGuardians !== undefined && (!readOnly || guardiansOnly);
   const contactsOnlyDialog = guardiansOnly && readOnly;
-  /** Parents or guardians (#2058) are asked for youth and underage members only, and only where the server sent them. */
-  const showParentFields = canEditGuardians && initialParents !== undefined && (formType === "YOUTH" || formType === "UNDERAGE");
+  /**
+   * Parents or guardians (#2058) are asked for youth and underage members only, and only where the server sent them. A
+   * member whose type changed to adult or staff still shows any saved ones, so the director can see and clear them.
+   */
+  const hasSavedParents = Boolean(editing && (parentMap?.[editing.id]?.length ?? 0) > 0);
+  const showParentFields = canEditGuardians && initialParents !== undefined && (formType === "YOUTH" || formType === "UNDERAGE" || hasSavedParents);
   /** Whether the dialog has this member's current guardians (#510): "failed" leaves guardians untouched on save. */
   const [guardianState, setGuardianState] = useState<"ready" | "loading" | "failed">("ready");
   const [guardianRev, setGuardianRev] = useState(0);
@@ -759,8 +763,9 @@ function ClubRosterWorkspaceInner({
     const guardianSlots = canEditGuardians && guardianState === "ready" ? contactSlots(form, "g") : null;
     const guardianProblems = guardianSlots ? validateGuardianForm(guardianSlots, (editing ? guardianMap?.[editing.id] : undefined) ?? []) : {};
     setGuardianErrors(guardianProblems);
-    // Parents or guardians (#2058): the same two slots, only for a youth or underage member, and left alone otherwise.
-    const parentSlots = showParentFields && guardianState === "ready" && (attendeeType === "YOUTH" || attendeeType === "UNDERAGE")
+    // Parents or guardians (#2058): the same two slots whenever the fieldset shows (a youth or underage member, or one
+    // with saved parents), and left alone otherwise.
+    const parentSlots = showParentFields && guardianState === "ready"
       ? contactSlots(form, "p")
       : null;
     const parentProblems = parentSlots ? validateParentForm(parentSlots, (editing ? parentMap?.[editing.id] : undefined) ?? []) : {};

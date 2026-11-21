@@ -101,7 +101,7 @@ export function RosterParentFields({ errors, guardianState, records }: {
     <RosterContactFields
       errors={errors}
       guardianState={guardianState}
-      help="Up to two parents or guardians. Your club's director and deputy, Area Coordinators and conference staff with sensitive-data access can see them. They are erased when this person is removed from the roster. Permission slips go to the first parent email, or to an emergency contact if there is no parent email."
+      help="Up to two parents or guardians. Your club's director and deputy can see and change them. They are erased when this person is removed from the roster. Permission slips go to the first parent email, or to an emergency contact if there is no parent email."
       kind="p"
       records={records}
       term={PARENT_CONTACT_TERM}
