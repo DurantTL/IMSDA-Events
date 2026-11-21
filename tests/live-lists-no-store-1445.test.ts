@@ -32,7 +32,7 @@ vi.mock("@/modules/club-rosters/repository", async () => {
 });
 vi.mock("@/modules/club-rosters/guardians-repository", async () => {
   const actual = await vi.importActual<typeof import("@/modules/club-rosters/guardians-repository")>("@/modules/club-rosters/guardians-repository");
-  return { ...actual, listGuardiansByMember: mocks.listGuardiansByMember };
+  return { ...actual, listGuardiansByMember: mocks.listGuardiansByMember, listParentsByMember: mocks.listGuardiansByMember };
 });
 vi.mock("@/modules/background-checks/refresh-after-write", () => ({ refreshBackgroundCheckMatchesSafely: mocks.refreshBackgroundCheckMatchesSafely }));
 
