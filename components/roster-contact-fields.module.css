@@ -1,0 +1,2 @@
+/* The member's own contact details in the roster popup (#2060): the layout reuses the guardian fieldset classes. */
+.wide { grid-column: 1 / -1; }

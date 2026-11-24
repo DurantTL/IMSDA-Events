@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ROSTER_EXPORT_COLUMNS, isGuardianRosterExportColumn } from "@/modules/club-rosters/export-columns";
+import { ROSTER_EXPORT_COLUMNS, guardianColumnParts } from "@/modules/club-rosters/export-columns";
 import { EMERGENCY_CONTACT_TERM } from "@/modules/club-rosters/guardians-domain";
 import { buildRosterExportTable } from "@/modules/club-rosters/export";
 
@@ -10,7 +10,7 @@ describe("staff-facing wording", () => {
   it("says Emergency contact, never Guardian, on screen and in the export headers", () => {
     expect(EMERGENCY_CONTACT_TERM.singular).toBe("Emergency contact");
     const guardianHeaders = Object.entries(ROSTER_EXPORT_COLUMNS)
-      .filter(([key]) => isGuardianRosterExportColumn(key as keyof typeof ROSTER_EXPORT_COLUMNS))
+      .filter(([key]) => guardianColumnParts(key as keyof typeof ROSTER_EXPORT_COLUMNS) !== null)
       .map(([, definition]) => definition.header);
     expect(guardianHeaders).toHaveLength(8);
     for (const header of guardianHeaders) {

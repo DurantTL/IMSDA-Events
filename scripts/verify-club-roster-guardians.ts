@@ -24,7 +24,7 @@ import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 import { addRosterMember, removeRosterMember, updateRosterMember } from "@/modules/club-rosters/repository";
 import { runRosterExport } from "@/modules/club-rosters/export-repository";
-import { GuardianAccessError, listGuardianContactsForClub, listGuardiansByMember, listParentsByMember } from "@/modules/club-rosters/guardians-repository";
+import { GuardianAccessError, listGuardianContactsForClub, listContactsByMember, listGuardiansByMember, listParentsByMember } from "@/modules/club-rosters/guardians-repository";
 import type { GuardianViewer } from "@/modules/club-rosters/guardians-domain";
 
 loadEnvConfig(process.cwd());
@@ -42,6 +42,8 @@ const SECRET_EMAIL = "verify.guardian@example.test";
 const SECRET_PHONE = "(515) 555-0188";
 const PARENT_NAME = "Verify Parent Only";
 const PARENT_EMAIL = "verify.parent@example.test";
+const CONTACT_EMAIL = "verify.member@example.test";
+const CONTACT_STREET = "100 Verify Contact St";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`FAILED: ${message}`);
@@ -167,12 +169,41 @@ async function main() {
   assert(await rejects(listParentsByMember(leaderB, clubs.a, clubYear)), "another club's leader is refused the parents");
   await updateRosterMember(clubs.a, added.memberId, { parents: [guardian(PARENT_NAME, { email: PARENT_EMAIL, phone: "(515) 555-0134" })] }, actor);
 
+  // The member's own contact details (#2060): a separate record, the same readers, never a row with every field empty.
+  const memberContact = { email: CONTACT_EMAIL, phone: "515-555-0134", addressLine1: CONTACT_STREET, addressLine2: "", city: "Des Moines", state: "ia", postalCode: "50309-1234" };
+  const blankContact = { email: "", phone: "", addressLine1: "", addressLine2: "", city: "", state: "", postalCode: "" };
+  const contactRow = (id: string) => prisma.clubRosterMemberContact.findUnique({ where: { rosterMemberId: id } });
+  await updateRosterMember(clubs.a, added.memberId, { contact: memberContact }, actor);
+  const storedContact = await contactRow(added.memberId);
+  assert(storedContact?.state === "IA" && storedContact.phone === "(515) 555-0134" && storedContact.postalCode === "50309-1234", "contact details are stored trimmed, with the state in capitals and the phone tidied");
+  assert((await countFor(added.memberId)) === 2 && (await parentCount(added.memberId)) === 1, "contact details are stored apart from emergency contacts and parents");
+  assert((await prisma.person.findFirstOrThrow({ where: { clubRosterMemberships: { some: { id: added.memberId } } } })).normalizedEmail !== CONTACT_EMAIL.toLowerCase(), "the contact email is not written to the Person");
+  await updateRosterMember(clubs.a, added.memberId, { role: "Pathfinder" }, actor);
+  assert((await contactRow(added.memberId)) !== null, "an edit that doesn't send contact details leaves them alone");
+  for (const bad of [{ email: "not an email" }, { phone: "call me" }, { state: "Iowa" }, { postalCode: "5030" }]) {
+    assert(await rejects(updateRosterMember(clubs.a, added.memberId, { contact: { ...memberContact, ...bad } }, actor)), `bad contact details ${JSON.stringify(Object.keys(bad))} are refused`);
+  }
+  assert((await contactRow(added.memberId))?.addressLine1 === CONTACT_STREET, "a refused contact edit saved nothing");
+  assert(added.memberId in (await listContactsByMember(leaderA, clubs.a, clubYear)), "the club's leader reads its members' contact details");
+  assert(await rejects(listContactsByMember(leaderB, clubs.a, clubYear)), "another club's leader is refused the contact details");
+  const contactExport = await runRosterExport(clubs.a, clubYear, {
+    mode: "csv",
+    columns: [{ key: "firstName" as const, header: "First" }, { key: "contactEmail" as const, header: "Member email" }, { key: "contactPostalCode" as const, header: "Member ZIP code" }],
+    confirmSensitive: true,
+  }, false, actor, true);
+  assert("csv" in contactExport && contactExport.csv.includes(`"Verifya","${CONTACT_EMAIL}","50309-1234"`), "the export carries contact details for a director");
+  assert(await rejects(runRosterExport(clubs.a, clubYear, { mode: "csv", columns: [{ key: "contactEmail" as const, header: "Member email" }], confirmSensitive: true }, false, actor, false)), "the export refuses contact columns to a role without guardian access");
+  await updateRosterMember(clubs.a, other.memberId, { contact: { ...blankContact, city: "Ames" } }, actor);
+  await updateRosterMember(clubs.a, other.memberId, { contact: blankContact }, actor);
+  assert((await contactRow(other.memberId)) === null, "clearing every contact field deletes the row instead of storing an empty one");
+
   // An inactive member keeps theirs; removal deletes only that member's.
   await updateRosterMember(clubs.a, other.memberId, { status: "INACTIVE" }, actor);
   assert((await countFor(other.memberId)) === 1, "an inactive member keeps their guardians");
   await removeRosterMember(clubs.a, added.memberId, actor);
   assert((await countFor(added.memberId)) === 0, "removing a member deletes every guardian of that member");
   assert((await parentCount(added.memberId)) === 0, "removing a member deletes every parent of that member");
+  assert((await contactRow(added.memberId)) === null, "removing a member deletes their contact details");
   assert((await countFor(other.memberId)) === 1, "removal leaves other members' guardians");
   assert(!(await listGuardianContactsForClub(coordinator, clubs.a, clubYear)).some((contact) => contact.memberId === added.memberId), "a removed member is not listed");
 
@@ -183,7 +214,7 @@ async function main() {
   // No audit row holds a guardian value.
   const audits = await prisma.auditLog.findMany({ where: { metadata: { path: ["organizationId"], string_starts_with: P } } });
   const text = JSON.stringify(audits);
-  for (const secret of [PARENT_NAME, PARENT_EMAIL, "Verify Parent Renamed", "Verify Parent Two", SECRET_NAME, SECRET_EMAIL, SECRET_PHONE, "Verify Renamed", "Verify Second", "Verify Other Guardian", "Verify Adult Contact", "Verify Adult Contact Two", "=SUM(1+1)", "Verify August Contact", "Verify August Second", "Verify Past Year", "Verify Other Club"]) {
+  for (const secret of [CONTACT_EMAIL, CONTACT_STREET, PARENT_NAME, PARENT_EMAIL, "Verify Parent Renamed", "Verify Parent Two", SECRET_NAME, SECRET_EMAIL, SECRET_PHONE, "Verify Renamed", "Verify Second", "Verify Other Guardian", "Verify Adult Contact", "Verify Adult Contact Two", "=SUM(1+1)", "Verify August Contact", "Verify August Second", "Verify Past Year", "Verify Other Club"]) {
     assert(!text.includes(secret), `no audit row contains "${secret}"`);
   }
   assert(audits.some((row) => row.action === "CLUB_ROSTER_GUARDIANS_VIEWED"), "a coordinator's or staff opening is audited");

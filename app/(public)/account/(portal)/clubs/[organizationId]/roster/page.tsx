@@ -11,7 +11,7 @@ import { registrationReturnTo } from "@/modules/club-registrations/roster-return
 import { getCarryForwardOffer } from "@/modules/club-rosters/carry-forward";
 import { carryForwardOversightOpen } from "@/modules/club-rosters/carry-forward-domain";
 import { rosterYearView } from "@/modules/club-rosters/domain";
-import { rosterGuardiansForAccess, rosterParentsForAccess } from "@/modules/club-rosters/guardians-access";
+import { rosterContactsForAccess, rosterGuardiansForAccess, rosterParentsForAccess } from "@/modules/club-rosters/guardians-access";
 import { ROSTER_DETAILS_NEEDED_FILTER, rosterSectionsStartClosed } from "@/modules/club-rosters/roster-view";
 import { listRoster } from "@/modules/club-rosters/repository";
 import { isGuestClub, listTransferClubOptions } from "@/modules/club-transfers/repository";
@@ -53,7 +53,7 @@ export default async function ClubRosterPage({
   const canTransfer = access.capabilities.manageTeam && !readOnly && !(await isGuestClub(organizationId));
   // School type and church membership (#1668): not for a Clubs Administrator acting as director.
   const schoolDetails = rosterSchoolDetailsVisible(access);
-  const [members, complianceStatuses, clubOptions, guardians, parents] = await Promise.all([
+  const [members, complianceStatuses, clubOptions, guardians, parents, contacts] = await Promise.all([
     // School type and church membership (#1668): this is the club's own roster (director, deputy, registrar).
     listRoster(organizationId, clubYear, new Date(), { includeSchoolDetails: schoolDetails }),
     clubPortalComplianceStatuses(organizationId, clubYear, access.capabilities),
@@ -61,6 +61,7 @@ export default async function ClubRosterPage({
     // Guardian contacts (#510): the club's director and deputy only, and only on the current and next year, where they can be edited (#959).
     contactsEditable ? rosterGuardiansForAccess(access, organizationId, clubYear) : Promise.resolve(undefined),
     contactsEditable ? rosterParentsForAccess(access, organizationId, clubYear) : Promise.resolve(undefined),
+    contactsEditable ? rosterContactsForAccess(access, organizationId, clubYear) : Promise.resolve(undefined),
   ]);
   // No class history link for someone who has moved to another club (#791); the page would 404 for them. One query for the whole roster.
   const movedAway = await personIdsMovedToOtherClubs(organizationId, members.flatMap((member) => (member.personId ? [member.personId] : [])));
@@ -124,7 +125,7 @@ export default async function ClubRosterPage({
       <NextYearRosterOffer offer={nextYearOffer} organizationId={organizationId} />
       {readOnly && (
         <p className="inline-notice" role="status">
-          Showing the {clubYear} roster, read-only. {contactsEditable && guardians ? "A director or deputy can still edit emergency contacts and parents or guardians here. " : ""}
+          Showing the {clubYear} roster, read-only. {contactsEditable && guardians ? "A director or deputy can still edit emergency contacts, parents or guardians and contact details here. " : ""}
           <a href={`/account/clubs/${organizationId}/roster`}>Back to {currentClubYear}</a> to
           add, edit, or remove people.
         </p>
@@ -145,6 +146,7 @@ export default async function ClubRosterPage({
         headingActions={canTransfer ? <RequestTransferButton clubOptions={clubOptions} organizationId={organizationId} /> : undefined}
         guardians={guardians}
         parents={parents}
+        memberContacts={contacts}
         guardiansOnly={readOnly && contactsEditable}
         healthRecordFlags={healthRecordFlags}
         healthTab={healthTab}

@@ -8,8 +8,8 @@ import { rolePermissions } from "@/modules/access/permissions";
 import { resolveAreaCoordinatorViewer, resolveAreaCoordinatorViewerForClub } from "@/modules/club-forms/access";
 import type { requireRosterAccess } from "@/modules/club-rosters/access";
 import { RosterAccessError } from "@/modules/club-rosters/access";
-import { listGuardiansByMember, listParentsByMember } from "@/modules/club-rosters/guardians-repository";
-import { staffHoldsSensitiveData, type GuardianRecord, type GuardianViewer } from "@/modules/club-rosters/guardians-domain";
+import { listContactsByMember, listGuardiansByMember, listParentsByMember } from "@/modules/club-rosters/guardians-repository";
+import { staffHoldsSensitiveData, type ContactValues, type GuardianRecord, type GuardianViewer } from "@/modules/club-rosters/guardians-domain";
 import { hasEventEnded } from "@/modules/events/lifecycle";
 
 /**
@@ -64,6 +64,16 @@ export async function rosterParentsForAccess(
 ): Promise<Record<string, GuardianRecord[]> | undefined> {
   const viewer = clubLeaderGuardianViewerFromAccess(access);
   return viewer ? listParentsByMember(viewer, organizationId, clubYear) : undefined;
+}
+
+/** The club's member contact details for the roster response (#2060), under the same rule as the emergency contacts. */
+export async function rosterContactsForAccess(
+  access: OpenRosterAccess,
+  organizationId: string,
+  clubYear: string,
+): Promise<Record<string, ContactValues> | undefined> {
+  const viewer = clubLeaderGuardianViewerFromAccess(access);
+  return viewer ? listContactsByMember(viewer, organizationId, clubYear) : undefined;
 }
 
 /** An Area Coordinator (their own account, or a system administrator or Clubs Administrator acting as one), or null. */

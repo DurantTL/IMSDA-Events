@@ -119,7 +119,7 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
     title: "Step by step: Add, edit and remove a roster member",
     summary: "Add a person to your roster, change their details, and take them off when they leave.",
     needs: ["A club role of Director, Deputy or Registrar."],
-    changes: ["The roster for the club year changes. Removing someone erases their emergency contacts and parents or guardians."],
+    changes: ["The roster for the club year changes. Removing someone erases their contact details, emergency contacts and parents or guardians."],
     verify: ["The roster shows the new person, then the change, then no longer shows them."],
     next: "Fill in the club forms for the new year.",
     destinationIds: ["club-roster"],

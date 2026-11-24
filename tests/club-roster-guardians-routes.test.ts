@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   removeRosterMember: vi.fn(),
   listGuardiansByMember: vi.fn(),
   listParentsByMember: vi.fn(),
+  listContactsByMember: vi.fn(),
   refreshBackgroundCheckMatchesSafely: vi.fn(),
 }));
 
@@ -30,7 +31,7 @@ vi.mock("@/modules/club-rosters/repository", async () => {
 });
 vi.mock("@/modules/club-rosters/guardians-repository", async () => {
   const actual = await vi.importActual<typeof import("@/modules/club-rosters/guardians-repository")>("@/modules/club-rosters/guardians-repository");
-  return { ...actual, listGuardiansByMember: mocks.listGuardiansByMember, listParentsByMember: mocks.listParentsByMember };
+  return { ...actual, listGuardiansByMember: mocks.listGuardiansByMember, listParentsByMember: mocks.listParentsByMember, listContactsByMember: mocks.listContactsByMember };
 });
 vi.mock("@/modules/background-checks/refresh-after-write", () => ({ refreshBackgroundCheckMatchesSafely: mocks.refreshBackgroundCheckMatchesSafely }));
 
@@ -66,6 +67,8 @@ const guardians = [
 ];
 const storedGuardians = { "member-1": [{ position: 1, name: "Synthetic Guardian", relationship: "Mother", email: "guardian@example.test", phone: "(515) 555-0101" }] };
 const parents = [{ name: "Synthetic Parent", relationship: "Father", email: "parent@example.test", phone: "(515) 555-0102" }];
+const contact = { email: "member@example.test", phone: "(515) 555-0103", addressLine1: "100 Sample St", addressLine2: "", city: "Des Moines", state: "IA", postalCode: "50309" };
+const storedContacts = { "member-1": contact };
 const storedParents = { "member-1": [{ position: 1, ...parents[0] }] };
 
 beforeEach(() => {
@@ -77,6 +80,7 @@ beforeEach(() => {
   mocks.removeRosterMember.mockResolvedValue({ personId: null, nameKept: false });
   mocks.listGuardiansByMember.mockResolvedValue(storedGuardians);
   mocks.listParentsByMember.mockResolvedValue(storedParents);
+  mocks.listContactsByMember.mockResolvedValue(storedContacts);
   mocks.refreshBackgroundCheckMatchesSafely.mockResolvedValue(undefined);
 });
 
@@ -234,5 +238,54 @@ describe("roster routes and parent or guardian contacts (#2058)", () => {
     response = await patchMember(request("PATCH", { parents }), memberCtx);
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: "PARENT_EMAIL_INVALID" });
+  });
+});
+
+describe("roster routes and member contact details (#2060)", () => {
+  it.each(["DIRECTOR", "DEPUTY"] as const)("lets a %s add and edit a member with contact details, and returns them", async (role) => {
+    mocks.requireRosterAccess.mockResolvedValue(accessFor(role));
+    let response = await postRoster(request("POST", { ...newMember, contact }), orgCtx);
+    expect(response.status).toBe(201);
+    expect(mocks.addRosterMember).toHaveBeenCalledWith("club-1", expect.any(String), expect.objectContaining({ contact: expect.objectContaining({ city: "Des Moines" }) }), { accountId: "account-1" });
+    await expect(response.json()).resolves.toMatchObject({ contacts: storedContacts });
+
+    response = await patchMember(request("PATCH", { contact }), memberCtx);
+    expect(response.status).toBe(200);
+    expect(mocks.updateRosterMember).toHaveBeenCalledWith("club-1", "member-1", expect.objectContaining({ contact: expect.any(Object) }), { accountId: "account-1" }, undefined, { requireGender: true });
+    await expect(response.json()).resolves.toMatchObject({ contacts: storedContacts });
+  });
+
+  it("refuses a registrar who sends contact details with 403 and writes nothing", async () => {
+    mocks.requireRosterAccess.mockResolvedValue(accessFor("REGISTRAR"));
+    let response = await postRoster(request("POST", { ...newMember, contact }), orgCtx);
+    expect(response.status).toBe(403);
+    expect(mocks.addRosterMember).not.toHaveBeenCalled();
+    response = await patchMember(request("PATCH", { contact }), memberCtx);
+    expect(response.status).toBe(403);
+    expect(mocks.updateRosterMember).not.toHaveBeenCalled();
+  });
+
+  it("never puts the contacts key in a registrar's response, and does for a director", async () => {
+    mocks.requireRosterAccess.mockResolvedValue(accessFor("REGISTRAR"));
+    let response = await getRoster(request("GET"), orgCtx);
+    expect(await response.json()).not.toHaveProperty("contacts");
+    expect(mocks.listContactsByMember).not.toHaveBeenCalled();
+    mocks.requireRosterAccess.mockResolvedValue(accessFor("DIRECTOR"));
+    response = await getRoster(request("GET"), orgCtx);
+    await expect(response.json()).resolves.toMatchObject({ contacts: storedContacts });
+  });
+
+  it("rejects a bad state or ZIP with a 400, and maps the contact error codes to 400", async () => {
+    mocks.requireRosterAccess.mockResolvedValue(accessFor("DIRECTOR"));
+    let response = await patchMember(request("PATCH", { contact: { ...contact, state: "Iowa" } }), memberCtx);
+    expect(response.status).toBe(400);
+    response = await patchMember(request("PATCH", { contact: { ...contact, postalCode: "5030" } }), memberCtx);
+    expect(response.status).toBe(400);
+    for (const code of ["CONTACT_EMAIL_INVALID", "CONTACT_PHONE_INVALID", "CONTACT_STATE_INVALID", "CONTACT_POSTAL_CODE_INVALID"] as const) {
+      mocks.updateRosterMember.mockRejectedValueOnce(new RosterOperationError(code, "Fix this."));
+      response = await patchMember(request("PATCH", { contact }), memberCtx);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: code });
+    }
   });
 });

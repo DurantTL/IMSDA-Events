@@ -123,7 +123,8 @@ export function ClubRosterCarryForward({
     }
     const copied = Number(result.body.guardiansCopied ?? 0);
     const parentsCopied = Number(result.body.parentsCopied ?? 0);
-    setDone(`Started the ${toClubYear} roster with ${String(result.body.carried)} ${result.body.carried === 1 ? "person" : "people"}${copied > 0 ? `, ${String(copied)} emergency ${copied === 1 ? "contact" : "contacts"} copied` : ""}${parentsCopied > 0 ? `, ${String(parentsCopied)} ${parentsCopied === 1 ? "parent or guardian" : "parents or guardians"} copied` : ""}.`);
+    const contactsCopied = Number(result.body.contactsCopied ?? 0);
+    setDone(`Started the ${toClubYear} roster with ${String(result.body.carried)} ${result.body.carried === 1 ? "person" : "people"}${copied > 0 ? `, ${String(copied)} emergency ${copied === 1 ? "contact" : "contacts"} copied` : ""}${parentsCopied > 0 ? `, ${String(parentsCopied)} ${parentsCopied === 1 ? "parent or guardian" : "parents or guardians"} copied` : ""}${contactsCopied > 0 ? `, contact details copied for ${String(contactsCopied)} ${contactsCopied === 1 ? "person" : "people"}` : ""}.`);
     router.refresh();
   }
 
@@ -145,7 +146,7 @@ export function ClubRosterCarryForward({
     >
       <p className="field-help">
         Everyone on the {fromClubYear} roster is ticked, except anyone with a pending transfer to another club. Untick anyone who is leaving, and change a type, role or class
-        for anyone moving up. People you carry keep their record, birth date, emergency contacts and parents or guardians; the {fromClubYear} roster stays as it was.
+        for anyone moving up. People you carry keep their record, birth date, emergency contacts, parents or guardians and contact details; the {fromClubYear} roster stays as it was.
       </p>
       <div className="intro-actions">
         <button className="secondary-button" onClick={() => setAll(true)} type="button">Tick everyone</button>

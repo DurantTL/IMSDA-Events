@@ -173,6 +173,141 @@ export function validateParentForm(
   return errors;
 }
 
+// ---------------------------------------------------------------------------
+// The member's own contact details (#2060)
+
+/**
+ * Optional contact details for a roster member themselves (#2060), kept apart from emergency contacts and parents:
+ * their own email and phone and a mailing address (a youth's household address). Stored in `ClubRosterMemberContact`,
+ * plain text, with the same readers and editors as emergency contacts.
+ */
+export const CONTACT_FIELDS = ["email", "phone", "addressLine1", "addressLine2", "city", "state", "postalCode"] as const;
+export type ContactField = (typeof CONTACT_FIELDS)[number];
+export type ContactValues = Record<ContactField, string>;
+
+export const contactFieldLabels: Record<ContactField, string> = {
+  email: "Email",
+  phone: "Phone",
+  addressLine1: "Street address",
+  addressLine2: "Address line 2",
+  city: "City",
+  state: "State",
+  postalCode: "ZIP code",
+};
+
+export const EMPTY_CONTACT: ContactValues = { email: "", phone: "", addressLine1: "", addressLine2: "", city: "", state: "", postalCode: "" };
+
+/** Field length caps, matching the guardian fields where they overlap (email 254, phone 40). */
+export const CONTACT_MAX_LENGTHS: Record<ContactField, number> = {
+  email: 254,
+  phone: 40,
+  addressLine1: 120,
+  addressLine2: 120,
+  city: 80,
+  state: 2,
+  postalCode: 10,
+};
+
+/** US states, DC, the territories and the military mail codes (AA, AE, AP) a mailing address may use. */
+export const US_STATE_CODES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD",
+  "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "AS", "GU", "MP", "PR", "VI", "AA", "AE", "AP",
+] as const;
+const stateCodes: ReadonlySet<string> = new Set(US_STATE_CODES);
+
+export const CONTACT_STATE_MESSAGE = "Enter a two-letter state code, such as IA or MO.";
+export const CONTACT_POSTAL_CODE_MESSAGE = "Enter a 5-digit ZIP code, such as 50309, or ZIP+4, such as 50309-1234.";
+
+/** Empty, or a two-letter US state or territory code in either case. */
+export function contactStateProblem(value: string): string | null {
+  const state = value.trim();
+  if (!state) return null;
+  return stateCodes.has(state.toUpperCase()) ? null : CONTACT_STATE_MESSAGE;
+}
+
+/** Empty, 12345, or 12345-6789. */
+export function contactPostalCodeProblem(value: string): string | null {
+  const zip = value.trim();
+  if (!zip) return null;
+  return /^\d{5}(-\d{4})?$/.test(zip) ? null : CONTACT_POSTAL_CODE_MESSAGE;
+}
+
+export function contactIsBlank(contact: Partial<ContactValues>) {
+  return CONTACT_FIELDS.every((field) => !(contact[field] ?? "").trim());
+}
+
+/** The contact as it is stored: every field trimmed, the phone normalized, the state in capitals; or null when all is blank. */
+export function contactToStore(contact: Partial<ContactValues>): ContactValues | null {
+  if (contactIsBlank(contact)) return null;
+  const value = (field: ContactField) => (contact[field] ?? "").trim();
+  return {
+    email: value("email"),
+    phone: normalizePhoneAnswer(value("phone")),
+    addressLine1: value("addressLine1"),
+    addressLine2: value("addressLine2"),
+    city: value("city"),
+    state: value("state").toUpperCase(),
+    postalCode: value("postalCode"),
+  };
+}
+
+/** The first problem with a contact, keyed by the error code the repository throws, or null. A saved email or phone left alone passes. */
+export function contactProblem(
+  contact: Partial<ContactValues>,
+  stored?: { email?: string; phone?: string } | null,
+): { code: "CONTACT_EMAIL_INVALID" | "CONTACT_PHONE_INVALID" | "CONTACT_STATE_INVALID" | "CONTACT_POSTAL_CODE_INVALID"; message: string } | null {
+  const email = guardianEmailProblem(contact.email ?? "", stored?.email);
+  if (email) return { code: "CONTACT_EMAIL_INVALID", message: email };
+  const phone = guardianPhoneProblem(contact.phone ?? "", stored?.phone);
+  if (phone) return { code: "CONTACT_PHONE_INVALID", message: phone };
+  const state = contactStateProblem(contact.state ?? "");
+  if (state) return { code: "CONTACT_STATE_INVALID", message: state };
+  const postalCode = contactPostalCodeProblem(contact.postalCode ?? "");
+  if (postalCode) return { code: "CONTACT_POSTAL_CODE_INVALID", message: postalCode };
+  return null;
+}
+
+const contactText = (field: ContactField) => z.string().trim().max(CONTACT_MAX_LENGTHS[field], `Keep this under ${CONTACT_MAX_LENGTHS[field]} characters.`).default("");
+
+/** A contact in a roster add: email and phone checked here. */
+export const contactInputSchema = z.object({
+  email: contactText("email").refine((value) => guardianEmailProblem(value) === null, { message: EMAIL_FIELD_MESSAGE }),
+  phone: contactText("phone").refine((value) => guardianPhoneProblem(value) === null, { message: PHONE_FIELD_MESSAGE }),
+  addressLine1: contactText("addressLine1"),
+  addressLine2: contactText("addressLine2"),
+  city: contactText("city"),
+  // No length cap before the specific check, so a long state such as "Iowa" gets the state message, not a length one.
+  state: z.string().trim().default("").refine((value) => contactStateProblem(value) === null, { message: CONTACT_STATE_MESSAGE }),
+  postalCode: z.string().trim().default("").refine((value) => contactPostalCodeProblem(value) === null, { message: CONTACT_POSTAL_CODE_MESSAGE }),
+}).strict();
+
+/** A contact in a roster edit: email and phone are checked against the stored ones where the member is loaded, so an old saved value does not block the edit. */
+export const contactUpdateInputSchema = contactInputSchema.extend({ email: contactText("email"), phone: contactText("phone") });
+
+export type ContactInput = z.infer<typeof contactInputSchema>;
+
+/** The stored contact as the dialog's values, blanks when none. */
+export function contactValues(record: ContactValues | undefined): ContactValues {
+  return record ? { ...record } : { ...EMPTY_CONTACT };
+}
+
+/** Inline errors for the contact details section, keyed by field. */
+export type ContactFormErrors = Partial<Record<"email" | "phone" | "state" | "postalCode", string>>;
+
+export function validateContactForm(contact: Partial<ContactValues>, stored?: { email?: string; phone?: string } | null): ContactFormErrors {
+  const errors: ContactFormErrors = {};
+  const email = guardianEmailProblem(contact.email ?? "", stored?.email);
+  const phone = guardianPhoneProblem(contact.phone ?? "", stored?.phone);
+  const state = contactStateProblem(contact.state ?? "");
+  const postalCode = contactPostalCodeProblem(contact.postalCode ?? "");
+  if (email) errors.email = email;
+  if (phone) errors.phone = phone;
+  if (state) errors.state = state;
+  if (postalCode) errors.postalCode = postalCode;
+  return errors;
+}
+
 /** The stored guardians as two dialog slots, filling gaps with blanks. */
 export function guardianSlotValues(records: readonly GuardianRecord[] | undefined): GuardianValues[] {
   return Array.from({ length: GUARDIAN_SLOTS }, (_, index) => {
