@@ -28,6 +28,8 @@ describe("the contact details rules", () => {
     expect(contactStateProblem("MO")).toBeNull();
     expect(contactStateProblem("DC")).toBeNull();
     expect(contactStateProblem("PR")).toBeNull();
+    for (const military of ["AA", "AE", "ap"]) expect(contactStateProblem(military)).toBeNull();
+    expect(contactStateProblem("UM")).not.toBeNull();
     expect(contactStateProblem("Iowa")).not.toBeNull();
     expect(contactStateProblem("ZZ")).not.toBeNull();
     expect(contactStateProblem("I")).not.toBeNull();
@@ -76,6 +78,11 @@ describe("the contact schemas", () => {
     expect(contactInputSchema.safeParse({ email: "not an email" }).success).toBe(false);
     expect(contactInputSchema.safeParse({ phone: "call me" }).success).toBe(false);
     expect(contactInputSchema.safeParse({ state: "Iowa" }).success).toBe(false);
+    // A long state or ZIP gets the specific message, not the generic length one.
+    const longState = contactInputSchema.safeParse({ state: "Iowa" });
+    expect(JSON.stringify(longState.error?.issues)).toContain("two-letter state code");
+    expect(JSON.stringify(longState.error?.issues)).not.toContain("Keep this under");
+    expect(JSON.stringify(contactInputSchema.safeParse({ postalCode: "123456789012" }).error?.issues)).toContain("5-digit ZIP");
     expect(contactInputSchema.safeParse({ postalCode: "5030" }).success).toBe(false);
     expect(contactInputSchema.safeParse({ nickname: "x" }).success).toBe(false);
     expect(contactInputSchema.safeParse({ addressLine1: "x".repeat(CONTACT_MAX_LENGTHS.addressLine1 + 1) }).success).toBe(false);

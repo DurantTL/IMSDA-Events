@@ -208,11 +208,11 @@ export const CONTACT_MAX_LENGTHS: Record<ContactField, number> = {
   postalCode: 10,
 };
 
-/** US states, DC and the territories a club's mailing address may use. */
+/** US states, DC, the territories and the military mail codes (AA, AE, AP) a mailing address may use. */
 export const US_STATE_CODES = [
   "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
   "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD",
-  "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "AS", "GU", "MP", "PR", "VI", "UM",
+  "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "AS", "GU", "MP", "PR", "VI", "AA", "AE", "AP",
 ] as const;
 const stateCodes: ReadonlySet<string> = new Set(US_STATE_CODES);
 
@@ -277,8 +277,9 @@ export const contactInputSchema = z.object({
   addressLine1: contactText("addressLine1"),
   addressLine2: contactText("addressLine2"),
   city: contactText("city"),
-  state: contactText("state").refine((value) => contactStateProblem(value) === null, { message: CONTACT_STATE_MESSAGE }),
-  postalCode: contactText("postalCode").refine((value) => contactPostalCodeProblem(value) === null, { message: CONTACT_POSTAL_CODE_MESSAGE }),
+  // No length cap before the specific check, so a long state such as "Iowa" gets the state message, not a length one.
+  state: z.string().trim().default("").refine((value) => contactStateProblem(value) === null, { message: CONTACT_STATE_MESSAGE }),
+  postalCode: z.string().trim().default("").refine((value) => contactPostalCodeProblem(value) === null, { message: CONTACT_POSTAL_CODE_MESSAGE }),
 }).strict();
 
 /** A contact in a roster edit: email and phone are checked against the stored ones where the member is loaded, so an old saved value does not block the edit. */

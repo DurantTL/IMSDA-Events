@@ -362,9 +362,9 @@ describe("guardian columns in a roster export (#510)", () => {
 describe("member contact columns in a roster export (#2060)", () => {
   const contactColumns = [
     { key: "firstName" as const, header: "First" },
-    { key: "contactEmail" as const, header: "Email" },
-    { key: "contactCity" as const, header: "City" },
-    { key: "contactPostalCode" as const, header: "ZIP code" },
+    { key: "contactEmail" as const, header: "Member email" },
+    { key: "contactCity" as const, header: "Member city" },
+    { key: "contactPostalCode" as const, header: "Member ZIP code" },
   ];
 
   beforeEach(() => {
@@ -399,5 +399,21 @@ describe("member contact columns in a roster export (#2060)", () => {
     expect(preview.rows).toEqual(csvResult.rows);
     const previewed = mocks.writeAuditLog.mock.calls.map(([call]) => call).find((call) => call.action === "CLUB_ROSTER_EXPORT_PREVIEWED");
     expect(previewed.metadata).toMatchObject({ memberContactsOpened: 1 });
+  });
+
+  it("loads and counts each set only for its own columns", async () => {
+    db.guardians.push({ id: "g1", rosterMemberId: "member-1", position: 1, name: "Synthetic Guardian One", relationship: "", email: "", phone: "" });
+    const audited = () => mocks.writeAuditLog.mock.calls.map(([call]) => call);
+    await runRosterExport("club-1", "2026-27", { mode: "csv", columns: contactColumns, confirmSensitive: true }, false, actor, true);
+    expect(db.client.clubRosterGuardian.findMany).not.toHaveBeenCalled();
+    expect(audited().at(-1).metadata).not.toHaveProperty("guardianContactsExported");
+    await runRosterExport("club-1", "2026-27", { mode: "preview", columns: contactColumns, confirmSensitive: true }, false, actor, true);
+    expect(audited().at(-1).metadata).toMatchObject({ guardianContactsOpened: 0, memberContactsOpened: 1 });
+    vi.clearAllMocks();
+    const emergencyOnly = [{ key: "guardian1Name" as const, header: "Emergency contact 1 name" }];
+    await runRosterExport("club-1", "2026-27", { mode: "csv", columns: emergencyOnly, confirmSensitive: true }, false, actor, true);
+    expect(db.client.clubRosterMemberContact.findMany).not.toHaveBeenCalled();
+    expect(audited().at(-1).metadata).toMatchObject({ guardianContactsExported: 1 });
+    expect(audited().at(-1).metadata).not.toHaveProperty("memberContactsExported");
   });
 });

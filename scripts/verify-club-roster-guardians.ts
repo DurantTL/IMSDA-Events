@@ -188,11 +188,11 @@ async function main() {
   assert(await rejects(listContactsByMember(leaderB, clubs.a, clubYear)), "another club's leader is refused the contact details");
   const contactExport = await runRosterExport(clubs.a, clubYear, {
     mode: "csv",
-    columns: [{ key: "firstName" as const, header: "First" }, { key: "contactEmail" as const, header: "Email" }, { key: "contactPostalCode" as const, header: "ZIP code" }],
+    columns: [{ key: "firstName" as const, header: "First" }, { key: "contactEmail" as const, header: "Member email" }, { key: "contactPostalCode" as const, header: "Member ZIP code" }],
     confirmSensitive: true,
   }, false, actor, true);
   assert("csv" in contactExport && contactExport.csv.includes(`"Verifya","${CONTACT_EMAIL}","50309-1234"`), "the export carries contact details for a director");
-  assert(await rejects(runRosterExport(clubs.a, clubYear, { mode: "csv", columns: [{ key: "contactEmail" as const, header: "Email" }], confirmSensitive: true }, false, actor, false)), "the export refuses contact columns to a role without guardian access");
+  assert(await rejects(runRosterExport(clubs.a, clubYear, { mode: "csv", columns: [{ key: "contactEmail" as const, header: "Member email" }], confirmSensitive: true }, false, actor, false)), "the export refuses contact columns to a role without guardian access");
   await updateRosterMember(clubs.a, other.memberId, { contact: { ...blankContact, city: "Ames" } }, actor);
   await updateRosterMember(clubs.a, other.memberId, { contact: blankContact }, actor);
   assert((await contactRow(other.memberId)) === null, "clearing every contact field deletes the row instead of storing an empty one");

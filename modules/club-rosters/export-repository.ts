@@ -7,6 +7,8 @@ import type { actorAttribution } from "@/modules/club-rosters/access";
 import { buildRosterExportTable } from "@/modules/club-rosters/export";
 import {
   ROSTER_EXPORT_PREVIEW_ROW_LIMIT,
+  contactColumnField,
+  guardianColumnParts,
   isGuardianRosterExportColumn,
   isRosterExportColumnKey,
   sensitiveRosterExportColumns,
@@ -168,8 +170,11 @@ export async function runRosterExport(
   if (needsBirthDate && !canSeeBirthDates) {
     throw new RosterExportError("SENSITIVE_ACCESS_DENIED", "Your club role doesn't include birth dates. Ask your club director.");
   }
-  const needsGuardians = request.columns.some((column) => isGuardianRosterExportColumn(column.key));
-  if (needsGuardians && !canSeeGuardians) {
+  const needsGuardianColumns = request.columns.some((column) => isGuardianRosterExportColumn(column.key));
+  // Each set is loaded, and counted in the audit, only when one of its own columns is chosen.
+  const needsEmergency = request.columns.some((column) => guardianColumnParts(column.key) !== null);
+  const needsMemberContacts = request.columns.some((column) => contactColumnField(column.key) !== null);
+  if (needsGuardianColumns && !canSeeGuardians) {
     throw new RosterExportError("SENSITIVE_ACCESS_DENIED", "Emergency contacts and contact details are for your club's director and deputy.");
   }
 
@@ -178,8 +183,8 @@ export async function runRosterExport(
 
   if (request.mode === "csv") {
     const birthDates = needsBirthDate ? await revealBirthDatesForExport(organizationId, clubYear, null) : null;
-    const guardians = needsGuardians ? await guardiansForExport(organizationId, clubYear, null) : null;
-    const contacts = needsGuardians ? await contactsForExport(organizationId, clubYear, null) : null;
+    const guardians = needsEmergency ? await guardiansForExport(organizationId, clubYear, null) : null;
+    const contacts = needsMemberContacts ? await contactsForExport(organizationId, clubYear, null) : null;
     const table = buildRosterExportTable(allMembers, request.columns, birthDates, guardians, contacts);
     await writeAuditLog({
       ...("userId" in actor ? { actorUserId: actor.userId } : {}),
@@ -204,14 +209,14 @@ export async function runRosterExport(
   const birthDates = needsBirthDate && shown.length > 0
     ? await revealBirthDatesForExport(organizationId, clubYear, shown.map((member) => member.id))
     : null;
-  const guardians = needsGuardians && shown.length > 0
+  const guardians = needsEmergency && shown.length > 0
     ? await guardiansForExport(organizationId, clubYear, shown.map((member) => member.id))
     : null;
-  const contacts = needsGuardians && shown.length > 0
+  const contacts = needsMemberContacts && shown.length > 0
     ? await contactsForExport(organizationId, clubYear, shown.map((member) => member.id))
     : null;
   const table = buildRosterExportTable(shown, request.columns, birthDates, guardians, contacts);
-  if (needsBirthDate || needsGuardians) {
+  if (needsBirthDate || needsGuardianColumns) {
     await writeAuditLog({
       ...("userId" in actor ? { actorUserId: actor.userId } : {}),
       action: "CLUB_ROSTER_EXPORT_PREVIEWED",

@@ -36,13 +36,13 @@ export const ROSTER_EXPORT_COLUMNS = {
   guardian2Email: { header: "Emergency contact 2 email", sensitive: true, guardian: true },
   guardian2Phone: { header: "Emergency contact 2 phone", sensitive: true, guardian: true },
   // The member's own contact details (#2060): the same readers as the emergency contacts.
-  contactEmail: { header: "Email", sensitive: true, guardian: true },
-  contactPhone: { header: "Phone", sensitive: true, guardian: true },
-  contactAddressLine1: { header: "Street address", sensitive: true, guardian: true },
-  contactAddressLine2: { header: "Address line 2", sensitive: true, guardian: true },
-  contactCity: { header: "City", sensitive: true, guardian: true },
-  contactState: { header: "State", sensitive: true, guardian: true },
-  contactPostalCode: { header: "ZIP code", sensitive: true, guardian: true },
+  contactEmail: { header: "Member email", sensitive: true, guardian: true },
+  contactPhone: { header: "Member phone", sensitive: true, guardian: true },
+  contactAddressLine1: { header: "Member street address", sensitive: true, guardian: true },
+  contactAddressLine2: { header: "Member address line 2", sensitive: true, guardian: true },
+  contactCity: { header: "Member city", sensitive: true, guardian: true },
+  contactState: { header: "Member state", sensitive: true, guardian: true },
+  contactPostalCode: { header: "Member ZIP code", sensitive: true, guardian: true },
 } as const satisfies Record<string, RosterExportColumnDefinition>;
 
 
