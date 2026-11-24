@@ -8,7 +8,8 @@
  * stored as `ClubRosterGuardian`, so the column keys still say "guardian") are
  * offered as sensitive columns, and only to someone who may see them
  * (`guardian: true` below): the club's director and deputy. Only fields the
- * roster already collects appear.
+ * roster already collects appear. The member's own contact details (#2060, stored as `ClubRosterMemberContact`) are
+ * offered the same way, with the keys `contact...`.
  */
 type RosterExportColumnDefinition = { header: string; sensitive: boolean; guardian?: true };
 
@@ -34,6 +35,14 @@ export const ROSTER_EXPORT_COLUMNS = {
   guardian2Relationship: { header: "Emergency contact 2 relationship", sensitive: true, guardian: true },
   guardian2Email: { header: "Emergency contact 2 email", sensitive: true, guardian: true },
   guardian2Phone: { header: "Emergency contact 2 phone", sensitive: true, guardian: true },
+  // The member's own contact details (#2060): the same readers as the emergency contacts.
+  contactEmail: { header: "Email", sensitive: true, guardian: true },
+  contactPhone: { header: "Phone", sensitive: true, guardian: true },
+  contactAddressLine1: { header: "Street address", sensitive: true, guardian: true },
+  contactAddressLine2: { header: "Address line 2", sensitive: true, guardian: true },
+  contactCity: { header: "City", sensitive: true, guardian: true },
+  contactState: { header: "State", sensitive: true, guardian: true },
+  contactPostalCode: { header: "ZIP code", sensitive: true, guardian: true },
 } as const satisfies Record<string, RosterExportColumnDefinition>;
 
 
@@ -68,6 +77,21 @@ export function guardianColumnParts(key: RosterExportColumnKey): { position: 1 |
   const match = /^guardian([12])(Name|Relationship|Email|Phone)$/.exec(key);
   if (!match) return null;
   return { position: Number(match[1]) as 1 | 2, field: match[2]!.toLowerCase() as "name" | "relationship" | "email" | "phone" };
+}
+
+const contactColumnFields = {
+  contactEmail: "email",
+  contactPhone: "phone",
+  contactAddressLine1: "addressLine1",
+  contactAddressLine2: "addressLine2",
+  contactCity: "city",
+  contactState: "state",
+  contactPostalCode: "postalCode",
+} as const;
+
+/** The member contact field (#2060) a column shows, or null for any other column. */
+export function contactColumnField(key: RosterExportColumnKey): (typeof contactColumnFields)[keyof typeof contactColumnFields] | null {
+  return Object.hasOwn(contactColumnFields, key) ? contactColumnFields[key as keyof typeof contactColumnFields] : null;
 }
 
 export function isSensitiveRosterExportColumn(key: RosterExportColumnKey) {

@@ -14,7 +14,7 @@ import {
 } from "@/modules/club-rosters/export-columns";
 import type { RosterExportFormatInput, RosterExportRequest } from "@/modules/club-rosters/export-schemas";
 import { BIRTH_DATE_LOCKED_ACTION_MESSAGE, openBirthDateOrLocked } from "@/modules/club-rosters/birth-dates";
-import { guardiansForExport } from "@/modules/club-rosters/guardians-repository";
+import { contactsForExport, guardiansForExport } from "@/modules/club-rosters/guardians-repository";
 import { listRoster } from "@/modules/club-rosters/repository";
 import { toCsv } from "@/modules/reporting/csv";
 
@@ -170,7 +170,7 @@ export async function runRosterExport(
   }
   const needsGuardians = request.columns.some((column) => isGuardianRosterExportColumn(column.key));
   if (needsGuardians && !canSeeGuardians) {
-    throw new RosterExportError("SENSITIVE_ACCESS_DENIED", "Emergency contacts are for your club's director and deputy.");
+    throw new RosterExportError("SENSITIVE_ACCESS_DENIED", "Emergency contacts and contact details are for your club's director and deputy.");
   }
 
   const allMembers = await listRoster(organizationId, clubYear);
@@ -179,7 +179,8 @@ export async function runRosterExport(
   if (request.mode === "csv") {
     const birthDates = needsBirthDate ? await revealBirthDatesForExport(organizationId, clubYear, null) : null;
     const guardians = needsGuardians ? await guardiansForExport(organizationId, clubYear, null) : null;
-    const table = buildRosterExportTable(allMembers, request.columns, birthDates, guardians);
+    const contacts = needsGuardians ? await contactsForExport(organizationId, clubYear, null) : null;
+    const table = buildRosterExportTable(allMembers, request.columns, birthDates, guardians, contacts);
     await writeAuditLog({
       ...("userId" in actor ? { actorUserId: actor.userId } : {}),
       action: "CLUB_ROSTER_EXPORTED",
@@ -192,6 +193,8 @@ export async function runRosterExport(
         columns: columnKeys,
         rowCount: allMembers.length,
         ...(guardians ? { guardianContactsExported: Object.values(guardians).reduce((total, list) => total + list.length, 0) } : {}),
+        // Counts only (#2060): how many members had contact details, never a value.
+        ...(contacts ? { memberContactsExported: Object.keys(contacts).length } : {}),
       }),
     });
     return { ...table, totalRows: allMembers.length, csv: toCsv([table.headers, ...table.rows]) };
@@ -204,7 +207,10 @@ export async function runRosterExport(
   const guardians = needsGuardians && shown.length > 0
     ? await guardiansForExport(organizationId, clubYear, shown.map((member) => member.id))
     : null;
-  const table = buildRosterExportTable(shown, request.columns, birthDates, guardians);
+  const contacts = needsGuardians && shown.length > 0
+    ? await contactsForExport(organizationId, clubYear, shown.map((member) => member.id))
+    : null;
+  const table = buildRosterExportTable(shown, request.columns, birthDates, guardians, contacts);
   if (needsBirthDate || needsGuardians) {
     await writeAuditLog({
       ...("userId" in actor ? { actorUserId: actor.userId } : {}),
@@ -219,6 +225,7 @@ export async function runRosterExport(
         rowsShown: shown.length,
         birthDatesOpened: birthDates ? Object.keys(birthDates).length : 0,
         guardianContactsOpened: guardians ? Object.values(guardians).reduce((total, list) => total + list.length, 0) : 0,
+        memberContactsOpened: contacts ? Object.keys(contacts).length : 0,
       }),
     });
   }

@@ -161,6 +161,7 @@ describe("removing a roster member erases their Health Record", () => {
     const tx = {
       clubRosterGuardian: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       clubRosterParent: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      clubRosterMemberContact: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       clubMeetingAttendance: { deleteMany: vi.fn(async () => { calls.push("attendance"); }) },
       healthRecord: { deleteMany: vi.fn(async () => { calls.push("healthRecord"); }) },
       healthRecordLink: { updateMany: vi.fn(async () => { calls.push("healthRecordLink"); }) },

@@ -139,8 +139,8 @@ export async function getCarryForwardOffer(organizationId: string, now = new Dat
 
 /**
  * Copies each carried member's emergency contacts (#942, stored as
- * `ClubRosterGuardian` since #510) and parent or guardian contacts (#2058, stored as `ClubRosterParent`) onto the
- * new year's row, whatever the member's type or age. The values
+ * `ClubRosterGuardian` since #510) parent or guardian contacts (#2058, stored as `ClubRosterParent`) and the member's own contact details
+ * (#2060, stored as `ClubRosterMemberContact`) onto the new year's row, whatever the member's type or age. The values
  * are copied exactly as stored (the source is plain text by director decision,
  * so nothing is sealed or opened here) and last year's rows are only read.
  * Returns the number of contacts copied of each kind; no value leaves this function.
@@ -164,7 +164,14 @@ async function copyContacts(tx: Db, organizationId: string, toClubYear: string, 
   const parents = parentRows.length === 0 ? 0 : (await tx.clubRosterParent.createMany({
     data: parentRows.map((contact) => ({ ...contact, rosterMemberId: targetBySource.get(contact.rosterMemberId)! })),
   })).count;
-  return { guardians, parents };
+  const ownRows = await tx.clubRosterMemberContact.findMany({
+    where,
+    select: { rosterMemberId: true, email: true, phone: true, addressLine1: true, addressLine2: true, city: true, state: true, postalCode: true },
+  });
+  const memberContacts = ownRows.length === 0 ? 0 : (await tx.clubRosterMemberContact.createMany({
+    data: ownRows.map((contact) => ({ ...contact, rosterMemberId: targetBySource.get(contact.rosterMemberId)! })),
+  })).count;
+  return { guardians, parents, contacts: memberContacts };
 }
 
 export type CarryForwardResult = {
@@ -181,6 +188,8 @@ export type CarryForwardResult = {
   guardiansCopied: number;
   /** Parent or guardian contacts copied the same way (#2058; a count only). */
   parentsCopied: number;
+  /** Members whose own contact details were copied (#2060; a count only). */
+  contactsCopied: number;
   personIds: string[];
 };
 
@@ -258,9 +267,9 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
     // People already on the new roster count as handled, not as left behind.
     const leftBehind = totalActive - sources.length;
     if (carried > 0) await tx.clubRosterMember.createMany({ data: rows });
-    const { guardians: guardiansCopied, parents: parentsCopied } = carried > 0
+    const { guardians: guardiansCopied, parents: parentsCopied, contacts: contactsCopied } = carried > 0
       ? await copyContacts(tx, organizationId, toClubYear, sourceByPerson)
-      : { guardians: 0, parents: 0 };
+      : { guardians: 0, parents: 0, contacts: 0 };
     const record = await tx.clubRosterCarryForward.create({
       data: {
         organizationId,
@@ -292,6 +301,7 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
         alreadyThere,
         guardiansCopied,
         parentsCopied,
+        contactsCopied,
         ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : { actAsId: actor.actAsId ?? null }),
       },
     }, tx);
@@ -305,6 +315,7 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
       alreadyThere,
       guardiansCopied,
       parentsCopied,
+      contactsCopied,
       personIds: rows.flatMap((row) => (row.personId ? [row.personId] : [])),
     };
   });

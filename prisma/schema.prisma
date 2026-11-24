@@ -6983,6 +6983,8 @@ model ClubRosterMember {
   guardians           ClubRosterGuardian[]
   /// Up to two parent or guardian contacts (#2058), separate from emergency contacts. Deleted with the member's removal.
   parents             ClubRosterParent[]
+  /// The member's own optional contact details (#2060): email, phone and mailing address, apart from emergency contacts and parents. Deleted with the member's removal.
+  contact             ClubRosterMemberContact?
 
   @@unique([organizationId, clubYear, personId])
   @@index([organizationId, clubYear, status])
@@ -7031,6 +7033,26 @@ model ClubRosterParent {
   rosterMember ClubRosterMember @relation(fields: [rosterMemberId], references: [id], onDelete: Cascade)
 
   @@unique([rosterMemberId, position])
+}
+
+/// A roster member's own contact details (#2060): email, phone and mailing address (a youth's household address), every
+/// field optional, plain text, read and edited by the club's director and deputy only. A row with every field empty is
+/// never stored. It cascades with the member and is deleted when the member is removed or erased. Values never go into
+/// audit metadata or logs.
+model ClubRosterMemberContact {
+  id             String   @id @default(cuid())
+  rosterMemberId String   @unique
+  email          String   @default("")
+  phone          String   @default("")
+  addressLine1   String   @default("")
+  addressLine2   String   @default("")
+  city           String   @default("")
+  state          String   @default("")
+  postalCode     String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  rosterMember ClubRosterMember @relation(fields: [rosterMemberId], references: [id], onDelete: Cascade)
 }
 
 /// An optional club-level feature a club has switched on (#1709). A row exists only while the feature is on: off is the

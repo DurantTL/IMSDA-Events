@@ -2,14 +2,15 @@
  * Dirty tracking for the roster person/contact editor (#1101). The form is
  * uncontrolled, so the editor takes a snapshot of its entries once the loaded
  * values are in the DOM and compares against it when the person tries to close.
- * Person fields and contact fields (emergency contacts and parents or guardians, #2058) are snapshotted separately because
+ * Person fields and contact fields (emergency contacts, parents or guardians (#2058) and the person's own contact details (#2060)) are snapshotted separately because
  * a contact refresh (#510) re-baselines only the contact fields and must not
  * hide what was typed into the person fields.
  */
 export type RosterFormPart = "person" | "contacts";
 export type RosterFormSnapshot = { person: string; contacts: string };
 
-const guardianFieldName = /^[gp]\d+(Name|Relationship|Email|Phone)$/;
+/** Emergency contact (`g1Name`), parent (`p1Name`) and the member's own contact details (`contactCity`, #2060) fields. */
+const guardianFieldName = /^([gp]\d+(Name|Relationship|Email|Phone)|contact(Email|Phone|AddressLine1|AddressLine2|City|State|PostalCode))$/;
 
 export function rosterFormSnapshot(entries: Iterable<[string, string]>, part: RosterFormPart) {
   const picked: Array<[string, string]> = [];
@@ -46,7 +47,7 @@ export function rosterCloseDecision(input: { saving: boolean; reviewing: boolean
 
 export const rosterDiscardPrompt = {
   title: "Discard unsaved changes?",
-  body: "This person's details, emergency contacts or parents or guardians have changes that haven't been saved. Discarding closes the editor and loses them.",
+  body: "This person's details, contact details, emergency contacts or parents or guardians have changes that haven't been saved. Discarding closes the editor and loses them.",
   confirmLabel: "Discard changes",
   cancelLabel: "Keep editing",
   destructive: true,

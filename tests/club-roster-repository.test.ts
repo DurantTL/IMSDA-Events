@@ -34,7 +34,7 @@ const youth = {
 
 function fakeDatabase() {
   let sequence = 0;
-  const db = { guardians: [] as Row[], parents: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), snapshotReferences: new Set<string>(), mergeReferences: new Set<string>(), anonymizedReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[], tltProfilesErased: [] as string[], masterGuideErased: [] as Row[] };
+  const db = { guardians: [] as Row[], parents: [] as Row[], contacts: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), snapshotReferences: new Set<string>(), mergeReferences: new Set<string>(), anonymizedReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[], tltProfilesErased: [] as string[], masterGuideErased: [] as Row[] };
   const matches = (row: Row, where: Record<string, unknown> = {}) => Object.entries(where).every(([key, value]) => {
     if (value === undefined) return true;
     if (value && typeof value === "object" && "not" in value) return row[key] !== (value as { not: unknown }).not;
@@ -124,6 +124,21 @@ function fakeDatabase() {
         db.parents = db.parents.filter((row) => !(row.rosterMemberId === where.rosterMemberId
           && (where.position === undefined || where.position.in.includes(row.position as number))));
         return { count: before - db.parents.length };
+      },
+    },
+    clubRosterMemberContact: {
+      findUnique: async ({ where }: { where: { rosterMemberId: string } }) => db.contacts.find((row) => row.rosterMemberId === where.rosterMemberId) ?? null,
+      upsert: async ({ where, create, update }: { where: { rosterMemberId: string }; create: Row; update: Row }) => {
+        const found = db.contacts.find((row) => row.rosterMemberId === where.rosterMemberId);
+        if (found) return Object.assign(found, update);
+        const row = { ...create, id: `contact-${++sequence}` };
+        db.contacts.push(row);
+        return row;
+      },
+      deleteMany: async ({ where }: { where: { rosterMemberId: string } }) => {
+        const before = db.contacts.length;
+        db.contacts = db.contacts.filter((row) => row.rosterMemberId !== where.rosterMemberId);
+        return { count: before - db.contacts.length };
       },
     },
     organization: { findUnique: async () => ({ clubKind: "PATHFINDER" }) },
@@ -344,6 +359,73 @@ describe("club roster storage", () => {
         await expect(updateRosterMember("club-1", memberId, { parents: [{ ...mother, name: "Next Year Parent" }] }, actor, august)).resolves.toBeDefined();
         expect(parentOnFile(memberId)).toEqual([{ position: 1, name: "Next Year Parent" }]);
         await expect(updateRosterMember("club-1", memberId, { parents: [mother], role: "TLT" }, actor, august)).rejects.toMatchObject({ code: "ROSTER_YEAR_READ_ONLY" });
+      });
+    });
+
+    describe("member contact details (#2060)", () => {
+      const contact = { email: " Member@Example.test ", phone: "515-555-0134", addressLine1: " 100 Sample St ", addressLine2: "", city: "Des Moines", state: "ia", postalCode: "50309-1234" };
+      const contactOnFile = (id: string) => db.contacts.find((row) => row.rosterMemberId === id);
+      const updates = () => mocks.writeAuditLog.mock.calls.map(([entry]) => entry).filter((entry) => entry.action === "CLUB_ROSTER_MEMBER_UPDATED");
+
+      it("stores them trimmed with the state in capitals, apart from the Person, and audits a count only", async () => {
+        const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, contact }, actor, { now });
+        expect(contactOnFile(memberId)).toMatchObject({ email: "Member@Example.test", phone: "(515) 555-0134", addressLine1: "100 Sample St", city: "Des Moines", state: "IA", postalCode: "50309-1234" });
+        const added = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "CLUB_ROSTER_MEMBER_ADDED");
+        expect(added.metadata).toMatchObject({ contactStored: true });
+        expect(JSON.stringify(mocks.writeAuditLog.mock.calls)).not.toContain("Sample St");
+        expect(JSON.stringify(mocks.writeAuditLog.mock.calls)).not.toContain("Member@Example.test");
+        expect(db.people.some((person) => "normalizedEmail" in person || "phone" in person)).toBe(false);
+      });
+
+      it("never stores a row with every field empty, and deletes the stored one when it is cleared", async () => {
+        const blank = { email: "", phone: "", addressLine1: "", addressLine2: "", city: "", state: "", postalCode: "" };
+        const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, contact: blank }, actor, { now });
+        expect(contactOnFile(memberId)).toBeUndefined();
+        await updateRosterMember("club-1", memberId, { contact }, actor, now);
+        expect(contactOnFile(memberId)).toBeDefined();
+        await updateRosterMember("club-1", memberId, { role: "TLT" }, actor, now);
+        expect(contactOnFile(memberId)).toBeDefined();
+        await updateRosterMember("club-1", memberId, { contact: { ...contact, city: "Ames" } }, actor, now);
+        expect(contactOnFile(memberId)).toMatchObject({ city: "Ames" });
+        await updateRosterMember("club-1", memberId, { contact: blank }, actor, now);
+        expect(contactOnFile(memberId)).toBeUndefined();
+        expect(updates().at(-1).metadata).toMatchObject({ contactStored: false, contactCleared: true });
+      });
+
+      it("saves nothing when the email, phone, state or ZIP is invalid, but lets a saved email or phone through", async () => {
+        const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, contact }, actor, { now });
+        const before = { ...contactOnFile(memberId)! };
+        await expect(updateRosterMember("club-1", memberId, { contact: { ...contact, email: "not an email" } }, actor, now)).rejects.toMatchObject({ code: "CONTACT_EMAIL_INVALID" });
+        await expect(updateRosterMember("club-1", memberId, { contact: { ...contact, phone: "call me" } }, actor, now)).rejects.toMatchObject({ code: "CONTACT_PHONE_INVALID" });
+        await expect(updateRosterMember("club-1", memberId, { contact: { ...contact, state: "ZZ" } }, actor, now)).rejects.toMatchObject({ code: "CONTACT_STATE_INVALID" });
+        await expect(updateRosterMember("club-1", memberId, { contact: { ...contact, postalCode: "5030" } }, actor, now)).rejects.toMatchObject({ code: "CONTACT_POSTAL_CODE_INVALID" });
+        expect(contactOnFile(memberId)).toEqual(before);
+        const legacy = "legacy..mail@example.test";
+        contactOnFile(memberId)!.email = legacy;
+        await expect(updateRosterMember("club-1", memberId, { contact: { ...contact, email: legacy, city: "Ames" } }, actor, now)).resolves.toBeDefined();
+        expect(contactOnFile(memberId)).toMatchObject({ email: legacy, city: "Ames" });
+      });
+
+      it("deletes them with the member, and only that member's", async () => {
+        const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, contact }, actor, { now });
+        const { memberId: other } = await addRosterMember("club-1", "2026-27", { ...youth, firstName: "Other", contact }, actor, { now });
+        await removeRosterMember("club-1", memberId, actor, now);
+        expect(contactOnFile(memberId)).toBeUndefined();
+        expect(contactOnFile(other)).toBeDefined();
+        const removed = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "CLUB_ROSTER_MEMBER_REMOVED");
+        expect(removed.metadata).toMatchObject({ contactErased: true });
+      });
+
+      it("can be edited on next year's row alone, and not on a past year's", async () => {
+        const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, contact }, actor, { now });
+        db.members.find((row) => row.id === memberId)!.clubYear = "2025-26";
+        await expect(updateRosterMember("club-1", memberId, { contact: { ...contact, city: "Ames" } }, actor, now)).rejects.toMatchObject({ code: "GUARDIANS_PRIOR_YEAR" });
+        expect(contactOnFile(memberId)).toMatchObject({ city: "Des Moines" });
+        const august = new Date("2026-08-15T15:00:00Z");
+        db.members.find((row) => row.id === memberId)!.clubYear = "2026-27";
+        await expect(updateRosterMember("club-1", memberId, { contact: { ...contact, city: "Ames" } }, actor, august)).resolves.toBeDefined();
+        expect(contactOnFile(memberId)).toMatchObject({ city: "Ames" });
+        await expect(updateRosterMember("club-1", memberId, { contact, role: "TLT" }, actor, august)).rejects.toMatchObject({ code: "ROSTER_YEAR_READ_ONLY" });
       });
     });
 

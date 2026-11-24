@@ -39,6 +39,7 @@ describe("roster export columns (#490)", () => {
       "firstName", "lastName", "birthDate", "age", "gender", "classLevel", "isTlt", "schoolGrade", "baptized", "role",
       "guardian1Name", "guardian1Relationship", "guardian1Email", "guardian1Phone",
       "guardian2Name", "guardian2Relationship", "guardian2Email", "guardian2Phone",
+      "contactEmail", "contactPhone", "contactAddressLine1", "contactAddressLine2", "contactCity", "contactState", "contactPostalCode",
     ]);
     expect(ROSTER_EXPORT_COLUMN_KEYS).not.toContain("emergencyContact");
   });
@@ -116,7 +117,7 @@ describe("guardian export columns (#510)", () => {
     const withAccess = rosterExportColumnKeysFor(true);
     const without = rosterExportColumnKeysFor(false);
     expect(without).toEqual(["firstName", "lastName", "birthDate", "age", "gender", "classLevel", "isTlt", "schoolGrade", "baptized", "role"]);
-    expect(withAccess).toHaveLength(18);
+    expect(withAccess).toHaveLength(25);
     expect(without.some(isGuardianRosterExportColumn)).toBe(false);
   });
 
@@ -124,6 +125,10 @@ describe("guardian export columns (#510)", () => {
     expect(guardianColumnParts("guardian2Phone")).toEqual({ position: 2, field: "phone" });
     expect(guardianColumnParts("guardian1Relationship")).toEqual({ position: 1, field: "relationship" });
     expect(guardianColumnParts("firstName")).toBeNull();
+    // The member's own contact columns (#2060) are guardian-gated and sensitive, but are not emergency contact slots.
+    expect(guardianColumnParts("contactEmail")).toBeNull();
+    expect(isGuardianRosterExportColumn("contactPostalCode")).toBe(true);
+    expect(isSensitiveRosterExportColumn("contactCity")).toBe(true);
   });
 
   it("fills guardian cells from the guardians it is given, and leaves them empty otherwise", () => {

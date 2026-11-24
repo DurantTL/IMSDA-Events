@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   updateRosterMember: vi.fn(),
   removeRosterMember: vi.fn(),
   listGuardiansByMember: vi.fn(),
+  listContactsByMember: vi.fn(),
   refreshBackgroundCheckMatchesSafely: vi.fn(),
 }));
 
@@ -32,7 +33,7 @@ vi.mock("@/modules/club-rosters/repository", async () => {
 });
 vi.mock("@/modules/club-rosters/guardians-repository", async () => {
   const actual = await vi.importActual<typeof import("@/modules/club-rosters/guardians-repository")>("@/modules/club-rosters/guardians-repository");
-  return { ...actual, listGuardiansByMember: mocks.listGuardiansByMember, listParentsByMember: mocks.listGuardiansByMember };
+  return { ...actual, listGuardiansByMember: mocks.listGuardiansByMember, listParentsByMember: mocks.listGuardiansByMember, listContactsByMember: mocks.listContactsByMember };
 });
 vi.mock("@/modules/background-checks/refresh-after-write", () => ({ refreshBackgroundCheckMatchesSafely: mocks.refreshBackgroundCheckMatchesSafely }));
 
@@ -70,6 +71,7 @@ beforeEach(() => {
   mocks.updateRosterMember.mockResolvedValue({ personId: "person-1" });
   mocks.removeRosterMember.mockResolvedValue({ personId: null, nameKept: false });
   mocks.listGuardiansByMember.mockResolvedValue({});
+  mocks.listContactsByMember.mockResolvedValue({});
   mocks.refreshBackgroundCheckMatchesSafely.mockResolvedValue(undefined);
 });
 

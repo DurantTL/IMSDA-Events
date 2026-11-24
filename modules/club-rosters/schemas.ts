@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { rosterRoleOrDefault } from "@/modules/club-rosters/domain";
-import { guardiansInputSchema, guardiansUpdateSchema, parentsInputSchema, parentsUpdateSchema } from "@/modules/club-rosters/guardians-domain";
+import { contactInputSchema, contactUpdateInputSchema, guardiansInputSchema, guardiansUpdateSchema, parentsInputSchema, parentsUpdateSchema } from "@/modules/club-rosters/guardians-domain";
 
 const classLevel = z.enum(["FRIEND", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "BASIC_STAFF_TRAINING", "MASTER_GUIDE"]).nullable();
 
@@ -64,6 +64,8 @@ export const rosterMemberInputSchema = z.object({
   guardians: guardiansInputSchema.optional(),
   /** Parent or guardian contacts (#2058): the same rules as `guardians`, a separate set. */
   parents: parentsInputSchema.optional(),
+  /** The member's own contact details (#2060): the same rule as `guardians`, a separate record. */
+  contact: contactInputSchema.optional(),
   willingToDrive: ignoredWillingToDrive,
 }).strict()
   .refine((data) => data.gender !== null, { message: "Choose Male or Female.", path: ["gender"] })
@@ -85,6 +87,7 @@ export const rosterMemberUpdateSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]),
   guardians: guardiansUpdateSchema,
   parents: parentsUpdateSchema,
+  contact: contactUpdateInputSchema,
   willingToDrive: ignoredWillingToDrive,
 }).partial().strict().refine((data) => !("gender" in data) || data.gender !== null, {
   message: "Choose Male or Female.",

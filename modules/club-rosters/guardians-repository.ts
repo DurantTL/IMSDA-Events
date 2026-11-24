@@ -8,6 +8,9 @@ import {
   guardianAuditActor,
   guardianSlotsFrom,
   guardianViewerCanRead,
+  contactToStore,
+  type ContactInput,
+  type ContactValues,
   type GuardianInput,
   type GuardianRecord,
   type GuardianViewer,
@@ -124,6 +127,62 @@ export async function listParentsByMember(
   return byMember;
 }
 
+const contactSelect = {
+  email: true,
+  phone: true,
+  addressLine1: true,
+  addressLine2: true,
+  city: true,
+  state: true,
+  postalCode: true,
+} satisfies Prisma.ClubRosterMemberContactSelect;
+
+/**
+ * Stores or clears one member's own contact details (#2060) inside the caller's transaction. Trimmed, the state in
+ * capitals; a contact with every field empty is not stored, and any row already there is deleted. Returns what happened
+ * as a flag only, for the caller's audit entry. The caller has already checked the values and that the actor may edit.
+ */
+export async function replaceMemberContact(
+  tx: Prisma.TransactionClient,
+  rosterMemberId: string,
+  contact: Partial<ContactInput>,
+): Promise<{ stored: boolean; cleared: boolean }> {
+  const values = contactToStore(contact);
+  if (!values) {
+    const cleared = await tx.clubRosterMemberContact.deleteMany({ where: { rosterMemberId } });
+    return { stored: false, cleared: cleared.count > 0 };
+  }
+  await tx.clubRosterMemberContact.upsert({
+    where: { rosterMemberId },
+    create: { rosterMemberId, ...values },
+    update: values,
+  });
+  return { stored: true, cleared: false };
+}
+
+/** Deletes a member's contact details (removal, erasure). Returns how many rows went (0 or 1). */
+export async function deleteMemberContact(tx: Prisma.TransactionClient, rosterMemberId: string): Promise<number> {
+  const result = await tx.clubRosterMemberContact.deleteMany({ where: { rosterMemberId } });
+  return result.count;
+}
+
+/** The club's member contact details keyed by roster member id, for the club leader's roster dialog (#2060). */
+export async function listContactsByMember(
+  viewer: GuardianViewer,
+  organizationId: string,
+  clubYear: string,
+): Promise<Record<string, ContactValues>> {
+  assertCanRead(viewer, organizationId);
+  const rows = await getPrisma().clubRosterMemberContact.findMany({
+    where: { rosterMember: { organizationId, clubYear, status: { not: "REMOVED" } } },
+    orderBy: { rosterMemberId: "asc" },
+    select: { rosterMemberId: true, ...contactSelect },
+  });
+  const byMember: Record<string, ContactValues> = {};
+  for (const { rosterMemberId, ...values } of rows) byMember[rosterMemberId] = values;
+  return byMember;
+}
+
 /**
  * The club's guardians keyed by roster member id, for the club leader's roster
  * dialog. Members who were removed have none (their rows were deleted).
@@ -221,5 +280,23 @@ export async function guardiansForExport(organizationId: string, clubYear: strin
   });
   const byMember: Record<string, GuardianRecord[]> = {};
   for (const row of rows) (byMember[row.rosterMemberId] ??= []).push(toRecord(row));
+  return byMember;
+}
+
+/**
+ * Member contact details for a set of members, for the export builder (#2060). The caller (the export) has already
+ * confirmed the actor may see guardians for this club. Audited by the caller as counts only.
+ */
+export async function contactsForExport(organizationId: string, clubYear: string, memberIds: string[] | null) {
+  const rows = await getPrisma().clubRosterMemberContact.findMany({
+    where: {
+      rosterMember: { organizationId, clubYear, status: { not: "REMOVED" } },
+      ...(memberIds ? { rosterMemberId: { in: memberIds } } : {}),
+    },
+    orderBy: { rosterMemberId: "asc" },
+    select: { rosterMemberId: true, ...contactSelect },
+  });
+  const byMember: Record<string, ContactValues> = {};
+  for (const { rosterMemberId, ...values } of rows) byMember[rosterMemberId] = values;
   return byMember;
 }
