@@ -3595,7 +3595,8 @@ export function PublicRegistrationForm({
             {deferredOrganizationBilling && !teamConfirmation && (
               <>
                 <PerPersonPriceNotice price={freeTeamEvent ? noCostPrice(confirmation.perPerson ?? perPersonPrice({ lineItems: confirmation.lineItems, roster: rosterEnabled })) : priceForBilledOrganization(confirmation.perPerson ?? perPersonPrice({ lineItems: confirmation.lineItems, roster: rosterEnabled }), billed)} className="public-registration-review-waitlist" />
-                {!waitlisted && <p className="public-registration-review-waitlist">No payment is due online.</p>}
+                {/* The school sentence already says no payment is due online. */}
+                {!waitlisted && billed.kind !== "SCHOOL" && <p className="public-registration-review-waitlist">No payment is due online.</p>}
               </>
             )}
             {group && !waitlisted && !teamConfirmation && <p className="public-registration-review-waitlist"><strong>{group.billingNotice}</strong>{group.noCost ? "" : " No payment is due online. The total below is an estimate."}</p>}

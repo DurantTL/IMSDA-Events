@@ -161,6 +161,7 @@ describe("Music Fest order summary and review wording", () => {
   it("uses the same wording on the confirmation's price notice", () => {
     const source = readFileSync("components/public-registration-form.tsx", "utf8");
     expect(source).toContain("priceForBilledOrganization(confirmation.perPerson ??");
+    expect(source).toContain("{!waitlisted && billed.kind !== \"SCHOOL\" && <p className=\"public-registration-review-waitlist\">No payment is due online.</p>}");
     expect(source).toContain("<ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} billed={billed} className=\"public-registration-summary-lines\" />");
     expect(source).toContain("<ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} billed={billed} className=\"public-registration-review-lines\" />");
   });
