@@ -27,6 +27,7 @@ export default async function ClubHonorsPage({ params }: { params: Promise<{ org
         canVoid={access.capabilities.manageTeam}
         clubYear={clubYear}
         honorOptions={honors}
+        honorPageBase={`/account/clubs/${organizationId}/honors`}
         initialRows={rows}
         organizationId={organizationId}
       />

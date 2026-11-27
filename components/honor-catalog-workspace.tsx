@@ -17,12 +17,16 @@ import type { HonorRecord } from "@/modules/honors/repository";
 import { EmptyState } from "@/components/empty-state";
 import { useEditedForms } from "@/components/use-edited-forms";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import { HonorCategoryLabel } from "@/components/honor-category-label";
+import { honorCategoryLabels } from "@/modules/honors/domain";
 
 /** Sorts from the headers, in the address (#1458); the catalog stays in the order the server gave until a column is chosen. */
 const HONOR_CATALOG_SORT = {
   code: { label: "Code", value: (honor) => honor.code },
   name: { label: "Name", value: (honor) => honor.name },
+  category: { label: "Category", value: (honor) => (honor.category ? honorCategoryLabels[honor.category] : "") },
   status: { label: "Status", value: (honor) => (honor.isActive ? "Active" : "Inactive") },
+  requirements: { label: "Requirements", kind: "number", noteLabel: "requirements", value: (honor) => honor.requirementCount },
   offered: { label: "Used in classes", kind: "number", noteLabel: "classes using it", value: (honor) => honor.offeringCount },
 } satisfies Record<string, SortSpec<HonorRecord>>;
 
@@ -135,12 +139,42 @@ export function HonorCatalogWorkspace({ initialHonors, showEventLink = false }: 
     />
   );
 
+  const requirementsImportDialog = (
+    <CsvImportDialog
+      eyebrow="Honor requirements CSV"
+      help={(
+        <>
+          <p>
+            Upload the requirements file built from the Pathfinder Wiki (North American Division Youth Ministries), one row
+            per requirement or lettered part, matched to honors by code. Only text from a source whose license is recorded
+            is accepted, and each honor keeps the page it came from so its credit line can link to it.
+          </p>
+          <p>
+            Text that hasn&apos;t changed is skipped. Changed text becomes a new version and the old one is kept. Honors
+            missing from the file keep their requirements; nothing is deleted.
+          </p>
+        </>
+      )}
+      importUrl="/api/admin/honors/requirements/import"
+      onImported={(result) => {
+        if (Array.isArray(result.honors)) setHonors(result.honors as HonorRecord[]);
+        setNotice(`Honor requirements updated: ${Number(result.added ?? 0)} added, ${Number(result.replaced ?? 0)} replaced with a new version.`);
+      }}
+      templateHref="/api/admin/honors/requirements/template"
+      templateLabel="Requirements template"
+      title="Import requirements"
+      uploadLabel="Import requirements"
+      variant="staff"
+    />
+  );
+
   return (
     <>
       <section className="page-stack">
         <p className={styles.definition} data-catalog-definition="">
           This list defines each honor.{honors.length > 0 && <> &quot;Used in classes&quot; counts the classes across all Honors Weekends, past ones included, that teach it.</>}{" "}
           Honors members have already earned stay on their records, which show the honor&apos;s current name and code.
+          Open an honor to see its requirements.
         </p>
         {showEventLink && (
           <ul aria-label="Related pages" className={styles.links}>
@@ -159,7 +193,7 @@ export function HonorCatalogWorkspace({ initialHonors, showEventLink = false }: 
               />
             </label>
           )}
-          <span className={styles.toolbarTools}>{importDialog}</span>
+          <span className={styles.toolbarTools}>{importDialog}{requirementsImportDialog}</span>
         </div>
         <section className="panel dense-rows">
           <div className="section-heading">
@@ -182,7 +216,9 @@ export function HonorCatalogWorkspace({ initialHonors, showEventLink = false }: 
                     <tr role="row">
                       <SortableHeader {...sorted.headerProps("code")} />
                       <SortableHeader {...sorted.headerProps("name")} />
+                      <SortableHeader {...sorted.headerProps("category")} />
                       <SortableHeader {...sorted.headerProps("status")} />
+                      <SortableHeader {...sorted.headerProps("requirements")} />
                       <SortableHeader {...sorted.headerProps("offered")} />
                       <th role="columnheader" scope="col"><span className="sr-only">Actions</span></th>
                     </tr>
@@ -192,13 +228,19 @@ export function HonorCatalogWorkspace({ initialHonors, showEventLink = false }: 
                       <tr key={honor.id} role="row">
                         <td {...cardCell("Code")}><code>{honor.code}</code></td>
                         <th role="rowheader" scope="row">
-                          <strong className={styles.name}>{honor.name}</strong>
+                          <strong className={styles.name}><Link href={`/admin/honors/${encodeURIComponent(honor.id)}`}>{honor.name}</Link></strong>
                           {honor.description && <small className={styles.detail}>{honor.description}</small>}
                         </th>
+                        <td {...cardCell("Category")}>
+                          {honor.category ? <HonorCategoryLabel category={honor.category} /> : "Not set"}
+                        </td>
                         <td {...cardCell("Status")}>
                           <span className={`status-chip ${honor.isActive ? "green" : "gold"}`}>
                             {honor.isActive ? "Active" : "Inactive"}
                           </span>
+                        </td>
+                        <td {...cardCell("Requirements")}>
+                          {honor.requirementCount === 0 ? "None yet" : `${honor.requirementCount} ${honor.requirementCount === 1 ? "requirement" : "requirements"}`}
                         </td>
                         <td {...cardCell("Used in classes")}>
                           {honor.offeringCount === 0 ? "Not in any class" : `${honor.offeringCount} ${honor.offeringCount === 1 ? "class" : "classes"}`}

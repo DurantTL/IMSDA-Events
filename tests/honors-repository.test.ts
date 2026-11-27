@@ -125,6 +125,7 @@ function fakeDatabase() {
           ...honor,
           updatedAt: now,
           _count: { offeringHonors: db.offeringHonors.filter((row) => row.honorId === honor.id).length },
+          requirementSets: [],
         })),
       create: async ({ data }: { data: Row }) => {
         if (db.honors.some((honor) => honor.code === data.code)) {

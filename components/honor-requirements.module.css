@@ -1,0 +1,13 @@
+/* Requirement text and its credit line (#2054), shared by the staff and club honor pages. Tokens only. */
+.sectionTitle { margin: 16px 0 8px; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.list { display: grid; gap: 10px; margin: 0; padding: 0 0 0 1.6em; line-height: 1.55; }
+.list > li::marker { color: var(--imsda-navy); font-weight: 700; }
+.text { margin: 0; overflow-wrap: anywhere; }
+.parts { display: grid; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
+.part { display: flex; gap: 8px; min-width: 0; }
+.deep { padding-left: 1.6em; }
+.marker { flex: 0 0 auto; min-width: 1.6em; color: var(--muted); font-weight: 600; }
+.credit { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.55; overflow-wrap: anywhere; }
+.credit a { color: var(--imsda-purple); text-decoration: underline; text-underline-offset: 3px; }
+.facts { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.facts > li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }

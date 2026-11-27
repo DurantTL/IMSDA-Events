@@ -32,7 +32,7 @@ const read = (path: string) => readFileSync(join(__dirname, "..", path), "utf8")
 
 const honor = (over: Partial<HonorRecord> = {}): HonorRecord => ({
   id: "h1", code: "AR-001", name: "Sample Knots", description: "A long synthetic description that has to wrap on a phone without cutting words off at the edge of the card.",
-  isActive: true, catalogNumber: null, category: null, offeringCount: 2, updatedAt: "2026-11-01T00:00:00.000Z", ...over,
+  isActive: true, catalogNumber: null, category: null, offeringCount: 2, requirementCount: 0, updatedAt: "2026-11-01T00:00:00.000Z", ...over,
 });
 const supply = (over: Partial<ClubSupplyItemRecord> = {}): ClubSupplyItemRecord => ({
   id: "s1", section: "INSIGNIA", name: "Sample Patch", catalogNumber: "001234", sizeLabel: null, isActive: true, honorId: null, honorCode: null,

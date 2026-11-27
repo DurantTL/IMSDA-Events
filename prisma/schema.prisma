@@ -6428,6 +6428,8 @@ model Honor {
   clubSupplyItems ClubSupplyItem[]
   clubOrderHonorLines ClubOrderHonorLine[]
   masterAwardGroupHonors MasterAwardRuleGroupHonor[]
+  /// Requirement text (#2054), one current set per language; older versions stay.
+  requirementSets RequirementSet[]
 
   @@index([isActive, name])
   @@index([normalizedName])
@@ -6446,6 +6448,69 @@ enum HonorCategory {
   OUTDOOR_INDUSTRIES
   MISCELLANEOUS_HONORS
   MASTER_AWARDS
+}
+
+/// What a requirement set belongs to (#2054): an honor now, a class level
+/// once class requirements are tracked one by one (#1689).
+enum RequirementSubject {
+  HONOR
+  CLASS
+}
+
+/// One version of the requirements for an honor or a class (#2054), in one
+/// language, from one recorded source. The license and credit are copied onto
+/// the set when it is imported, so the credit shown with the text always
+/// matches where that text came from. Re-importing changed text adds a new set
+/// and retires the old one (`retiredAt`); nothing is deleted, so anything
+/// signed off later (#2053, #1689) stays tied to the wording it was made
+/// against. A database check keeps exactly one of `honorId` and `classLevel`,
+/// matching `subject`, and partial unique indexes allow one current set per
+/// honor (or class level) and language.
+model RequirementSet {
+  id          String             @id @default(cuid())
+  subject     RequirementSubject
+  honorId     String?
+  classLevel  ClubClassLevel?
+  /// A language code, `en` for now (#2055 decides Spanish).
+  language    String             @default("en")
+  /// The calendar date (`YYYY-MM-DD`) the text was taken from its source; also the version label.
+  retrievedOn String
+  /// The recorded source's key (`modules/requirements/sources.ts`).
+  sourceKey   String
+  sourceName  String
+  /// The page the text was taken from, linked in the credit line.
+  sourceUrl   String
+  license     String
+  licenseUrl  String
+  retiredAt   DateTime?
+  createdAt   DateTime           @default(now())
+
+  honor        Honor?        @relation(fields: [honorId], references: [id], onDelete: Restrict)
+  requirements Requirement[]
+
+  @@index([honorId, language])
+  @@index([classLevel, language])
+}
+
+/// One line of a requirement set (#2054), in order. A top-level requirement
+/// has an empty `label`; its lettered parts (`a`, `b`, or `a.i` one level
+/// deeper) follow it with the same `number`. Sign-off (#2053, #1689) is meant
+/// to be per top-level requirement, with the lettered parts shown inside it.
+/// `section` groups requirements under a heading (the class requirements in
+/// #1689 have sections; honor requirements leave it empty).
+model Requirement {
+  id       String @id @default(cuid())
+  setId    String
+  position Int
+  section  String @default("")
+  number   Int
+  label    String @default("")
+  text     String
+
+  set RequirementSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  @@unique([setId, position])
+  @@unique([setId, section, number, label])
 }
 
 /// Every section of the club supply catalog (#531). The last ten are the
