@@ -53,7 +53,7 @@ export async function setPastorContact(input: { organizationId: string; contact:
       // A retry of the same save changes nothing: the active pastor already has these details.
       const current = await tx.organizationContact.findFirst({
         where: { organizationId: input.organizationId, kind: "PASTOR", effectiveTo: null },
-        select: { id: true, name: true, email: true, phone: true },
+        select: { id: true, name: true, email: true, phone: true, effectiveFrom: true },
       });
       // The phone must pass the shared check unless it is the active contact's own saved phone (#1193); the decision is made here
       // from the stored value. The message never carries the phone.
@@ -65,11 +65,18 @@ export async function setPastorContact(input: { organizationId: string; contact:
       if (current && current.name === contact.name && current.email === contact.email && current.phone === contact.phone) {
         return { id: current.id, replaced: false };
       }
-      const now = new Date();
-      const ended = await tx.organizationContact.updateMany({
-        where: { organizationId: input.organizationId, kind: "PASTOR", effectiveTo: null },
-        data: { effectiveTo: now, endedByUserId: input.actor.id, endReason: "Replaced by a new pastor contact" },
-      });
+      // The active pastor may have been saved a moment after this clock reading (another user, or another server whose clock runs
+      // ahead); the change starts no earlier than the contact it ends, so the date range check always holds (#2050).
+      const clock = new Date();
+      const now = current && current.effectiveFrom > clock ? current.effectiveFrom : clock;
+      if (current) {
+        const ended = await tx.organizationContact.updateMany({
+          where: { id: current.id, effectiveTo: null },
+          data: { effectiveTo: now, endedByUserId: input.actor.id, endReason: "Replaced by a new pastor contact" },
+        });
+        // Another user ended or replaced it first.
+        if (ended.count === 0) throw concurrentChange();
+      }
       const created = await tx.organizationContact.create({
         data: {
           organizationId: input.organizationId,
@@ -84,13 +91,13 @@ export async function setPastorContact(input: { organizationId: string; contact:
       });
       await writeAuditLog({
         actorUserId: input.actor.id,
-        action: ended.count > 0 ? "PASTOR_CONTACT_REPLACED" : "PASTOR_CONTACT_ADDED",
+        action: current ? "PASTOR_CONTACT_REPLACED" : "PASTOR_CONTACT_ADDED",
         entityType: "Organization",
         entityId: input.organizationId,
-        summary: ended.count > 0 ? "Replaced a church's pastor contact." : "Added a church's pastor contact.",
-        metadata: { organizationId: input.organizationId, contactId: created.id, replacedPrevious: ended.count > 0 },
+        summary: current ? "Replaced a church's pastor contact." : "Added a church's pastor contact.",
+        metadata: { organizationId: input.organizationId, contactId: created.id, replacedPrevious: current !== null },
       }, tx);
-      return { id: created.id, replaced: ended.count > 0 };
+      return { id: created.id, replaced: current !== null };
     });
   } catch (error) {
     if (isUniqueViolation(error)) throw concurrentChange();

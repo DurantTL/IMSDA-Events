@@ -26,7 +26,6 @@ const fakeDb = {
   },
   organizationContact: {
     updateMany: vi.fn(async ({ where, data }: { where: Row; data: Row }) => {
-      if (state.barrier) await state.barrier.arrive();
       const hit = state.contacts.filter((row) => matches(row, where));
       hit.forEach((row) => Object.assign(row, data));
       return { count: hit.length };
@@ -39,7 +38,11 @@ const fakeDb = {
       state.contacts.push(row);
       return { id: row.id };
     }),
-    findFirst: vi.fn(async ({ where }: { where: Row }) => state.contacts.find((row) => matches(row, where)) ?? null),
+    findFirst: vi.fn(async ({ where }: { where: Row }) => {
+      // Both racers read the active contact before either writes.
+      if (state.barrier) await state.barrier.arrive();
+      return state.contacts.find((row) => matches(row, where)) ?? null;
+    }),
     findMany: vi.fn(async ({ where }: { where: { organizationId: string | { in: string[] }; effectiveTo?: null } }) =>
       state.contacts
         .filter((row) => (typeof where.organizationId === "string" ? row.organizationId === where.organizationId : where.organizationId.in.includes(row.organizationId as string)))
@@ -143,6 +146,31 @@ describe("setPastorContact", () => {
     expect(lost.reason).toBeInstanceOf(OrganizationContactError);
     expect(lost.reason).toMatchObject({ code: "CONCURRENT_CHANGE" });
     expect(state.contacts.filter((row) => row.effectiveTo === null)).toHaveLength(1);
+  });
+
+  it("tells the loser to retry when two replacements race for the same active pastor (#2050)", async () => {
+    await setPastorContact({ organizationId: "church-1", contact: pastor, actor: admin });
+    let arrived = 0;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    state.barrier = { arrive: async () => { arrived += 1; if (arrived >= 2) release(); await gate; } };
+    const results = await Promise.allSettled([
+      setPastorContact({ organizationId: "church-1", contact: { ...pastor, name: "First Pastor" }, actor: admin }),
+      setPastorContact({ organizationId: "church-1", contact: { ...pastor, name: "Second Pastor" }, actor: { id: "admin-2", globalRole: "SYSTEM_ADMIN" } }),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect((results.find((result) => result.status === "rejected") as PromiseRejectedResult).reason).toMatchObject({ code: "CONCURRENT_CHANGE" });
+    expect(state.contacts).toHaveLength(2);
+    expect(state.contacts.filter((row) => row.effectiveTo === null)).toHaveLength(1);
+  });
+
+  it("never ends the active pastor before it started, even when it was saved after this clock reading (#2050)", async () => {
+    const ahead = new Date(Date.now() + 60_000);
+    state.contacts.push({ id: "pastor-ahead", organizationId: "church-1", kind: "PASTOR", name: "Pat Pastor", email: null, phone: null, effectiveFrom: ahead, effectiveTo: null });
+    await setPastorContact({ organizationId: "church-1", contact: { ...pastor, name: "Next Pastor" }, actor: admin });
+    const [ended, created] = state.contacts;
+    expect((ended.effectiveTo as Date).getTime()).toBeGreaterThanOrEqual(ahead.getTime());
+    expect((created.effectiveFrom as Date).getTime()).toBe((ended.effectiveTo as Date).getTime());
   });
 
   it("treats a retry of the same details as already saved: no new row, no end, no audit", async () => {

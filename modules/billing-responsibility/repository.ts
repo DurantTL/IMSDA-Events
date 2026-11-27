@@ -616,10 +616,15 @@ async function requireBillableOrganization(tx: Client, organizationId: string) {
   }
 }
 
+const contactConcurrentChange = () =>
+  new BillingResponsibilityError("Someone else just changed this billing contact. Reload and try again.", "CONCURRENT_CHANGE");
+
 /**
  * Adds a billing contact, ending the organization's previous one in the same transaction, so
- * history is kept and exactly one is active. A new contact starts unverified. A database index
- * settles two administrators racing: one of them gets CONCURRENT_CHANGE.
+ * history is kept and exactly one is active. A new contact starts unverified. Two administrators
+ * racing are settled by the database: the loser always gets CONCURRENT_CHANGE (#2050), either
+ * because the contact it meant to end was ended first or because the one-active index refuses
+ * its new row.
  */
 export async function setOrganizationBillingContact(input: {
   organizationId: string;
@@ -631,11 +636,23 @@ export async function setOrganizationBillingContact(input: {
   try {
     return await prisma.$transaction(async (tx) => {
       await requireBillableOrganization(tx, input.organizationId);
-      const now = new Date();
-      const ended = await tx.organizationBillingContact.updateMany({
+      const active = await tx.organizationBillingContact.findFirst({
         where: { organizationId: input.organizationId, effectiveTo: null },
-        data: { effectiveTo: now, endedByUserId: input.actor.id, endReason: "Replaced by a new billing contact" },
+        select: { id: true, effectiveFrom: true },
       });
+      // The active contact may have been saved a moment after this clock reading (another
+      // administrator, or another server whose clock runs ahead). Ending it before it started
+      // breaks the date range check, so the change starts no earlier than the contact it ends.
+      const clock = new Date();
+      const startsAt = active && active.effectiveFrom > clock ? active.effectiveFrom : clock;
+      if (active) {
+        const ended = await tx.organizationBillingContact.updateMany({
+          where: { id: active.id, effectiveTo: null },
+          data: { effectiveTo: startsAt, endedByUserId: input.actor.id, endReason: "Replaced by a new billing contact" },
+        });
+        // Another administrator ended or replaced it first.
+        if (ended.count === 0) throw contactConcurrentChange();
+      }
       const created = await tx.organizationBillingContact.create({
         data: {
           organizationId: input.organizationId,
@@ -644,25 +661,24 @@ export async function setOrganizationBillingContact(input: {
           phone: input.contact.phone,
           roleLabel: input.contact.roleLabel,
           source: "STAFF_ENTERED",
-          effectiveFrom: now,
+          effectiveFrom: startsAt,
           createdByUserId: input.actor.id,
         },
         select: { id: true },
       });
+      const replaced = active !== null;
       await writeAuditLog({
         actorUserId: input.actor.id,
-        action: ended.count > 0 ? "BILLING_CONTACT_REPLACED" : "BILLING_CONTACT_ADDED",
+        action: replaced ? "BILLING_CONTACT_REPLACED" : "BILLING_CONTACT_ADDED",
         entityType: "Organization",
         entityId: input.organizationId,
-        summary: ended.count > 0 ? "Replaced an organization's billing contact." : "Added an organization's billing contact.",
-        metadata: { organizationId: input.organizationId, contactId: created.id, replacedPrevious: ended.count > 0 },
+        summary: replaced ? "Replaced an organization's billing contact." : "Added an organization's billing contact.",
+        metadata: { organizationId: input.organizationId, contactId: created.id, replacedPrevious: replaced },
       }, tx);
-      return { id: created.id, replaced: ended.count > 0 };
+      return { id: created.id, replaced };
     });
   } catch (error) {
-    if (isUniqueViolation(error)) {
-      throw new BillingResponsibilityError("Someone else just changed this billing contact. Reload and try again.", "CONCURRENT_CHANGE");
-    }
+    if (isUniqueViolation(error)) throw contactConcurrentChange();
     throw error;
   }
 }

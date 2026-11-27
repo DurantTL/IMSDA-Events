@@ -272,6 +272,18 @@ async function main() {
   await prisma.event.delete({ where: { id: ids.eventC } });
   assert(await prisma.registrationBillingResponsibilityChange.count({ where: { registrationId: rGone } }) === 0, "deleting an event removes its history and responsibilities");
 
+  // A replacement never ends a contact before it started (#2050): a racing administrator's row, or one saved by a
+  // server whose clock runs ahead, may start after this one's clock reading. Ending it at that reading broke the date
+  // range check and surfaced a raw error instead of a change.
+  const ahead = await prisma.organizationBillingContact.create({
+    data: { organizationId: ids.churchA, name: "Clock Ahead", email: "clock.ahead@example.test", roleLabel: "Treasurer", effectiveFrom: new Date(Date.now() + 60_000) },
+  });
+  assert((await setOrganizationBillingContact({ organizationId: ids.churchA, contact, actor: admin1 })).replaced, "a contact that starts later than this clock reading is still replaced");
+  const aheadEnded = await prisma.organizationBillingContact.findUniqueOrThrow({ where: { id: ahead.id } });
+  const afterAhead = await prisma.organizationBillingContact.findFirstOrThrow({ where: { organizationId: ids.churchA, effectiveTo: null } });
+  assert(aheadEnded.effectiveTo !== null && aheadEnded.effectiveTo >= aheadEnded.effectiveFrom, "it is ended no earlier than it started");
+  assert(afterAhead.effectiveFrom.getTime() === aheadEnded.effectiveTo.getTime(), "its replacement starts when it ends");
+
   // The contact is reused by another event without re-entering it.
   const otherView = await getBillingResponsibilityView(ids.eventB);
   const group = otherView.groups.find((entry) => entry.party.kind === "ORGANIZATION" && entry.party.id === ids.churchB);
