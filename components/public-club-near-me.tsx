@@ -65,6 +65,12 @@ export function PublicClubNearMe({ origin, onOriginChange }: { origin: DistanceO
     if (watchdogRef.current) clearTimeout(watchdogRef.current);
   }, []);
 
+  useEffect(() => {
+    if (!focusNearMeRef.current || locating) return;
+    focusNearMeRef.current = false;
+    nearMeButtonRef.current?.focus();
+  });
+
   if (!scriptsRunning) return null;
 
   function stopWatchdog() {
@@ -151,12 +157,6 @@ export function PublicClubNearMe({ origin, onOriginChange }: { origin: DistanceO
     // once it has re-rendered (it may still be disabled from a location request).
     focusNearMeRef.current = true;
   }
-
-  useEffect(() => {
-    if (!focusNearMeRef.current || locating) return;
-    focusNearMeRef.current = false;
-    nearMeButtonRef.current?.focus();
-  });
 
   const sortedNote = origin ? `Sorted by distance from ${origin.label}. Distances are straight-line miles.` : "";
   // An error is read out here too: submitting with Enter leaves focus in the box, so focusing it again says nothing.
