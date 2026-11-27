@@ -33,7 +33,7 @@ used only in the browser: not sent to the server, stored or logged.
   at), so centering the map on the point asks OpenStreetMap for the pictures of that area. To keep
   that to a region rather than a street, the map frames a point no closer than zoom 9
   (`NEAR_ME_MAX_ZOOM` in `components/public-club-map.tsx`), where one picture covers roughly
-  40 to 50 miles. The point itself is not sent; the visitor can still zoom in by hand.
+  35 to 40 miles. The point itself is not sent; the visitor can still zoom in by hand.
 - If location is refused, blocked (by the visitor, a privacy browser or a policy), unavailable
   or never answered, the page says so in plain words, keeps the usual order and offers the town
   or ZIP box.

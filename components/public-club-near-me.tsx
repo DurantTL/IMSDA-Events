@@ -53,6 +53,7 @@ export function PublicClubNearMe({ origin, onOriginChange }: { origin: DistanceO
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const placeInputRef = useRef<HTMLInputElement | null>(null);
   const nearMeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const focusNearMeRef = useRef(false);
   const id = useId();
   const headingId = `${id}-heading`;
   const placeId = `${id}-place`;
@@ -146,9 +147,16 @@ export function PublicClubNearMe({ origin, onOriginChange }: { origin: DistanceO
     setPlaceError(null);
     setPlaceBusy(false);
     onOriginChange(null);
-    // This button goes away with the sort, so keyboard focus returns to Near me.
-    nearMeButtonRef.current?.focus();
+    // This button goes away with the sort, so keyboard focus returns to Near me
+    // once it has re-rendered (it may still be disabled from a location request).
+    focusNearMeRef.current = true;
   }
+
+  useEffect(() => {
+    if (!focusNearMeRef.current || locating) return;
+    focusNearMeRef.current = false;
+    nearMeButtonRef.current?.focus();
+  });
 
   const sortedNote = origin ? `Sorted by distance from ${origin.label}. Distances are straight-line miles.` : "";
   // An error is read out here too: submitting with Enter leaves focus in the box, so focusing it again says nothing.

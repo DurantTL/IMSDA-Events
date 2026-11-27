@@ -147,6 +147,17 @@ describe("Near me on Find a club (#2056)", () => {
     expect(mounted.container.textContent).toContain("Sorted by distance from ZIP 50010 (Ames, IA).");
   });
 
+  it("returns focus to Near me after Show usual order, even while a location request is waiting", async () => {
+    setGeolocation({ getCurrentPosition: vi.fn() });
+    await render();
+    await lookUp("Columbia, MO");
+    await act(async () => { nearMeButton().click(); });
+    expect(buttonByText(mounted.container, "Finding your location…")?.disabled).toBe(true);
+    await act(async () => { buttonByText(mounted.container, "Show usual order")!.click(); });
+    expect(nearMeButton().disabled).toBe(false);
+    expect(document.activeElement).toBe(nearMeButton());
+  });
+
   it("frees the Sort button when Near me is pressed while the town table is still loading", async () => {
     setGeolocation({ getCurrentPosition: vi.fn((success: PositionCallback) => success({ coords: { latitude: 42.03, longitude: -93.62 } } as GeolocationPosition)) });
     await render();

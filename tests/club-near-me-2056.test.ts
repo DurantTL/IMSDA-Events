@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { clubMiles, formatMiles, milesBetween, nearestPoints, sortByDistance, type DistanceOrigin } from "@/components/club-distance";
 import { buildPlaceIndex, lookUpPlace, normalizeTownName, placeLookupMessage } from "@/components/place-lookup";
 import { placeLookupRows } from "@/components/place-lookup-data";
+import { NEAR_ME_MAX_ZOOM } from "@/components/public-club-map";
 import { locationProblemMessage, problemFromErrorCode } from "@/components/public-club-near-me";
 import nextConfig from "../next.config";
 
@@ -116,7 +117,7 @@ describe("the location never leaves the browser (#2056)", () => {
       }
     }
     // Map pictures around the point stay regional (ADR 0018).
-    expect(read("components/public-club-map.tsx")).toMatch(/NEAR_ME_MAX_ZOOM = 9;/);
+    expect(NEAR_ME_MAX_ZOOM).toBe(9);
   });
 
   it("loads the town table only on demand, from the bundle", () => {
