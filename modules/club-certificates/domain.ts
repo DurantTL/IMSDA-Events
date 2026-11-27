@@ -1,7 +1,7 @@
 /**
  * Optional class and honor certificates (#1696), pure. A club's director or deputy picks completed honors and class
  * completions on their own roster and prints one landscape certificate each, or saves them as a PDF from the browser.
- * Nothing is sent. A certificate shows only a first and last name, what was completed, the date and the club: never a
+ * Nothing is sent. Printing records each certificate with a verification number (#2052). A certificate shows only a first and last name, what was completed, the date and the club: never a
  * birth date, a contact, a health detail or any other roster field.
  */
 
@@ -30,6 +30,8 @@ export type CertificateCandidate = {
   key: string;
   kind: CertificateKind;
   memberId: string;
+  /** The roster member's person: what a printed certificate is recorded against (#2052). */
+  personId: string;
   firstName: string;
   lastName: string;
   /** The honor's name or the class's name. */
@@ -70,25 +72,29 @@ export function formatCompletionDate(value: string): string {
 export function honorCandidates(
   rows: ReadonlyArray<{ memberId: string; firstName: string; lastName: string; honors: ReadonlyArray<{ honorId: string; honorName: string; status: string; completionDate: string; recordedAtOrganizationId?: string }> }>,
   organizationId: string,
+  /** Roster member id to person id, for the members on the active roster; an honor row for anyone else is left out. */
+  personIdByMember: ReadonlyMap<string, string>,
 ): CertificateCandidate[] {
   const out: CertificateCandidate[] = [];
   for (const row of rows) {
+    const personId = personIdByMember.get(row.memberId);
+    if (!personId) continue;
     for (const honor of row.honors) {
       if (honor.status !== "COMPLETED" || !isCalendarDate(honor.completionDate)) continue;
       // Only honors this club recorded: a certificate never carries another club's honor under this club's name.
       if (honor.recordedAtOrganizationId !== organizationId) continue;
-      out.push({ key: certificateKey("HONOR", row.memberId, honor.honorId), kind: "HONOR", memberId: row.memberId, firstName: row.firstName, lastName: row.lastName, title: honor.honorName, completedOn: honor.completionDate });
+      out.push({ key: certificateKey("HONOR", row.memberId, honor.honorId), kind: "HONOR", memberId: row.memberId, personId, firstName: row.firstName, lastName: row.lastName, title: honor.honorName, completedOn: honor.completionDate });
     }
   }
   return out;
 }
 
 export function classCandidates(
-  rows: ReadonlyArray<{ memberId: string; firstName: string; lastName: string; classLevel: ClubClassLevel; completedOn: string }>,
+  rows: ReadonlyArray<{ memberId: string; personId: string; firstName: string; lastName: string; classLevel: ClubClassLevel; completedOn: string }>,
 ): CertificateCandidate[] {
   return rows
     .filter((row) => isCalendarDate(row.completedOn))
-    .map((row) => ({ key: certificateKey("CLASS", row.memberId, row.classLevel), kind: "CLASS" as const, memberId: row.memberId, firstName: row.firstName, lastName: row.lastName, title: classCertificateTitle(row.classLevel), completedOn: row.completedOn }));
+    .map((row) => ({ key: certificateKey("CLASS", row.memberId, row.classLevel), kind: "CLASS" as const, memberId: row.memberId, personId: row.personId, firstName: row.firstName, lastName: row.lastName, title: classCertificateTitle(row.classLevel), completedOn: row.completedOn }));
 }
 
 /** Last name, first name, then newest completion first, then title: a steady order for the list and the print. */
@@ -151,3 +157,80 @@ export function selectCertificates(keys: readonly string[], candidates: readonly
 export function certificateItemsParam(keys: readonly string[]): string {
   return keys.map(encodeURIComponent).join(",");
 }
+
+// ---- Verification numbers, issued certificates and the public check page (#2052), pure ----
+
+/** Crockford base32: digits and letters without I, L, O and U, so a number read off paper is hard to get wrong. */
+export const CERTIFICATE_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+export const CERTIFICATE_CODE_LENGTH = 8;
+
+/** A new verification number, stored without the dash: 8 characters from the alphabet. `randomInt(max)` gives 0 up to max - 1 (the caller passes crypto's). */
+export function generateCertificateCode(randomInt: (max: number) => number): string {
+  let code = "";
+  for (let index = 0; index < CERTIFICATE_CODE_LENGTH; index += 1) {
+    code += CERTIFICATE_CODE_ALPHABET.charAt(randomInt(CERTIFICATE_CODE_ALPHABET.length));
+  }
+  return code;
+}
+
+/** How the number reads on paper: `XXXX-XXXX`. */
+export function formatCertificateCode(code: string): string {
+  return code.length === CERTIFICATE_CODE_LENGTH ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
+}
+
+/**
+ * What someone typed or scanned, as a stored number: capitals, spaces and dashes dropped, O read as 0 and I or L as 1.
+ * Null when it is not exactly 8 characters of the alphabet.
+ */
+export function normalizeCertificateCode(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > 64) return null;
+  const cleaned = value.toUpperCase().replace(/[\s-]+/g, "").replace(/O/g, "0").replace(/[IL]/g, "1");
+  if (cleaned.length !== CERTIFICATE_CODE_LENGTH) return null;
+  for (const char of cleaned) if (!CERTIFICATE_CODE_ALPHABET.includes(char)) return null;
+  return cleaned;
+}
+
+/** The unique key that allows one valid certificate per completion; the record drops it when voided. */
+export function certificateActiveKey(parts: { organizationId: string; personId: string; kind: CertificateKind; refId: string; completedOn: string }): string {
+  return [parts.organizationId, parts.personId, parts.kind, parts.refId, parts.completedOn].join("|");
+}
+
+/** The honor id or class level a candidate was built from (the last part of its key). */
+export function certificateRefId(candidate: Pick<CertificateCandidate, "key">): string {
+  return candidate.key.split(":")[2] ?? "";
+}
+
+/** What the check page may be given about one issued certificate: never the person, a birth date or any contact. */
+export type CertificateCheckRecord = { kind: CertificateKind; title: string; completedOn: string; clubName: string; voidedAt: Date | null };
+
+export const CERTIFICATE_NOT_FOUND_MESSAGE = "We couldn't find a certificate with that number. Check the number on the certificate and try again.";
+export const CERTIFICATE_VOIDED_MESSAGE = "The club withdrew this certificate, so it is no longer valid.";
+
+export type CertificateCheckView =
+  | { status: "GENUINE"; kindLabel: string; title: string; completedOn: string; clubName: string }
+  | { status: "WITHDRAWN" }
+  | { status: "NOT_FOUND" };
+
+/** The check page's whole content for a lookup result. Unknown and malformed numbers are the same answer; a withdrawn one shows no details. */
+export function certificateCheckView(record: CertificateCheckRecord | null): CertificateCheckView {
+  if (!record) return { status: "NOT_FOUND" };
+  if (record.voidedAt) return { status: "WITHDRAWN" };
+  return { status: "GENUINE", kindLabel: certificateKindLabels[record.kind], title: record.title, completedOn: formatCompletionDate(record.completedOn), clubName: record.clubName };
+}
+
+/** One row of "Printed certificates" on the club's certificates page. */
+export type IssuedCertificateRow = {
+  id: string;
+  code: string;
+  /** Null when the person was removed from the roster and erased; the certificate stays. */
+  firstName: string | null;
+  lastName: string | null;
+  title: string;
+  kind: CertificateKind;
+  completedOn: string;
+  issuedAt: string;
+  voidedAt: string | null;
+};
+
+/** The most printed certificates the club's list shows. */
+export const ISSUED_CERTIFICATES_LIST_MAX = 50;

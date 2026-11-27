@@ -57,6 +57,8 @@ page that replaced them.
 | `/pay/square/return/[returnId]` | The person who just paid | Square sends people back here after checkout | Payment status after card checkout |
 | `/staff-invite/[token]` | The person the invitation was emailed to | Link in a staff invitation email | Accept a staff invitation |
 | `/unsubscribe/[token]` | The person the email was sent to | Link in an event announcement email | Event email preferences |
+| `/verify` | Anyone with a certificate | Address printed on a club certificate; the check page's own form | Type a certificate's verification number to check it |
+| `/verify/[code]` | Anyone with a certificate | QR code or link on a printed club certificate | Whether a certificate is genuine, with its honor or class, date and club only |
 | `/embed/[eventSlug]/[formSlug]` | Anyone | Embedded on another website | An embedded registration form |
 | `/embed/calendar` | Anyone | Embedded on another website (`docs/CALENDAR-WIDGET.md`) | Embedded upcoming events |
 
@@ -141,8 +143,8 @@ person's role allows. Print views open from the page named and have no tab of th
 | `/account/clubs/[organizationId]/club-info` | Director, deputy | Club tabs: Club settings | Club profile, club admins and optional features |
 | `/account/clubs/[organizationId]/letters` | Director, deputy, when turned on | "Open letters" in Club settings | Letters and certificates |
 | `/account/clubs/[organizationId]/letters/[templateId]/print` | Director, deputy, when turned on | "Open print view" on Letters | Printable letters |
-| `/account/clubs/[organizationId]/certificates` | Director, deputy, when turned on | "Open certificates" in Club settings | Class and honor certificates |
-| `/account/clubs/[organizationId]/certificates/print` | Director, deputy, when turned on | "Print certificates" on Certificates | Printable certificates |
+| `/account/clubs/[organizationId]/certificates` | Director, deputy, when turned on | "Open certificates" in Club settings | Class and honor certificates, and the printed certificates with a Void button |
+| `/account/clubs/[organizationId]/certificates/print` | Director, deputy, when turned on | "Print certificates" on Certificates | Printable certificates, each with a verification number and QR code |
 | `/account/clubs/[organizationId]/charts` | Director, deputy, registrar (birthdays and age groups: director, deputy), when turned on | Roster; Club settings | Roster charts and birthdays |
 | `/account/clubs/[organizationId]/calendar` | Any club role to view; director, deputy to change, when turned on | "Open calendar" in Club settings | Club calendar and reminders |
 | `/account/clubs/[organizationId]/master-guide` | Director, deputy, when turned on | "Open Master Guide tracking" in Club settings | Master Guide candidates and approvals |

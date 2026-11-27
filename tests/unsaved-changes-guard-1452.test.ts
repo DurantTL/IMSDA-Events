@@ -37,6 +37,7 @@ const allowlist: Record<string, string> = {
   "components/health-privacy-acknowledgment.tsx": "action button only, no typed fields",
   "components/health-record-actions.tsx": "action button only, no typed fields",
   "components/import-workspace.tsx": "one field",
+  "components/certificate-check-form.tsx": "search or filter",
   "components/information-form-fill-in.tsx": "saves instantly / autosave",
   "components/login-form.tsx": "sign-in",
   "components/meal-closeout-review-form.tsx": "action button only, no typed fields",

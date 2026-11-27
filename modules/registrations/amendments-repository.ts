@@ -889,6 +889,7 @@ async function personIsOnlyThisAttendee(tx: Prisma.TransactionClient, personId: 
           memberTransfers: true,
           clubOrderNeeds: true,
           memberClassCompletions: true,
+          clubCertificates: true,
         },
       },
       backgroundCheckMatch: { select: { id: true } },

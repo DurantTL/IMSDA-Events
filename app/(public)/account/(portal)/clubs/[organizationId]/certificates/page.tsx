@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { clubAccessClosed } from "@/components/club-access-closed";
 import { GetFilterForm } from "@/components/get-filter-form";
-import { ClubCertificatePicker } from "@/components/club-certificates";
+import { ClubCertificatePicker, PrintedCertificates } from "@/components/club-certificates";
 import styles from "@/components/club-certificates.module.css";
 import { filterCandidates, parseCertificateFilter } from "@/modules/club-certificates/domain";
 import { loadClubCertificates } from "@/modules/club-certificates/repository";
@@ -72,6 +72,18 @@ export default async function ClubCertificatesPage({
         </GetFilterForm>
         <p className={styles.meta}>{`${shown.length} ${shown.length === 1 ? "completion" : "completions"} shown`}</p>
         <ClubCertificatePicker candidates={shown} filtered={filtered} key={`${filter.kind}|${filter.from}|${filter.to}`} organizationId={organizationId} />
+      </section>
+      <section aria-labelledby="printed-certificates-heading" className="public-manage-card">
+        <div className="public-manage-card-heading">
+          <h2 id="printed-certificates-heading">Printed certificates</h2>
+        </div>
+        <p className="quiet-copy">
+          Each certificate you print gets a verification number and a QR code. Anyone who scans the code or types the number at
+          the check page sees only that it is genuine, what was completed, the date and your club. If one was printed by mistake,
+          void it: the check page then says it is no longer valid. Printing the same completion again after that gives a new number.
+          If you correct a completion date or remove an honor, void the old certificate too, because it still checks as genuine until you do.
+        </p>
+        <PrintedCertificates organizationId={organizationId} rows={list.issued.rows} total={list.issued.total} />
       </section>
     </>
   );

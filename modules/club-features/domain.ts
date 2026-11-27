@@ -27,7 +27,7 @@ export const clubOptionalFeatureDefinitions: Record<ClubOptionalFeatureKey, { ti
   },
   "completion-certificates": {
     title: "Class and honor certificates",
-    description: "Lets your director and deputy print a certificate for each completed honor or class on your roster, one landscape page each, or save them as PDF from the browser, for a batch at investiture. It adds a Certificates page to your club. Nothing is emailed or sent.",
+    description: "Lets your director and deputy print a certificate for each completed honor or class on your roster, one landscape page each, or save them as PDF from the browser, for a batch at investiture. Each one is recorded with a verification number and a QR code, so anyone can check it on a public page that shows only what was completed, the date and your club, and you can void one printed by mistake. It adds a Certificates page to your club. Nothing is emailed or sent.",
   },
   "roster-charts": {
     title: "Roster charts and birthdays",

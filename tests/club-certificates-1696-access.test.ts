@@ -51,8 +51,8 @@ type Role = "DIRECTOR" | "DEPUTY" | "REGISTRAR" | "REPORTER";
 const params = { params: Promise.resolve({ organizationId: "club-1" }) };
 const pageProps = (query: Record<string, string> = {}) => ({ ...params, searchParams: Promise.resolve(query) });
 const printProps = (items = "h:m1:h1", organizationId = "club-1") => ({ params: Promise.resolve({ organizationId }), searchParams: Promise.resolve({ items }) });
-const candidate = { key: "h:m1:h1", kind: "HONOR", memberId: "m1", firstName: "Ann", lastName: "Example", title: "Archery", completedOn: "2026-10-04" };
-const list = { clubYear: "2026-27", clubName: "Test Pathfinders", candidates: [candidate] };
+const candidate = { key: "h:m1:h1", kind: "HONOR", memberId: "m1", personId: "p1", firstName: "Ann", lastName: "Example", title: "Archery", completedOn: "2026-10-04" };
+const list = { clubYear: "2026-27", clubName: "Test Pathfinders", candidates: [candidate], issued: { total: 0, rows: [] } };
 
 function signedInAs(role: Role | null, clubId = "club-1") {
   mocks.currentStaffActingContext.mockResolvedValue(null);
@@ -81,7 +81,7 @@ beforeEach(() => {
   mocks.passkeysConfigured.mockResolvedValue(false);
   mocks.isClubFeatureEnabled.mockResolvedValue(true);
   mocks.loadClubCertificates.mockImplementation(async (_id: string, capabilities: { editProfile: boolean }) => (capabilities.editProfile ? list : null));
-  mocks.loadCertificateSheets.mockImplementation(async (_id: string, capabilities: { editProfile: boolean }) => (capabilities.editProfile ? { clubName: "Test Pathfinders", sheets: [candidate] } : null));
+  mocks.loadCertificateSheets.mockImplementation(async (_id: string, capabilities: { editProfile: boolean }) => (capabilities.editProfile ? { clubName: "Test Pathfinders", sheets: [{ ...candidate, code: "ABCD2345" }] } : null));
 });
 
 describe("the certificates page", () => {
@@ -157,6 +157,7 @@ describe("the print page", () => {
     expect(await PrintPage(printProps())).not.toBeNull();
     expect(mocks.loadCertificateSheets.mock.calls[0]![0]).toBe("club-1");
     expect(mocks.loadCertificateSheets.mock.calls[0]![2]).toBe("h:m1:h1");
+    expect(mocks.loadCertificateSheets.mock.calls[0]![3]).toEqual({ accountId: "account-1" });
   });
 
   it("shows one certificate per item with only the name, what was completed, the date and the club", async () => {
@@ -165,6 +166,10 @@ describe("the print page", () => {
     expect(html.match(/<section/g)).toHaveLength(1);
     for (const text of ["Certificate of completion", "Ann Example", "Archery", "October 4, 2026", "Test Pathfinders", "Director", "Date", "1 certificate,"]) expect(html).toContain(text);
     expect(html).not.toMatch(/birth|phone|email|health/i);
+    expect(html).toContain("ABCD-2345");
+    expect(html).toContain("Verification number");
+    expect(html).toContain("/verify");
+    expect(html).toContain("<svg");
   });
 
   it("shows a notice and no print button when nothing is left to print", async () => {

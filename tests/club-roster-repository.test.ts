@@ -34,7 +34,7 @@ const youth = {
 
 function fakeDatabase() {
   let sequence = 0;
-  const db = { guardians: [] as Row[], parents: [] as Row[], contacts: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), snapshotReferences: new Set<string>(), mergeReferences: new Set<string>(), anonymizedReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[], tltProfilesErased: [] as string[], masterGuideErased: [] as Row[] };
+  const db = { requestedCountKeys: [] as string[], guardians: [] as Row[], parents: [] as Row[], contacts: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), snapshotReferences: new Set<string>(), mergeReferences: new Set<string>(), anonymizedReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[], tltProfilesErased: [] as string[], masterGuideErased: [] as Row[] };
   const matches = (row: Row, where: Record<string, unknown> = {}) => Object.entries(where).every(([key, value]) => {
     if (value === undefined) return true;
     if (value && typeof value === "object" && "not" in value) return row[key] !== (value as { not: unknown }).not;
@@ -61,6 +61,7 @@ function fakeDatabase() {
         // removal asked for it, so a missing relation in the guard shows up as the person being deleted anyway.
         const guardian = db.guardianReferences.has(person.id) ? 1 : 0;
         const requested = select?._count?.select ?? {};
+        db.requestedCountKeys.push(...Object.keys(requested));
         const guardianCounts = Object.fromEntries(
           ["guardianAuthoritiesAsMinor", "guardianAuthoritiesAsAdult", "guardianAuthoritiesDeclared", "guardianConflictsAsMinor", "guardianConflictsAsAdult"]
             .filter((key) => requested[key]).map((key) => [key, guardian]),
@@ -652,6 +653,15 @@ describe("club roster storage", () => {
     ]);
     expect(await listRoster("club-1", "2026-27", now)).toEqual([]);
     await expect(updateRosterMember("club-1", lone, { role: "Back" }, actor, now)).rejects.toMatchObject({ code: "MEMBER_REMOVED" });
+  });
+
+  it("removing a member whose only other record is a printed certificate still deletes the person (#2052)", async () => {
+    const { memberId } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+    db.requestedCountKeys.length = 0;
+    await removeRosterMember("club-1", memberId, actor, now);
+    // A certificate does not keep the person: its person column is cleared by the database, so the removal never counts it.
+    expect(db.requestedCountKeys).not.toContain("clubCertificates");
+    expect(db.people).toEqual([]);
   });
 
   it("removing a member with honor history deletes the person and their honor entries, and audits the count (#486)", async () => {

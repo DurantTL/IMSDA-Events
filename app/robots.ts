@@ -32,6 +32,7 @@ export default function robots(): MetadataRoute.Robots {
         "/archived-events",
         "/staff",
         "/unsubscribe/",
+        "/verify",
       ],
     },
     sitemap: `${baseUrl.replace(/\/$/, "")}/sitemap.xml`,
