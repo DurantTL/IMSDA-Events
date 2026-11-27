@@ -218,7 +218,7 @@ describe("church-invoice review screen (#743)", () => {
     expect(renderToStaticMarkup(createElement(ChurchInvoiceReviewFacts, { recipient: null }))).toContain("Your church");
     const { readFileSync } = await import("node:fs");
     const source = readFileSync("components/public-registration-form.tsx", "utf8");
-    expect(source).toContain("<ChurchInvoiceReviewFacts recipient={invoiceRecipient} />");
+    expect(source).toContain("<ChurchInvoiceReviewFacts recipient={invoiceRecipient} billed={billed} />");
     expect(source).toContain("Attendees</p>");
   });
 });

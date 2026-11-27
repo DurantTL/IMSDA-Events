@@ -39,6 +39,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PerPersonPriceNotice } from "@/components/per-person-price-notice";
 import { ChurchInvoiceNotice, ChurchInvoiceReviewFacts } from "@/components/church-invoice-notice";
 import { churchInvoiceTerms, invoiceRecipientName, termsMatchPrice } from "@/modules/club-registrations/church-invoice-terms";
+import { billedOrganization, priceForBilledOrganization } from "@/modules/club-registrations/billed-organization";
 import { DateGuidance } from "@/components/date-guidance";
 import { PUBLIC_DATE_GUIDANCE, parseTypedDate } from "@/modules/forms/typed-date";
 import { RegistrationAccountPrompt } from "@/components/registration-account-prompt";
@@ -998,6 +999,8 @@ export function PublicRegistrationForm({
   const invoiceRecipient = deferredOrganizationBilling
     ? invoiceRecipientName(definition, rosterEnabled ? registrationResponses : responses)
     : null;
+  // A school-billed form names the school, not a church, wherever the bill is mentioned. Display only.
+  const billed = useMemo(() => billedOrganization(definition, { eventName: event.name }), [definition, event.name]);
   const displayedPromoCode = activeQuote?.promoCode ?? null;
   const visibleFieldKeys = useMemo(() => {
     const visible = new Set<string>();
@@ -3117,7 +3120,7 @@ export function PublicRegistrationForm({
           </h3>
           {deferredOrganizationBilling ? (
             <>
-              <ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} className="public-registration-review-lines" />
+              <ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} billed={billed} className="public-registration-review-lines" />
               {displayedPromoCode && <p>Promo code <ExactValue>{displayedPromoCode}</ExactValue> applied.</p>}
             </>
           ) : baseCalculation.previewFailed ? (
@@ -3174,7 +3177,7 @@ export function PublicRegistrationForm({
             </p>
           )}
           {!joiningWaitlist && deferredOrganizationBilling && (
-            <ChurchInvoiceReviewFacts recipient={invoiceRecipient} />
+            <ChurchInvoiceReviewFacts recipient={invoiceRecipient} billed={billed} />
           )}
           {!joiningWaitlist && group && (
             <p className="public-registration-review-waitlist">
@@ -3591,8 +3594,9 @@ export function PublicRegistrationForm({
             </dl>
             {deferredOrganizationBilling && !teamConfirmation && (
               <>
-                <PerPersonPriceNotice price={freeTeamEvent ? noCostPrice(confirmation.perPerson ?? perPersonPrice({ lineItems: confirmation.lineItems, roster: rosterEnabled })) : (confirmation.perPerson ?? perPersonPrice({ lineItems: confirmation.lineItems, roster: rosterEnabled }))} className="public-registration-review-waitlist" />
-                {!waitlisted && <p className="public-registration-review-waitlist">No payment is due online.</p>}
+                <PerPersonPriceNotice price={freeTeamEvent ? noCostPrice(confirmation.perPerson ?? perPersonPrice({ lineItems: confirmation.lineItems, roster: rosterEnabled })) : priceForBilledOrganization(confirmation.perPerson ?? perPersonPrice({ lineItems: confirmation.lineItems, roster: rosterEnabled }), billed)} className="public-registration-review-waitlist" />
+                {/* The school sentence already says no payment is due online. */}
+                {!waitlisted && billed.kind !== "SCHOOL" && <p className="public-registration-review-waitlist">No payment is due online.</p>}
               </>
             )}
             {group && !waitlisted && !teamConfirmation && <p className="public-registration-review-waitlist"><strong>{group.billingNotice}</strong>{group.noCost ? "" : " No payment is due online. The total below is an estimate."}</p>}
@@ -3962,7 +3966,7 @@ export function PublicRegistrationForm({
           )}
           {group?.waitlistNote && <p className="public-registration-summary-empty">{group.waitlistNote}</p>}
           {rosterEnabled && <p className="public-registration-summary-roster"><UsersRound size={15} aria-hidden="true" /> <span>{`${attendees.length} ${pluralAttendeeLabel(roster.attendeeLabel, attendees.length)}`}</span></p>}
-          {deferredOrganizationBilling ? <ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} className="public-registration-summary-lines" /> : baseCalculation.previewFailed ? <p className="public-registration-summary-empty" data-testid="preview-unavailable" role="status">{PREVIEW_UNAVAILABLE_TEXT}</p> : calculation.lineItems.length === 0 ? <p className="public-registration-summary-empty">Select any priced options to see your total.</p> : (
+          {deferredOrganizationBilling ? <ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} billed={billed} className="public-registration-summary-lines" /> : baseCalculation.previewFailed ? <p className="public-registration-summary-empty" data-testid="preview-unavailable" role="status">{PREVIEW_UNAVAILABLE_TEXT}</p> : calculation.lineItems.length === 0 ? <p className="public-registration-summary-empty">Select any priced options to see your total.</p> : (
             <div className="public-registration-summary-lines">
               {calculation.lineItems.map((item) => (
                 <div key={item.key}><span>{item.label}{item.pricingLabel && <small>{item.pricingLabel}</small>}</span><strong translate="no">{formatCents(item.amountCents)}</strong></div>
