@@ -18,8 +18,9 @@ import { CLUB_OPTIONAL_FEATURE_KEYS, clubOptionalFeatureDefinitions } from "@/mo
 
 /** Class and honor certificates (#1696), pure. Synthetic data only. */
 
-const ann = { memberId: "m1", firstName: "Ann", lastName: "Example" };
-const zed = { memberId: "m2", firstName: "Zed", lastName: "Sample" };
+const ann = { memberId: "m1", personId: "p1", firstName: "Ann", lastName: "Example" };
+const zed = { memberId: "m2", personId: "p2", firstName: "Zed", lastName: "Sample" };
+const people = new Map([["m1", "p1"], ["m2", "p2"]]);
 
 describe("the feature key", () => {
   it("is on the typed list with a title and an off-by-default description", () => {
@@ -41,7 +42,7 @@ describe("current completions", () => {
         { honorId: "h2", honorName: "Knots", status: "IN_PROGRESS", completionDate: "", recordedAtOrganizationId: "club-1" },
         { honorId: "h3", honorName: "Camping", status: "COMPLETED", completionDate: "not a date", recordedAtOrganizationId: "club-1" },
       ],
-    }], "club-1");
+    }], "club-1", people);
     expect(out.map((item) => item.key)).toEqual(["h:m1:h1"]);
     expect(out[0]).toMatchObject({ kind: "HONOR", title: "Archery", completedOn: "2026-10-04" });
   });
@@ -54,7 +55,7 @@ describe("current completions", () => {
         { honorId: "h2", honorName: "Knots", status: "COMPLETED", completionDate: "2026-10-05", recordedAtOrganizationId: "club-1" },
         { honorId: "h3", honorName: "Birds", status: "COMPLETED", completionDate: "2026-10-06" },
       ],
-    }], "club-1");
+    }], "club-1", people);
     expect(out.map((item) => item.key)).toEqual(["h:m1:h2"]);
   });
 
@@ -66,7 +67,7 @@ describe("current completions", () => {
     }) as unknown as Parameters<typeof currentHonorsFromHistory>[0][number];
     const voided = { reason: "mistake", voidedAt: "2026-10-05T00:00:00.000Z", voidedByName: "" };
     const current = currentHonorsFromHistory([entry({ voided })]);
-    expect(honorCandidates([{ ...ann, honors: current }], "club-1")).toEqual([]);
+    expect(honorCandidates([{ ...ann, honors: current }], "club-1", people)).toEqual([]);
   });
 
   it("builds class completions with class names", () => {
@@ -85,7 +86,7 @@ describe("current completions", () => {
       ...honorCandidates([{ ...ann, honors: [
         { honorId: "a", honorName: "Archery", status: "COMPLETED", completionDate: "2026-02-01", recordedAtOrganizationId: "club-1" },
         { honorId: "b", honorName: "Birds", status: "COMPLETED", completionDate: "2026-03-01", recordedAtOrganizationId: "club-1" },
-      ] }], "club-1"),
+      ] }], "club-1", people),
     ]);
     expect(list.map((item) => item.title)).toEqual(["Birds", "Archery", "Friend Class"]);
   });
@@ -107,7 +108,7 @@ describe("dates", () => {
 
 describe("filters", () => {
   const all = sortCandidates([
-    ...honorCandidates([{ ...ann, honors: [{ honorId: "a", honorName: "Archery", status: "COMPLETED", completionDate: "2026-05-10", recordedAtOrganizationId: "club-1" }] }], "club-1"),
+    ...honorCandidates([{ ...ann, honors: [{ honorId: "a", honorName: "Archery", status: "COMPLETED", completionDate: "2026-05-10", recordedAtOrganizationId: "club-1" }] }], "club-1", people),
     ...classCandidates([{ ...zed, classLevel: "RANGER", completedOn: "2026-06-20" }, { ...ann, classLevel: "GUIDE", completedOn: "2026-06-21" }]),
   ]);
   it("parses defensively", () => {
@@ -139,7 +140,7 @@ describe("the items a print asks for", () => {
   });
   it("keeps only keys that are current completions here, in the order asked, and drops the rest silently", () => {
     const candidates = [
-      ...honorCandidates([{ ...ann, honors: [{ honorId: "a", honorName: "Archery", status: "COMPLETED", completionDate: "2026-05-10", recordedAtOrganizationId: "club-1" }] }], "club-1"),
+      ...honorCandidates([{ ...ann, honors: [{ honorId: "a", honorName: "Archery", status: "COMPLETED", completionDate: "2026-05-10", recordedAtOrganizationId: "club-1" }] }], "club-1", people),
       ...classCandidates([{ ...zed, classLevel: "RANGER", completedOn: "2026-06-20" }]),
     ];
     const chosen = selectCertificates([certificateKey("CLASS", "m2", "RANGER"), "h:other-club-member:a", "h:m1:a", "h:m1:a", "h:m1:never"], candidates);

@@ -3131,6 +3131,7 @@ model Person {
   pendingMemberTransfer MemberTransfer?  @relation("MemberTransferPendingPerson")
   clubOrderNeeds        ClubOrderNeed[]
   memberClassCompletions MemberClassCompletion[]
+  clubCertificates ClubCertificate[]
   guardianAuthoritiesAsMinor GuardianAuthority[] @relation("GuardianAuthorityMinor")
   guardianAuthoritiesAsAdult GuardianAuthority[] @relation("GuardianAuthorityAdult")
   guardianAuthoritiesDeclared GuardianAuthority[] @relation("GuardianAuthorityActorPerson")
@@ -3446,6 +3447,7 @@ model Organization {
   clubOrderListLines ClubOrderListLine[]
   clubOrderHonorLines ClubOrderHonorLine[]
   memberClassCompletions MemberClassCompletion[]
+  clubCertificates ClubCertificate[]
   sponsoredPromoCodes PromoCode[] @relation("PromoCodeSponsor")
   clubFormSubmissions ClubFormSubmission[]
   billingContacts         OrganizationBillingContact[]
@@ -8460,6 +8462,45 @@ model EventCloneRecord {
 
   @@unique([actorUserId, requestKey])
   @@index([sourceEventId, createdAt])
+}
+
+/// What a club certificate is (#2052).
+enum ClubCertificateKind {
+  HONOR
+  CLASS
+}
+
+/// One printed class or honor certificate (#2052, optional feature `completion-certificates`). Printing records it once
+/// per completion; a reprint reuses the same row and number. `code` is the verification number printed on the paper
+/// (8 Crockford base32 characters, stored without the dash). `title` and `clubName` are what was printed. `activeKey`
+/// is `org|person|kind|ref|completedOn` while the certificate is valid and null once voided, so the unique index allows
+/// one valid certificate per completion and any number of voided ones. A voided row is kept as history. Exactly one
+/// issuer column is set (attendee account, or the staff user acting as the club's director), and the same for the voider.
+model ClubCertificate {
+  id                String              @id @default(cuid())
+  code              String              @unique
+  organizationId    String
+  personId          String
+  kind              ClubCertificateKind
+  /// The honor id or the class level.
+  refId             String
+  title             String
+  /// The calendar date (`YYYY-MM-DD`) the honor or class was completed.
+  completedOn       String
+  clubName          String
+  issuedAt          DateTime            @default(now())
+  issuedByAccountId String?
+  issuedByUserId    String?
+  voidedAt          DateTime?
+  voidedByAccountId String?
+  voidedByUserId    String?
+  activeKey         String?             @unique
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  person       Person       @relation(fields: [personId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([personId])
 }
 
 /// A class a member finished, recorded by a director (#532). The roster only

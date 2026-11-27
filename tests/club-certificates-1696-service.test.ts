@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
     clubOptionalFeature: { findUnique: vi.fn(), createMany: vi.fn(), deleteMany: vi.fn() },
     clubRosterMember: { findMany: vi.fn() },
     memberClassCompletion: { findMany: vi.fn() },
+    clubCertificate: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), count: vi.fn(), updateMany: vi.fn() },
   };
   return { prisma, writeAuditLog: vi.fn(), listClubHonorsPage: vi.fn() };
 });
@@ -45,7 +46,13 @@ beforeEach(() => {
     { id: "m2", personId: "p2", person: { firstName: "Zed", lastName: "Sample" } },
   ]);
   mocks.prisma.memberClassCompletion.findMany.mockResolvedValue([{ personId: "p2", classLevel: "RANGER", completedOn: "2026-06-20" }]);
+  mocks.prisma.clubCertificate.findMany.mockResolvedValue([]);
+  mocks.prisma.clubCertificate.count.mockResolvedValue(0);
+  let issued = 0;
+  mocks.prisma.clubCertificate.create.mockImplementation(async ({ data }: { data: { code: string } }) => ({ id: `cert-${++issued}`, code: data.code }));
 });
+
+const actor = { accountId: "account-1" };
 
 describe("switching the feature on and off", () => {
   it("is audited when switched on, with the club, the feature and the director's account", async () => {
@@ -65,7 +72,7 @@ describe("switching the feature on and off", () => {
     mocks.prisma.clubOptionalFeature.findUnique.mockResolvedValue(null);
     expect(await clubCertificatesAvailable("club-1", director)).toBe(false);
     expect(await loadClubCertificates("club-1", director, now)).toBeNull();
-    expect(await loadCertificateSheets("club-1", director, "h:m1:h1", now)).toBeNull();
+    expect(await loadCertificateSheets("club-1", director, "h:m1:h1", actor, now)).toBeNull();
     mocks.prisma.clubOptionalFeature.findUnique.mockResolvedValue({ id: "feature-1" });
     expect(await clubCertificatesAvailable("club-1", registrar)).toBe(false);
     expect(mocks.listClubHonorsPage).not.toHaveBeenCalled();
@@ -84,12 +91,12 @@ describe("the list", () => {
 
 describe("the print", () => {
   it("keeps current completions here and silently drops anything else", async () => {
-    const result = await loadCertificateSheets("club-1", director, "c:m2:RANGER,h:m9:h1,h:m1:h2,h:m1:h3,h:m1:h1,junk", now);
+    const result = await loadCertificateSheets("club-1", director, "c:m2:RANGER,h:m9:h1,h:m1:h2,h:m1:h3,h:m1:h1,junk", actor, now);
     expect(result?.sheets.map((item) => item.key)).toEqual(["c:m2:RANGER", "h:m1:h1"]);
   });
 
   it("reads nothing when no valid item is asked for", async () => {
-    const result = await loadCertificateSheets("club-1", director, "junk", now);
+    const result = await loadCertificateSheets("club-1", director, "junk", actor, now);
     expect(result).toEqual({ clubName: "Test Pathfinders", sheets: [] });
     expect(mocks.listClubHonorsPage).not.toHaveBeenCalled();
   });

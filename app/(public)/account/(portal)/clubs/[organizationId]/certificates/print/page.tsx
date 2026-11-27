@@ -3,21 +3,40 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { clubAccessClosed } from "@/components/club-access-closed";
+import { ExactValue } from "@/components/exact-value";
 import { PrintReportButton } from "@/components/print-report-button";
 import styles from "@/components/club-certificates.module.css";
 import { BRAND_SYMBOL_PATH } from "@/lib/brand";
 import { formatPersonName } from "@/lib/person-name";
-import { formatCompletionDate } from "@/modules/club-certificates/domain";
+import { formatCertificateCode, formatCompletionDate } from "@/modules/club-certificates/domain";
+import { certificateQr, certificateVerifyHost, certificateVerifyUrl } from "@/modules/club-certificates/qr";
 import { loadCertificateSheets } from "@/modules/club-certificates/repository";
-import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
+import { actorAttribution, getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 
 export const metadata: Metadata = { title: "Print certificates" };
 export const dynamic = "force-dynamic";
 
+/** The small check corner of a certificate (#2052): a QR code to the public check page, the number, and where to check it by hand. */
+function VerifyCorner({ code, host }: { code: string; host: string }) {
+  const qr = certificateQr(certificateVerifyUrl(code));
+  return (
+    <div className={styles.verify}>
+      <svg aria-label="QR code that opens the page to check this certificate" className={styles.verifyQr} role="img" shapeRendering="crispEdges" viewBox={`-2 -2 ${qr.size + 4} ${qr.size + 4}`}>
+        <path d={qr.path} fill="currentColor" />
+      </svg>
+      <span className={styles.verifyText}>
+        <span>{"Verification number "}<ExactValue>{formatCertificateCode(code)}</ExactValue></span>
+        <span>{"Check it at "}<ExactValue>{`${host}/verify`}</ExactValue></span>
+      </span>
+    </div>
+  );
+}
+
 /**
  * One landscape certificate per printed page (#1696), for the `items` in the query. The server keeps only items that are
  * current completions of people on this club's active roster; anything else is dropped. A certificate holds a name, what
- * was completed, the date and the club, and nothing else from the roster. Same gate as the certificates page.
+ * was completed, the date and the club, and nothing else from the roster; printing records it with a verification number
+ * (a reprint keeps its number) and a QR code to the public check page. Same gate as the certificates page.
  */
 export default async function ClubCertificatePrintPage({
   params,
@@ -29,8 +48,9 @@ export default async function ClubCertificatePrintPage({
   const [{ organizationId }, { items }] = await Promise.all([params, searchParams]);
   const access = await getRosterAccessStateForPage(organizationId);
   if (access.state !== "OPEN") return clubAccessClosed(access);
-  const result = await loadCertificateSheets(organizationId, access.capabilities, items);
+  const result = await loadCertificateSheets(organizationId, access.capabilities, items, actorAttribution(access.actor));
   if (!result) notFound();
+  const host = certificateVerifyHost();
   return (
     <>
       <div className={styles.printTools}>
@@ -57,6 +77,7 @@ export default async function ClubCertificatePrintPage({
                     <span className={styles.signature}>Director</span>
                     <span className={styles.signature}>Date</span>
                   </div>
+                  <VerifyCorner code={sheet.code} host={host} />
                 </section>
               ))}
             </div>

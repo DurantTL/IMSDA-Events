@@ -137,6 +137,11 @@ const nextConfig: NextConfig = {
         headers: privateRegistrationHeaders,
       },
       {
+        // A printed certificate's check page (#2052): the number is on paper, not a secret, but the pages are never cached, indexed or sent in a referrer.
+        source: "/verify/:path*",
+        headers: privateRegistrationHeaders,
+      },
+      {
         // A club form's single-use private link (#610): never cached, never indexed, no referrer.
         source: "/club-forms/:path*",
         headers: privateRegistrationHeaders,
