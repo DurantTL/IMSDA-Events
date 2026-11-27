@@ -20,6 +20,8 @@ type PinEntry = { marker: Marker; group: ClubMapGroup; signature: string };
 
 const defaultCenter: [number, number] = [39.5, -93.5];
 const defaultZoom = 6;
+/** The closest the map frames a "Near me" point (#2056); see the refit below. */
+export const NEAR_ME_MAX_ZOOM = 9;
 
 /**
  * The club map (#437): one pin per church with coordinates, listing every
@@ -64,6 +66,7 @@ export function PublicClubMap({
   const onStatusRef = useRef(onStatus);
   const tileStatusRef = useRef<TileStatus>("ready");
   const lastBoundsRef = useRef<[number, number][] | null>(null);
+  const lastMaxZoomRef = useRef(11);
   const originMarkerRef = useRef<Marker | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -114,7 +117,7 @@ export function PublicClubMap({
             if (pin) {
               mapRef.current.panTo(pin.marker.getLatLng());
             } else if (lastBoundsRef.current) {
-              mapRef.current.fitBounds(lastBoundsRef.current, { padding: [32, 32], maxZoom: 11 });
+              mapRef.current.fitBounds(lastBoundsRef.current, { padding: [32, 32], maxZoom: lastMaxZoomRef.current });
             }
           }
           lastWidth = width;
@@ -200,13 +203,16 @@ export function PublicClubMap({
         ? [[origin.latitude, origin.longitude] as [number, number], ...nearestPoints(groups, origin).map((group) => [group.latitude, group.longitude] as [number, number])]
         : groups.map((group) => [group.latitude, group.longitude] as [number, number]);
       lastBoundsRef.current = bounds;
-      map.fitBounds(bounds, { padding: [32, 32], maxZoom: 11 });
+      lastMaxZoomRef.current = origin ? NEAR_ME_MAX_ZOOM : 11;
+      // Map pictures come from OpenStreetMap for whatever area is shown, so around a "Near me" point the map stops
+      // at a regional zoom: the pictures it asks for cover tens of miles, not the visitor's street.
+      map.fitBounds(bounds, { padding: [32, 32], maxZoom: lastMaxZoomRef.current });
     }
 
     applySelection(pins, selectedIdRef.current);
   }, [ready, groups, origin]);
 
-  // Mark the "Near me" point. It is drawn only here, in the browser, and never sent anywhere.
+  // Mark the "Near me" point. It is drawn only here, in the browser; the point itself is never sent anywhere.
   useEffect(() => {
     const L = leafletRef.current;
     const map = mapRef.current;

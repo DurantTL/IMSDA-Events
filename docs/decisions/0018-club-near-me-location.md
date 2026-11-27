@@ -22,12 +22,18 @@ used only in the browser: not sent to the server, stored or logged.
   not used here, because it would send what the visitor typed to our server and on to the
   Census Bureau. A town that exists in both states asks for IA or MO; a place outside the two
   states is not found, and the message says so.
-- The point stays in the page's memory. It is not sent in any request, put in the web address
+- The point stays in the page's memory. It is not sent in any request (beyond the map pictures
+  below), put in the web address
   (the search box's `?q=` is unchanged), stored in the browser, logged or measured by the
   public metrics beacon. Leaving the page forgets it.
 - Distances are straight-line miles. Clubs without a map location keep their usual order at the
   end of the list. The map frames the point and the nearest three pins and marks the point with
   a dot that only the page draws.
+- The map's pictures come from OpenStreetMap (as they already do for any area the visitor looks
+  at), so centering the map on the point asks OpenStreetMap for the pictures of that area. To keep
+  that to a region rather than a street, the map frames a point no closer than zoom 9
+  (`NEAR_ME_MAX_ZOOM` in `components/public-club-map.tsx`), where one picture covers roughly
+  40 to 50 miles. The point itself is not sent; the visitor can still zoom in by hand.
 - If location is refused, blocked (by the visitor, a privacy browser or a policy), unavailable
   or never answered, the page says so in plain words, keeps the usual order and offers the town
   or ZIP box.

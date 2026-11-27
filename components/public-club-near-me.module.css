@@ -53,10 +53,6 @@
   font-size: var(--type-public-body);
 }
 
-.placeInput[aria-invalid="true"] {
-  border-color: var(--coral);
-}
-
 .placeForm :global(.field-error-message) {
   margin: 4px 0 0;
 }

@@ -25,10 +25,10 @@ export function problemFromErrorCode(code: number): LocationProblem {
   return code === 1 ? "blocked" : "unavailable";
 }
 
-// The browser gives up after this long once location is allowed; the page stops waiting a little later in
-// case a privacy browser never answers at all (a late answer still sorts the list).
+// The browser gives up after this long once location is allowed. The page stops waiting later, counting the
+// time the permission prompt is open, in case a privacy browser never answers at all (a late answer still sorts the list).
 const LOCATE_TIMEOUT_MS = 15_000;
-const LOCATE_WATCHDOG_MS = 20_000;
+const LOCATE_WATCHDOG_MS = 30_000;
 
 const subscribeNothing = () => () => {};
 
@@ -52,6 +52,7 @@ export function PublicClubNearMe({ origin, onOriginChange }: { origin: DistanceO
   const requestRef = useRef(0);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const placeInputRef = useRef<HTMLInputElement | null>(null);
+  const nearMeButtonRef = useRef<HTMLButtonElement | null>(null);
   const id = useId();
   const headingId = `${id}-heading`;
   const placeId = `${id}-place`;
@@ -73,6 +74,7 @@ export function PublicClubNearMe({ origin, onOriginChange }: { origin: DistanceO
   function locate() {
     const request = ++requestRef.current;
     setPlaceError(null);
+    setPlaceBusy(false);
     setProblem(null);
     const geolocation = typeof navigator !== "undefined" ? navigator.geolocation : undefined;
     if (!geolocation || (typeof window !== "undefined" && window.isSecureContext === false)) {
@@ -142,21 +144,25 @@ export function PublicClubNearMe({ origin, onOriginChange }: { origin: DistanceO
     setLocating(false);
     setProblem(null);
     setPlaceError(null);
+    setPlaceBusy(false);
     onOriginChange(null);
+    // This button goes away with the sort, so keyboard focus returns to Near me.
+    nearMeButtonRef.current?.focus();
   }
 
   const sortedNote = origin ? `Sorted by distance from ${origin.label}. Distances are straight-line miles.` : "";
+  // An error is read out here too: submitting with Enter leaves focus in the box, so focusing it again says nothing.
   const announcement = locating
     ? "Finding your location…"
     : problem
       ? locationProblemMessage(problem)
-      : sortedNote;
+      : placeError ?? sortedNote;
 
   return (
     <section aria-labelledby={headingId} className={styles.nearMe}>
       <h3 className={styles.heading} id={headingId}>Sort by distance</h3>
       <div className={styles.controls}>
-        <button aria-busy={locating} className={`secondary-button ${styles.nearMeButton}`} disabled={locating} onClick={locate} type="button">
+        <button aria-busy={locating} className={`secondary-button ${styles.nearMeButton}`} disabled={locating} onClick={locate} ref={nearMeButtonRef} type="button">
           <LocateFixed aria-hidden="true" size={16} /> {locating ? "Finding your location…" : "Near me"}
         </button>
         <form aria-label="Distance from a town or ZIP" className={styles.placeForm} noValidate onSubmit={lookUp}>

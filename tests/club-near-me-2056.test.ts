@@ -108,6 +108,17 @@ describe("the location never leaves the browser (#2056)", () => {
     }
   });
 
+  it("the page and map that carry the point send, store and log nothing either", () => {
+    for (const file of ["components/public-club-directory.tsx", "components/public-club-map.tsx"]) {
+      const source = read(file);
+      for (const banned of ["fetch(", "sendBeacon", "sendHit", "XMLHttpRequest", "localStorage", "sessionStorage", "document.cookie", "console."]) {
+        expect(source.includes(banned), `${file} uses ${banned}`).toBe(false);
+      }
+    }
+    // Map pictures around the point stay regional (ADR 0018).
+    expect(read("components/public-club-map.tsx")).toMatch(/NEAR_ME_MAX_ZOOM = 9;/);
+  });
+
   it("loads the town table only on demand, from the bundle", () => {
     expect(read("components/place-lookup.ts")).toContain('import("@/components/place-lookup-data")');
     for (const [file, source] of sources) expect(source, file).not.toMatch(/from "@\/components\/place-lookup-data"/);

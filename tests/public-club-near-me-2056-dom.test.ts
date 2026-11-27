@@ -91,6 +91,7 @@ describe("Near me on Find a club (#2056)", () => {
 
     await act(async () => { buttonByText(mounted.container, "Show usual order")!.click(); });
     expect(names()).toEqual(["Ames Pathfinders", "Brookside Explorers", "Columbia Adventurers"]);
+    expect(document.activeElement).toBe(nearMeButton());
     expect(mounted.container.textContent).not.toMatch(/\d mi\b|Under 1 mi/);
     expect(mapProps.at(-1)?.origin).toBeNull();
   });
@@ -125,7 +126,7 @@ describe("Near me on Find a club (#2056)", () => {
       await render();
       await act(async () => { nearMeButton().click(); });
       expect(buttonByText(mounted.container, "Finding your location…")?.disabled).toBe(true);
-      await act(async () => { vi.advanceTimersByTime(20_000); });
+      await act(async () => { vi.advanceTimersByTime(30_000); });
       expect(mounted.container.textContent).toContain("Your location could not be found");
       expect(nearMeButton().disabled).toBe(false);
     } finally {
@@ -146,6 +147,20 @@ describe("Near me on Find a club (#2056)", () => {
     expect(mounted.container.textContent).toContain("Sorted by distance from ZIP 50010 (Ames, IA).");
   });
 
+  it("frees the Sort button when Near me is pressed while the town table is still loading", async () => {
+    setGeolocation({ getCurrentPosition: vi.fn((success: PositionCallback) => success({ coords: { latitude: 42.03, longitude: -93.62 } } as GeolocationPosition)) });
+    await render();
+    await typeInto(placeBox(), "Columbia, MO");
+    await act(async () => {
+      placeBox().form!.requestSubmit();
+      nearMeButton().click();
+    });
+    await vi.waitFor(() => expect(buttonByText(mounted.container, "Sort").disabled).toBe(false));
+    // The later answer (Near me) wins; the slower town lookup is ignored.
+    expect(mounted.container.textContent).toContain("Sorted by distance from your location.");
+    expect(names()[0]).toBe("Ames Pathfinders");
+  });
+
   it("says next to the box when a town can't be found", async () => {
     setGeolocation(undefined);
     await render();
@@ -155,6 +170,7 @@ describe("Near me on Find a club (#2056)", () => {
     const message = document.getElementById(box.getAttribute("aria-describedby")!);
     expect(message?.classList.contains("field-error-message")).toBe(true);
     expect(message?.textContent).toBe("We couldn't find “Atlantis” in Iowa or Missouri. Check the spelling or try a ZIP code.");
+    expect([...mounted.container.querySelectorAll('[role="status"]')].map((node) => node.textContent).join(" ")).toContain("We couldn't find “Atlantis”");
     expect(names()).toEqual(["Ames Pathfinders", "Brookside Explorers", "Columbia Adventurers"]);
   });
 
