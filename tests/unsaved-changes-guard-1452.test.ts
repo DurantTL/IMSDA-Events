@@ -48,6 +48,7 @@ const allowlist: Record<string, string> = {
   "components/password-reset-request-form.tsx": "sign-in",
   "components/people-quick-filters.tsx": "search or filter",
   "components/public-club-directory.tsx": "search or filter",
+  "components/public-club-near-me.tsx": "search or filter",
   "components/public-lodging-assignment.tsx": "action button only, no typed fields",
   "components/public-registration-recovery-form.tsx": "sign-in",
   "components/public-responsible-adult.tsx": "action button only, no typed fields",

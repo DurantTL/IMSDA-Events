@@ -141,3 +141,13 @@
 .map :global(.club-map-tooltip) strong,
 .map :global(.club-map-tooltip) ul { font-size: 1rem; }
 .overlayNote { max-width: calc(100% - 24px); white-space: normal; text-align: center; overflow-wrap: anywhere; }
+
+/* The "Near me" point (#2056): a purple dot with a white ring, under the club pins. */
+.originIcon {
+  box-sizing: border-box;
+  border: 3px solid var(--card);
+  border-radius: 50%;
+  background: var(--imsda-purple);
+  box-shadow: 0 0 0 2px var(--imsda-purple);
+  pointer-events: none;
+}

@@ -9,6 +9,8 @@ import type { PublicClubListing } from "@/modules/organizations/public-club-dire
 import type { PublicClubMapStatus } from "@/components/public-club-map";
 import { announcedCountText, createRetryableLoader, effectiveView, unmappedSentence } from "@/components/public-club-finder-logic";
 import { locationKey } from "@/components/public-club-map-content";
+import { clubMiles, formatMiles, sortByDistance, type DistanceOrigin } from "@/components/club-distance";
+import { PublicClubNearMe } from "@/components/public-club-near-me";
 import styles from "./public-club-directory.module.css";
 
 type MapProps = ComponentProps<typeof import("@/components/public-club-map").PublicClubMap>;
@@ -28,6 +30,8 @@ export function matches(club: PublicClubListing, query: string) {
  * selecting one highlights the other. Only ever shown here: church name,
  * club name, town, and meeting day/time — whatever the server sent, which
  * is already nothing more (see modules/organizations/public-club-directory).
+ * "Near me" (#2056) sorts the list by distance from a point that never leaves
+ * the browser (see components/public-club-near-me).
  */
 export function PublicClubDirectory({ clubs, initialSearch = "" }: { clubs: PublicClubListing[]; initialSearch?: string }) {
   const search = useClientSearch(initialSearch, SEARCH_DEBOUNCE_MS, "q");
@@ -36,6 +40,7 @@ export function PublicClubDirectory({ clubs, initialSearch = "" }: { clubs: Publ
   const selectedId = selection?.id ?? null;
   const [view, setView] = useState<"list" | "map">("list");
   const [mapStatus, setMapStatus] = useState<PublicClubMapStatus>("loading");
+  const [origin, setOrigin] = useState<DistanceOrigin | null>(null);
   const [mapAttempt, setMapAttempt] = useState(0);
   const [MapComponent, setMapComponent] = useState<ComponentType<MapProps> | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
@@ -43,6 +48,7 @@ export function PublicClubDirectory({ clubs, initialSearch = "" }: { clubs: Publ
   const searchId = `${rowIdPrefix}-search`;
 
   const filtered = useMemo(() => clubs.filter((club) => matches(club, query)), [clubs, query]);
+  const ordered = useMemo(() => sortByDistance(filtered, origin), [filtered, origin]);
   const mappable = useMemo(() => filtered.filter((club) => club.latitude !== null && club.longitude !== null), [filtered]);
   // Whether to show a map at all depends on every listed club, not the
   // search: the map stays mounted while typing, even when no pin matches.
@@ -148,6 +154,8 @@ export function PublicClubDirectory({ clubs, initialSearch = "" }: { clubs: Publ
         </div>
       )}
 
+      {anyMappable && <PublicClubNearMe onOriginChange={setOrigin} origin={origin} />}
+
       {clubs.length === 0 ? (
         <EmptyState className="empty-state panel" headingLevel={2} icon={<MapPin aria-hidden="true" size={26} />} title="No clubs are listed publicly yet">Only clubs that choose a public listing appear here. Check back soon, or use Club forms if you already belong to a club.</EmptyState>
       ) : (
@@ -155,7 +163,7 @@ export function PublicClubDirectory({ clubs, initialSearch = "" }: { clubs: Publ
           {anyMappable && (
             <div className={styles.mapPane}>
               {MapComponent ? (
-                <MapComponent clubs={mappable} key={mapAttempt} onSelect={selectFromMap} onStatus={setMapStatus} selectedId={selectedId} />
+                <MapComponent clubs={mappable} key={mapAttempt} onSelect={selectFromMap} onStatus={setMapStatus} origin={origin} selectedId={selectedId} />
               ) : (
                 <div className={styles.mapLoading}>{mapStatus === "unavailable" ? "Map unavailable" : "Loading map…"}</div>
               )}
@@ -169,11 +177,13 @@ export function PublicClubDirectory({ clubs, initialSearch = "" }: { clubs: Publ
                 <button className={styles.resetButton} onClick={clearSearch} type="button">Clear filters</button>
               </EmptyState></li>
             ) : (
-              filtered.map((club) => {
+              ordered.map((club) => {
                 const isSelected = selectedId === club.id;
                 const sharesPin = !isSelected && selectedPoint !== null
                   && club.latitude !== null && club.longitude !== null
                   && locationKey(club.latitude, club.longitude) === selectedPoint;
+                const miles = clubMiles(club, origin);
+                const summary = [club.churchName, club.town, miles === null ? "" : formatMiles(miles)].filter(Boolean).join(" · ");
                 const className = [
                   styles.clubButton,
                   isSelected ? styles.selected : "",
@@ -190,7 +200,7 @@ export function PublicClubDirectory({ clubs, initialSearch = "" }: { clubs: Publ
                       <span className={styles.clubIcon}><UsersRound aria-hidden="true" size={16} /></span>
                       <span className={styles.clubText}>
                         <strong>{club.clubName}</strong>
-                        <small>{club.churchName}{club.town ? ` · ${club.town}` : ""}</small>
+                        <small>{summary}</small>
                         {sharesPin && <small className={styles.samePinNote}>Same church, same pin</small>}
                       </span>
                     </button>

@@ -1,0 +1,90 @@
+/* "Near me" on Find a club (#2056): the shared secondary buttons and the search field's border and radius. */
+.nearMe {
+  display: grid;
+  gap: 8px;
+  max-width: 760px;
+}
+
+.heading {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--type-public-body);
+  font-weight: 600;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 16px;
+}
+
+.nearMeButton {
+  font-size: var(--type-button-cta);
+}
+
+.placeForm {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.placeLabel {
+  color: var(--muted);
+  font-size: var(--type-public-label);
+}
+
+.placeRow {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.placeInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-element);
+  background: var(--field-bg);
+  color: var(--ink);
+  padding: 0 12px;
+  font-size: var(--type-public-body);
+}
+
+.placeForm :global(.field-error-message) {
+  margin: 4px 0 0;
+}
+
+.problem,
+.sortedNote {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--type-public-body);
+  overflow-wrap: anywhere;
+}
+
+.sortedNote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.credit {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--type-public-label);
+}
+
+.credit a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.credit a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}

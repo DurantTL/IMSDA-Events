@@ -219,6 +219,18 @@ const nextConfig: NextConfig = {
         headers: privateRegistrationHeaders,
       },
       {
+        // "Near me" on Find a club (#2056) asks the browser for the visitor's
+        // location; the page alone may ask, and the location never leaves
+        // the browser (components/club-distance.ts).
+        source: "/clubs",
+        headers: [
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(self), browsing-topics=()",
+          },
+        ],
+      },
+      {
         source: "/check-in",
         headers: [
           {
