@@ -12,6 +12,7 @@ import {
   type ClubMapGroup,
 } from "@/components/public-club-map-content";
 import { nextTileStatus, type TileStatus } from "@/components/public-club-finder-logic";
+import { nearestPoints, type DistanceOrigin } from "@/components/club-distance";
 import styles from "./public-club-map.module.css";
 
 type Leaflet = typeof import("leaflet");
@@ -42,8 +43,11 @@ export function PublicClubMap({
   selectedId,
   onSelect,
   onStatus,
+  origin = null,
 }: {
   clubs: PublicClubListing[];
+  /** "Near me" (#2056): when set, the map frames this point and the nearest pins, and marks the point. */
+  origin?: DistanceOrigin | null;
   selectedId: string | null;
   onSelect: (id: string) => void;
   /** Reports whether the map library and its tiles loaded, so the page can say so honestly. */
@@ -60,6 +64,7 @@ export function PublicClubMap({
   const onStatusRef = useRef(onStatus);
   const tileStatusRef = useRef<TileStatus>("ready");
   const lastBoundsRef = useRef<[number, number][] | null>(null);
+  const originMarkerRef = useRef<Marker | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -130,6 +135,7 @@ export function PublicClubMap({
       mapRef.current = null;
       layerRef.current = null;
       leafletRef.current = null;
+      originMarkerRef.current = null;
       fittedRef.current = null;
     };
   }, []);
@@ -184,17 +190,35 @@ export function PublicClubMap({
       pins.set(group.key, { marker, group, signature: groupSignature(group) });
     }
 
-    // Refit only when the set of visible pins changes, not on every keystroke.
-    const fitKey = groups.map((group) => group.key).join("|");
-    if (fitKey !== fittedRef.current && groups.length > 0) {
+    // Refit only when the set of visible pins or the "Near me" point changes, not on every keystroke.
+    // With a point, frame it and its nearest few pins rather than every pin.
+    const originKey = origin ? `${origin.latitude},${origin.longitude}` : "";
+    const fitKey = `${groups.map((group) => group.key).join("|")}@${originKey}`;
+    if (fitKey !== fittedRef.current && (groups.length > 0 || origin)) {
       fittedRef.current = fitKey;
-      const bounds = groups.map((group) => [group.latitude, group.longitude] as [number, number]);
+      const bounds = origin
+        ? [[origin.latitude, origin.longitude] as [number, number], ...nearestPoints(groups, origin).map((group) => [group.latitude, group.longitude] as [number, number])]
+        : groups.map((group) => [group.latitude, group.longitude] as [number, number]);
       lastBoundsRef.current = bounds;
       map.fitBounds(bounds, { padding: [32, 32], maxZoom: 11 });
     }
 
     applySelection(pins, selectedIdRef.current);
-  }, [ready, groups]);
+  }, [ready, groups, origin]);
+
+  // Mark the "Near me" point. It is drawn only here, in the browser, and never sent anywhere.
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    if (!ready || !L || !map) return;
+    originMarkerRef.current?.remove();
+    originMarkerRef.current = null;
+    if (!origin) return;
+    const icon = L.divIcon({ className: styles.originIcon, html: false, iconSize: [18, 18], iconAnchor: [9, 9] });
+    const marker = L.marker([origin.latitude, origin.longitude], { icon, interactive: false, keyboard: false, zIndexOffset: -1000 }).addTo(map);
+    marker.getElement()?.setAttribute("aria-hidden", "true");
+    originMarkerRef.current = marker;
+  }, [ready, origin]);
 
   // Mirror the list's selection onto the map.
   useEffect(() => {
