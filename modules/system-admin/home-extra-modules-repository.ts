@@ -6,7 +6,9 @@ import type { AdminRoles } from "@/modules/access/admin-roles-domain";
 import type { EventPermission } from "@/modules/access/permissions";
 import { listActiveEventPermissionsForUser } from "@/modules/access/membership-repository";
 import { countWaitingNewClubApplications, listOldestWaitingClubApplications } from "@/modules/club-applications/repository";
+import { openStatuses } from "@/modules/cancellation-requests/domain";
 import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
+import { loadEventLedger } from "@/modules/invoices/ledger-repository";
 import { HOME_MODULES, type HomeModuleKey } from "@/modules/system-admin/home-layout-domain";
 import { clubYearInstants, conferenceClubYear } from "@/modules/system-admin/home-modules-model";
 import {
@@ -98,7 +100,9 @@ async function readMoneyThisSeason(userId: string, roles: AdminRoles, now: Date)
   const events = season.filter((event) => permitted.has(event.id));
   if (events.length === 0) return buildMoneyThisSeason(clubYear, [], now);
   const ids = events.map((event) => event.id);
-  const [payments, registrations, requested, pending] = await Promise.all([
+  const churchBilledIds = events.filter((event) => event.billingMode === "DEFERRED_ORGANIZATION_INVOICE").map((event) => event.id);
+  const withRefund = { eventId: { in: ids }, proposedRefundCents: { gt: 0 } };
+  const [payments, registrations, open, approvedNotStarted, executions, pending, cancellationRefundIds, ledgers] = await Promise.all([
     prisma.payment.findMany({
       where: { eventId: { in: ids }, status: "SUCCEEDED" },
       select: { eventId: true, amount: true, refunds: { where: { status: "SUCCEEDED" }, select: { amount: true } } },
@@ -112,13 +116,33 @@ async function readMoneyThisSeason(userId: string, roles: AdminRoles, now: Date)
         payments: { where: { status: "SUCCEEDED" }, select: { amount: true, refunds: { where: { status: "SUCCEEDED" }, select: { amount: true } } } },
       },
     }),
+    // Cancellation refunds still to go back: requests not decided yet, approved ones nobody has carried out, and those
+    // being carried out or carried out with a refund that failed and nobody settled.
     prisma.cancellationRequest.groupBy({
       by: ["eventId"],
-      where: { eventId: { in: ids }, status: "REQUESTED", proposedRefundCents: { gt: 0 } },
+      where: { ...withRefund, status: { in: [...openStatuses] } },
       _count: { _all: true },
       _sum: { proposedRefundCents: true },
     }),
-    prisma.refund.findMany({ where: { eventId: { in: ids }, status: "PENDING" }, select: { eventId: true, amount: true } }),
+    prisma.cancellationRequest.groupBy({
+      by: ["eventId"],
+      where: { ...withRefund, status: "APPROVED", execution: { is: null } },
+      _count: { _all: true },
+      _sum: { proposedRefundCents: true },
+    }),
+    prisma.cancellationExecution.findMany({
+      where: {
+        eventId: { in: ids },
+        approvedRefundCents: { gt: 0 },
+        OR: [{ status: { not: "COMPLETED" } }, { refunds: { some: { status: "FAILED", resolvedAt: null } } }],
+      },
+      select: { eventId: true, status: true, approvedRefundCents: true, refunds: { select: { amountCents: true, status: true, resolvedAt: true } } },
+    }),
+    prisma.refund.findMany({ where: { eventId: { in: ids }, status: "PENDING" }, select: { id: true, eventId: true, amount: true } }),
+    // A cancellation's refund already counts above, so its processor refund is not counted twice.
+    prisma.cancellationExecutionRefund.findMany({ where: { eventId: { in: ids }, refundId: { not: null } }, select: { refundId: true } }),
+    // Church invoices, as the Event money report adds them up.
+    Promise.all(churchBilledIds.map(async (eventId) => [eventId, await loadEventLedger(eventId)] as const)),
   ]);
   const sources = new Map<string, MoneyEventSource>(events.map((event) => [event.id, {
     id: event.id,
@@ -128,7 +152,8 @@ async function readMoneyThisSeason(userId: string, roles: AdminRoles, now: Date)
     churchBilled: event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
     payments: [],
     activeRegistrations: [],
-    requestedRefunds: { count: 0, cents: 0 },
+    churchInvoices: null,
+    cancellationRefunds: { undecidedOrNotStarted: { count: 0, cents: 0 }, executions: [] },
     pendingRefunds: { count: 0, cents: 0 },
   }]));
   for (const payment of payments) {
@@ -146,15 +171,34 @@ async function readMoneyThisSeason(userId: string, roles: AdminRoles, now: Date)
       })),
     });
   }
-  for (const group of requested) {
-    const source = sources.get(group.eventId);
-    if (source) source.requestedRefunds = { count: group._count._all, cents: group._sum.proposedRefundCents ?? 0 };
+  for (const group of [...open, ...approvedNotStarted]) {
+    const waiting = sources.get(group.eventId)?.cancellationRefunds.undecidedOrNotStarted;
+    if (!waiting) continue;
+    waiting.count += group._count._all;
+    waiting.cents += group._sum.proposedRefundCents ?? 0;
   }
+  for (const execution of executions) {
+    sources.get(execution.eventId)?.cancellationRefunds.executions.push({
+      completed: execution.status === "COMPLETED",
+      approvedRefundCents: execution.approvedRefundCents,
+      legs: execution.refunds.map((leg) => ({ amountCents: leg.amountCents, status: leg.status, resolved: leg.resolvedAt !== null })),
+    });
+  }
+  const counted = new Set(cancellationRefundIds.map((leg) => leg.refundId));
   for (const refund of pending) {
     const source = sources.get(refund.eventId);
-    if (!source) continue;
+    if (!source || counted.has(refund.id)) continue;
     source.pendingRefunds.count += 1;
     source.pendingRefunds.cents += cents(refund.amount);
+  }
+  for (const [eventId, ledger] of ledgers) {
+    const source = sources.get(eventId);
+    if (!source) continue;
+    source.churchInvoices = {
+      invoiceCount: ledger.length,
+      receivedCents: ledger.reduce((total, invoice) => total + invoice.figures.paidCents, 0),
+      stillOwedCents: ledger.reduce((total, invoice) => total + invoice.figures.outstandingCents, 0),
+    };
   }
   return buildMoneyThisSeason(clubYear, [...sources.values()], now);
 }
@@ -170,7 +214,7 @@ async function readLiveCheckIn(userId: string, roles: AdminRoles, now: Date): Pr
       startsAt: { lte: new Date(now.getTime() + WINDOW_SLACK_MS) },
       endsAt: { gte: new Date(now.getTime() - WINDOW_SLACK_MS) },
     },
-    select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, archivedAt: true },
+    select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, archivedAt: true, lifecycleState: true },
   });
   const open = candidates.filter((event) => isCheckInOpen(event, now));
   const permitted = await eventsWithPermission(userId, roles, open.map((event) => event.id), "MANAGE_CHECK_IN");

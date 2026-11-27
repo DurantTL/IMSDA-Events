@@ -81,15 +81,40 @@ const db = {
     },
   },
   cancellationRequest: {
-    groupBy: async ({ where }: { where: { eventId: { in: string[] } } }) => {
+    groupBy: async ({ where }: { where: { eventId: { in: string[] }; status: unknown } }) => {
       ask("cancellationRequest", where);
-      return [{ eventId: "evt_camporee", _count: { _all: 2 }, _sum: { proposedRefundCents: 4000 } }].filter((row) => where.eventId.in.includes(row.eventId));
+      // Two open requests asking $40 back, and one approved that nobody has carried out ($25).
+      const rows = where.status === "APPROVED"
+        ? [{ eventId: "evt_camporee", _count: { _all: 1 }, _sum: { proposedRefundCents: 2500 } }]
+        : [{ eventId: "evt_camporee", _count: { _all: 2 }, _sum: { proposedRefundCents: 4000 } }];
+      return rows.filter((row) => where.eventId.in.includes(row.eventId));
+    },
+  },
+  cancellationExecution: {
+    findMany: async ({ where }: { where: { eventId: { in: string[] } } }) => {
+      ask("cancellationExecution", where);
+      // Being carried out: $30 approved, $10 back so far.
+      return [{ eventId: "evt_camporee", status: "PROCESSOR_PENDING", approvedRefundCents: 3000, refunds: [{ amountCents: 1000, status: "DONE", resolvedAt: null }, { amountCents: 2000, status: "PENDING", resolvedAt: null }] }]
+        .filter((row) => where.eventId.in.includes(row.eventId));
+    },
+  },
+  cancellationExecutionRefund: {
+    findMany: async ({ where }: { where: { eventId: { in: string[] } } }) => {
+      ask("cancellationExecutionRefund", where);
+      return [{ refundId: "ref_cancel" }];
     },
   },
   refund: {
     findMany: async ({ where }: { where: { eventId: { in: string[] } } }) => {
       ask("refund", where);
-      return [{ eventId: "evt_camporee", amount: 15 }].filter((row) => where.eventId.in.includes(row.eventId));
+      // One manual refund with the processor ($15), and the cancellation's own one, already counted above.
+      return [{ id: "ref_manual", eventId: "evt_camporee", amount: 15 }, { id: "ref_cancel", eventId: "evt_camporee", amount: 20 }].filter((row) => where.eventId.in.includes(row.eventId));
+    },
+  },
+  invoice: {
+    findMany: async ({ where }: { where: { eventId: string } }) => {
+      (asked.invoice ??= []).push([where.eventId]);
+      return [];
     },
   },
   registrationAttendee: {
@@ -193,6 +218,8 @@ describe("Home reads per role (#1893)", () => {
     expect(data["money-this-season"]?.rows.map((row) => row.id)).toEqual(["evt_music", "evt_camporee", "evt_retreat"]);
     expect(data["live-check-in"]?.rows.map((row) => row.id)).toEqual(["evt_music", "evt_camporee"]);
     expect(asked.payment).toEqual([["evt_camporee", "evt_music", "evt_retreat"]]);
+    // Church invoices are read only for the event billed to churches.
+    expect(asked.invoice).toEqual([["evt_music"]]);
   });
 
   it("Clubs admin: the applications, and money and check-in only for club events", async () => {
@@ -207,8 +234,10 @@ describe("Home reads per role (#1893)", () => {
     const data = await loadHomeExtraModules("user_events", events, all, now);
     expect(data["club-applications"]).toBeUndefined();
     expect(data["money-this-season"]?.rows.map((row) => row.id)).toEqual(["evt_camporee"]);
+    // $40 asked for, $25 approved, $20 still with the processor on one being carried out, $15 manual: 5 waiting, $100.
+    expect(data["money-this-season"]?.rows[0]).toMatchObject({ collectedCents: 10000, owedCents: 5000, refundsWaiting: { count: 5, cents: 10000 } });
     expect(data["live-check-in"]?.rows.map((row) => row.id)).toEqual(["evt_camporee"]);
-    for (const table of ["payment", "registration", "cancellationRequest", "refund", "registrationAttendee", "checkIn", "clubEventRegistration"]) {
+    for (const table of ["payment", "registration", "cancellationRequest", "cancellationExecution", "cancellationExecutionRefund", "refund", "registrationAttendee", "checkIn", "clubEventRegistration"]) {
       expect(asked[table]?.flat().every((id) => id === "evt_camporee"), table).toBe(true);
     }
   });
@@ -287,7 +316,8 @@ describe("Money this season model (#1893)", () => {
   function money(patch: Partial<MoneyEventSource> & { id: string }): MoneyEventSource {
     return {
       name: `Event ${patch.id}`, startsAt: new Date("2026-12-01T15:00:00Z"), endsAt: new Date("2026-12-03T15:00:00Z"), churchBilled: false,
-      payments: [], activeRegistrations: [], requestedRefunds: { count: 0, cents: 0 }, pendingRefunds: { count: 0, cents: 0 }, ...patch,
+      payments: [], activeRegistrations: [], churchInvoices: null,
+      cancellationRefunds: { undecidedOrNotStarted: { count: 0, cents: 0 }, executions: [] }, pendingRefunds: { count: 0, cents: 0 }, ...patch,
     };
   }
 
@@ -300,11 +330,29 @@ describe("Money this season model (#1893)", () => {
         // Overpaid: never a negative balance.
         { totalAmountCents: 1000, payments: [{ amountCents: 3000, refunds: [] }] },
       ],
-      requestedRefunds: { count: 2, cents: 4000 },
+      cancellationRefunds: { undecidedOrNotStarted: { count: 2, cents: 4000 }, executions: [] },
       pendingRefunds: { count: 1, cents: 1500 },
     }));
     expect(figures).toEqual({ collectedCents: 10000, owedCents: 5000, refundsWaiting: { count: 3, cents: 5500 } });
+  });
+
+  it("counts a cancellation's refund until it is paid back, and a failed one until someone settles it", () => {
+    const refunds = (executions: MoneyEventSource["cancellationRefunds"]["executions"]) => moneyFigures(money({ id: "a", cancellationRefunds: { undecidedOrNotStarted: { count: 0, cents: 0 }, executions } })).refundsWaiting;
+    // Under way: $50 approved, $20 back.
+    expect(refunds([{ completed: false, approvedRefundCents: 5000, legs: [{ amountCents: 2000, status: "DONE", resolved: false }] }])).toEqual({ count: 1, cents: 3000 });
+    // Not started yet: the whole amount.
+    expect(refunds([{ completed: false, approvedRefundCents: 5000, legs: [] }])).toEqual({ count: 1, cents: 5000 });
+    // Carried out, but one refund failed and nobody settled it.
+    expect(refunds([{ completed: true, approvedRefundCents: 5000, legs: [{ amountCents: 3000, status: "DONE", resolved: false }, { amountCents: 2000, status: "FAILED", resolved: false }] }])).toEqual({ count: 1, cents: 2000 });
+    // Carried out offline (no refund lines), or a failed refund settled outside the app: nothing waits.
+    expect(refunds([{ completed: true, approvedRefundCents: 5000, legs: [] }])).toEqual({ count: 0, cents: 0 });
+    expect(refunds([{ completed: false, approvedRefundCents: 2000, legs: [{ amountCents: 2000, status: "FAILED", resolved: true }] }])).toEqual({ count: 0, cents: 0 });
+  });
+
+  it("adds what churches paid and still owe on their invoices for an event billed to churches", () => {
     expect(moneyFigures(money({ id: "b", churchBilled: true })).owedCents).toBeNull();
+    const invoiced = moneyFigures(money({ id: "c", churchBilled: true, churchInvoices: { invoiceCount: 2, receivedCents: 30000, stillOwedCents: 12000 }, payments: [{ amountCents: 500, refundedCents: 0 }] }));
+    expect(invoiced).toMatchObject({ collectedCents: 30500, owedCents: 12000 });
   });
 
   it("totals every event, lists six with links to Payments for each, and counts the rest", () => {
@@ -312,13 +360,16 @@ describe("Money this season model (#1893)", () => {
     const view = buildMoneyThisSeason("2026-2027", many, now);
     expect(view.rows).toHaveLength(MONEY_EVENTS_MAX);
     expect(view.moreCount).toBe(2);
-    expect(view.totals).toMatchObject({ collectedText: "$80.00", owedText: "$0.00", refundsText: "None", eventCount: 8 });
+    expect(view.totals).toMatchObject({ collectedCents: 8000, owedCents: 0, refundsWaiting: { count: 0, cents: 0 }, eventCount: 8 });
     expect(view.rows[0].href).toBe("/finance?event=e0");
     expect(view.footerLink.href).toBe("/finance");
   });
 
-  it("says Billed to churches when every event is billed after the event", () => {
-    expect(buildMoneyThisSeason("2026-2027", [money({ id: "a", churchBilled: true })], now).totals.owedText).toBe("Billed to churches");
+  it("says Billed to churches when no event has an invoice or balance yet", async () => {
+    const view = buildMoneyThisSeason("2026-2027", [money({ id: "a", churchBilled: true })], now);
+    expect(view.totals.owedCents).toBeNull();
+    const { MoneyThisSeasonModule } = await import("@/components/home-modules");
+    expect(renderToStaticMarkup(createElement(MoneyThisSeasonModule, { view }))).toContain("Billed to churches");
   });
 
   it("renders totals and per-event rows, and says when there is nothing to show", async () => {
@@ -327,7 +378,8 @@ describe("Money this season model (#1893)", () => {
     const html = renderToStaticMarkup(createElement(MoneyThisSeasonModule, { view }));
     expect(html).toContain('data-testid="home-money-totals"');
     expect(html).toContain('href="/finance?event=evt_1"');
-    expect(html).toContain("$25.00");
+    expect(html).toContain('<span translate="no">$25.00</span>');
+    expect(html).toContain("None");
     const empty = renderToStaticMarkup(createElement(MoneyThisSeasonModule, { view: buildMoneyThisSeason("2026-2027", [], now) }));
     expect(empty).toContain('data-testid="home-money-empty"');
   });
@@ -349,13 +401,16 @@ describe("Live check-in model (#1893)", () => {
     expect(isCheckInOpen(event, new Date("2026-11-15T05:59:00Z"))).toBe(true);
     expect(isCheckInOpen(event, new Date("2026-11-15T06:01:00Z"))).toBe(false);
     expect(isCheckInOpen({ ...event, archivedAt: now }, new Date("2026-11-13T14:00:00Z"))).toBe(false);
+    expect(isCheckInOpen({ ...event, lifecycleState: "DRAFT" }, new Date("2026-11-13T14:00:00Z"))).toBe(false);
+    expect(isCheckInOpen({ ...event, lifecycleState: "TEST" }, new Date("2026-11-13T14:00:00Z"))).toBe(false);
+    expect(isCheckInOpen({ ...event, lifecycleState: "IN_PROGRESS" }, new Date("2026-11-13T14:00:00Z"))).toBe(true);
   });
 
   it("shows people and clubs checked in and the last arrival, linking to that event's desk", () => {
     const view = buildLiveCheckIn([live({ id: "evt_1" }), live({ id: "closed", startsAt: new Date("2027-01-15T18:00:00Z"), endsAt: new Date("2027-01-17T18:00:00Z") })], now);
     expect(view.rows).toEqual([{
       id: "evt_1", name: "Event evt_1", href: "/check-in?event=evt_1", peopleText: "20 of 80 people checked in",
-      clubsText: "3 of 12 clubs checked in", lastArrivalText: "Last arrival 8:41 AM", percentCheckedIn: 25,
+      clubsText: "3 of 12 clubs checked in", lastArrivalText: "Last arrival 8:41 AM CST", percentCheckedIn: 25,
     }]);
     expect(buildLiveCheckIn([live({ id: "x", clubCount: 0, checkedInCount: 0, lastArrivalAt: null })], now).rows[0]).toMatchObject({ clubsText: null, lastArrivalText: "No one checked in yet" });
     expect(lastArrivalText(null, tz)).toBe("No one checked in yet");

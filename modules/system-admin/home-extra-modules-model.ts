@@ -6,7 +6,7 @@
  */
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { registrationBalance } from "@/modules/system-admin/dashboard";
-import { formatCents } from "@/modules/payments/format-cents";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
 import { APPLICATIONS_PATH, applicationHref } from "@/modules/club-applications/queue-model";
 import { newClubTypeLabels } from "@/modules/club-applications/domain";
 
@@ -53,6 +53,14 @@ export function buildClubApplications(waitingCount: number, oldest: readonly Wai
 
 export const MONEY_EVENTS_MAX = 6;
 
+/** A cancellation request's refund that has not gone back yet. Amounts are whole cents. */
+export type CancellationRefundSource = {
+  /** Open requests (REQUESTED, UNDER_REVIEW, INFORMATION_NEEDED) and approved ones not carried out yet, by their refund. */
+  undecidedOrNotStarted: { count: number; cents: number };
+  /** Approved requests being carried out, or carried out with a refund that failed and nobody settled. */
+  executions: Array<{ completed: boolean; approvedRefundCents: number; legs: Array<{ amountCents: number; status: string; resolved: boolean }> }>;
+};
+
 /** One event the person can open Payments for, with its money records. Amounts are whole cents. */
 export type MoneyEventSource = {
   id: string;
@@ -65,32 +73,26 @@ export type MoneyEventSource = {
   payments: Array<{ amountCents: number; refundedCents: number }>;
   /** Active (SUBMITTED or CONFIRMED) registrations, with SUCCEEDED payments and refunds: the dashboards' balance input. */
   activeRegistrations: Array<{ totalAmountCents: number; payments: Array<{ amountCents: number; refunds: Array<{ amountCents: number }> }> }>;
-  /** Cancellation requests still waiting for a decision (the attention rule: REQUESTED) that ask for a refund. */
-  requestedRefunds: { count: number; cents: number };
-  /** Refunds sent to the processor and not yet answered (PENDING). */
+  /** For an event billed to churches: its church invoices, as the Event money report adds them up (`loadEventLedger`). */
+  churchInvoices: { invoiceCount: number; receivedCents: number; stillOwedCents: number } | null;
+  cancellationRefunds: CancellationRefundSource;
+  /** Other refunds sent to the processor and not yet answered (PENDING), not part of a cancellation. */
   pendingRefunds: { count: number; cents: number };
 };
 
 export type MoneyFigures = {
   collectedCents: number;
-  /** Null for an event billed to churches, which never has attendee balances. */
+  /** Null for an event billed to churches with no church invoice yet. */
   owedCents: number | null;
   refundsWaiting: { count: number; cents: number };
 };
 
-export type MoneyEventRow = MoneyFigures & {
-  id: string;
-  name: string;
-  href: string;
-  collectedText: string;
-  owedText: string;
-  refundsText: string;
-};
+export type MoneyEventRow = MoneyFigures & { id: string; name: string; href: string };
 
 export type MoneyThisSeasonView = {
   clubYear: string;
   /** Every event the person can open Payments for this season, added up. */
-  totals: { collectedText: string; owedText: string; refundsText: string; eventCount: number };
+  totals: MoneyFigures & { eventCount: number };
   rows: MoneyEventRow[];
   /** Events beyond `MONEY_EVENTS_MAX`, counted in the totals but not listed. */
   moreCount: number;
@@ -98,33 +100,42 @@ export type MoneyThisSeasonView = {
 };
 
 /**
+ * What one cancellation still has to pay back. A request not carried out yet owes its refund; one being carried out
+ * owes what its refunds have not paid (a failed refund that a named person settled outside the app counts as paid);
+ * one carried out owes only a failed refund nobody settled (an offline refund has no refund lines).
+ */
+function cancellationStillToRefund(execution: CancellationRefundSource["executions"][number]): number {
+  const failedUnsettled = execution.legs.filter((leg) => leg.status === "FAILED" && !leg.resolved).reduce((total, leg) => total + leg.amountCents, 0);
+  if (execution.completed) return failedUnsettled;
+  const paid = execution.legs.filter((leg) => leg.status === "DONE" || (leg.status === "FAILED" && leg.resolved)).reduce((total, leg) => total + leg.amountCents, 0);
+  return Math.max(0, execution.approvedRefundCents - paid);
+}
+
+/**
  * One event's figures, by the rules the app already keeps:
- * - Collected: successful payments less their successful refunds (the money report's paid total net of refunds).
- * - Still owed: `registrationBalance` summed over active registrations, the balance rule behind the dashboards and the
- *   Events Administrator's open balances; an event billed to churches has none.
- * - Refunds waiting: cancellation requests waiting for a decision that ask for a refund, plus refunds still with the processor.
+ * - Collected: successful payments less their successful refunds (the money report's paid total net of refunds), plus,
+ *   for an event billed to churches, what the churches have paid on their invoices (the money report's "received").
+ * - Still owed: `registrationBalance` summed over active registrations, the balance rule behind the dashboards; for an
+ *   event billed to churches, what is still owed on its church invoices, or none until it is invoiced.
+ * - Refunds waiting: cancellation refunds not paid back yet (asked for, approved or under way), plus other refunds
+ *   still with the processor.
  */
 export function moneyFigures(event: MoneyEventSource): MoneyFigures {
-  const collectedCents = event.payments.reduce((total, payment) => total + payment.amountCents - payment.refundedCents, 0);
+  const paidCents = event.payments.reduce((total, payment) => total + payment.amountCents - payment.refundedCents, 0);
+  const collectedCents = paidCents + (event.churchInvoices?.receivedCents ?? 0);
   const owedCents = event.churchBilled
-    ? null
+    ? (event.churchInvoices && event.churchInvoices.invoiceCount > 0 ? event.churchInvoices.stillOwedCents : null)
     : event.activeRegistrations.reduce((total, registration) => total + registrationBalance({ status: "CONFIRMED", ...registration }), 0);
+  const executions = event.cancellationRefunds.executions.map(cancellationStillToRefund).filter((cents) => cents > 0);
   return {
     collectedCents,
     owedCents,
     refundsWaiting: {
-      count: event.requestedRefunds.count + event.pendingRefunds.count,
-      cents: event.requestedRefunds.cents + event.pendingRefunds.cents,
+      count: event.cancellationRefunds.undecidedOrNotStarted.count + executions.length + event.pendingRefunds.count,
+      cents: event.cancellationRefunds.undecidedOrNotStarted.cents + executions.reduce((total, cents) => total + cents, 0) + event.pendingRefunds.cents,
     },
   };
 }
-
-export function refundsWaitingText(refunds: { count: number; cents: number }): string {
-  if (refunds.count === 0) return "None";
-  return `${refunds.count} (${formatCents(refunds.cents)})`;
-}
-
-const owedText = (cents: number | null) => (cents === null ? "Billed to churches" : formatCents(cents));
 
 /** The order the dashboards use: happening now, then upcoming (soonest first), then past (most recent first). */
 function moneyOrder(now: Date) {
@@ -140,25 +151,15 @@ const paymentsHref = (eventId: string) => `/finance?event=${encodeURIComponent(e
 export function buildMoneyThisSeason(clubYear: string, events: readonly MoneyEventSource[], now: Date): MoneyThisSeasonView {
   const sorted = [...events].sort(moneyOrder(now));
   const figures = sorted.map((event) => ({ event, figures: moneyFigures(event) }));
-  const collected = figures.reduce((total, row) => total + row.figures.collectedCents, 0);
-  const owed = figures.reduce((total, row) => total + (row.figures.owedCents ?? 0), 0);
-  const refunds = figures.reduce((total, row) => ({ count: total.count + row.figures.refundsWaiting.count, cents: total.cents + row.figures.refundsWaiting.cents }), { count: 0, cents: 0 });
-  const everyEventChurchBilled = figures.length > 0 && figures.every((row) => row.figures.owedCents === null);
-  const rows = figures.slice(0, MONEY_EVENTS_MAX).map(({ event, figures: own }): MoneyEventRow => ({
-    ...own,
-    id: event.id,
-    name: event.name,
-    href: paymentsHref(event.id),
-    collectedText: formatCents(own.collectedCents),
-    owedText: owedText(own.owedCents),
-    refundsText: refundsWaitingText(own.refundsWaiting),
-  }));
+  const owed = figures.filter((row) => row.figures.owedCents !== null);
+  const rows = figures.slice(0, MONEY_EVENTS_MAX).map(({ event, figures: own }): MoneyEventRow => ({ ...own, id: event.id, name: event.name, href: paymentsHref(event.id) }));
   return {
     clubYear,
     totals: {
-      collectedText: formatCents(collected),
-      owedText: everyEventChurchBilled ? owedText(null) : formatCents(owed),
-      refundsText: refundsWaitingText(refunds),
+      collectedCents: figures.reduce((total, row) => total + row.figures.collectedCents, 0),
+      // Null only when no event has a balance to add up yet (every one is billed to churches and not invoiced).
+      owedCents: figures.length > 0 && owed.length === 0 ? null : owed.reduce((total, row) => total + (row.figures.owedCents ?? 0), 0),
+      refundsWaiting: figures.reduce((total, row) => ({ count: total.count + row.figures.refundsWaiting.count, cents: total.cents + row.figures.refundsWaiting.cents }), { count: 0, cents: 0 }),
       eventCount: figures.length,
     },
     rows,
@@ -170,14 +171,18 @@ export function buildMoneyThisSeason(clubYear: string, events: readonly MoneyEve
 // --- Live check-in -------------------------------------------------------
 
 /** The event dates the check-in window needs. */
-export type CheckInWindowSource = { startsAt: Date; endsAt: Date; timezone: string; archivedAt: Date | null };
+export type CheckInWindowSource = { startsAt: Date; endsAt: Date; timezone: string; archivedAt: Date | null; lifecycleState?: string | null };
+
+/** An event still being set up or tried out has no real check-in. */
+const NOT_LIVE_STATES = new Set(["DRAFT", "TEST", "ARCHIVED"]);
 
 /**
  * Whether an event's check-in is open: from the start of its first calendar day through the end of its last, in the
- * event's own time zone (the days the app treats as the event's, `hasEventEnded`). An archived event is never open.
+ * event's own time zone (the days the app treats as the event's, `hasEventEnded`). An archived event, or one still in
+ * draft or test, is never open.
  */
 export function isCheckInOpen(event: CheckInWindowSource, now: Date): boolean {
-  if (event.archivedAt !== null) return false;
+  if (event.archivedAt !== null || NOT_LIVE_STATES.has(event.lifecycleState ?? "")) return false;
   const today = calendarDateInEventTimeZone(now, event.timezone);
   return today >= calendarDateInEventTimeZone(event.startsAt, event.timezone)
     && today <= calendarDateInEventTimeZone(event.endsAt, event.timezone);
@@ -211,7 +216,8 @@ export type LiveCheckInView = { rows: LiveCheckInRow[] };
 
 export function lastArrivalText(at: Date | null, timeZone: string): string {
   if (!at) return "No one checked in yet";
-  const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone }).format(at);
+  // Labeled with its zone (rule B13), in the event's own time zone like the check-in desk.
+  const time = formatInTimeZone(at, timeZone, { hour: "numeric", minute: "2-digit" });
   return `Last arrival ${time}`;
 }
 

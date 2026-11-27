@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { Money } from "@/components/exact-value";
 import styles from "@/components/home-modules.module.css";
 import type { EventsFillingUpView, MonthlyRecordsView, SeasonNumbersView } from "@/modules/system-admin/home-modules-model";
 import type { ClubApplicationsView, LiveCheckInView, MoneyThisSeasonView } from "@/modules/system-admin/home-extra-modules-model";
@@ -150,13 +151,23 @@ export function ClubApplicationsModule({ view }: { view: ClubApplicationsView | 
   );
 }
 
+/** Still owed: an amount, or "Billed to churches" before an event billed to churches is invoiced. */
+function Owed({ cents }: { cents: number | null }) {
+  return cents === null ? <>Billed to churches</> : <Money cents={cents} />;
+}
+
+/** "None", or how many and how much, e.g. "2 (<amount>)". */
+function RefundsWaiting({ count, cents }: { count: number; cents: number }) {
+  return count === 0 ? <>None</> : <>{count} (<Money cents={cents} />)</>;
+}
+
 /** Money this season (#1893): collected, still owed and refunds waiting, added up and per event the person can open Payments for. */
 export function MoneyThisSeasonModule({ view }: { view: MoneyThisSeasonView | null }) {
   if (!view) return <Unavailable what="The money numbers" />;
   if (view.totals.eventCount === 0) {
     return (
       <div className={styles.module} data-testid="home-money-this-season">
-        <p className={styles.message} data-testid="home-money-empty"><strong>No events this season.</strong> Events you can open Payments for show here once they are set up for club year {view.clubYear}.</p>
+        <p className={styles.message} data-testid="home-money-empty"><strong>No events this season that you can open Payments for.</strong> They show here once they are set up for club year {view.clubYear}.</p>
       </div>
     );
   }
@@ -164,16 +175,18 @@ export function MoneyThisSeasonModule({ view }: { view: MoneyThisSeasonView | nu
     <div className={styles.module} data-testid="home-money-this-season">
       <p className={styles.rowText}>Club year {view.clubYear}, {view.totals.eventCount === 1 ? "1 event" : `${view.totals.eventCount} events`}</p>
       <dl className={`${styles.counts} ${styles.moneyCounts}`} data-testid="home-money-totals">
-        <div><dt>Collected</dt><dd>{view.totals.collectedText}</dd></div>
-        <div><dt>Still owed</dt><dd>{view.totals.owedText}</dd></div>
-        <div><dt>Refunds waiting</dt><dd>{view.totals.refundsText}</dd></div>
+        <div><dt>Collected</dt><dd><Money cents={view.totals.collectedCents} /></dd></div>
+        <div><dt>Still owed</dt><dd><Owed cents={view.totals.owedCents} /></dd></div>
+        <div><dt>Refunds waiting</dt><dd><RefundsWaiting {...view.totals.refundsWaiting} /></dd></div>
       </dl>
       <ul className={styles.list}>
         {view.rows.map((row) => (
           <li key={row.id} data-event-id={row.id}>
             <Link className={styles.eventRow} href={row.href}>
               <span className={styles.rowTitle} translate="no">{row.name}</span>
-              <span className={styles.rowText}>Collected {row.collectedText} · Still owed {row.owedText} · Refunds waiting {row.refundsText}</span>
+              <span className={styles.rowText}>
+                Collected <Money cents={row.collectedCents} /> · Still owed <Owed cents={row.owedCents} /> · Refunds waiting <RefundsWaiting {...row.refundsWaiting} />
+              </span>
             </Link>
           </li>
         ))}
