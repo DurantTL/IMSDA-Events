@@ -216,7 +216,7 @@ describe("exports, drafts, PDFs and messages leave signatures out", () => {
 describe("event deletion", () => {
   const empty: EventDeletionCounts = {
     registrations: 0, attendees: 0, payments: 0, invoices: 0, honorEnrollments: 0, locations: 0, forms: 0, messages: 0, queuedMessages: 0,
-    formSubmissions: 0, informationFormResponses: 0, imports: 0, merchandiseOrders: 0, clubRegistrationDrafts: 0, communityPosts: 0,
+    formSubmissions: 0, informationFormResponses: 0, imports: 0, merchandiseOrders: 0, clubRegistrationDrafts: 0, staffRegistrationDrafts: 0, communityPosts: 0,
     announcements: 0, realPayments: 0, scholarshipContributions: 0, healthSnapshots: 0, heldHealthSnapshots: 0, acknowledgmentEvidence: 0, acknowledgmentWithdrawals: 0,
     signatureEvidence: 0,
   };

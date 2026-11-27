@@ -75,6 +75,7 @@ export default async function FinishStaffDraftPage({
         merchandise={experience.merchandise}
         initialResponses={view.responses as FormResponses}
         initialAttendeeResponses={{}}
+        initialAttendees={view.attendees.map((attendee) => ({ clientId: attendee.clientId, responses: attendee.responses as FormResponses }))}
         disableDrafts
         staffSubmit={{
           submitUrl: `/api/events/${encodeURIComponent(event.id)}/staff-registration-drafts/${encodeURIComponent(draftId)}/submit`,

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { publicRegistrationInputSchema, type PublicRegistrationInput } from "@/modules/forms/public-domain";
-import { STAFF_DRAFT_SOURCES } from "@/modules/staff-registration-drafts/domain";
+import { STAFF_DRAFT_MAX_ATTENDEES, STAFF_DRAFT_SOURCES } from "@/modules/staff-registration-drafts/domain";
 
 /** Answers arrive as a flat object of short plain values; the server keeps only what the form allows (see `domain.ts`). */
 const responsesSchema = z.record(z.string().max(100), z.unknown()).refine(
@@ -8,15 +8,24 @@ const responsesSchema = z.record(z.string().max(100), z.unknown()).refine(
   "Too many answers.",
 );
 
+/** The people attending (#1510): a short list of `{ clientId, responses }`; the server keeps only what a draft may hold. */
+const attendeesSchema = z.array(z.strictObject({
+  clientId: z.string().trim().min(1).max(80),
+  responses: responsesSchema,
+})).max(STAFF_DRAFT_MAX_ATTENDEES);
+
 export const createStaffDraftSchema = z.strictObject({
   formId: z.string().trim().min(1).max(100),
   source: z.enum(STAFF_DRAFT_SOURCES),
   responses: responsesSchema.optional(),
+  attendees: attendeesSchema.optional(),
 });
 
 export const updateStaffDraftSchema = z.strictObject({
   source: z.enum(STAFF_DRAFT_SOURCES).optional(),
   responses: responsesSchema,
+  /** Left out, the people already on the draft are kept as they are. */
+  attendees: attendeesSchema.optional(),
 });
 
 export type CreateStaffDraftInput = z.infer<typeof createStaffDraftSchema>;

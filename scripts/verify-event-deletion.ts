@@ -220,6 +220,13 @@ async function main() {
   await prisma.formTestSubmission.create({
     data: { eventId, formVersionId: formVersion.id, submittedByUserId: adminId, responses: {}, validation: {}, isValid: true },
   });
+  // Staff-started registrations (#1510): an open one holds answers and blocks; a discarded one holds none and is not counted.
+  await prisma.staffRegistrationDraft.create({
+    data: { eventId, formId: form.id, formVersionId: formVersion.id, source: "PHONE", responses: { first_name: "Synthetic" }, createdByUserId: adminId, updatedByUserId: adminId },
+  });
+  await prisma.staffRegistrationDraft.create({
+    data: { eventId, formId: form.id, formVersionId: formVersion.id, source: "PAPER", status: "DISCARDED", discardedAt: new Date(), createdByUserId: adminId, updatedByUserId: adminId },
+  });
 
   // Files and content
   const asset = await prisma.eventAsset.create({
@@ -471,11 +478,12 @@ async function main() {
   assert(c.messages === BULK_REGISTRATIONS + 3 && c.queuedMessages === BULK_REGISTRATIONS + 2, "messages counted, queued ones separately");
   assert(c.formSubmissions === 1 && c.imports === 1 && c.merchandiseOrders === 1, "form submissions, imports and merchandise orders counted");
   assert(c.clubRegistrationDrafts === 1 && c.communityPosts === 1 && c.announcements === 1, "club drafts, community posts and announcements counted");
+  assert(c.staffRegistrationDrafts === 1, `only the open staff-started registration is counted (${c.staffRegistrationDrafts})`);
   assert(!preview.decision.allowed, "the preview refuses a system admin when records are attached");
   const reason = preview.decision.allowed ? "" : preview.decision.reason;
   for (const phrase of [
     "registrations", "attendees", "payments", "invoice", "honors enrollment", "form submission", "import run",
-    "merchandise order", "club registration draft", "community post", "announcement", "messages",
+    "merchandise order", "club registration draft", "unfinished phone or paper registration", "community post", "announcement", "messages",
   ]) {
     assert(reason.includes(phrase), `the refusal names "${phrase}" (${reason})`);
   }
@@ -556,6 +564,11 @@ async function main() {
   const setupFormVersion = await prisma.registrationFormVersion.create({ data: { formId: setupForm.id, createdByUserId: adminId, versionNumber: 1, definition: {} } });
   await prisma.formTestSubmission.create({
     data: { eventId: setupEventId, formVersionId: setupFormVersion.id, submittedByUserId: adminId, responses: {}, validation: {}, isValid: true },
+  });
+  // A discarded staff-started registration (#1510) holds no answers: it does not block, and it goes with the event even though it
+  // RESTRICTs the form version.
+  await prisma.staffRegistrationDraft.create({
+    data: { eventId: setupEventId, formId: setupForm.id, formVersionId: setupFormVersion.id, source: "WALK_IN", status: "DISCARDED", discardedAt: new Date(), createdByUserId: adminId, updatedByUserId: adminId },
   });
   await prisma.promoCode.create({ data: { eventId: setupEventId, code: "EVDELSETUP", normalizedCode: "EVDELSETUP", discountType: "FIXED_CENTS", discountValue: 500 } });
   const setupSession = await prisma.honorSession.create({ data: { eventId: setupEventId, name: "Evdel Setup Session", normalizedName: "evdel setup session", locationId: setupLocation.id } });

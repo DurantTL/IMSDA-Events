@@ -15,7 +15,7 @@ import { RegistrationThemeScope } from "@/components/registration-theme-scope";
 import { publicRegistrationBrandingImages } from "@/components/registration-branding-urls";
 import { getPublishedThemeRowBySlug } from "@/modules/registration-themes/repository";
 import { registrationThemeStyle, resolveRegistrationBranding, resolveRegistrationTheme } from "@/modules/registration-themes/resolve";
-import { prefillFromStaffDraft, resolveStaffDraftLink } from "@/modules/staff-registration-drafts/repository";
+import { prefillAttendeesFromStaffDraft, prefillFromStaffDraft, resolveStaffDraftLink } from "@/modules/staff-registration-drafts/repository";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +70,9 @@ export default async function FinishStaffRegistrationPage({ params }: { params: 
   // Only the answers to questions the form asks now; the public submit uses the current published version.
   // The sanitizer keeps plain strings, booleans, string lists and string maps only, which is what the form's answers hold.
   const initialResponses = prefillFromStaffDraft(experience.form.definition, link.responses) as FormResponses;
+  // The people staff entered on a roster form (#1510), by the same rule: names, attendee type, shirt size, paid or limited choices.
+  const initialAttendees = prefillAttendeesFromStaffDraft(experience.form.definition, link.attendees, link.responses)
+    .map((attendee) => ({ clientId: attendee.clientId, responses: attendee.responses as FormResponses }));
   const editableCards = await listPublishedRegistrationInfoCards(link.eventSlug);
   const themeRow = await getPublishedThemeRowBySlug(link.eventSlug);
   const themeStyle = registrationThemeStyle(resolveRegistrationTheme(themeRow));
@@ -91,6 +94,7 @@ export default async function FinishStaffRegistrationPage({ params }: { params: 
       merchandise={experience.merchandise}
       initialResponses={initialResponses}
       initialAttendeeResponses={{}}
+      initialAttendees={initialAttendees}
       staffDraftToken={token}
       securityCheck={await securityCheckConfigForPage()}
       disableDrafts

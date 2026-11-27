@@ -5820,6 +5820,9 @@ model StaffRegistrationDraft {
   status            StaffRegistrationDraftStatus @default(OPEN)
   /// Registration-scope answers to saveable fields only; cleared on submit and on discard.
   responses         Json                         @default("{}")
+  /// The people attending on a roster form (#1510): `[{ clientId, responses }]`, only the attendee answers a browser draft
+  /// may keep (names, attendee type, shirt size, paid or limited choices). Cleared on submit and on discard.
+  attendees         Json                         @default("[]")
   createdByUserId   String
   updatedByUserId   String
   /// SHA-256 of the private link's token; the token itself is never stored. Kept after submit so a repeat gets a clear answer.

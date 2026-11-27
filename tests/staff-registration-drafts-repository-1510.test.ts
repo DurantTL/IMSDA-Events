@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { draftDefinition } from "./support/staff-draft-definition";
+import { draftDefinition, rosterDraftDefinition } from "./support/staff-draft-definition";
 
 const mocks = vi.hoisted(() => ({
   checkPublicRegistration: vi.fn(),
@@ -182,6 +182,81 @@ describe("starting and saving a staff draft (#1510)", () => {
     await discardStaffDraft("event-1", "draft-1", "staff-1");
     expect(mocks.draftUpdate).toHaveBeenCalledWith({ where: { id: "draft-1" }, data: expect.objectContaining({ status: "DISCARDED", responses: {}, handOffTokenHash: null, handOffMessageId: null }) });
     expect(mocks.auditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ action: "STAFF_REGISTRATION_DRAFT_DISCARDED" }) });
+  });
+});
+
+describe("people attending on a roster draft (#1510)", () => {
+  const rosterForm = { ...publishedForm(), versions: [{ id: "v1", definition: rosterDraftDefinition }] };
+  const sam = { clientId: "p1", responses: { first_name: "Sam", last_name: "Sample", shirt_size: "M" } };
+  function rosterRow(overrides: Record<string, unknown> = {}) {
+    return draftRow({ responses: { email: "avery@example.test" }, attendees: [sam], formVersion: { definition: rosterDraftDefinition }, ...overrides });
+  }
+
+  beforeEach(() => {
+    mocks.formFindFirst.mockResolvedValue(rosterForm);
+    mocks.queryRaw.mockResolvedValue([{ id: "draft-1" }]);
+  });
+
+  it("stores only the per-person answers a browser draft may keep, and never a birth date or medical answer", async () => {
+    await createStaffDraft("event-1", "staff-1", {
+      formId: "form-1",
+      source: "PHONE",
+      responses: { email: "avery@example.test" },
+      attendees: [{ clientId: "p1", responses: { first_name: "Sam", last_name: "Sample", shirt_size: "M", birth_date: "2014-02-01", allergies: "synthetic" } }],
+    });
+    expect(mocks.draftCreate.mock.calls[0]![0].data.attendees).toEqual([sam]);
+    expect(mocks.auditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ metadata: expect.objectContaining({ attendeeCount: 1 }) }) });
+    expect(JSON.stringify(mocks.auditCreate.mock.calls)).not.toContain("Sam");
+  });
+
+  it("a save that leaves the people out keeps them and keeps the registrant's link", async () => {
+    mocks.draftFindFirst.mockResolvedValue(rosterRow({ status: "HANDED_OFF", handOffMessageId: "message-0" }));
+    const result = await updateStaffDraft("event-1", "draft-1", "staff-2", { responses: { email: "avery@example.test" } });
+    expect(result).toMatchObject({ linkRevoked: false, changed: false });
+    expect(mocks.draftUpdate).not.toHaveBeenCalled();
+  });
+
+  it("changing a person withdraws the link that was sent", async () => {
+    mocks.draftFindFirst.mockResolvedValue(rosterRow({ status: "HANDED_OFF", handOffMessageId: "message-0" }));
+    const result = await updateStaffDraft("event-1", "draft-1", "staff-2", {
+      responses: { email: "avery@example.test" },
+      attendees: [{ ...sam, responses: { ...sam.responses, shirt_size: "L" } }],
+    });
+    expect(result.linkRevoked).toBe(true);
+    expect(mocks.draftUpdate).toHaveBeenCalledWith({ where: { id: "draft-1" }, data: expect.objectContaining({ status: "OPEN", attendees: [{ ...sam, responses: { ...sam.responses, shirt_size: "L" } }] }) });
+  });
+
+  it("discarding clears the people", async () => {
+    mocks.draftFindFirst.mockResolvedValue(rosterRow());
+    await discardStaffDraft("event-1", "draft-1", "staff-1");
+    expect(mocks.draftUpdate).toHaveBeenCalledWith({ where: { id: "draft-1" }, data: expect.objectContaining({ status: "DISCARDED", attendees: [] }) });
+  });
+
+  it("checks the people entered, and lists each person's birth date for the registrant", async () => {
+    mocks.draftFindFirst.mockResolvedValue(rosterRow());
+    mocks.checkPublicRegistration.mockRejectedValue(new PublicRegistrationError("INVALID_SUBMISSION", "Review the highlighted fields and submit again.", [
+      { kind: "validation", code: "INVALID_RESPONSE", fieldId: "att2", key: "last_name", path: "attendees.0.responses.last_name", attendeeIndex: 0, message: "This is required." },
+    ]));
+    const result = await checkStaffDraft("event-1", "draft-1", "staff-1");
+    expect(mocks.checkPublicRegistration.mock.calls[0]![2]).toMatchObject({ attendees: [sam] });
+    expect(result).toMatchObject({
+      ok: false,
+      rosterPending: false,
+      lines: { staffNeeds: ["Camper 1, Camper last name: This is required."], registrantFills: ["Birth date (for each camper)"] },
+    });
+  });
+
+  it("with nobody entered yet, the check says the price waits on the people", async () => {
+    mocks.draftFindFirst.mockResolvedValue(rosterRow({ attendees: [] }));
+    mocks.checkPublicRegistration.mockRejectedValue(new PublicRegistrationError("INVALID_SUBMISSION", "Review the highlighted fields and submit again.", [
+      { kind: "validation", code: "ATTENDEE_COUNT_INVALID", fieldId: null, key: "attendees", path: "attendees", attendeeIndex: null, message: "Add between 1 and 3 campers." },
+    ]));
+    expect(await checkStaffDraft("event-1", "draft-1", "staff-1")).toMatchObject({ ok: false, rosterPending: true, lines: { staffNeeds: ["Add between 1 and 3 campers."] } });
+  });
+
+  it("the registrant's link carries the people, for prefilling the roster", async () => {
+    mocks.draftFindUnique.mockResolvedValue({ id: "draft-1", eventId: "event-1", status: "HANDED_OFF", handOffExpiresAt: new Date("2026-11-20T00:00:00Z"), responses: { email: "avery@example.test" }, attendees: [sam], form: { slug: "camp-form" }, event: { slug: "camp" } });
+    expect(await resolveStaffDraftLink("a-token", now)).toMatchObject({ attendees: [sam] });
   });
 });
 

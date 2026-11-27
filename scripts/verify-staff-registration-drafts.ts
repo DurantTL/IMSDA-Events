@@ -8,6 +8,8 @@
  * Part two: staff finish a registration themselves (paper evidence with a location, staff-entered for a phone call, never online;
  * no signature or payment rows; replay and already-sent; a closed, not-yet-open or full event is refused and then overridden with a
  * reason, the same total and a separate audit row; an ended event never; the last seat goes to exactly one of a staff and a public submit).
+ * Part three: the people on a roster draft keep only their names (never an age or an acknowledgment), come back on the private
+ * link for the roster, and are cleared when the registrant sends it, when staff send it and when staff discard it.
  * Uses fictitious rows it creates and removes itself.
  *
  *   npm run test:staff-registration-drafts
@@ -19,7 +21,7 @@ import { hashOpaqueToken } from "../modules/access/tokens";
 import { registrationFormDefinitionSchema } from "../modules/forms/definition";
 import { submitPublicRegistration, type StaffSubmitContext } from "../modules/forms/public-repository";
 import { STAFF_DRAFT_LINK_TEMPLATE_KEY } from "../modules/staff-registration-drafts/link-email";
-import { checkStaffDraft, createStaffDraft, getStaffFinishView, submitStaffDraft } from "../modules/staff-registration-drafts/repository";
+import { checkStaffDraft, createStaffDraft, discardStaffDraft, getStaffFinishView, resolveStaffDraftLink, submitStaffDraft } from "../modules/staff-registration-drafts/repository";
 
 loadEnvConfig(process.cwd());
 
@@ -363,6 +365,44 @@ async function staffSubmitChecks() {
   const twoDraft = await staffDraft(roster, "PHONE", "RosterTwo", "roster");
   const twoRefusal = await rejection(submitPublicRegistration(roster.slug, rosterSlug, rosterInput([{ id: "p1", first: "SdcRosterOne", age: 30 }, { id: "p2", first: "SdcRosterTwo", age: 31 }], undefined, "RosterTwo"), undefined, undefined, undefined, staffContext(twoDraft)));
   assert(twoRefusal?.code === "EVENT_FULL" && /Only 1 attendee spot remain/.test(twoRefusal.message ?? ""), `the message uses the real remaining count (got ${String(twoRefusal?.message)})`);
+
+  // --- People on a roster draft: only what a browser draft may keep, back on the private link, cleared on every way out.
+  const people = await makeEvent("people", {}, ["roster"]);
+  const peopleSlug = `${people.slug}-roster`;
+  const peopleContact = (name: string) => ({ primary_contact_first_name: `Sdc${name}`, primary_contact_last_name: "Sample", email: `${P}-${name.toLowerCase()}@example.test` });
+  const peopleDraft = (name: string) => createStaffDraft(people.id, staffUserId, {
+    formId: `${people.id}_roster`, source: "PHONE", responses: peopleContact(name),
+    attendees: [
+      { clientId: "kid", responses: { first_name: `Sdc${name}Kid`, last_name: "Sample", attendee_age: "9", att_ack: true } },
+      { clientId: "blank", responses: { attendee_age: "40" } },
+    ],
+  });
+  // JSONB does not keep key order, so compare each person with its keys sorted.
+  const sorted = (people: unknown) => JSON.stringify((people as Array<{ clientId: string; responses: Record<string, unknown> }> | undefined ?? [])
+    .map((person) => ({ clientId: person.clientId, responses: Object.fromEntries(Object.entries(person.responses).sort(([a], [b]) => a.localeCompare(b))) })));
+  const keptOnly = (name: string) => sorted([{ clientId: "kid", responses: { first_name: `Sdc${name}Kid`, last_name: "Sample" } }]);
+  const linkDraft = await peopleDraft("PeopleLink");
+  const linkRow = await prisma.staffRegistrationDraft.findUniqueOrThrow({ where: { id: linkDraft.id } });
+  assert(sorted(linkRow.attendees) === keptOnly("PeopleLink"), `a roster draft keeps only each person's name, never an age or an acknowledgment (got ${JSON.stringify(linkRow.attendees)})`);
+  const peopleToken = randomUUID().replaceAll("-", "") + "p".repeat(11);
+  await handOff(linkDraft.id, peopleToken, new Date(Date.now() + 86_400_000));
+  const peopleLink = await resolveStaffDraftLink(peopleToken);
+  assert(sorted(peopleLink?.attendees) === keptOnly("PeopleLink"), "the private link carries the people for the roster");
+  const peopleInput = (name: string) => ({
+    versionId: `${people.id}_roster_v`, idempotencyKey: randomUUID(), responses: peopleContact(name),
+    attendees: [{ clientId: "kid", responses: { first_name: `Sdc${name}Kid`, last_name: "Sample", attendee_age: "30" } }],
+  });
+  await submitPublicRegistration(people.slug, peopleSlug, { ...peopleInput("PeopleLink"), staffDraftToken: peopleToken, website: "" as const });
+  const linkSent = await prisma.staffRegistrationDraft.findUniqueOrThrow({ where: { id: linkDraft.id } });
+  assert(linkSent.status === "SUBMITTED" && JSON.stringify(linkSent.attendees) === "[]", "the registrant's submit clears the people");
+  const staffPeopleDraft = await peopleDraft("PeopleStaff");
+  await submitPublicRegistration(people.slug, peopleSlug, peopleInput("PeopleStaff"), undefined, undefined, undefined, staffContext(staffPeopleDraft.id));
+  const staffSent = await prisma.staffRegistrationDraft.findUniqueOrThrow({ where: { id: staffPeopleDraft.id } });
+  assert(staffSent.status === "SUBMITTED" && JSON.stringify(staffSent.attendees) === "[]", "a staff submit clears the people");
+  const droppedDraft = await peopleDraft("PeopleDropped");
+  await discardStaffDraft(people.id, droppedDraft.id, staffUserId);
+  const dropped = await prisma.staffRegistrationDraft.findUniqueOrThrow({ where: { id: droppedDraft.id } });
+  assert(dropped.status === "DISCARDED" && JSON.stringify(dropped.attendees) === "[]", "discarding clears the people");
 
   // --- The last seat: a staff submit and a public submit at once. Exactly one gets in; the other is told the event is full.
   const race = await makeEvent("race", { capacity: 1 }, ["plain"]);
