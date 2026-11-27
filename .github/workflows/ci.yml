@@ -276,6 +276,8 @@ jobs:
       # Real-database check of the TLT year move-up (#1686): ticked TLTs move up one year and Year 4, no year, finished, left and already-set TLTs do not, unticked TLTs are held for the club year, a double submit moves nobody twice, a stale club year is refused, the directory save refuses an out-of-date year, and the audit has ids and counts only.
       - run: npm run test:tlt-move-up
       - run: npm run test:honor-class-requirements
+      # Real-database check of honor requirement text (#2054): an import adds the text with its credit, unchanged text is skipped, changed text becomes a new version with the old one kept, a racing import is refused, the database allows one current version and one subject per set, and the audit has codes and counts only.
+      - run: npm run test:honor-requirements
       # Real-database check of the Honors Weekend class waitlist (#831): join order, offers to the
       # next in line (one director emailed per offer), accept once, an unaccepted offer passing on
       # (sweep or late accept), skipping a youth who already holds a class in the session (they keep

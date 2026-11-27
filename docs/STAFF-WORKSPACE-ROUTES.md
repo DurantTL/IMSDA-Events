@@ -42,6 +42,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/forms` | System management | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/forms/page.tsx` |
 | `/admin/health-access` | System management | People | Break-glass and legal holds | - | More, Areas | People menu | - | `app/(workspace)/admin/health-access/page.tsx` |
 | `/admin/honors` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/honors/page.tsx` |
+| `/admin/honors/[honorId]` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/honors/[honorId]/page.tsx` |
 | `/admin/hubs/catalogs` | Page link | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/hubs/catalogs/page.tsx` |
 | `/admin/hubs/clubs` | Page link | Admin | Clubs | - | More, Areas | Admin menu | - | `app/(workspace)/admin/hubs/clubs/page.tsx` |
 | `/admin/hubs/events` | Page link | Admin | Events | - | More, Areas | Admin menu | - | `app/(workspace)/admin/hubs/events/page.tsx` |
@@ -191,7 +192,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/select-event` | Existing page link | Home | none (Help, Profile and pages no tab lists light Home and no tab) | - | More | Home menu | - | `app/select-event/page.tsx` |
 | `/staff` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/staff/page.tsx` |
 
-182 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
+183 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
 
 ## Query states that move a page to another tab or view
 

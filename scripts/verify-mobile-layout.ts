@@ -302,6 +302,8 @@ const pages: PageSpec[] = [
   club("registration-form", `/events/${clubEventId}`),
   club("class-tracking", "/class-tracking"),
   club("honors", "/honors"),
+  // One honor's requirement text and credit (#2054).
+  club("honor-requirements", `/honors/${multiHonorIds[0]}`),
   club("class-tracking-report", "/exports/class-tracking"),
   club("class-history", `/class-tracking/${P}_person_a_01`),
   club("roster-export", "/roster/export"),
@@ -612,6 +614,8 @@ const pages: PageSpec[] = [
   staff("form-template-editor", "/admin/form-templates/simple_rsvp", "system-admin"),
   staff("map-locations", "/admin/organizations/map-locations", "system-admin"),
   staff("honor-catalog", "/admin/honors", "system-admin"),
+  staff("honor-requirements", `/admin/honors/${multiHonorIds[0]}`, "system-admin"),
+  staff("honor-no-requirements", `/admin/honors/${multiHonorIds[1]}`, "system-admin"),
   staff("master-award-rules", "/admin/master-award-rules", "system-admin"),
   staff("year-end-reports", "/admin/clubs/reports/year-end", "system-admin"),
   staff("year-end-report-detail", `/admin/clubs/reports/year-end/${clubA}/2026-27`, "system-admin"),
@@ -1807,6 +1811,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
     prisma.registrationForm.deleteMany({ where: { id: { startsWith: `${P}_` } } }),
     prisma.honorOffering.deleteMany({ where: { id: multiHonorOfferingId } }),
     prisma.honorSession.deleteMany({ where: { id: multiHonorSessionId } }),
+    prisma.requirementSet.deleteMany({ where: { honorId: { in: multiHonorIds } } }),
     prisma.honor.deleteMany({ where: { id: { in: multiHonorIds } } }),
     prisma.deadlineReminderBatch.deleteMany({ where: { title: { startsWith: "Mobilecheck" } } }),
     prisma.calendarEntry.deleteMany({ where: { id: { startsWith: `${P}_deadline_` } } }),
@@ -2352,7 +2357,27 @@ async function seedMultiHonorClass(prisma: PrismaClient) {
     await prisma.honor.upsert({
       where: { id },
       update: {},
-      create: { id, code: `MOBILECHECK-${index + 1}`, name: `Mobilecheck ${long} ${index + 1}`, normalizedName: `mobilecheck honor ${index + 1}` },
+      create: { id, code: `MOBILECHECK-${index + 1}`, name: `Mobilecheck ${long} ${index + 1}`, normalizedName: `mobilecheck honor ${index + 1}`, category: index === 0 ? "SPIRITUAL_GROWTH_OUTREACH_AND_HERITAGE" : null },
+    });
+  }
+  // Requirement text with long lines, lettered and deeper parts and a second section (#2054), for the honor's requirements pages.
+  if (!(await prisma.requirementSet.findFirst({ where: { honorId: multiHonorIds[0]!, retiredAt: null } }))) {
+    const lines = [
+      { section: "", number: 1, label: "", text: `Explain the ${long} idea in your own words, with an example from your club.` },
+      { section: "", number: 2, label: "", text: "Do the following:" },
+      { section: "", number: 2, label: "a", text: "Name three synthetic samples and describe each one." },
+      { section: "", number: 2, label: "a.i", text: "Tell where each sample is usually found." },
+      { section: "", number: 2, label: "b", text: `Draw ${long} on a large sheet of paper.` },
+      { section: "Advanced", number: 1, label: "", text: "Teach requirement 2 to a younger Pathfinder." },
+    ];
+    await prisma.requirementSet.create({
+      data: {
+        subject: "HONOR", honorId: multiHonorIds[0]!, language: "en", retrievedOn: "2026-11-27", sourceKey: "pathfinder-wiki",
+        sourceName: "Pathfinder Wiki, North American Division Youth Ministries",
+        sourceUrl: "https://wiki.pathfindersonline.org/w/AY_Honors/Mobilecheck/Requirements",
+        license: "CC BY-SA 3.0", licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0/",
+        requirements: { createMany: { data: lines.map((line, position) => ({ ...line, position })) } },
+      },
     });
   }
   await prisma.honorSession.upsert({

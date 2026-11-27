@@ -18,7 +18,7 @@ vi.mock("@/lib/prisma", () => {
     honor: {
       createMany: mocks.createMany,
       update: mocks.update,
-      findMany: async () => (await mocks.listHonors()).map((honor: Record<string, unknown>) => ({ ...honor, updatedAt: new Date(), _count: { offerings: 0 } })),
+      findMany: async () => (await mocks.listHonors()).map((honor: Record<string, unknown>) => ({ ...honor, updatedAt: new Date(), _count: { offerings: 0 }, requirementSets: [] })),
     },
     $transaction: (work: (tx: unknown) => unknown) => work(client),
   };

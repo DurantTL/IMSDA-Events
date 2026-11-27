@@ -29,6 +29,7 @@ export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
   { pattern: "/more/event-patches" },
   { pattern: "/more/recognitions" },
   { pattern: "/admin/honors" },
+  { pattern: "/admin/honors/[honorId]" },
   { pattern: "/admin/master-award-rules" },
   { pattern: "/more/clubs/[organizationId]", notSegments: ["reports"] },
   { pattern: "/admin/club-forms" },

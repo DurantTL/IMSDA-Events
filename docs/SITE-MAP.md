@@ -116,6 +116,7 @@ person's role allows. Print views open from the page named and have no tab of th
 | `/account/clubs/[organizationId]/roster-health` | Director, deputy, when turned on | Club home card; button on Roster | Roster health list |
 | `/account/clubs/[organizationId]/staff-training` | Director, deputy, when turned on | Roster; Club settings | Staff certifications and workshops |
 | `/account/clubs/[organizationId]/honors` | Director, deputy, registrar | Club tabs: Honors | Members' honors |
+| `/account/clubs/[organizationId]/honors/[honorId]` | Director, deputy, registrar | An honor in a member's history on Honors | One honor's requirements, with the credit line |
 | `/account/clubs/[organizationId]/exports/honors` | Director, deputy, registrar | Print on Honors | Printable honors report |
 | `/account/clubs/[organizationId]/class-tracking` | Director, deputy, registrar | Club tabs: Class tracking | Earned awards and class completions |
 | `/account/clubs/[organizationId]/class-tracking/[personId]` | Director, deputy, registrar | A member on Class tracking | One member's class history |

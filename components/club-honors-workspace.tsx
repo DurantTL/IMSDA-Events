@@ -69,6 +69,7 @@ export function ClubHonorsWorkspace({
   staff = false,
   initialHonorFilter = "",
   initialStatusFilter = "",
+  honorPageBase,
 }: {
   organizationId: string;
   clubYear: string;
@@ -80,6 +81,8 @@ export function ClubHonorsWorkspace({
   /** Start with the honor or status filter already chosen (the page's own filters, preset). */
   initialHonorFilter?: string;
   initialStatusFilter?: "" | "IN_PROGRESS" | "COMPLETED";
+  /** Where an honor's requirements page lives (`<base>/<honorId>`, #2054); its name in a member's history links there. */
+  honorPageBase?: string;
 }) {
   const [rows, setRows] = useState(initialRows);
   const [honorFilter, setHonorFilter] = useState(initialHonorFilter);
@@ -567,7 +570,7 @@ export function ClubHonorsWorkspace({
                 {visibleHonorHistory(history.history).map((entry) => (
                   <li key={entry.id}>
                     <span>
-                      <strong>{entry.honorName}</strong>
+                      <strong>{honorPageBase ? <Link href={`${honorPageBase}/${encodeURIComponent(entry.honorId)}`}>{entry.honorName}</Link> : entry.honorName}</strong>
                       <small>
                         {memberHonorStatusLabels[entry.status]}{entry.completionDate ? ` · ${entry.completionDate}` : ""}
                         {" · "}{entry.recordedByName}, {entry.recordedAtOrganizationName}

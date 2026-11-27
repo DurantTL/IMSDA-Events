@@ -113,6 +113,11 @@ const honorSelect = {
   updatedAt: true,
   // Classes that teach this honor, as one of several or alone (#812).
   _count: { select: { offeringHonors: true } },
+  // The current English requirement text, counted by top-level requirement (#2054).
+  requirementSets: {
+    where: { language: "en", retiredAt: null },
+    select: { _count: { select: { requirements: { where: { label: "" } } } } },
+  },
 } satisfies Prisma.HonorSelect;
 
 function serializeHonor(honor: Prisma.HonorGetPayload<{ select: typeof honorSelect }>) {
@@ -125,6 +130,7 @@ function serializeHonor(honor: Prisma.HonorGetPayload<{ select: typeof honorSele
     catalogNumber: honor.catalogNumber,
     category: honor.category,
     offeringCount: honor._count.offeringHonors,
+    requirementCount: honor.requirementSets[0]?._count.requirements ?? 0,
     updatedAt: honor.updatedAt.toISOString(),
   };
 }

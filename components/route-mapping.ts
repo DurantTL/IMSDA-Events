@@ -249,6 +249,7 @@ export function buildRouteMapping(): RouteMappingRow[] {
 /** Dynamic detail pages: each is opened from a list or parent page, so none is a row above. A new dynamic page fails the page test until it is listed here with its reason. */
 export const unmappedDynamicPages: Readonly<Record<string, string>> = {
   "/admin/club-forms/[templateKey]": "Club form builder, opened from Club forms.",
+  "/admin/honors/[honorId]": "One honor's requirements, opened from the Honor catalog.",
   "/admin/clubs/reports/[organizationId]/[month]": "One club's Monthly Record, opened from Review monthly records.",
   "/admin/clubs/reports/year-end/[organizationId]/[year]": "One club's Year-End Report, read only, opened from the Year-End Reports list.",
   "/admin/event-templates/[templateId]": "Edit one event template, opened from Event templates.",
