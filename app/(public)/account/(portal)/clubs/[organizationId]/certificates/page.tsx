@@ -81,6 +81,7 @@ export default async function ClubCertificatesPage({
           Each certificate you print gets a verification number and a QR code. Anyone who scans the code or types the number at
           the check page sees only that it is genuine, what was completed, the date and your club. If one was printed by mistake,
           void it: the check page then says it is no longer valid. Printing the same completion again after that gives a new number.
+          If you correct a completion date or remove an honor, void the old certificate too, because it still checks as genuine until you do.
         </p>
         <PrintedCertificates organizationId={organizationId} rows={list.issued.rows} total={list.issued.total} />
       </section>

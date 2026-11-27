@@ -152,6 +152,21 @@ describe("the printed certificates section", () => {
     expect(html).toContain("new number");
   });
 
+  it("shows a certificate whose person was removed from the roster, and dates in Central time", async () => {
+    signedInAs("DIRECTOR");
+    const rows = [
+      { id: "cert-3", code: "GONE2345", firstName: null, lastName: null, title: "Knots", kind: "HONOR", completedOn: "2026-10-04", issuedAt: "2026-11-02T01:00:00.000Z", voidedAt: "2026-11-02T04:30:00.000Z" },
+    ];
+    mocks.loadClubCertificates.mockResolvedValue({ ...list, issued: { total: 1, rows } });
+    const html = renderToStaticMarkup((await CertificatesPage({ params: Promise.resolve({ organizationId: "club-1" }), searchParams: Promise.resolve({}) })) as ReactElement);
+    expect(html).toContain("Removed from the roster");
+    expect(html).toContain("GONE-2345");
+    // 8 pm Central on Nov 1 is already Nov 2 in UTC; 11:30 pm Central on Nov 1 likewise.
+    expect(html).toContain("printed November 1, 2026");
+    expect(html).toContain("Voided on November 1, 2026");
+    expect(html).toContain("void the old certificate");
+  });
+
   it("says when nothing has been printed, and when the list is cut", async () => {
     signedInAs("DIRECTOR");
     mocks.loadClubCertificates.mockResolvedValue({ ...list, issued: { total: 0, rows: [] } });

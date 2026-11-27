@@ -95,8 +95,8 @@ async function listIssuedCertificates(organizationId: string): Promise<{ total: 
     rows: rows.map((row) => ({
       id: row.id,
       code: row.code,
-      firstName: row.person.firstName,
-      lastName: row.person.lastName,
+      firstName: row.person?.firstName ?? null,
+      lastName: row.person?.lastName ?? null,
       title: row.title,
       kind: row.kind,
       completedOn: row.completedOn,

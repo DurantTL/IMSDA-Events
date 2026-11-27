@@ -11,7 +11,7 @@ CREATE TABLE "ClubCertificate" (
     "id" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
-    "personId" TEXT NOT NULL,
+    "personId" TEXT,
     "kind" "ClubCertificateKind" NOT NULL,
     "refId" TEXT NOT NULL,
     "title" TEXT NOT NULL,
@@ -44,4 +44,4 @@ CREATE INDEX "ClubCertificate_personId_idx" ON "ClubCertificate"("personId");
 ALTER TABLE "ClubCertificate" ADD CONSTRAINT "ClubCertificate_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ClubCertificate" ADD CONSTRAINT "ClubCertificate_personId_fkey" FOREIGN KEY ("personId") REFERENCES "Person"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ClubCertificate" ADD CONSTRAINT "ClubCertificate_personId_fkey" FOREIGN KEY ("personId") REFERENCES "Person"("id") ON DELETE SET NULL ON UPDATE CASCADE;

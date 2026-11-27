@@ -1,6 +1,7 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
+import { requireRosterAccess } from "@/modules/club-rosters/access";
 import { rosterApiError } from "@/modules/club-rosters/api-errors";
+import { certificateActor } from "@/modules/club-certificates/actor";
 import { voidClubCertificate } from "@/modules/club-certificates/repository";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -15,8 +16,7 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
   try {
     const { organizationId, certificateId } = await context.params;
     const access = await requireRosterAccess(organizationId, new Date(), "editProfile");
-    const attribution = actorAttribution(access.actor);
-    const actor = access.actor.kind === "STAFF_ACTING" && access.actor.viaClubsAdministrator ? { ...attribution, viaClubsAdministrator: true as const } : attribution;
+    const actor = certificateActor(access.actor);
     const voided = await voidClubCertificate(organizationId, certificateId, access.capabilities, actor);
     if (!voided) return Response.json({ error: "NOT_FOUND", message: "That certificate could not be found." }, { status: 404 });
     return Response.json({ voided: true });

@@ -222,8 +222,9 @@ export function certificateCheckView(record: CertificateCheckRecord | null): Cer
 export type IssuedCertificateRow = {
   id: string;
   code: string;
-  firstName: string;
-  lastName: string;
+  /** Null when the person was removed from the roster and erased; the certificate stays. */
+  firstName: string | null;
+  lastName: string | null;
   title: string;
   kind: CertificateKind;
   completedOn: string;

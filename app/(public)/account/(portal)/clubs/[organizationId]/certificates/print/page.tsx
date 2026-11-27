@@ -8,10 +8,11 @@ import { PrintReportButton } from "@/components/print-report-button";
 import styles from "@/components/club-certificates.module.css";
 import { BRAND_SYMBOL_PATH } from "@/lib/brand";
 import { formatPersonName } from "@/lib/person-name";
+import { certificateActor } from "@/modules/club-certificates/actor";
 import { formatCertificateCode, formatCompletionDate } from "@/modules/club-certificates/domain";
 import { certificateQr, certificateVerifyHost, certificateVerifyUrl } from "@/modules/club-certificates/qr";
 import { loadCertificateSheets } from "@/modules/club-certificates/repository";
-import { actorAttribution, getRosterAccessStateForPage } from "@/modules/club-rosters/access";
+import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 
 export const metadata: Metadata = { title: "Print certificates" };
 export const dynamic = "force-dynamic";
@@ -48,7 +49,7 @@ export default async function ClubCertificatePrintPage({
   const [{ organizationId }, { items }] = await Promise.all([params, searchParams]);
   const access = await getRosterAccessStateForPage(organizationId);
   if (access.state !== "OPEN") return clubAccessClosed(access);
-  const result = await loadCertificateSheets(organizationId, access.capabilities, items, actorAttribution(access.actor));
+  const result = await loadCertificateSheets(organizationId, access.capabilities, items, certificateActor(access.actor));
   if (!result) notFound();
   const host = certificateVerifyHost();
   return (

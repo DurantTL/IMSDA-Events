@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -180,5 +181,11 @@ describe("the public lookup", () => {
     expect(await findCertificateForCheck("nope")).toBeNull();
     expect(mocks.prisma.clubCertificate.findUnique).not.toHaveBeenCalled();
     expect(await findCertificateForCheck("ABCD2345")).toBeNull();
+  });
+});
+
+describe("a person with printed certificates is never renamed in place", () => {
+  it("counts certificates in the amendment's only-this-attendee check", () => {
+    expect(readFileSync("modules/registrations/amendments-repository.ts", "utf8")).toContain("clubCertificates: true");
   });
 });

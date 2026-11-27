@@ -8474,13 +8474,13 @@ enum ClubCertificateKind {
 /// per completion; a reprint reuses the same row and number. `code` is the verification number printed on the paper
 /// (8 Crockford base32 characters, stored without the dash). `title` and `clubName` are what was printed. `activeKey`
 /// is `org|person|kind|ref|completedOn` while the certificate is valid and null once voided, so the unique index allows
-/// one valid certificate per completion and any number of voided ones. A voided row is kept as history. Exactly one
+/// one valid certificate per completion and any number of voided ones. `personId` is cleared when the person is erased from the roster, and the certificate stays checkable. A voided row is kept as history. Exactly one
 /// issuer column is set (attendee account, or the staff user acting as the club's director), and the same for the voider.
 model ClubCertificate {
   id                String              @id @default(cuid())
   code              String              @unique
   organizationId    String
-  personId          String
+  personId          String?
   kind              ClubCertificateKind
   /// The honor id or the class level.
   refId             String
@@ -8497,7 +8497,7 @@ model ClubCertificate {
   activeKey         String?             @unique
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  person       Person       @relation(fields: [personId], references: [id], onDelete: Restrict)
+  person       Person?      @relation(fields: [personId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
   @@index([personId])

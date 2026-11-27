@@ -7,6 +7,7 @@ import { Ban, Printer } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CodeValue, ExactValue } from "@/components/exact-value";
 import { notSavedMessage } from "@/components/form-message";
+import { conferenceDateFormat } from "@/modules/calendar/conference-format";
 import { formatPersonName } from "@/lib/person-name";
 import {
   CERTIFICATES_PRINT_MAX,
@@ -72,7 +73,13 @@ export function ClubCertificatePicker({ organizationId, candidates, filtered = f
   );
 }
 
-const issuedDate = (iso: string) => formatCompletionDate(iso.slice(0, 10));
+/** A stored instant as a long date in the conference time zone (Central), so an evening print is not shown as the next day. */
+const issuedDate = (iso: string) => conferenceDateFormat({ dateStyle: "long" }).format(new Date(iso));
+
+/** The person on a row, or a plain note when they were removed from the roster. */
+function personLabel(row: IssuedCertificateRow) {
+  return row.firstName === null && row.lastName === null ? "Removed from the roster" : formatPersonName(row);
+}
 
 function VoidButton({ organizationId, row }: { organizationId: string; row: IssuedCertificateRow }) {
   const router = useRouter();
@@ -96,7 +103,7 @@ function VoidButton({ organizationId, row }: { organizationId: string; row: Issu
       setBusy(false);
     }
   }
-  const name = formatPersonName(row);
+  const name = personLabel(row);
   return (
     <>
       <button className="secondary-button" onClick={() => { setError(""); setConfirming(true); }} type="button">
@@ -130,7 +137,7 @@ export function PrintedCertificates({ organizationId, rows, total }: { organizat
           <li className={styles.issuedItem} key={row.id}>
             <div className={styles.issuedText}>
               <CodeValue code={formatCertificateCode(row.code)} />
-              <span><ExactValue>{formatPersonName(row)}</ExactValue>{": "}<ExactValue>{row.title}</ExactValue></span>
+              <span><ExactValue>{personLabel(row)}</ExactValue>{": "}<ExactValue>{row.title}</ExactValue></span>
               <span className={styles.meta}>{`${certificateKindLabels[row.kind]} · completed ${formatCompletionDate(row.completedOn)} · printed ${issuedDate(row.issuedAt)}`}</span>
               <span className={row.voidedAt ? styles.voided : styles.valid}>{row.voidedAt ? `Voided on ${issuedDate(row.voidedAt)}` : "Valid"}</span>
             </div>
