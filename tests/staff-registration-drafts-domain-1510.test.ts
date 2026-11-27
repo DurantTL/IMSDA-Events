@@ -96,6 +96,25 @@ describe("people attending on a staff draft (#1510)", () => {
     expect(kept.map((person) => person.clientId)).toEqual(["p1", "p3", "p4"]);
   });
 
+  it("leaves a per-person fee out entirely, and never keeps an age or a paid choice's price line", () => {
+    const withFee = registrationFormDefinitionSchema.parse({
+      ...rosterDefinition,
+      sections: [{
+        ...rosterDefinition.sections[0]!,
+        fields: [
+          ...rosterDefinition.sections[0]!.fields,
+          { ...base, id: "att7", key: "attendee_age", label: "Age", type: "NUMBER", scope: "ATTENDEE" },
+          { ...base, id: "att8", key: "registration_fee", label: "Registration fee", type: "CALCULATED", scope: "ATTENDEE", priceCents: 2_500 },
+        ],
+      }],
+    });
+    const keys = staffDraftPlan(withFee).attendeeFields.map((entry) => entry.field.key);
+    expect(keys).not.toContain("registration_fee");
+    expect(staffDraftPlan(withFee).attendeeFields.find((entry) => entry.field.key === "attendee_age")?.editable).toBe(false);
+    expect(sanitizeStaffDraftAttendees(withFee, [{ clientId: "p1", responses: { first_name: "Sam", attendee_age: "9", registration_fee: 2_500 } }]))
+      .toEqual([{ clientId: "p1", responses: { first_name: "Sam" } }]);
+  });
+
   it("keeps no people on a form without a roster, or from something that is not a list", () => {
     expect(sanitizeStaffDraftAttendees(draftDefinition, [{ clientId: "p1", responses: { first_name: "A" } }])).toEqual([]);
     expect(sanitizeStaffDraftAttendees(rosterDefinition, { clientId: "p1" })).toEqual([]);

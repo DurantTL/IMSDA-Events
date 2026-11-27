@@ -38,13 +38,13 @@ export const STAFF_DRAFT_STATUS_WORDS = {
   DISCARDED: "Cancelled",
 } as const satisfies Record<StaffDraftStatus, StatusWord>;
 
-/** The shared `.status-chip` color for each word: gold for a draft still waiting, green once sent, purple when discarded. */
+/** The shared `.status-chip` color for each word: gold for a draft still waiting, green once sent, neutral when discarded (as other Cancelled chips are). */
 export const STAFF_DRAFT_STATUS_TONES = {
   OPEN: "gold",
   HANDED_OFF: "gold",
   SUBMITTED: "green",
-  DISCARDED: "purple",
-} as const satisfies Record<StaffDraftStatus, "gold" | "green" | "purple">;
+  DISCARDED: "neutral",
+} as const satisfies Record<StaffDraftStatus, "gold" | "green" | "neutral">;
 
 export function staffDraftStatusWord(status: StaffDraftStatus): StatusWord {
   return STAFF_DRAFT_STATUS_WORDS[status];
@@ -118,7 +118,8 @@ export function staffDraftPlan(definition: RegistrationFormDefinition) {
   const attendeeFields: StaffDraftPlanField[] = rosterEnabled
     ? definition.sections
       .flatMap((section) => section.fields)
-      .filter((field) => !isInformationField(field) && field.scope === "ATTENDEE")
+      // A calculated line (a per-person fee) is worked out by the form, so it is neither staff's nor the registrant's to fill in.
+      .filter((field) => !isInformationField(field) && field.scope === "ATTENDEE" && field.type !== "CALCULATED")
       .map((field) => ({ field, editable: !excluded.has(field.key) }))
     : [];
   return {

@@ -8,6 +8,7 @@ import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { promoCodeField } from "@/modules/promo-codes/domain";
 import { isFieldVisible, type RegistrationFormDefinition } from "@/modules/forms/definition";
+import { planAttendeeRemoval, withoutAttendee } from "@/modules/forms/attendee-removal";
 import { Money } from "@/components/exact-value";
 import { savedMessage } from "@/components/form-message";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
@@ -474,14 +475,33 @@ function PeopleEditor({
   const registrantOnly = plan.attendeeFields.filter((entry) => !entry.editable).map((entry) => entry.field.label);
   const atLimit = attendees.length >= plan.roster.maxAttendees;
   const newRow = useRef<string | null>(null);
+  // After a removal, focus moves to the person who took its place (or the one before it), else to the add button.
+  const removedAt = useRef<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
+  const [pendingRemove, setPendingRemove] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState("");
   useEffect(() => {
-    // A new person's first field takes focus, so a keyboard user carries straight on.
-    if (!newRow.current) return;
-    const row = listRef.current?.querySelector<HTMLElement>(`[data-person="${newRow.current}"] input, [data-person="${newRow.current}"] select`);
-    row?.focus();
-    newRow.current = null;
+    if (newRow.current) {
+      // A new person's first field takes focus, so a keyboard user carries straight on.
+      const row = listRef.current?.querySelector<HTMLElement>(`[data-person="${newRow.current}"] input, [data-person="${newRow.current}"] select`);
+      row?.focus();
+      newRow.current = null;
+      return;
+    }
+    if (removedAt.current !== null) {
+      const rows = listRef.current?.querySelectorAll<HTMLElement>("[data-person]") ?? [];
+      const next = rows[Math.min(removedAt.current, rows.length - 1)];
+      const target = next?.querySelector<HTMLElement>("input, select, textarea, button") ?? addRef.current ?? listRef.current;
+      target?.focus();
+      removedAt.current = null;
+    }
   }, [attendees.length]);
+
+  function personName(attendee: StaffDraftAttendee, index: number) {
+    const name = [attendee.responses.first_name, attendee.responses.last_name].filter((part) => typeof part === "string" && part.trim()).join(" ").trim();
+    return name || `${label} ${index + 1}`;
+  }
 
   function update(clientId: string, key: string, value: unknown) {
     onChange(attendees.map((attendee) => (attendee.clientId === clientId ? { ...attendee, responses: { ...attendee.responses, [key]: value } } : attendee)));
@@ -490,8 +510,27 @@ function PeopleEditor({
   function add() {
     const clientId = newClientId();
     newRow.current = clientId;
+    setAnnouncement("");
     onChange([...attendees, { clientId, responses: {} }]);
   }
+
+  function remove(clientId: string) {
+    const index = attendees.findIndex((attendee) => attendee.clientId === clientId);
+    if (index === -1) return;
+    removedAt.current = index;
+    setAnnouncement(`Removed ${personName(attendees[index]!, index)}.`);
+    onChange(withoutAttendee(attendees, clientId));
+  }
+
+  // A draft may hold fewer people than the form needs, so nothing blocks a removal; a person with answers asks first.
+  function askRemove(clientId: string) {
+    const plan = planAttendeeRemoval(attendees, clientId, 0, (attendee) => Object.values(attendee.responses).some((value) => value !== "" && value !== null && value !== undefined && !(Array.isArray(value) && value.length === 0)));
+    if (plan === "remove") remove(clientId);
+    else if (plan === "confirm") setPendingRemove(clientId);
+  }
+
+  const pendingIndex = pendingRemove ? attendees.findIndex((attendee) => attendee.clientId === pendingRemove) : -1;
+  const pendingName = pendingIndex >= 0 ? personName(attendees[pendingIndex]!, pendingIndex) : label;
 
   return (
     <fieldset className={styles.panel}>
@@ -521,7 +560,7 @@ function PeopleEditor({
                 ))}
               </div>
               {!locked && (
-                <button className={`secondary-button ${styles.personRemove}`} type="button" onClick={() => onChange(attendees.filter((entry) => entry.clientId !== attendee.clientId))}>
+                <button className={`secondary-button ${styles.personRemove}`} type="button" onClick={() => askRemove(attendee.clientId)}>
                   Remove<span className="sr-only"> {label.toLowerCase()} {index + 1}</span>
                 </button>
               )}
@@ -532,8 +571,19 @@ function PeopleEditor({
       {!locked && (
         atLimit
           ? <p className={styles.note}>This form takes at most {plan.roster.maxAttendees}.</p>
-          : <button className="secondary-button" type="button" onClick={add}>{plan.roster.addButtonLabel}</button>
+          : <button className="secondary-button" type="button" onClick={add} ref={addRef}>{plan.roster.addButtonLabel}</button>
       )}
+      <p className="sr-only" role="status">{announcement}</p>
+      <ConfirmDialog
+        open={pendingIndex >= 0}
+        title={`Remove ${pendingName} and their answers?`}
+        confirmLabel={`Remove ${pendingName}`}
+        destructive
+        onCancel={() => setPendingRemove(null)}
+        onConfirm={() => { const clientId = pendingRemove; setPendingRemove(null); if (clientId) remove(clientId); }}
+      >
+        <p>{`Everything entered for ${pendingName} is cleared when you save. Cancel keeps every answer.`}</p>
+      </ConfirmDialog>
     </fieldset>
   );
 }
@@ -570,7 +620,7 @@ function CheckView({ result }: { result: CheckResult }) {
             <ul>{registrantFills.map((line) => <li key={line}>{line}</li>)}</ul>
           </>
         )}
-        {result.rosterPending && <p className={styles.note}>A price shows once the registrant adds the people attending.</p>}
+        {result.rosterPending && <p className={styles.note}>A price shows once people are added.</p>}
         {staffNeeds.length === 0 && registrantFills.length === 0 && !result.rosterPending && <p className={styles.note}>{result.message}</p>}
       </div>
     );
