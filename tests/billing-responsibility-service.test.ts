@@ -91,7 +91,7 @@ const fakeDb = {
       state.contacts.push(row);
       return { id: row.id };
     }),
-    findFirst: vi.fn(async ({ where }: { where: Row }) => state.contacts.find((row) => row.id === where.id && row.organizationId === where.organizationId && row.effectiveTo === null) ?? null),
+    findFirst: vi.fn(async ({ where }: { where: Row }) => state.contacts.find((row) => Object.entries(where).every(([key, value]) => row[key] === value)) ?? null),
     findMany: vi.fn(async ({ where }: { where: { organizationId: { in: string[] }; effectiveTo?: null } }) =>
       state.contacts.filter((row) => where.organizationId.in.includes(row.organizationId as string) && (where.effectiveTo === undefined || row.effectiveTo === null))
         .map((row) => ({ effectiveFrom: new Date("2026-10-01T00:00:00Z"), ...row }))),
@@ -305,6 +305,27 @@ describe("billing contacts (#165): conference-wide, system administrators only",
     const { Prisma } = await import("@prisma/client");
     fakeDb.organizationBillingContact.create.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError("unique", { code: "P2002", clientVersion: "test" }));
     await expect(setOrganizationBillingContact({ organizationId: "church-1", contact, actor: admin })).rejects.toMatchObject({ code: "CONCURRENT_CHANGE" });
+  });
+
+  it("reports a concurrent change when another administrator ended the active contact first (#2050)", async () => {
+    await setOrganizationBillingContact({ organizationId: "church-1", contact, actor: admin });
+    // The winner ended the contact between this transaction's read and its update.
+    fakeDb.organizationBillingContact.updateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(setOrganizationBillingContact({ organizationId: "church-1", contact: { ...contact, name: "Late Treasurer" }, actor: admin2 }))
+      .rejects.toMatchObject({ code: "CONCURRENT_CHANGE" });
+    expect(state.contacts).toHaveLength(1);
+    expect(state.audits.filter((entry) => entry.action === "BILLING_CONTACT_REPLACED")).toHaveLength(0);
+  });
+
+  it("never ends the active contact before it started, even when it was saved after this clock reading (#2050)", async () => {
+    const ahead = new Date(Date.now() + 60_000);
+    state.contacts.push({ id: "contact-ahead", organizationId: "church-1", name: "Terry Treasurer", effectiveFrom: ahead, effectiveTo: null, verifiedAt: null });
+    await expect(setOrganizationBillingContact({ organizationId: "church-1", contact: { ...contact, name: "Next Treasurer" }, actor: admin }))
+      .resolves.toMatchObject({ replaced: true });
+    const [ended, created] = state.contacts;
+    // The database's date range check (effectiveTo >= effectiveFrom) holds, and the history has no gap.
+    expect((ended.effectiveTo as Date).getTime()).toBeGreaterThanOrEqual(ahead.getTime());
+    expect((created.effectiveFrom as Date).getTime()).toBe((ended.effectiveTo as Date).getTime());
   });
 
   it("event finance staff see only the active contact's name, role and email, never a phone or history", async () => {
