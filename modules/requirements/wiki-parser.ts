@@ -56,7 +56,8 @@ function htmlToLines(html: string): RawLine[] {
   let current = "";
   let heading = false;
   let resumes: number | undefined;
-  const lists: Array<{ ordered: boolean; count: number; type: string }> = [];
+  // `owner` on a bullet list is the depth of the numbered item that holds it, so its bullets stay with that item.
+  const lists: Array<{ ordered: boolean; count: number; type: string; owner?: number }> = [];
   const orderedDepth = () => lists.filter((entry) => entry.ordered).length;
   const flush = () => {
     const text = decodeEntities(current).replace(/\s+/g, " ").trim();
@@ -82,15 +83,16 @@ function htmlToLines(html: string): RawLine[] {
         resumes = undefined;
         const type = /\btype="([^"]*)"/i.exec(attributes)?.[1] ?? "";
         const start = Number(/\bstart="(\d+)"/i.exec(attributes)?.[1] ?? "1");
-        lists.push({ ordered: tag === "ol", count: start - 1, type });
+        const holder = orderedDepth();
+        lists.push({ ordered: tag === "ol", count: start - 1, type, ...(tag === "ul" && holder > 0 ? { owner: holder } : {}) });
       }
       continue;
     }
     if (tag === "li") {
       flush();
-      resumes = undefined;
-      if (closing) continue;
       const list = lists[lists.length - 1];
+      resumes = closing ? undefined : list?.owner;
+      if (closing) continue;
       if (list?.ordered) {
         const value = /\bvalue="(\d+)"/i.exec(attributes)?.[1];
         list.count = value ? Number(value) : list.count + 1;
@@ -112,8 +114,8 @@ function htmlToLines(html: string): RawLine[] {
   return lines;
 }
 
-// A space (or the end of the line) must follow the marker, so "2.5 km" is text, not requirement 2.
-const TOP = /^(\d{1,3})[.)](?:\s+(.*)|$)/;
+// A digit must not follow the marker, so "2.5 km" is text, not requirement 2; "2.Tie it." (no space) is still requirement 2.
+const TOP = /^(\d{1,3})[.)](?!\d)\s*(.*)$/;
 const PART = /^([a-z])[.)]\s+(.+)$/;
 const SUB_PART = /^((?:i{1,3}|iv|v|vi{1,3}|ix|x))[.)]\s+(.+)$/;
 
@@ -143,11 +145,6 @@ export function parseWikiRequirementsHtml(html: string): RequirementLine[] {
     }
     const last = result[result.length - 1];
     if (!last || !lastTop) continue;
-    if (resumes === 1 || (resumes === 2 && lastPart)) {
-      const owner = resumes === 1 ? lastTop : lastPart!;
-      owner.text = `${owner.text} ${text}`.trim();
-      continue;
-    }
     const sub = SUB_PART.exec(text);
     // "i." after "h." is the letter i; after another letter it starts the roman parts under that letter.
     if (sub && lastLetter && !(sub[1] === "i" && lastLetter === "h") && !(sub[1] === "v" && lastLetter === "u") && !(sub[1] === "x" && lastLetter === "w")) {
@@ -161,7 +158,9 @@ export function parseWikiRequirementsHtml(html: string): RequirementLine[] {
       result.push(lastPart);
       continue;
     }
-    last.text = `${last.text} ${text}`.trim();
+    // Text after a nested list, or a bullet inside an item, goes to the item that holds it, not the last part.
+    const owner = resumes === 1 ? lastTop : resumes === 2 && lastPart ? lastPart : last;
+    owner.text = `${owner.text} ${text}`.trim();
   }
   return result.filter((line) => line.text !== "");
 }

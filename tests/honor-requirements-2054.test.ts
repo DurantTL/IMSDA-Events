@@ -266,6 +266,34 @@ describe("Pathfinder Wiki reader (#2054)", () => {
     ));
   });
 
+  it("reads a number with no space after it as a requirement", () => {
+    expect(parseWikiRequirementsHtml("<p><b>1. Know it.</b></p><p><b>2.</b>Tie it.</p>")).toEqual(lines([1, "", "Know it."], [2, "", "Tie it."]));
+  });
+
+  it("still reads lettered parts that come after a nested bullet list", () => {
+    const html = "<ol><li>Do these:<ul><li>a note</li></ul><dl><dd>a. First</dd><dd>b. Second</dd></dl></li><li>Next.</li></ol>";
+    expect(parseWikiRequirementsHtml(html)).toEqual(lines(
+      [1, "", "Do these: a note"],
+      [1, "a", "First"],
+      [1, "b", "Second"],
+      [2, "", "Next."],
+    ));
+  });
+
+  it("keeps bullets after a nested list with the item that holds them, at each depth", () => {
+    const html = `<ol>
+      <li>Know:<ol><li>Square</li></ol>and these:<ul><li>a bullet</li></ul></li>
+      <li>Explain:<ol><li>Part a<ol><li>detail</li></ol>tail of a</li></ol></li>
+    </ol>`;
+    expect(parseWikiRequirementsHtml(html)).toEqual(lines(
+      [1, "", "Know: and these: a bullet"],
+      [1, "a", "Square"],
+      [2, "", "Explain:"],
+      [2, "a", "Part a tail of a"],
+      [2, "a.i", "detail"],
+    ));
+  });
+
   it("treats i. after h. as a letter, and joins a number with the paragraph after it", () => {
     const html = "<p>1.</p><p>Name eight samples:</p><p>h. Eighth</p><p>i. Ninth</p>";
     expect(parseWikiRequirementsHtml(html)).toEqual(lines([1, "", "Name eight samples:"], [1, "h", "Eighth"], [1, "i", "Ninth"]));
