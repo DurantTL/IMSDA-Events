@@ -93,11 +93,13 @@ const db = {
   cancellationExecution: {
     findMany: async ({ where }: { where: { eventId: { in: string[] } } }) => {
       ask("cancellationExecution", where);
-      // Being carried out: $30 approved, $10 back, $15 still with the processor, and $5 the processor confirmed since (line not updated yet).
-      return [{ eventId: "evt_camporee", status: "PROCESSOR_PENDING", approvedRefundCents: 3000, refunds: [
+      // Being carried out: $35 approved, $10 back, $15 still with the processor, $5 the processor confirmed since (line not
+      // updated yet) and $5 the processor failed since (still owed).
+      return [{ eventId: "evt_camporee", status: "PROCESSOR_PENDING", approvedRefundCents: 3500, refunds: [
         { amountCents: 1000, status: "DONE", resolvedAt: null, refundId: "ref_done" },
         { amountCents: 1500, status: "PENDING", resolvedAt: null, refundId: "ref_cancel" },
         { amountCents: 500, status: "PENDING", resolvedAt: null, refundId: "ref_confirmed" },
+        { amountCents: 500, status: "PENDING", resolvedAt: null, refundId: "ref_failed" },
       ] }]
         .filter((row) => where.eventId.in.includes(row.eventId));
     },
@@ -111,7 +113,7 @@ const db = {
   refund: {
     findMany: async ({ where }: { where: { eventId?: { in: string[] }; id?: { in: string[] } } }) => {
       if (where.id) {
-        const statuses: Record<string, string> = { ref_done: "SUCCEEDED", ref_cancel: "PENDING", ref_confirmed: "SUCCEEDED" };
+        const statuses: Record<string, string> = { ref_done: "SUCCEEDED", ref_cancel: "PENDING", ref_confirmed: "SUCCEEDED", ref_failed: "FAILED" };
         return where.id.in.map((id) => ({ id, status: statuses[id] ?? "PENDING" }));
       }
       const eventIds = where.eventId?.in ?? [];
@@ -248,10 +250,10 @@ describe("Home reads per role (#1893)", () => {
     const data = await loadHomeExtraModules("user_events", events, all, now);
     expect(data["club-applications"]).toBeUndefined();
     expect(data["money-this-season"]?.rows.map((row) => row.id)).toEqual(["evt_camporee"]);
-    // $40 asked for, $25 approved, $15 still with the processor on one being carried out, $15 manual: 5 waiting, $95.
-    expect(data["money-this-season"]?.rows[0]).toMatchObject({ collectedCents: 10000, owedCents: 5000, refundsWaiting: { count: 5, cents: 9500 } });
+    // $40 asked for, $25 approved, $20 not back yet on one being carried out, $15 manual: 5 waiting, $100.
+    expect(data["money-this-season"]?.rows[0]).toMatchObject({ collectedCents: 10000, owedCents: 5000, refundsWaiting: { count: 5, cents: 10000 } });
     expect(data["live-check-in"]?.rows.map((row) => row.id)).toEqual(["evt_camporee"]);
-    for (const table of ["payment", "registration", "cancellationRequest", "cancellationExecution", "cancellationExecutionRefund", "refund", "registrationAttendee", "checkIn", "clubEventRegistration"]) {
+    for (const table of ["payment", "registration", "cancellationRequest", "cancellationExecution", "cancellationExecutionRefund", "refund", "invoiceGroup", "registrationAttendee", "checkIn", "clubEventRegistration"]) {
       expect(asked[table]?.flat().every((id) => id === "evt_camporee"), table).toBe(true);
     }
   });
