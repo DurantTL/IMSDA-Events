@@ -100,7 +100,9 @@ async function readMoneyThisSeason(userId: string, roles: AdminRoles, now: Date)
   const events = season.filter((event) => permitted.has(event.id));
   if (events.length === 0) return buildMoneyThisSeason(clubYear, [], now);
   const ids = events.map((event) => event.id);
-  const churchBilledIds = events.filter((event) => event.billingMode === "DEFERRED_ORGANIZATION_INVOICE").map((event) => event.id);
+  // Church invoices, on events billed to churches and on General events where a church's promo code was invoiced (#399).
+  const invoiced = await prisma.invoice.groupBy({ by: ["eventId"], where: { eventId: { in: ids }, baseNumber: { not: null } }, _count: { _all: true } });
+  const invoicedIds = invoiced.map((group) => group.eventId);
   const withRefund = { eventId: { in: ids }, proposedRefundCents: { gt: 0 } };
   const [payments, registrations, open, approvedNotStarted, executions, pending, cancellationRefundIds, ledgers] = await Promise.all([
     prisma.payment.findMany({
@@ -136,14 +138,26 @@ async function readMoneyThisSeason(userId: string, roles: AdminRoles, now: Date)
         approvedRefundCents: { gt: 0 },
         OR: [{ status: { not: "COMPLETED" } }, { refunds: { some: { status: "FAILED", resolvedAt: null } } }],
       },
-      select: { eventId: true, status: true, approvedRefundCents: true, refunds: { select: { amountCents: true, status: true, resolvedAt: true } } },
+      select: { eventId: true, status: true, approvedRefundCents: true, refunds: { select: { amountCents: true, status: true, resolvedAt: true, refundId: true } } },
     }),
     prisma.refund.findMany({ where: { eventId: { in: ids }, status: "PENDING" }, select: { id: true, eventId: true, amount: true } }),
     // A cancellation's refund already counts above, so its processor refund is not counted twice.
     prisma.cancellationExecutionRefund.findMany({ where: { eventId: { in: ids }, refundId: { not: null } }, select: { refundId: true } }),
     // Church invoices, as the Event money report adds them up.
-    Promise.all(churchBilledIds.map(async (eventId) => [eventId, await loadEventLedger(eventId)] as const)),
+    Promise.all(invoicedIds.map(async (eventId) => [eventId, await loadEventLedger(eventId)] as const)),
   ]);
+  // A cancellation refund line is brought up to date only when someone carries the cancellation on, so read its processor
+  // refund's own status, which the Square webhook keeps current (as the cancellation page does, `withRefundStatuses`).
+  const legRefundIds = executions.flatMap((execution) => execution.refunds.flatMap((leg) => (leg.refundId && !leg.resolvedAt ? [leg.refundId] : [])));
+  const legRefundStatus = new Map(legRefundIds.length === 0
+    ? []
+    : (await prisma.refund.findMany({ where: { id: { in: legRefundIds } }, select: { id: true, status: true } })).map((refund) => [refund.id, refund.status]));
+  const legStatus = (leg: { status: string; resolvedAt: Date | null; refundId: string | null }) => {
+    const refund = leg.refundId && !leg.resolvedAt ? legRefundStatus.get(leg.refundId) : undefined;
+    if (refund === "SUCCEEDED") return "DONE";
+    if (refund === "FAILED") return "FAILED";
+    return leg.status;
+  };
   const sources = new Map<string, MoneyEventSource>(events.map((event) => [event.id, {
     id: event.id,
     name: event.name,
@@ -181,7 +195,7 @@ async function readMoneyThisSeason(userId: string, roles: AdminRoles, now: Date)
     sources.get(execution.eventId)?.cancellationRefunds.executions.push({
       completed: execution.status === "COMPLETED",
       approvedRefundCents: execution.approvedRefundCents,
-      legs: execution.refunds.map((leg) => ({ amountCents: leg.amountCents, status: leg.status, resolved: leg.resolvedAt !== null })),
+      legs: execution.refunds.map((leg) => ({ amountCents: leg.amountCents, status: legStatus(leg), resolved: leg.resolvedAt !== null })),
     });
   }
   const counted = new Set(cancellationRefundIds.map((leg) => leg.refundId));

@@ -73,7 +73,7 @@ export type MoneyEventSource = {
   payments: Array<{ amountCents: number; refundedCents: number }>;
   /** Active (SUBMITTED or CONFIRMED) registrations, with SUCCEEDED payments and refunds: the dashboards' balance input. */
   activeRegistrations: Array<{ totalAmountCents: number; payments: Array<{ amountCents: number; refunds: Array<{ amountCents: number }> }> }>;
-  /** For an event billed to churches: its church invoices, as the Event money report adds them up (`loadEventLedger`). */
+  /** Its church invoices, as the Event money report adds them up (`loadEventLedger`); null when it has none. */
   churchInvoices: { invoiceCount: number; receivedCents: number; stillOwedCents: number } | null;
   cancellationRefunds: CancellationRefundSource;
   /** Other refunds sent to the processor and not yet answered (PENDING), not part of a cancellation. */
@@ -102,7 +102,8 @@ export type MoneyThisSeasonView = {
 /**
  * What one cancellation still has to pay back. A request not carried out yet owes its refund; one being carried out
  * owes what its refunds have not paid (a failed refund that a named person settled outside the app counts as paid);
- * one carried out owes only a failed refund nobody settled (an offline refund has no refund lines).
+ * one carried out owes only a failed refund nobody settled (every other line of a carried-out cancellation, offline ones
+ * included, is done).
  */
 function cancellationStillToRefund(execution: CancellationRefundSource["executions"][number]): number {
   const failedUnsettled = execution.legs.filter((leg) => leg.status === "FAILED" && !leg.resolved).reduce((total, leg) => total + leg.amountCents, 0);
@@ -113,19 +114,20 @@ function cancellationStillToRefund(execution: CancellationRefundSource["executio
 
 /**
  * One event's figures, by the rules the app already keeps:
- * - Collected: successful payments less their successful refunds (the money report's paid total net of refunds), plus,
- *   for an event billed to churches, what the churches have paid on their invoices (the money report's "received").
- * - Still owed: `registrationBalance` summed over active registrations, the balance rule behind the dashboards; for an
- *   event billed to churches, what is still owed on its church invoices, or none until it is invoiced.
+ * - Collected: successful payments less their successful refunds (the money report's paid total net of refunds), plus
+ *   what churches have paid on their invoices (the money report's "received").
+ * - Still owed: `registrationBalance` summed over active registrations, the balance rule behind the dashboards, plus what
+ *   is still owed on church invoices; an event billed to churches has no attendee balances, and shows none until invoiced.
  * - Refunds waiting: cancellation refunds not paid back yet (asked for, approved or under way), plus other refunds
  *   still with the processor.
  */
 export function moneyFigures(event: MoneyEventSource): MoneyFigures {
   const paidCents = event.payments.reduce((total, payment) => total + payment.amountCents - payment.refundedCents, 0);
   const collectedCents = paidCents + (event.churchInvoices?.receivedCents ?? 0);
+  const invoiceOwedCents = event.churchInvoices && event.churchInvoices.invoiceCount > 0 ? event.churchInvoices.stillOwedCents : null;
   const owedCents = event.churchBilled
-    ? (event.churchInvoices && event.churchInvoices.invoiceCount > 0 ? event.churchInvoices.stillOwedCents : null)
-    : event.activeRegistrations.reduce((total, registration) => total + registrationBalance({ status: "CONFIRMED", ...registration }), 0);
+    ? invoiceOwedCents
+    : event.activeRegistrations.reduce((total, registration) => total + registrationBalance({ status: "CONFIRMED", ...registration }), 0) + (invoiceOwedCents ?? 0);
   const executions = event.cancellationRefunds.executions.map(cancellationStillToRefund).filter((cents) => cents > 0);
   return {
     collectedCents,

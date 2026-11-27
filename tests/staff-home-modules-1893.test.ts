@@ -93,8 +93,12 @@ const db = {
   cancellationExecution: {
     findMany: async ({ where }: { where: { eventId: { in: string[] } } }) => {
       ask("cancellationExecution", where);
-      // Being carried out: $30 approved, $10 back so far.
-      return [{ eventId: "evt_camporee", status: "PROCESSOR_PENDING", approvedRefundCents: 3000, refunds: [{ amountCents: 1000, status: "DONE", resolvedAt: null }, { amountCents: 2000, status: "PENDING", resolvedAt: null }] }]
+      // Being carried out: $30 approved, $10 back, $15 still with the processor, and $5 the processor confirmed since (line not updated yet).
+      return [{ eventId: "evt_camporee", status: "PROCESSOR_PENDING", approvedRefundCents: 3000, refunds: [
+        { amountCents: 1000, status: "DONE", resolvedAt: null, refundId: "ref_done" },
+        { amountCents: 1500, status: "PENDING", resolvedAt: null, refundId: "ref_cancel" },
+        { amountCents: 500, status: "PENDING", resolvedAt: null, refundId: "ref_confirmed" },
+      ] }]
         .filter((row) => where.eventId.in.includes(row.eventId));
     },
   },
@@ -105,13 +109,23 @@ const db = {
     },
   },
   refund: {
-    findMany: async ({ where }: { where: { eventId: { in: string[] } } }) => {
-      ask("refund", where);
+    findMany: async ({ where }: { where: { eventId?: { in: string[] }; id?: { in: string[] } } }) => {
+      if (where.id) {
+        const statuses: Record<string, string> = { ref_done: "SUCCEEDED", ref_cancel: "PENDING", ref_confirmed: "SUCCEEDED" };
+        return where.id.in.map((id) => ({ id, status: statuses[id] ?? "PENDING" }));
+      }
+      const eventIds = where.eventId?.in ?? [];
+      ask("refund", { eventId: { in: eventIds } });
       // One manual refund with the processor ($15), and the cancellation's own one, already counted above.
-      return [{ id: "ref_manual", eventId: "evt_camporee", amount: 15 }, { id: "ref_cancel", eventId: "evt_camporee", amount: 20 }].filter((row) => where.eventId.in.includes(row.eventId));
+      return [{ id: "ref_manual", eventId: "evt_camporee", amount: 15 }, { id: "ref_cancel", eventId: "evt_camporee", amount: 15 }].filter((row) => eventIds.includes(row.eventId));
     },
   },
   invoice: {
+    // Only Music Fest (billed to churches) has invoices.
+    groupBy: async ({ where }: { where: { eventId: { in: string[] } } }) => {
+      ask("invoiceGroup", where);
+      return [{ eventId: "evt_music", _count: { _all: 1 } }].filter((row) => where.eventId.in.includes(row.eventId));
+    },
     findMany: async ({ where }: { where: { eventId: string } }) => {
       (asked.invoice ??= []).push([where.eventId]);
       return [];
@@ -218,7 +232,7 @@ describe("Home reads per role (#1893)", () => {
     expect(data["money-this-season"]?.rows.map((row) => row.id)).toEqual(["evt_music", "evt_camporee", "evt_retreat"]);
     expect(data["live-check-in"]?.rows.map((row) => row.id)).toEqual(["evt_music", "evt_camporee"]);
     expect(asked.payment).toEqual([["evt_camporee", "evt_music", "evt_retreat"]]);
-    // Church invoices are read only for the event billed to churches.
+    // Church invoices are read only for an event that has one.
     expect(asked.invoice).toEqual([["evt_music"]]);
   });
 
@@ -234,8 +248,8 @@ describe("Home reads per role (#1893)", () => {
     const data = await loadHomeExtraModules("user_events", events, all, now);
     expect(data["club-applications"]).toBeUndefined();
     expect(data["money-this-season"]?.rows.map((row) => row.id)).toEqual(["evt_camporee"]);
-    // $40 asked for, $25 approved, $20 still with the processor on one being carried out, $15 manual: 5 waiting, $100.
-    expect(data["money-this-season"]?.rows[0]).toMatchObject({ collectedCents: 10000, owedCents: 5000, refundsWaiting: { count: 5, cents: 10000 } });
+    // $40 asked for, $25 approved, $15 still with the processor on one being carried out, $15 manual: 5 waiting, $95.
+    expect(data["money-this-season"]?.rows[0]).toMatchObject({ collectedCents: 10000, owedCents: 5000, refundsWaiting: { count: 5, cents: 9500 } });
     expect(data["live-check-in"]?.rows.map((row) => row.id)).toEqual(["evt_camporee"]);
     for (const table of ["payment", "registration", "cancellationRequest", "cancellationExecution", "cancellationExecutionRefund", "refund", "registrationAttendee", "checkIn", "clubEventRegistration"]) {
       expect(asked[table]?.flat().every((id) => id === "evt_camporee"), table).toBe(true);
@@ -344,8 +358,8 @@ describe("Money this season model (#1893)", () => {
     expect(refunds([{ completed: false, approvedRefundCents: 5000, legs: [] }])).toEqual({ count: 1, cents: 5000 });
     // Carried out, but one refund failed and nobody settled it.
     expect(refunds([{ completed: true, approvedRefundCents: 5000, legs: [{ amountCents: 3000, status: "DONE", resolved: false }, { amountCents: 2000, status: "FAILED", resolved: false }] }])).toEqual({ count: 1, cents: 2000 });
-    // Carried out offline (no refund lines), or a failed refund settled outside the app: nothing waits.
-    expect(refunds([{ completed: true, approvedRefundCents: 5000, legs: [] }])).toEqual({ count: 0, cents: 0 });
+    // Carried out (offline too, every line done), or a failed refund settled outside the app: nothing waits.
+    expect(refunds([{ completed: true, approvedRefundCents: 5000, legs: [{ amountCents: 5000, status: "DONE", resolved: false }] }])).toEqual({ count: 0, cents: 0 });
     expect(refunds([{ completed: false, approvedRefundCents: 2000, legs: [{ amountCents: 2000, status: "FAILED", resolved: true }] }])).toEqual({ count: 0, cents: 0 });
   });
 
@@ -353,6 +367,12 @@ describe("Money this season model (#1893)", () => {
     expect(moneyFigures(money({ id: "b", churchBilled: true })).owedCents).toBeNull();
     const invoiced = moneyFigures(money({ id: "c", churchBilled: true, churchInvoices: { invoiceCount: 2, receivedCents: 30000, stillOwedCents: 12000 }, payments: [{ amountCents: 500, refundedCents: 0 }] }));
     expect(invoiced).toMatchObject({ collectedCents: 30500, owedCents: 12000 });
+    // A General event where a church's promo code was invoiced: the invoice adds to the attendee balances.
+    const promo = moneyFigures(money({
+      id: "d", churchInvoices: { invoiceCount: 1, receivedCents: 0, stillOwedCents: 60000 },
+      activeRegistrations: [{ totalAmountCents: 5000, payments: [] }],
+    }));
+    expect(promo).toMatchObject({ collectedCents: 0, owedCents: 65000 });
   });
 
   it("totals every event, lists six with links to Payments for each, and counts the rest", () => {
