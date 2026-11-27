@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { EventsFillingUpModule, MonthlyRecordsModule, SeasonNumbersModule } from "@/components/home-modules";
+import { ClubApplicationsModule, EventsFillingUpModule, LiveCheckInModule, MoneyThisSeasonModule, MonthlyRecordsModule, SeasonNumbersModule } from "@/components/home-modules";
 import { ComingUpPage, NeedsYouPage } from "@/components/home-pages";
 import { StaffHomeBoard } from "@/components/staff-home-board";
 import { StaffInstallCard } from "@/components/staff-install-card";
@@ -14,6 +14,7 @@ import { buildNeedsView } from "@/modules/system-admin/home-needs-model";
 import { loadComingUp } from "@/modules/system-admin/home-coming-up-repository";
 import type { HomeModuleKey } from "@/modules/system-admin/home-layout-domain";
 import { loadHomeLayout } from "@/modules/system-admin/home-layout-repository";
+import { loadHomeExtraModules } from "@/modules/system-admin/home-extra-modules-repository";
 import { loadHomeModules } from "@/modules/system-admin/home-modules-repository";
 import { usableQuickLinks } from "@/modules/system-admin/home-quick-links-domain";
 import { loadNeedsInput } from "@/modules/system-admin/home-needs-repository";
@@ -57,6 +58,7 @@ export default async function HomeNeedsYouPage() {
   // The module reads start first: a system administrator's every-event read then also serves Needs you's own events, so
   // each heavy read runs once per request (modules/system-admin/request-reads.ts).
   const modulesRead = loadHomeModules(roles, shown);
+  const extraRead = loadHomeExtraModules(user.id, roles, shown);
   const view = buildNeedsView(await loadNeedsInput(roles, held));
   const comingUp = comingUpShown || view.allClear ? await loadComingUp(user, async () => held) : null;
   const bodies: Partial<Record<HomeModuleKey, ReactNode>> = {};
@@ -67,11 +69,23 @@ export default async function HomeNeedsYouPage() {
   if (shown.has("events-filling-up")) bodies["events-filling-up"] = <EventsFillingUpModule view={data["events-filling-up"] ?? null} />;
   if (shown.has("season-numbers")) bodies["season-numbers"] = <SeasonNumbersModule view={data["season-numbers"] ?? null} />;
   if (shown.has("monthly-records")) bodies["monthly-records"] = <MonthlyRecordsModule view={data["monthly-records"] ?? null} />;
+  // Club applications, Money this season and Live check-in (#1893): each read only when shown and allowed.
+  const extra = await extraRead;
+  const resting: HomeModuleKey[] = [];
+  if (shown.has("club-applications")) bodies["club-applications"] = <ClubApplicationsModule view={extra["club-applications"] ?? null} />;
+  if (shown.has("money-this-season")) bodies["money-this-season"] = <MoneyThisSeasonModule view={extra["money-this-season"] ?? null} />;
+  if (shown.has("live-check-in")) {
+    const live = extra["live-check-in"];
+    // Live check-in is on Home only while check-in is open at an event the person can check people in at.
+    if (live && live.rows.length === 0) resting.push("live-check-in");
+    else if (live !== undefined) bodies["live-check-in"] = <LiveCheckInModule view={live} />;
+    else resting.push("live-check-in");
+  }
   const quickLinkOptions = usableQuickLinks(roles).map(({ key, label, href }) => ({ key, label, href }));
   return (
     <section className="page-stack">
       {header}
-      <StaffHomeBoard modules={layout.modules} bodies={bodies} quickLinkOptions={quickLinkOptions} />
+      <StaffHomeBoard modules={layout.modules} bodies={bodies} resting={resting} quickLinkOptions={quickLinkOptions} />
     </section>
   );
 }

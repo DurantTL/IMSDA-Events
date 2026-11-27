@@ -220,6 +220,15 @@
   font-weight: 600;
 }
 
+/* What a module shows and for whom (#1893), under its name in Customize. */
+.moduleNote {
+  flex: 1 1 100%;
+  margin: 0 0 6px 30px;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 400;
+}
+
 .panelFoot {
   display: flex;
   flex: none;

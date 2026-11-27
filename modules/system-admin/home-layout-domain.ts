@@ -7,7 +7,16 @@
 import { heldAdminRoles, type AdminRole, type AdminRoles } from "@/modules/access/admin-roles-domain";
 import { cleanQuickLinkKeys, defaultQuickLinkKeys } from "@/modules/system-admin/home-quick-links-domain";
 
-export type HomeModuleKey = "needs-you" | "coming-up" | "events-filling-up" | "season-numbers" | "monthly-records" | "quick-links";
+export type HomeModuleKey =
+  | "live-check-in"
+  | "needs-you"
+  | "coming-up"
+  | "events-filling-up"
+  | "season-numbers"
+  | "monthly-records"
+  | "club-applications"
+  | "money-this-season"
+  | "quick-links";
 
 export type HomeModuleDefinition = {
   key: HomeModuleKey;
@@ -16,12 +25,20 @@ export type HomeModuleDefinition = {
   hideable: boolean;
   /** Decided on the server from the person's current roles. */
   mayUse: (roles: AdminRoles) => boolean;
+  /** A short line under the name in Customize, for a module that is not always on Home. */
+  note?: string;
 };
 
 const anyAdminRole = (roles: AdminRoles) => heldAdminRoles(roles).length > 0;
 /** Admins who can see event data: a system administrator, or assigned to at least one event. */
 const canSeeEvents = (roles: AdminRoles) => roles.systemAdmin || roles.eventAdminEventIds.length > 0;
 const canSeeClubs = (roles: AdminRoles) => roles.systemAdmin || roles.clubsAdministrator;
+/**
+ * Admins who may hold an event permission through an admin role: a system administrator (every event), an Events admin
+ * (EVENT_ADMIN on their events) or a Clubs admin (EVENT_ADMIN on club events, #1643). Money this season and Live check-in
+ * then read only the events where the person holds MANAGE_FINANCE or MANAGE_CHECK_IN now (`home-extra-modules-repository.ts`).
+ */
+const mayHoldEventPermissions = (roles: AdminRoles) => roles.systemAdmin || roles.clubsAdministrator || roles.eventAdminEventIds.length > 0;
 
 /** Every module, in the order Customize lists unused ones. */
 export const HOME_MODULES: readonly HomeModuleDefinition[] = [
@@ -30,6 +47,9 @@ export const HOME_MODULES: readonly HomeModuleDefinition[] = [
   { key: "events-filling-up", label: "Events filling up", hideable: true, mayUse: canSeeEvents },
   { key: "season-numbers", label: "Season numbers", hideable: true, mayUse: anyAdminRole },
   { key: "monthly-records", label: "Monthly Records by area", hideable: true, mayUse: canSeeClubs },
+  { key: "club-applications", label: "Club applications", hideable: true, mayUse: canSeeClubs },
+  { key: "live-check-in", label: "Live check-in", hideable: true, mayUse: mayHoldEventPermissions, note: "Shows only while check-in is open at an event you can check people in at." },
+  { key: "money-this-season", label: "Money this season", hideable: true, mayUse: mayHoldEventPermissions, note: "Only events you can open Payments for." },
   { key: "quick-links", label: "Quick links", hideable: true, mayUse: anyAdminRole },
 ];
 
@@ -38,9 +58,9 @@ export const HOME_MODULES: readonly HomeModuleDefinition[] = [
  * a later module joins its roles here in the issue that builds it.
  */
 export const HOME_ROLE_DEFAULTS: Record<AdminRole, HomeModuleKey[]> = {
-  SYSTEM_ADMIN: ["needs-you", "events-filling-up", "season-numbers", "monthly-records", "quick-links"],
-  EVENTS_ADMIN: ["needs-you", "events-filling-up", "season-numbers", "coming-up"],
-  CLUBS_ADMIN: ["needs-you", "monthly-records", "season-numbers"],
+  SYSTEM_ADMIN: ["live-check-in", "needs-you", "events-filling-up", "season-numbers", "monthly-records", "quick-links"],
+  EVENTS_ADMIN: ["live-check-in", "needs-you", "events-filling-up", "season-numbers", "coming-up"],
+  CLUBS_ADMIN: ["needs-you", "monthly-records", "club-applications", "season-numbers"],
 };
 
 /** Roles are merged in this order, whatever order they are held in. */
@@ -51,7 +71,7 @@ export const HOME_LAYOUT_MAX = 32;
 
 /** `links` (catalogue keys) belongs to the Quick links entry only. */
 export type HomeLayoutEntry = { key: HomeModuleKey; shown: boolean; links?: string[] };
-export type HomeLayoutModule = HomeLayoutEntry & { label: string; hideable: boolean };
+export type HomeLayoutModule = HomeLayoutEntry & { label: string; hideable: boolean; note?: string };
 export type HomeLayout = { modules: HomeLayoutModule[]; customized: boolean };
 
 const byKey = new Map<string, HomeModuleDefinition>(HOME_MODULES.map((def) => [def.key, def]));
@@ -113,6 +133,7 @@ function describe(entries: readonly HomeLayoutEntry[], roles: AdminRoles): HomeL
   return entries.map((entry) => {
     const definition = byKey.get(entry.key)!;
     const described: HomeLayoutModule = { key: entry.key, shown: entry.shown, label: definition.label, hideable: definition.hideable };
+    if (definition.note) described.note = definition.note;
     if (entry.key === "quick-links") described.links = entry.links ?? defaultQuickLinkKeys(roles);
     return described;
   });

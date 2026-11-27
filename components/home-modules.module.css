@@ -1,4 +1,4 @@
-/* Staff Home modules (#1705): cards for Events filling up, Season numbers and Monthly Records. One column on a phone, nothing scrolls sideways. */
+/* Staff Home modules (#1705, #1893): cards for Events filling up, Season numbers, Monthly Records, Club applications, Money and Live check-in. One column on a phone, nothing scrolls sideways. */
 .module {
   display: grid;
   gap: 12px;
@@ -186,4 +186,13 @@
   color: var(--imsda-navy);
   font-size: max(var(--type-staff-floor, 0px), 1.25rem);
   font-weight: 800;
+}
+
+/* Money totals (#1893): dollar amounts need more room than counts, so the three wrap onto more rows on a phone. */
+.moneyCounts {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.moneyCounts dd {
+  overflow-wrap: anywhere;
 }

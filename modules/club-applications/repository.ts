@@ -565,6 +565,21 @@ export async function countWaitingNewClubApplications(viewer: ApplicationViewer 
   return getPrisma().newClubApplication.count({ where: { status: "PENDING" } });
 }
 
+/**
+ * The oldest waiting applications for the staff Home card (#1893): the club's name and kind and when it was sent, and
+ * nothing else (no director, contact or attachment). Same viewers as the queue; same order (oldest first).
+ */
+export async function listOldestWaitingClubApplications(viewer: ApplicationViewer | null | undefined, take: number) {
+  requireViewer(viewer);
+  const rows = await getPrisma().newClubApplication.findMany({
+    where: { status: "PENDING" },
+    orderBy: { createdAt: "asc" },
+    take: Math.max(0, Math.min(take, 50)),
+    select: { id: true, clubName: true, clubType: true, createdAt: true },
+  });
+  return rows.map((row) => ({ id: row.id, clubName: row.clubName, clubType: row.clubType, submittedAt: row.createdAt }));
+}
+
 /** The stored attachment's details for the download route; null when there is none. Same viewers as the queue. */
 export async function getApplicationAttachment(viewer: ApplicationViewer | null | undefined, applicationId: string) {
   requireViewer(viewer);

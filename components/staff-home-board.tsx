@@ -34,11 +34,14 @@ async function callLayoutApi(method: "PUT" | "DELETE", body?: unknown): Promise<
 const saveLayout = (input: unknown) => callLayoutApi("PUT", { modules: input });
 const resetLayout = () => callLayoutApi("DELETE");
 
-/** Puts the shown modules into the slots the shown ones held, so hidden modules keep their place (#1705). */
-export function reorderShown(modules: readonly HomeLayoutModule[], shownKeys: readonly HomeModuleKey[]): HomeLayoutModule[] {
+/**
+ * Puts the shown modules into the slots the shown ones held, so hidden modules keep their place (#1705). A module in
+ * `resting` (shown, but with nothing to show right now, #1893) is not on the board, so it keeps its slot too.
+ */
+export function reorderShown(modules: readonly HomeLayoutModule[], shownKeys: readonly HomeModuleKey[], resting: ReadonlySet<HomeModuleKey> = new Set()): HomeLayoutModule[] {
   const byKey = new Map(modules.map((item) => [item.key, item]));
   let next = 0;
-  return modules.map((item) => (item.shown ? byKey.get(shownKeys[next++])! : item));
+  return modules.map((item) => (item.shown && !resting.has(item.key) ? byKey.get(shownKeys[next++])! : item));
 }
 
 export type QuickLinkOption = { key: string; label: string; href: string };
@@ -63,10 +66,14 @@ function QuickLinksBody({ picks, options, onPick }: { picks: readonly string[]; 
   );
 }
 
-export function StaffHomeBoard({ modules: initial, bodies, quickLinkOptions = [], defaultArranging = false, action = saveLayout, resetAction = resetLayout }: {
+const noneResting: readonly HomeModuleKey[] = [];
+
+export function StaffHomeBoard({ modules: initial, bodies, resting: restingKeys = noneResting, quickLinkOptions = [], defaultArranging = false, action = saveLayout, resetAction = resetLayout }: {
   modules: HomeLayoutModule[];
   /** Server-rendered module bodies by key; a shown module without one is still loading. */
   bodies: Partial<Record<HomeModuleKey, ReactNode>>;
+  /** Shown modules with nothing to show right now (Live check-in while no check-in is open, #1893): left off the board, kept in Customize. */
+  resting?: readonly HomeModuleKey[];
   /** The pages this person may pick for Quick links, from the server. */
   quickLinkOptions?: QuickLinkOption[];
   /** Starts in Arrange mode (tests and previews). */
@@ -110,7 +117,10 @@ export function StaffHomeBoard({ modules: initial, bodies, quickLinkOptions = []
     handle?.focus({ preventScroll: true });
   });
 
-  const shownModules = modules.filter((item) => item.shown);
+  const resting = new Set(restingKeys);
+  /** The cards on the board, which Arrange moves: shown, and not resting. */
+  const onBoard = (list: readonly HomeLayoutModule[]) => list.filter((item) => item.shown && !resting.has(item.key));
+  const shownModules = onBoard(modules);
   const quickLinksModule = modules.find((item) => item.key === "quick-links");
 
   /** `refresh` is true for a show/hide change or a reset, so newly shown modules load; a move only applies the returned layout. */
@@ -147,7 +157,7 @@ export function StaffHomeBoard({ modules: initial, bodies, quickLinkOptions = []
   }
 
   function announceMove(scope: Scope, key: HomeModuleKey, next: HomeLayoutModule[]) {
-    const list = scope === "arrange" ? next.filter((item) => item.shown) : next;
+    const list = scope === "arrange" ? onBoard(next) : next;
     const position = list.findIndex((item) => item.key === key);
     const label = next.find((item) => item.key === key)!.label;
     setMessage(moveAnnouncement(label, position + 1, list.length));
@@ -156,12 +166,12 @@ export function StaffHomeBoard({ modules: initial, bodies, quickLinkOptions = []
   /** Moves a module to `to` within the scope's list; returns whether anything moved. */
   function moveTo(scope: Scope, key: HomeModuleKey, to: number) {
     const current = latest.current;
-    const list = scope === "arrange" ? current.filter((item) => item.shown) : current;
+    const list = scope === "arrange" ? onBoard(current) : current;
     const from = list.findIndex((item) => item.key === key);
     const target = Math.max(0, Math.min(list.length - 1, to));
     if (from === -1 || from === target) return false;
     const moved = moveItem(list, from, target);
-    const next = scope === "arrange" ? reorderShown(current, moved.map((item) => item.key)) : moved;
+    const next = scope === "arrange" ? reorderShown(current, moved.map((item) => item.key), resting) : moved;
     apply(next);
     dirty.current = true;
     announceMove(scope, key, next);
@@ -175,7 +185,7 @@ export function StaffHomeBoard({ modules: initial, bodies, quickLinkOptions = []
   }
 
   function handleKeyDown(scope: Scope, key: HomeModuleKey, event: KeyboardEvent<HTMLButtonElement>) {
-    const list = scope === "arrange" ? latest.current.filter((item) => item.shown) : latest.current;
+    const list = scope === "arrange" ? onBoard(latest.current) : latest.current;
     const at = list.findIndex((item) => item.key === key);
     const to = event.key === "ArrowUp" ? at - 1 : event.key === "ArrowDown" ? at + 1 : event.key === "Home" ? 0 : event.key === "End" ? list.length - 1 : null;
     if (to === null) return;
@@ -192,7 +202,7 @@ export function StaffHomeBoard({ modules: initial, bodies, quickLinkOptions = []
 
   function handlePointerMove(scope: Scope, key: HomeModuleKey, event: PointerEvent<HTMLButtonElement>) {
     if (!dragging || dragging.scope !== scope || dragging.key !== key) return;
-    const list = scope === "arrange" ? latest.current.filter((item) => item.shown) : latest.current;
+    const list = scope === "arrange" ? onBoard(latest.current) : latest.current;
     let target = 0;
     for (const item of list) {
       if (item.key === key) continue;
@@ -319,6 +329,7 @@ export function StaffHomeBoard({ modules: initial, bodies, quickLinkOptions = []
                       />
                       <span>{item.label}</span>
                       {!item.hideable ? <span className={styles.always}>Always shown</span> : null}
+                      {item.note ? <span className={styles.moduleNote}>{item.note}</span> : null}
                     </label>
                   </li>
                 ))}
