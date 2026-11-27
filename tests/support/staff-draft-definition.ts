@@ -25,3 +25,20 @@ export const draftDefinition = registrationFormDefinitionSchema.parse({
   }],
 });
 
+/** A roster form (#1510): per-person names and shirt size a draft may keep, and a birth date, allergies and grade it may not. */
+export const rosterDraftDefinition = registrationFormDefinitionSchema.parse({
+  ...draftDefinition,
+  attendeeRoster: { enabled: true, minAttendees: 1, maxAttendees: 3, attendeeLabel: "Camper", addButtonLabel: "Add camper" },
+  sections: [{
+    id: "details", title: "Details", description: "",
+    fields: [
+      { ...draftBase, id: "reg1", key: "email", label: "Email", type: "EMAIL", required: true },
+      { ...draftBase, id: "att1", key: "first_name", label: "Camper first name", type: "TEXT", scope: "ATTENDEE", required: true },
+      { ...draftBase, id: "att2", key: "last_name", label: "Camper last name", type: "TEXT", scope: "ATTENDEE", required: true },
+      { ...draftBase, id: "att3", key: "shirt_size", label: "Shirt size", type: "SELECT", scope: "ATTENDEE", options: ["S", "M", "L"] },
+      { ...draftBase, id: "att4", key: "birth_date", label: "Birth date", type: "DATE", scope: "ATTENDEE", required: true },
+      { ...draftBase, id: "att5", key: "allergies", label: "Allergies", type: "TEXT", scope: "ATTENDEE" },
+      { ...draftBase, id: "att6", key: "grade", label: "Grade", type: "SELECT", scope: "ATTENDEE", options: ["5", "6"] },
+    ],
+  }],
+});

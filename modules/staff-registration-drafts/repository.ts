@@ -16,12 +16,14 @@ import { publicRegistrationInputSchema } from "@/modules/forms/public-domain";
 import { checkPublicRegistration, getPublicRegistrationExperience, PublicRegistrationError, staffOverridableClosedState, submitPublicRegistration, type PublicRegistrationCheck } from "@/modules/forms/public-repository";
 import { StaffDraftError } from "@/modules/staff-registration-drafts/errors";
 import {
+  sanitizeStaffDraftAttendees,
   sanitizeStaffDraftResponses,
   staffDraftCheckLines,
   staffDraftContact,
   staffDraftLinkExpiry,
   staffDraftPlan,
   STAFF_DRAFT_FORM_CHANGED,
+  type StaffDraftAttendee,
   type StaffDraftCheckLines,
   type StaffDraftSource,
   type StaffDraftStatus,
@@ -42,6 +44,7 @@ const draftSelect = {
   source: true,
   status: true,
   responses: true,
+  attendees: true,
   handOffExpiresAt: true,
   handedOffAt: true,
   handOffMessageId: true,
@@ -63,9 +66,21 @@ function responsesFromJson(value: Prisma.JsonValue): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
+const canonicalAnswers = (value: Record<string, unknown>) => JSON.stringify(Object.keys(value).sort().map((key) => [key, value[key]]));
+
 function sameAnswers(left: Record<string, unknown>, right: Record<string, unknown>) {
-  const canonical = (value: Record<string, unknown>) => JSON.stringify(Object.keys(value).sort().map((key) => [key, value[key]]));
+  return canonicalAnswers(left) === canonicalAnswers(right);
+}
+
+/** The same people in the same order with the same answers. */
+function samePeople(left: StaffDraftAttendee[], right: StaffDraftAttendee[]) {
+  const canonical = (list: StaffDraftAttendee[]) => JSON.stringify(list.map((attendee) => [attendee.clientId, canonicalAnswers(attendee.responses)]));
   return canonical(left) === canonical(right);
+}
+
+/** The stored people, kept only as far as the form allows now (#1510). */
+function storedAttendees(definition: RegistrationFormDefinition, row: { attendees: Prisma.JsonValue; responses: Prisma.JsonValue }) {
+  return sanitizeStaffDraftAttendees(definition, row.attendees, sanitizeStaffDraftResponses(definition, responsesFromJson(row.responses)));
 }
 
 function toSummary(row: DraftRow) {
@@ -73,6 +88,8 @@ function toSummary(row: DraftRow) {
   const contact = staffDraftContact(definition, responsesFromJson(row.responses));
   return {
     id: row.id,
+    /** How many people staff entered on a roster form (#1510). */
+    attendeeCount: Array.isArray(row.attendees) ? row.attendees.length : 0,
     formId: row.formId,
     formName: row.form.name,
     source: row.source as StaffDraftSource,
@@ -184,11 +201,13 @@ export async function getStaffDraft(eventId: string, draftId: string) {
   const definitionSource = current?.definition ?? registrationFormDefinitionSchema.parse(row.formVersion.definition);
   const definition = await hydrateFormOptions(definitionSource, { attendeeTypes: current?.event.attendeeTypes });
   const plan = staffDraftPlan(definition);
+  const closed = row.status === "SUBMITTED" || row.status === "DISCARDED";
   return {
     draft: toSummary(row),
-    responses: row.status === "SUBMITTED" || row.status === "DISCARDED" ? {} : sanitizeStaffDraftResponses(definition, responsesFromJson(row.responses)),
+    responses: closed ? {} : sanitizeStaffDraftResponses(definition, responsesFromJson(row.responses)),
+    attendees: closed ? [] : storedAttendees(definition, row),
     definition,
-    plan: { rosterEnabled: plan.rosterEnabled, sections: plan.sections },
+    plan: { rosterEnabled: plan.rosterEnabled, sections: plan.sections, attendeeFields: plan.attendeeFields, roster: plan.roster },
     /** True when the form was published again after the draft was started. Save moves the draft to the new version; Check waits for that. */
     formChanged: Boolean(current && current.version.id !== row.formVersionId),
   };
@@ -198,6 +217,7 @@ export async function createStaffDraft(eventId: string, actorUserId: string, inp
   const prisma = getPrisma();
   const { form, version, definition } = await publishedFormForEvent(prisma, eventId, input.formId);
   const responses = sanitizeStaffDraftResponses(definition, input.responses ?? {});
+  const attendees = sanitizeStaffDraftAttendees(definition, input.attendees ?? [], responses);
   return prisma.$transaction(async (tx) => {
     const created = await tx.staffRegistrationDraft.create({
       data: {
@@ -206,6 +226,7 @@ export async function createStaffDraft(eventId: string, actorUserId: string, inp
         formVersionId: version.id,
         source: input.source,
         responses: responses as Prisma.InputJsonObject,
+        attendees: attendees as unknown as Prisma.InputJsonArray,
         createdByUserId: actorUserId,
         updatedByUserId: actorUserId,
       },
@@ -217,7 +238,7 @@ export async function createStaffDraft(eventId: string, actorUserId: string, inp
       action: "STAFF_REGISTRATION_DRAFT_CREATED",
       draftId: created.id,
       summary: "Started a registration for someone (phone, paper or walk-in).",
-      metadata: { source: input.source, formId: form.id, formVersionId: version.id, answerCount: Object.keys(responses).length },
+      metadata: { source: input.source, formId: form.id, formVersionId: version.id, answerCount: Object.keys(responses).length, attendeeCount: attendees.length },
     });
     return { id: created.id };
   });
@@ -234,9 +255,12 @@ export async function updateStaffDraft(eventId: string, draftId: string, actorUs
     if (row.status !== "OPEN" && row.status !== "HANDED_OFF") {
       throw new StaffDraftError("DRAFT_NOT_EDITABLE", "This registration was already sent or discarded, so it can't be changed.");
     }
-    // Only a real change withdraws the link the registrant already has: the cleaned answers or the source differ from what is stored.
+    // Only a real change withdraws the link the registrant already has: the cleaned answers, the people or the source differ
+    // from what is stored. Left out of the request, the people stay as they are (kept only as far as the form allows now).
     const stored = sanitizeStaffDraftResponses(definition, responsesFromJson(row.responses));
-    const changed = !sameAnswers(stored, responses) || Boolean(input.source && input.source !== row.source);
+    const storedPeople = storedAttendees(definition, row);
+    const attendees = sanitizeStaffDraftAttendees(definition, input.attendees ?? storedPeople, responses);
+    const changed = !sameAnswers(stored, responses) || !samePeople(storedPeople, attendees) || Boolean(input.source && input.source !== row.source);
     const linkRevoked = row.status === "HANDED_OFF" && changed;
     if (!changed && row.formVersionId === version.id) return { id: draftId, linkRevoked: false, changed: false };
     if (linkRevoked) await cancelPendingLinkMessage(tx, row.handOffMessageId);
@@ -244,6 +268,7 @@ export async function updateStaffDraft(eventId: string, draftId: string, actorUs
       where: { id: draftId },
       data: {
         responses: responses as Prisma.InputJsonObject,
+        attendees: attendees as unknown as Prisma.InputJsonArray,
         formVersionId: version.id,
         updatedByUserId: actorUserId,
         ...(input.source ? { source: input.source } : {}),
@@ -257,7 +282,7 @@ export async function updateStaffDraft(eventId: string, draftId: string, actorUs
       action: "STAFF_REGISTRATION_DRAFT_UPDATED",
       draftId,
       summary: linkRevoked ? "Changed a registration that had been sent; its private link was withdrawn." : "Changed a registration staff started.",
-      metadata: { formVersionId: version.id, answerCount: Object.keys(responses).length, linkRevoked, movedToNewVersion: row.formVersionId !== version.id },
+      metadata: { formVersionId: version.id, answerCount: Object.keys(responses).length, attendeeCount: attendees.length, linkRevoked, movedToNewVersion: row.formVersionId !== version.id },
     });
     return { id: draftId, linkRevoked, changed };
   });
@@ -275,6 +300,7 @@ export async function discardStaffDraft(eventId: string, draftId: string, actorU
         status: "DISCARDED",
         discardedAt: new Date(),
         responses: {},
+        attendees: [],
         handOffTokenHash: null,
         handOffExpiresAt: null,
         handOffMessageId: null,
@@ -309,24 +335,34 @@ export async function checkStaffDraft(eventId: string, draftId: string, actorUse
   if (version.id !== row.formVersionId) throw new StaffDraftError("FORM_CHANGED", STAFF_DRAFT_FORM_CHANGED);
   const pinned = await hydrateFormOptions(definition, { attendeeTypes: event.attendeeTypes });
   const roster = staffDraftPlan(pinned).rosterEnabled;
+  const responses = sanitizeStaffDraftResponses(definition, responsesFromJson(row.responses));
+  // The people staff entered (#1510), checked like any roster: too few, a missing name or a full choice shows up below.
+  const people = roster ? sanitizeStaffDraftAttendees(definition, row.attendees, responses) : [];
   const input = publicRegistrationInputSchema.parse({
     versionId: row.formVersionId,
     idempotencyKey: randomUUID(),
-    responses: sanitizeStaffDraftResponses(definition, responsesFromJson(row.responses)),
-    ...(roster ? { attendees: [] } : {}),
+    responses,
+    ...(roster ? { attendees: people } : {}),
   });
   let outcome: StaffDraftCheckResult;
   // The required answers only the registrant gives. The check treats them as optional, so they are listed from the form, on success and failure alike.
-  const registrantFills = staffDraftPlan(pinned).sections
-    .flatMap((section) => section.fields)
-    .filter((entry) => !entry.editable && entry.field.required && isFieldVisible(entry.field, input.responses))
-    .map((entry) => entry.field.label);
+  const plan = staffDraftPlan(pinned);
+  const registrantFills = [
+    ...plan.sections
+      .flatMap((section) => section.fields)
+      .filter((entry) => !entry.editable && entry.field.required && isFieldVisible(entry.field, input.responses))
+      .map((entry) => entry.field.label),
+    // Per-person answers only the registrant gives (a birth date, medical details), once each, for the people entered so far.
+    ...plan.attendeeFields
+      .filter((entry) => !entry.editable && entry.field.required && people.some((person) => isFieldVisible(entry.field, { ...input.responses, ...person.responses })))
+      .map((entry) => `${entry.field.label} (for each ${plan.roster.attendeeLabel.toLowerCase()})`),
+  ];
   try {
     outcome = { ok: true, check: await checkPublicRegistration(event.slug, form.slug, input), registrantFills };
   } catch (error) {
     if (!(error instanceof PublicRegistrationError)) throw error;
     outcome = error.code === "INVALID_SUBMISSION" || error.code === "CAPACITY_REACHED"
-      ? { ok: false, kind: "NEEDS_ANSWERS", message: error.message, lines: withRegistrantFills(staffDraftCheckLines(error.issues, pinned), registrantFills), rosterPending: roster }
+      ? { ok: false, kind: "NEEDS_ANSWERS", message: error.message, lines: withRegistrantFills(staffDraftCheckLines(error.issues, pinned), registrantFills), rosterPending: roster && people.length === 0 }
       : { ok: false, kind: "UNAVAILABLE", message: error.message, code: error.code, overridable: error.overridable };
   }
   await auditDraft(prisma, {
@@ -453,6 +489,7 @@ export async function resolveStaffDraftLink(token: string, now = new Date()) {
       status: true,
       handOffExpiresAt: true,
       responses: true,
+      attendees: true,
       form: { select: { slug: true } },
       event: { select: { slug: true } },
     },
@@ -463,12 +500,18 @@ export async function resolveStaffDraftLink(token: string, now = new Date()) {
     eventSlug: draft.event.slug,
     formSlug: draft.form.slug,
     responses: responsesFromJson(draft.responses),
+    attendees: draft.attendees,
   };
 }
 
 /** The saved answers kept only for questions the form asks now (and may hold), for prefilling the public form. */
 export function prefillFromStaffDraft(definition: RegistrationFormDefinition, responses: Record<string, unknown>) {
   return sanitizeStaffDraftResponses(definition, responses);
+}
+
+/** The saved people (#1510), kept only for the per-person questions the form asks now (and may hold), for prefilling its roster. */
+export function prefillAttendeesFromStaffDraft(definition: RegistrationFormDefinition, attendees: unknown, responses: Record<string, unknown>) {
+  return sanitizeStaffDraftAttendees(definition, attendees, prefillFromStaffDraft(definition, responses));
 }
 
 /**
@@ -515,8 +558,10 @@ export type StaffFinishView =
     kind: "READY";
     draft: { id: string; source: StaffDraftSource; status: StaffDraftStatus; formName: string };
     experience: NonNullable<Awaited<ReturnType<typeof getPublicRegistrationExperience>>>;
-    /** The saved answers, kept only for questions the form asks now. Never the people: staff add those in the form. */
+    /** The saved answers, kept only for questions the form asks now. */
     responses: Record<string, unknown>;
+    /** The people staff entered on the draft (#1510), for the form's roster; staff add the rest for each person in the form. */
+    attendees: StaffDraftAttendee[];
     /** The rule the event is past right now, in plain words, or null when nothing needs overriding. */
     overrideRule: string | null;
     canOverride: boolean;
@@ -531,7 +576,7 @@ export async function getStaffFinishView(eventId: string, draftId: string, canOv
   const prisma = getPrisma();
   const row = await prisma.staffRegistrationDraft.findFirst({
     where: { id: draftId, eventId },
-    select: { id: true, formId: true, status: true, source: true, responses: true, form: { select: { slug: true, name: true } }, event: { select: { slug: true } } },
+    select: { id: true, formId: true, status: true, source: true, responses: true, attendees: true, form: { select: { slug: true, name: true } }, event: { select: { slug: true } } },
   });
   if (!row) return { kind: "MESSAGE", message: "That draft could not be found." };
   if (row.status === "SUBMITTED") return { kind: "MESSAGE", message: "This registration was already sent." };
@@ -564,6 +609,7 @@ export async function getStaffFinishView(eventId: string, draftId: string, canOv
     draft: { id: row.id, source: row.source as StaffDraftSource, status: row.status as StaffDraftStatus, formName: row.form.name },
     experience: { ...experience, form: { ...experience.form, definition } },
     responses: prefillFromStaffDraft(definition, responsesFromJson(row.responses)),
+    attendees: prefillAttendeesFromStaffDraft(definition, row.attendees, responsesFromJson(row.responses)),
     overrideRule,
     canOverride,
   };

@@ -8,7 +8,8 @@ import { PublicRegistrationForm } from "@/components/public-registration-form";
 import { staffSubmitExtras, staffSubmitFieldErrors, type StaffSubmitConfig } from "@/components/staff-submit-panel";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { definitionWithoutCardOption } from "@/modules/payments/online-card-fee";
-import { staffDraftStatusLabel } from "@/modules/staff-registration-drafts/domain";
+import { STAFF_DRAFT_STATUSES, staffDraftStatusDetail, staffDraftStatusWord } from "@/modules/staff-registration-drafts/domain";
+import { STATUS_WORDS } from "@/modules/registrations/status-words";
 
 /** The staff finish form (#1510): staff mode hides signatures and card choices and adds the paper location and the override. Synthetic data only. */
 const field = (key: string, type: string, extra: Record<string, unknown> = {}) => ({
@@ -120,9 +121,18 @@ describe("what a staff submit sends", () => {
 });
 
 describe("the draft status in words", () => {
-  it("names the staff member for a registration staff sent, and keeps the registrant wording otherwise", () => {
-    expect(staffDraftStatusLabel("SUBMITTED", "Alex Staff")).toBe("Sent by staff (Alex Staff)");
-    expect(staffDraftStatusLabel("SUBMITTED", null)).toBe("Submitted by registrant");
-    expect(staffDraftStatusLabel("HANDED_OFF", "Alex Staff")).toBe("Sent to registrant");
+  it("names the staff member for a registration staff sent, and says the registrant sent it otherwise", () => {
+    expect(staffDraftStatusDetail("SUBMITTED", "Alex Staff")).toBe("Sent by staff (Alex Staff)");
+    expect(staffDraftStatusDetail("SUBMITTED", null)).toBe("Sent by the registrant");
+    expect(staffDraftStatusDetail("HANDED_OFF", "Alex Staff")).toBe("Link sent to the registrant");
+    expect(staffDraftStatusDetail("OPEN", null)).toBe("Not sent yet");
+  });
+
+  it("puts only an agreed status word on the chip (site rule B12)", () => {
+    for (const status of STAFF_DRAFT_STATUSES) expect(STATUS_WORDS).toContain(staffDraftStatusWord(status));
+    expect(staffDraftStatusWord("OPEN")).toBe("Draft");
+    expect(staffDraftStatusWord("HANDED_OFF")).toBe("Draft");
+    expect(staffDraftStatusWord("SUBMITTED")).toBe("Submitted");
+    expect(staffDraftStatusWord("DISCARDED")).toBe("Cancelled");
   });
 });

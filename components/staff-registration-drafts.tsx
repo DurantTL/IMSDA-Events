@@ -17,8 +17,12 @@ import {
   STAFF_DRAFT_ROSTER_NOTE,
   STAFF_DRAFT_SOURCES,
   STAFF_DRAFT_SOURCE_LABELS,
-  staffDraftStatusLabel,
+  STAFF_DRAFT_STATUS_TONES,
+  staffDraftStatusDetail,
+  staffDraftStatusWord,
+  type StaffDraftAttendee,
   type StaffDraftCheckLines,
+  type StaffDraftPlanField,
   type StaffDraftPlanSection,
   type StaffDraftSource,
   type StaffDraftStatus,
@@ -34,6 +38,8 @@ export type StaffDraftRow = {
   submittedByStaffName?: string | null;
   registrantName: string | null;
   registrantEmail: string | null;
+  /** How many people staff entered on a roster form. */
+  attendeeCount?: number;
   updatedByName: string;
   updatedAt: string;
 };
@@ -41,8 +47,14 @@ export type StaffDraftRow = {
 type Detail = {
   draft: StaffDraftRow & { handOffExpiresAt: string | null };
   responses: Record<string, unknown>;
+  attendees: StaffDraftAttendee[];
   definition: RegistrationFormDefinition;
-  plan: { rosterEnabled: boolean; sections: StaffDraftPlanSection[] };
+  plan: {
+    rosterEnabled: boolean;
+    sections: StaffDraftPlanSection[];
+    attendeeFields: StaffDraftPlanField[];
+    roster: { attendeeLabel: string; addButtonLabel: string; minAttendees: number; maxAttendees: number };
+  };
   formChanged: boolean;
 };
 
@@ -78,6 +90,7 @@ export function StaffRegistrationDrafts({
   const [source, setSource] = useState<StaffDraftSource>("PHONE");
   const [detail, setDetail] = useState<Detail | null>(null);
   const [responses, setResponses] = useState<Responses>({});
+  const [attendees, setAttendees] = useState<StaffDraftAttendee[]>([]);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
@@ -111,6 +124,7 @@ export function StaffRegistrationDrafts({
       }
       setDetail(body);
       setResponses(body.responses);
+      setAttendees(body.attendees ?? []);
       setDirty(false);
       if (!keepMessage) setFocusEditor((count) => count + 1);
     } catch {
@@ -152,7 +166,7 @@ export function StaffRegistrationDrafts({
     if (!detail) return false;
     setBusy("save");
     setError("");
-    const result = await submitJson(`${base}/${encodeURIComponent(detail.draft.id)}`, { responses, source: detail.draft.source }, { method: "PATCH", fallbackMessage: "The draft could not be saved." });
+    const result = await submitJson(`${base}/${encodeURIComponent(detail.draft.id)}`, { responses, source: detail.draft.source, ...(detail.plan.rosterEnabled ? { attendees } : {}) }, { method: "PATCH", fallbackMessage: "The draft could not be saved." });
     setBusy("");
     if (!result.ok) {
       setError(result.unavailable ? unavailableMessage(result) : bodyMessage(result.body, "The draft could not be saved."));
@@ -284,10 +298,10 @@ export function StaffRegistrationDrafts({
             {drafts.map((row) => (
               <li className={`${styles.row} ${detail?.draft.id === row.id ? styles.rowSelected : ""}`} key={row.id}>
                 <div className={styles.rowCopy}>
-                  <span className={styles.rowTitle}>{row.registrantName ?? "Name not entered yet"}</span>
+                  <span className={styles.rowTitle}>{row.registrantName ?? "Name not entered yet"} <StaffDraftStatusChip status={row.status} /></span>
                   <p className={styles.rowMeta}>{row.registrantEmail ?? "Email not entered yet"}</p>
                   <p className={styles.rowMeta}>
-                    {STAFF_DRAFT_SOURCE_LABELS[row.source]} · {row.formName} · {staffDraftStatusLabel(row.status, row.submittedByStaffName)} · updated {updatedAtLabel(row.updatedAt)} by {row.updatedByName}
+                    {STAFF_DRAFT_SOURCE_LABELS[row.source]} · {row.formName}{row.attendeeCount ? ` · ${peopleCount(row.attendeeCount)}` : ""} · {staffDraftStatusDetail(row.status, row.submittedByStaffName)} · updated {updatedAtLabel(row.updatedAt)} by {row.updatedByName}
                   </p>
                 </div>
                 <button className={`secondary-button ${styles.rowOpen}`} type="button" disabled={busy !== ""} onClick={() => guarded(() => open(row.id))}>
@@ -304,9 +318,9 @@ export function StaffRegistrationDrafts({
 
       {detail && (
         <section className={styles.panel} aria-labelledby="staff-draft-edit">
-          <h2 id="staff-draft-edit" ref={headingRef} tabIndex={-1}>{detail.draft.registrantName ?? "New registration"} <span className={styles.chip}>{staffDraftStatusLabel(detail.draft.status, detail.draft.submittedByStaffName)}</span></h2>
+          <h2 id="staff-draft-edit" ref={headingRef} tabIndex={-1}>{detail.draft.registrantName ?? "New registration"} <StaffDraftStatusChip status={detail.draft.status} /></h2>
           <p className={styles.note}>
-            {STAFF_DRAFT_SOURCE_LABELS[detail.draft.source]} · {detail.draft.formName}. Answers marked &ldquo;{STAFF_DRAFT_REGISTRANT_FILLS_IN}&rdquo; are never kept in a draft.
+            {STAFF_DRAFT_SOURCE_LABELS[detail.draft.source]} · {detail.draft.formName} · {staffDraftStatusDetail(detail.draft.status, detail.draft.submittedByStaffName)}. Answers marked &ldquo;{STAFF_DRAFT_REGISTRANT_FILLS_IN}&rdquo; are never kept in a draft.
           </p>
           {detail.plan.rosterEnabled && <p className={styles.note}>{STAFF_DRAFT_ROSTER_NOTE}</p>}
           {detail.formChanged && <p className="form-error" role="alert">{STAFF_DRAFT_FORM_CHANGED} Save the draft to move it to the new version, then check it.</p>}
@@ -344,6 +358,16 @@ export function StaffRegistrationDrafts({
               </div>
             </fieldset>
           ))}
+
+          {detail.plan.rosterEnabled && (
+            <PeopleEditor
+              plan={detail.plan}
+              registrationResponses={responses}
+              attendees={attendees}
+              locked={!editable}
+              onChange={(next) => { setAttendees(next); setDirty(true); }}
+            />
+          )}
 
           {editable && (
             <div className={styles.actions}>
@@ -418,6 +442,105 @@ export function StaffRegistrationDrafts({
       </ConfirmDialog>
     </div>
   );
+}
+
+function peopleCount(count: number) {
+  return `${count} ${count === 1 ? "person" : "people"}`;
+}
+
+function newClientId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `person-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * The people attending on a roster form (#1510). Staff type only what a draft may keep about a person (name, attendee type,
+ * shirt size, paid or limited choices); the other per-person questions are named once as the registrant's to fill in.
+ */
+function PeopleEditor({
+  plan,
+  registrationResponses,
+  attendees,
+  locked,
+  onChange,
+}: {
+  plan: Detail["plan"];
+  registrationResponses: Responses;
+  attendees: StaffDraftAttendee[];
+  locked: boolean;
+  onChange: (next: StaffDraftAttendee[]) => void;
+}) {
+  const label = plan.roster.attendeeLabel;
+  const typed = plan.attendeeFields.filter((entry) => entry.editable);
+  const registrantOnly = plan.attendeeFields.filter((entry) => !entry.editable).map((entry) => entry.field.label);
+  const atLimit = attendees.length >= plan.roster.maxAttendees;
+  const newRow = useRef<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // A new person's first field takes focus, so a keyboard user carries straight on.
+    if (!newRow.current) return;
+    const row = listRef.current?.querySelector<HTMLElement>(`[data-person="${newRow.current}"] input, [data-person="${newRow.current}"] select`);
+    row?.focus();
+    newRow.current = null;
+  }, [attendees.length]);
+
+  function update(clientId: string, key: string, value: unknown) {
+    onChange(attendees.map((attendee) => (attendee.clientId === clientId ? { ...attendee, responses: { ...attendee.responses, [key]: value } } : attendee)));
+  }
+
+  function add() {
+    const clientId = newClientId();
+    newRow.current = clientId;
+    onChange([...attendees, { clientId, responses: {} }]);
+  }
+
+  return (
+    <fieldset className={styles.panel}>
+      <legend className={styles.sectionTitle}>People attending</legend>
+      <p className={styles.note}>
+        {attendees.length === 0 ? `No ${label.toLowerCase()} entered yet.` : peopleCount(attendees.length)}
+        {plan.roster.minAttendees > 1 ? ` This form needs at least ${plan.roster.minAttendees}.` : ""}
+      </p>
+      {registrantOnly.length > 0 && (
+        <p className={styles.note}>The registrant fills these in for each person: {registrantOnly.join(", ")}.</p>
+      )}
+      <div className={styles.people} ref={listRef}>
+        {attendees.map((attendee, index) => {
+          const values = { ...registrationResponses, ...attendee.responses };
+          return (
+            <fieldset className={styles.person} key={attendee.clientId} data-person={attendee.clientId}>
+              <legend className={styles.personTitle}>{label} {index + 1}</legend>
+              <div className={styles.fieldGrid}>
+                {typed.filter(({ field }) => isFieldVisible(field, values)).map(({ field }) => (
+                  <AmendmentField
+                    key={field.id}
+                    field={{ ...field, id: `${field.id}_${attendee.clientId}` }}
+                    values={attendee.responses}
+                    locked={locked}
+                    onChange={(value) => update(attendee.clientId, field.key, value)}
+                  />
+                ))}
+              </div>
+              {!locked && (
+                <button className={`secondary-button ${styles.personRemove}`} type="button" onClick={() => onChange(attendees.filter((entry) => entry.clientId !== attendee.clientId))}>
+                  Remove<span className="sr-only"> {label.toLowerCase()} {index + 1}</span>
+                </button>
+              )}
+            </fieldset>
+          );
+        })}
+      </div>
+      {!locked && (
+        atLimit
+          ? <p className={styles.note}>This form takes at most {plan.roster.maxAttendees}.</p>
+          : <button className="secondary-button" type="button" onClick={add}>{plan.roster.addButtonLabel}</button>
+      )}
+    </fieldset>
+  );
+}
+
+/** The draft's status word on the shared chip (site rules B12 and L4); what happened to it is said in words beside it. */
+function StaffDraftStatusChip({ status }: { status: StaffDraftStatus }) {
+  return <span className={`status-chip ${STAFF_DRAFT_STATUS_TONES[status]}`}>{staffDraftStatusWord(status)}</span>;
 }
 
 function CheckView({ result }: { result: CheckResult }) {

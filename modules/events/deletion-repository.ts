@@ -65,6 +65,7 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     imports,
     merchandiseOrders,
     clubRegistrationDrafts,
+    staffRegistrationDrafts,
     communityPosts,
     announcements,
     scholarshipContributions,
@@ -104,6 +105,8 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     db.importRun.count({ where: inEvent }),
     db.merchandiseOrder.count({ where: inEvent }),
     db.clubRegistrationDraft.count({ where: inEvent }),
+    // Staff-started registrations (#1510) still being entered or sent to the registrant hold typed-in answers; any one blocks.
+    db.staffRegistrationDraft.count({ where: { eventId, status: { in: ["OPEN", "HANDED_OFF"] } } }),
     db.communityPost.count({ where: inEvent }),
     db.announcement.count({ where: inEvent }),
     db.scholarshipContribution.count({ where: inEvent }),
@@ -133,6 +136,7 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     imports,
     merchandiseOrders,
     clubRegistrationDrafts,
+    staffRegistrationDrafts,
     communityPosts,
     announcements,
     realPayments: succeededPayments + openHeldCharges,
@@ -377,7 +381,9 @@ export async function removeEventOwnedRows(tx: Db, eventId: string) {
   await tx.cancellationCalculation.deleteMany({ where: inEvent });
   await tx.eventCancellationPolicyVersion.deleteMany({ where: inEvent });
 
-  // 7. Forms: capacity reservations and submissions RESTRICT form versions.
+  // 7. Forms: capacity reservations, submissions and staff-started registrations (#1510) RESTRICT form versions. Only
+  //    discarded and sent staff drafts are left by now (an open or sent-to-registrant one blocks the deletion), and they hold no answers.
+  await tx.staffRegistrationDraft.deleteMany({ where: inEvent });
   await tx.registrationCapacityReservation.deleteMany({ where: inEvent });
   await tx.publicRegistrationSubmission.deleteMany({ where: inEvent });
   await tx.formTestSubmission.deleteMany({ where: inEvent });

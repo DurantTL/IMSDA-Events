@@ -1897,7 +1897,7 @@ async function createPublicRegistrationTransaction(
     }
     await tx.staffRegistrationDraft.update({
       where: { id: staffDraftId },
-      data: { status: "SUBMITTED", registrationId: registration.id, submittedAt: now, responses: {}, handOffExpiresAt: null, updatedByUserId: staff.actorUserId, submittedByUserId: staff.actorUserId },
+      data: { status: "SUBMITTED", registrationId: registration.id, submittedAt: now, responses: {}, attendees: [], handOffExpiresAt: null, updatedByUserId: staff.actorUserId, submittedByUserId: staff.actorUserId },
     });
     // Counts, ids and states only: never an answer value.
     await tx.auditLog.create({
@@ -1944,11 +1944,11 @@ async function createPublicRegistrationTransaction(
       });
     }
   } else if (staffDraftId) {
-    // The provenance link (#1510): same transaction as the registration, so it is linked or it does not exist. The answers
-    // and the token are dropped; the token's hash stays so a repeat is told it was already sent.
+    // The provenance link (#1510): same transaction as the registration, so it is linked or it does not exist. The answers,
+    // the people and the token are dropped; the token's hash stays so a repeat is told it was already sent.
     await tx.staffRegistrationDraft.update({
       where: { id: staffDraftId },
-      data: { status: "SUBMITTED", registrationId: registration.id, submittedAt: now, responses: {}, handOffExpiresAt: null },
+      data: { status: "SUBMITTED", registrationId: registration.id, submittedAt: now, responses: {}, attendees: [], handOffExpiresAt: null },
     });
     await tx.auditLog.create({
       data: {

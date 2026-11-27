@@ -23,6 +23,12 @@ export type EventDeletionCounts = {
   merchandiseOrders: number;
   /** Club-entered registration drafts (guests, responses, honor selections, roster ages). */
   clubRegistrationDrafts: number;
+  /**
+   * Registrations staff started by phone, on paper or at the door that are still open or sent to the registrant (#1510).
+   * They hold typed-in answers and may have a live private link, so any one blocks the deletion. Discarded and sent ones
+   * hold no answers and go with the event.
+   */
+  staffRegistrationDrafts: number;
   communityPosts: number;
   announcements: number;
   /** Succeeded payments that are not sandbox (test-mode) card payments. */
@@ -75,6 +81,7 @@ export function eventDeletionBlockers(counts: EventDeletionCounts) {
   if (counts.imports > 0) blockers.push(plural(counts.imports, "import run"));
   if (counts.merchandiseOrders > 0) blockers.push(plural(counts.merchandiseOrders, "merchandise order"));
   if (counts.clubRegistrationDrafts > 0) blockers.push(plural(counts.clubRegistrationDrafts, "club registration draft"));
+  if (counts.staffRegistrationDrafts > 0) blockers.push(plural(counts.staffRegistrationDrafts, "unfinished phone or paper registration"));
   if (counts.communityPosts > 0) blockers.push(plural(counts.communityPosts, "community post"));
   if (counts.announcements > 0) blockers.push(plural(counts.announcements, "announcement"));
   if (counts.messages > 0) blockers.push(plural(counts.messages, "message"));

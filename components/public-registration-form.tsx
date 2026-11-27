@@ -324,6 +324,11 @@ export type PublicRegistrationFormProps = {
   merchandise?: PublicMerchandiseOffer | null;
   initialResponses?: FormResponses;
   initialAttendeeResponses?: FormResponses;
+  /**
+   * The people staff entered on a phone, paper or walk-in registration (#1510), prefilled on the roster of the registrant's
+   * private link and the staff finish page. Rows are added up to the form's minimum. Ignored on a club registration.
+   */
+  initialAttendees?: Array<{ clientId: string; responses: FormResponses }>;
   /** The private link's token when staff started this registration for the registrant (#1510); sent with the submit so it is linked back. */
   staffDraftToken?: string;
   /**
@@ -556,6 +561,7 @@ export function PublicRegistrationForm({
   merchandise = null,
   initialResponses = {},
   initialAttendeeResponses = {},
+  initialAttendees,
   staffDraftToken,
   staffSubmit,
   embedded = false,
@@ -600,6 +606,12 @@ export function PublicRegistrationForm({
   const [registrationResponses, setRegistrationResponses] = useState<FormResponses>(initialResponses);
   function buildInitialAttendees(): RosterAttendee[] {
     if (club) return club.initialAttendees;
+    if (roster.enabled && initialAttendees && initialAttendees.length > 0) {
+      const prefilled: RosterAttendee[] = initialAttendees.map((attendee) => ({ clientId: attendee.clientId, responses: { ...attendee.responses } }));
+      const used = new Set(prefilled.map((attendee) => attendee.clientId));
+      const padding = initialRoster(roster.minAttendees).filter((attendee) => !used.has(attendee.clientId));
+      return [...prefilled, ...padding.slice(0, Math.max(0, roster.minAttendees - prefilled.length))];
+    }
     const initial = initialRoster(roster.minAttendees);
     if (initial.length > 0) {
       let firstAttendeeResponses = initialAttendeeResponses;
