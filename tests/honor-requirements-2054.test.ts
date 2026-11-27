@@ -74,6 +74,19 @@ describe("requirements CSV (#2054)", () => {
     expect(parsed!.text).toBe("-Know the parts of a rope.");
   });
 
+  it("keeps the licensed text as written: fractions, superscripts and symbols are not rewritten", () => {
+    const [parsed] = parseRequirementCsv(file(row({ Text: "Swim ½ mile and mark an area of 10 m² ™" })));
+    expect(parsed!.text).toBe("Swim ½ mile and mark an area of 10 m² ™");
+  });
+
+  it("refuses requirement numbers that skip, so a number read out of the text is caught", () => {
+    const step = planRequirementImport(parseRequirementCsv(file(row(), row({ Number: "10", Text: "5 metres without stopping." }))), honors, [])[0]!;
+    expect(step).toMatchObject({ action: "SKIP", message: "Line 3: requirement 10 should be requirement 2. Numbers run 1, 2, 3 in order; check the file against the source page." });
+    expect(planRequirementImport(parseRequirementCsv(file(row({ Number: "2" }))), honors, [])[0]!.action).toBe("SKIP");
+    // Each section numbers from 1 again.
+    expect(planRequirementImport(parseRequirementCsv(file(row(), row({ Section: "Advanced", Text: "Teach it." }))), honors, [])[0]!.action).toBe("ADD");
+  });
+
   it("names each problem on its row", () => {
     const [parsed] = parseRequirementCsv(file(row({ Code: "", Language: "english", "Retrieved On": "2026-02-30", Number: "0", Item: "7!", Text: "" })));
     expect(parsed!.problems).toEqual([
@@ -233,6 +246,23 @@ describe("Pathfinder Wiki reader (#2054)", () => {
       [2, "a.ii", "second detail"],
       [2, "b", "Sample two"],
       [3, "", "Visit a sample place."],
+    ));
+  });
+
+  it("reads a decimal at the start of a line as text, not a new requirement", () => {
+    expect(parseWikiRequirementsHtml("<p>1. Swim the following:</p><p>2.5 km without stopping.</p><p>2. Float.</p>")).toEqual(lines(
+      [1, "", "Swim the following: 2.5 km without stopping."],
+      [2, "", "Float."],
+    ));
+  });
+
+  it("joins text after a nested list to the item that holds the list, not its last part", () => {
+    const html = "<ol><li>Know these knots:<ol><li>Square</li><li>Bowline</li></ol>and explain their uses.</li><li>Tie them.</li></ol>";
+    expect(parseWikiRequirementsHtml(html)).toEqual(lines(
+      [1, "", "Know these knots: and explain their uses."],
+      [1, "a", "Square"],
+      [1, "b", "Bowline"],
+      [2, "", "Tie them."],
     ));
   });
 

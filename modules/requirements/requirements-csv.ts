@@ -53,6 +53,8 @@ export type RequirementCsvRow = {
 };
 
 const clean = (value: string | undefined) => (value ?? "").normalize("NFKC").replace(/\s+/g, " ").trim();
+/** The licensed text is kept as written: only canonical composition (NFC) and spacing, never NFKC, which would turn ½ into 1⁄2 or m² into m2. */
+const cleanText = (value: string | undefined) => (value ?? "").normalize("NFC").replace(/\s+/g, " ").trim();
 /** Undoes the spreadsheet formula guard (`'=`) the CSV writer adds, so text starting with -, =, + or @ round-trips. */
 const unguard = (value: string) => (/^'[=+\-@]/.test(value) ? value.slice(1) : value);
 
@@ -88,20 +90,21 @@ export function parseRequirementCsv(text: string): RequirementCsvRow[] {
 
   return body.map((cells, index) => {
     const cell = (at: number) => (at < 0 ? "" : clean(cells[at]));
+    const textCell = (at: number) => (at < 0 ? "" : cleanText(cells[at]));
     const numberText = cell(columns.number);
     const label = cell(columns.item).toLowerCase().replace(/[.)]+$/, "");
     const row: RequirementCsvRow = {
       line: index + 2,
       code: normalizeHonorCode(cell(columns.code)).slice(0, 40),
-      honorName: cell(columns.honor).slice(0, 120),
+      honorName: textCell(columns.honor).slice(0, 120),
       language: cell(columns.language).toLowerCase(),
       retrievedOn: cell(columns.retrievedOn),
       sourceUrl: cell(columns.sourceUrl),
       license: cell(columns.license),
-      section: unguard(cell(columns.section)),
+      section: unguard(textCell(columns.section)),
       number: Number(numberText),
       label,
-      text: unguard(cell(columns.text)),
+      text: unguard(textCell(columns.text)),
       problems: [],
     };
     if (!row.code) row.problems.push("Every row needs an honor code.");
@@ -193,11 +196,18 @@ export function planRequirementImport(
 
     const seen = new Set<string>();
     const numbered = new Set<string>();
+    // Requirements run 1, 2, 3 in each section, so a number read out of the text (such as "10.5 metres") is caught.
+    const lastNumber = new Map<string, number>();
     for (const row of group) {
       const key = `${row.section}\u0000${row.number}\u0000${row.label}`;
       if (seen.has(key)) return skip(`Line ${row.line}: requirement ${row.number}${row.label ? row.label : ""} is in the file twice.`);
       seen.add(key);
       const parent = `${row.section}\u0000${row.number}`;
+      if (row.label === "") {
+        const expected = (lastNumber.get(row.section) ?? 0) + 1;
+        if (row.number !== expected) return skip(`Line ${row.line}: requirement ${row.number} should be requirement ${expected}. Numbers run 1, 2, 3 in order; check the file against the source page.`);
+        lastNumber.set(row.section, row.number);
+      }
       if (row.label === "") numbered.add(parent);
       else if (!numbered.has(parent)) return skip(`Line ${row.line}: part ${row.label} comes before requirement ${row.number} itself.`);
     }

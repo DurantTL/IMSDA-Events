@@ -30,7 +30,8 @@ const DROPPED_BLOCKS = [
 const STOP_HEADINGS = /^(references?|notes?|see also|answer key|answers|resources|external links|sources)$/i;
 const BLOCK_TAGS = new Set(["p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6", "dd", "dt", "dl", "blockquote", "center", "pre"]);
 
-type RawLine = { text: string; heading: boolean };
+/** `resumes` is set on text that follows a nested list inside a list item: it belongs to the item at that depth (1 = the requirement, 2 = its lettered part). */
+type RawLine = { text: string; heading: boolean; resumes?: number };
 
 /** Named and numeric character references the wiki emits. */
 export function decodeEntities(text: string) {
@@ -54,10 +55,12 @@ function htmlToLines(html: string): RawLine[] {
   const lines: RawLine[] = [];
   let current = "";
   let heading = false;
+  let resumes: number | undefined;
   const lists: Array<{ ordered: boolean; count: number; type: string }> = [];
+  const orderedDepth = () => lists.filter((entry) => entry.ordered).length;
   const flush = () => {
     const text = decodeEntities(current).replace(/\s+/g, " ").trim();
-    if (text) lines.push({ text, heading });
+    if (text) lines.push(resumes ? { text, heading, resumes } : { text, heading });
     current = "";
     heading = false;
   };
@@ -71,8 +74,12 @@ function htmlToLines(html: string): RawLine[] {
     const attributes = match[3] ?? "";
     if (tag === "ol" || tag === "ul") {
       flush();
-      if (closing) lists.pop();
-      else {
+      if (closing) {
+        lists.pop();
+        // Text after a nested list, still inside the outer item, continues that item.
+        resumes = orderedDepth() > 0 ? orderedDepth() : undefined;
+      } else {
+        resumes = undefined;
         const type = /\btype="([^"]*)"/i.exec(attributes)?.[1] ?? "";
         const start = Number(/\bstart="(\d+)"/i.exec(attributes)?.[1] ?? "1");
         lists.push({ ordered: tag === "ol", count: start - 1, type });
@@ -81,12 +88,13 @@ function htmlToLines(html: string): RawLine[] {
     }
     if (tag === "li") {
       flush();
+      resumes = undefined;
       if (closing) continue;
       const list = lists[lists.length - 1];
       if (list?.ordered) {
         const value = /\bvalue="(\d+)"/i.exec(attributes)?.[1];
         list.count = value ? Number(value) : list.count + 1;
-        const depth = lists.filter((entry) => entry.ordered).length;
+        const depth = orderedDepth();
         const style = list.type || (depth === 1 ? "1" : depth === 2 ? "a" : "i");
         const marker = style === "a" ? letterFor(list.count - 1) : style === "i" ? romanFor(list.count - 1) : String(list.count);
         current = `${marker}. `;
@@ -104,7 +112,8 @@ function htmlToLines(html: string): RawLine[] {
   return lines;
 }
 
-const TOP = /^(\d{1,3})[.)]\s*(.*)$/;
+// A space (or the end of the line) must follow the marker, so "2.5 km" is text, not requirement 2.
+const TOP = /^(\d{1,3})[.)](?:\s+(.*)|$)/;
 const PART = /^([a-z])[.)]\s+(.+)$/;
 const SUB_PART = /^((?:i{1,3}|iv|v|vi{1,3}|ix|x))[.)]\s+(.+)$/;
 
@@ -116,7 +125,9 @@ const SUB_PART = /^((?:i{1,3}|iv|v|vi{1,3}|ix|x))[.)]\s+(.+)$/;
 export function parseWikiRequirementsHtml(html: string): RequirementLine[] {
   const result: RequirementLine[] = [];
   let lastLetter = "";
-  for (const { text, heading } of htmlToLines(html)) {
+  let lastTop: RequirementLine | undefined;
+  let lastPart: RequirementLine | undefined;
+  for (const { text, heading, resumes } of htmlToLines(html)) {
     if (heading) {
       if (result.length > 0 && STOP_HEADINGS.test(text)) break;
       continue;
@@ -124,12 +135,19 @@ export function parseWikiRequirementsHtml(html: string): RequirementLine[] {
     const top = TOP.exec(text);
     if (top && Number(top[1]) >= 1) {
       // The text may sit on the next line ("1." alone, then a paragraph); it is added below.
-      result.push({ section: "", number: Number(top[1]), label: "", text: top[2] ?? "" });
+      lastTop = { section: "", number: Number(top[1]), label: "", text: top[2] ?? "" };
+      result.push(lastTop);
       lastLetter = "";
+      lastPart = undefined;
       continue;
     }
     const last = result[result.length - 1];
-    if (!last) continue;
+    if (!last || !lastTop) continue;
+    if (resumes === 1 || (resumes === 2 && lastPart)) {
+      const owner = resumes === 1 ? lastTop : lastPart!;
+      owner.text = `${owner.text} ${text}`.trim();
+      continue;
+    }
     const sub = SUB_PART.exec(text);
     // "i." after "h." is the letter i; after another letter it starts the roman parts under that letter.
     if (sub && lastLetter && !(sub[1] === "i" && lastLetter === "h") && !(sub[1] === "v" && lastLetter === "u") && !(sub[1] === "x" && lastLetter === "w")) {
@@ -139,7 +157,8 @@ export function parseWikiRequirementsHtml(html: string): RequirementLine[] {
     const part = PART.exec(text);
     if (part) {
       lastLetter = part[1]!;
-      result.push({ section: "", number: last.number, label: part[1]!, text: part[2]! });
+      lastPart = { section: "", number: last.number, label: part[1]!, text: part[2]! };
+      result.push(lastPart);
       continue;
     }
     last.text = `${last.text} ${text}`.trim();
